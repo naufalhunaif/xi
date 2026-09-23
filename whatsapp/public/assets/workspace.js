@@ -3,6 +3,8 @@
   const app = document.querySelector('meta[name="app-url"]')?.content?.replace(/\/$/, '')
   if (!version || !app) return
   const base = new URL(app, location.href)
+  // Dipasang di akar domain: pathname '/' → awalan API harus '/api/', bukan '//api/'.
+  const apiPrefix = `${base.pathname.replace(/\/$/, '')}/api/`
   const originalFetch = window.fetch.bind(window)
   let changing = false
   let retryAt = 0
@@ -65,7 +67,7 @@
   }
   window.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : input, location.href)
-    if (url.origin !== base.origin || !url.pathname.startsWith(`${base.pathname}/api/`))
+    if (url.origin !== base.origin || !url.pathname.startsWith(apiPrefix))
       return originalFetch(input, init)
     if (changing || suspended) throw abortError()
     if (base.origin !== location.origin) {
@@ -163,7 +165,7 @@
   document.addEventListener('securitypolicyviolation', (event) => {
     try {
       const url = new URL(event.blockedURI)
-      if (url.origin !== base.origin || !url.pathname.startsWith(`${base.pathname}/api/`) ||
+      if (url.origin !== base.origin || !url.pathname.startsWith(apiPrefix) ||
           !['connect-src', 'default-src'].includes(event.effectiveDirective)) return
       if (!recovering) failed(url, 'csp_blocked', null, false)
       failure = { ...failure, kind: 'csp_blocked', directive: event.effectiveDirective }
