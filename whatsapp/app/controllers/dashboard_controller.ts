@@ -212,7 +212,6 @@ export default class DashboardController {
       selectedContact,
       messages,
       account: session.get('account'),
-      appUrl: env.get('APP_URL').replace(/\/$/, ''),
       bundle: accountUrl.replace(/\/account$/, ''),
     })
   }
@@ -266,7 +265,6 @@ export default class DashboardController {
       oauth,
       claudeOauth,
       account: session.get('account'),
-      appUrl: env.get('APP_URL').replace(/\/$/, ''),
       bundle: accountUrl.replace(/\/account$/, ''),
     })
   }

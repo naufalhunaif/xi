@@ -45,7 +45,6 @@ export default class LeanController {
     return view.render('pages/dashboard', {
       page: 'lean',
       account: session.get('account'),
-      appUrl: env.get('APP_URL').replace(/\/$/, ''),
       bundle: (env.get('ACCOUNT_URL') || '')
         .replace(/\/$/, '')
         .replace(/\/account$/, ''),

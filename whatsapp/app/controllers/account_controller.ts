@@ -11,9 +11,10 @@ import {
   verifyUser,
 } from '#services/local_auth_service'
 import { appVersion } from '#services/app_version'
+import { publicAppUrl } from '#services/public_url'
 
 const clientId = 'whatsapp'
-const appUrl = () => env.get('APP_URL').replace(/\/$/, '')
+const appUrl = (request?: HttpContext['request']) => publicAppUrl(request)
 const accountUrl = () => String(env.get('ACCOUNT_URL') || '').replace(/\/$/, '')
 const random = () => randomBytes(32).toString('base64url')
 
@@ -32,12 +33,13 @@ async function jsonRequest(url: string, init: RequestInit) {
 
 function authPage(
   view: HttpContext['view'],
+  request: HttpContext['request'],
   mode: 'login' | 'setup',
   extra: Record<string, unknown> = {}
 ) {
   return view.render('pages/auth', {
     mode,
-    appUrl: appUrl(),
+    appUrl: appUrl(request),
     appVersion: appVersion(),
     error: '',
     email: '',
@@ -47,15 +49,18 @@ function authPage(
 }
 
 export default class AccountController {
-  async login({ session, response, view }: HttpContext) {
+  async login({ request, session, response, view }: HttpContext) {
     response.header('Cache-Control', 'no-store, private')
     // This endpoint starts a fresh login, including when an old signed cookie remains.
     session.forget('account')
     if (isLocalAuth()) {
       await initializeDatabase()
       if ((await countUsers()) === 0)
-        return response.redirect().withQs(false).toPath(`${appUrl()}/setup`)
-      return authPage(view, 'login')
+        return response
+          .redirect()
+          .withQs(false)
+          .toPath(`${appUrl(request)}/setup`)
+      return authPage(view, request, 'login')
     }
     const state = random()
     const verifier = random()
@@ -78,7 +83,11 @@ export default class AccountController {
   /** Login lokal (standalone). */
   async loginPost({ request, session, response, view }: HttpContext) {
     response.header('Cache-Control', 'no-store, private')
-    if (!isLocalAuth()) return response.redirect().withQs(false).toPath(`${appUrl()}/login`)
+    if (!isLocalAuth())
+      return response
+        .redirect()
+        .withQs(false)
+        .toPath(`${appUrl(request)}/login`)
     const email = String(request.input('email', '')).trim()
     const password = String(request.input('password', ''))
     try {
@@ -86,9 +95,9 @@ export default class AccountController {
       const user = await verifyUser(email, password, request.ip())
       session.regenerate()
       session.put('account', localSession(user))
-      return response.redirect().withQs(false).toPath(appUrl())
+      return response.redirect().withQs(false).toPath(appUrl(request))
     } catch (error) {
-      return authPage(view, 'login', {
+      return authPage(view, request, 'login', {
         email,
         error: error instanceof Error ? error.message : 'Login gagal.',
       })
@@ -96,21 +105,35 @@ export default class AccountController {
   }
 
   /** Wizard akun pertama (hanya saat belum ada user). */
-  async setup({ response, view }: HttpContext) {
+  async setup({ request, response, view }: HttpContext) {
     response.header('Cache-Control', 'no-store, private')
-    if (!isLocalAuth()) return response.redirect().withQs(false).toPath(`${appUrl()}/login`)
+    if (!isLocalAuth())
+      return response
+        .redirect()
+        .withQs(false)
+        .toPath(`${appUrl(request)}/login`)
     await initializeDatabase()
     if ((await countUsers()) > 0)
-      return response.redirect().withQs(false).toPath(`${appUrl()}/login`)
-    return authPage(view, 'setup')
+      return response
+        .redirect()
+        .withQs(false)
+        .toPath(`${appUrl(request)}/login`)
+    return authPage(view, request, 'setup')
   }
 
   async setupPost({ request, session, response, view }: HttpContext) {
     response.header('Cache-Control', 'no-store, private')
-    if (!isLocalAuth()) return response.redirect().withQs(false).toPath(`${appUrl()}/login`)
+    if (!isLocalAuth())
+      return response
+        .redirect()
+        .withQs(false)
+        .toPath(`${appUrl(request)}/login`)
     await initializeDatabase()
     if ((await countUsers()) > 0)
-      return response.redirect().withQs(false).toPath(`${appUrl()}/login`)
+      return response
+        .redirect()
+        .withQs(false)
+        .toPath(`${appUrl(request)}/login`)
     const email = String(request.input('email', '')).trim()
     const name = String(request.input('name', '')).trim()
     const password = String(request.input('password', ''))
@@ -120,9 +143,9 @@ export default class AccountController {
       const id = await createUser({ email, name, password })
       session.regenerate()
       session.put('account', localSession({ id, email: email.toLowerCase(), name }))
-      return response.redirect().withQs(false).toPath(appUrl())
+      return response.redirect().withQs(false).toPath(appUrl(request))
     } catch (error) {
-      return authPage(view, 'setup', {
+      return authPage(view, request, 'setup', {
         email,
         name,
         error: error instanceof Error ? error.message : 'Pendaftaran gagal.',
@@ -132,7 +155,11 @@ export default class AccountController {
 
   async callback({ request, session, response }: HttpContext) {
     response.header('Cache-Control', 'no-store, private')
-    if (isLocalAuth()) return response.redirect().withQs(false).toPath(`${appUrl()}/login`)
+    if (isLocalAuth())
+      return response
+        .redirect()
+        .withQs(false)
+        .toPath(`${appUrl(request)}/login`)
     const pending = session.get('account_oauth')
     session.forget('account_oauth')
     const state = request.input('state')
@@ -195,10 +222,14 @@ export default class AccountController {
     }
   }
 
-  async logout({ session, response }: HttpContext) {
+  async logout({ request, session, response }: HttpContext) {
     response.header('Cache-Control', 'no-store, private')
     session.clear()
-    if (isLocalAuth()) return response.redirect().withQs(false).toPath(`${appUrl()}/login`)
+    if (isLocalAuth())
+      return response
+        .redirect()
+        .withQs(false)
+        .toPath(`${appUrl(request)}/login`)
     const params = new URLSearchParams({ return_to: `${appUrl()}/login` })
     return response
       .redirect()

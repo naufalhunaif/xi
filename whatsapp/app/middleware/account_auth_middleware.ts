@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
 import env from '#start/env'
 import { isLocalAuth } from '#services/local_auth_service'
+import { publicAppUrl } from '#services/public_url'
 
 const accountUrl = () => String(env.get('ACCOUNT_URL') || '').replace(/\/$/, '')
 
@@ -9,7 +10,7 @@ export default class AccountAuthMiddleware {
   async handle({ session, response, request }: HttpContext, next: NextFn) {
     response.header('Cache-Control', 'no-store, private')
     const account = session.get('account')
-    const login = `${env.get('APP_URL').replace(/\/$/, '')}/login`
+    const login = `${publicAppUrl(request)}/login`
     const api = request.url().startsWith('/api/') || request.accepts(['html', 'json']) === 'json'
     const unauthenticated = () => {
       session.forget('account')

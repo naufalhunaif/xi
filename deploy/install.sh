@@ -26,6 +26,15 @@ CONF="$CONF_DIR/wa.conf"
 APP_USER=wa
 
 say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
+step() { printf '\033[1;32m[%3d%%]\033[0m %s\n' "$1" "$2"; }
+LOG=/var/log/wa/install.log
+quiet() { # quiet "label" cmd... — output ke log, tampil hanya bila gagal
+  local label="$1"; shift
+  mkdir -p /var/log/wa
+  if ! { printf '\n===== %s · %s =====\n' "$(date '+%F %T')" "$label"; "$@"; } >>"$LOG" 2>&1; then
+    printf '\033[1;31mGAGAL:\033[0m %s. Log: %s\n' "$label" "$LOG" >&2; tail -n 20 "$LOG" >&2; exit 1
+  fi
+}
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31mGAGAL:\033[0m %s\n' "$*" >&2; exit 1; }
 ask()  { # ask VAR "Pertanyaan" [default]
@@ -85,19 +94,19 @@ server_ip() { hostname -I 2>/dev/null | awk '{print $1}'; }
 IP="$(curl -fsS --max-time 6 https://api.ipify.org 2>/dev/null || server_ip)"
 [[ -n "$IP" ]] || IP="$(server_ip)"
 
-say "Mode: $MODE · folder: $DIR · IP: $IP · port: $PORT${DOMAIN:+ · domain: $DOMAIN}"
+printf '\n  WhatsApp standalone · %s · %s · http://%s:%s\n\n' "$MODE" "$DIR" "$IP" "$PORT"
 
 # ---------------------------------------------------------- paket OS ---------
-say 'Memasang paket sistem'
-apt-get update -qq
-apt-get install -y -qq --no-install-recommends ca-certificates curl gnupg git build-essential \
-  python3 pkg-config libstdc++6 xz-utils openssl cron >/dev/null
+step 5 'Memasang paket sistem'
+quiet 'apt update' apt-get update -qq
+quiet 'apt install' apt-get install -y -qq --no-install-recommends ca-certificates curl gnupg git build-essential \
+  python3 pkg-config libstdc++6 xz-utils openssl cron
 if [[ "$MODE" == bare ]]; then
-  apt-get install -y -qq --no-install-recommends mariadb-server supervisor >/dev/null
+  quiet 'apt install mariadb/supervisor' apt-get install -y -qq --no-install-recommends mariadb-server supervisor
   systemctl enable --now mariadb supervisor >/dev/null 2>&1 || true
 elif [[ ! -f /www/server/panel/plugin/supervisor/supervisord.conf && ! -f /etc/supervisord.conf && ! -f /etc/supervisor/supervisord.conf ]]; then
   # aaPanel tanpa plugin Supervisor: pakai Supervisor sistem.
-  apt-get install -y -qq --no-install-recommends supervisor >/dev/null
+  quiet 'apt install supervisor' apt-get install -y -qq --no-install-recommends supervisor
   systemctl enable --now supervisor >/dev/null 2>&1 || true
 fi
 
@@ -124,7 +133,7 @@ install_node_tarball() {
   NODE_BIN=/usr/local/lib/nodejs/node-v24/bin
 }
 if [[ -z "$NODE_BIN" ]]; then
-  say 'Memasang Node.js 24'
+  step 10 'Memasang Node.js 24'
   if curl -fsSL https://deb.nodesource.com/setup_24.x | bash - >/dev/null 2>&1 && apt-get install -y -qq nodejs >/dev/null 2>&1; then
     NODE_BIN="$(dirname "$(command -v node)")"
   else
@@ -133,7 +142,7 @@ if [[ -z "$NODE_BIN" ]]; then
   fi
 fi
 [[ "$(node_major "$NODE_BIN/node")" -ge 24 ]] || die 'Node.js 24+ tidak tersedia.'
-say "Node.js $("$NODE_BIN/node" -v) di $NODE_BIN"
+step 12 "Node.js $("$NODE_BIN/node" -v)"
 
 # ------------------------------------------------------------ user & dir -----
 if ! id -u "$APP_USER" >/dev/null 2>&1; then
@@ -151,28 +160,28 @@ git_url() {
 latest_tag() {
   git -C "$APP" tag -l 'v3.*' | sort -V | tail -n1
 }
-say 'Mengambil kode aplikasi'
+step 15 'Mengambil kode aplikasi'
 git config --system --add safe.directory "$APP" 2>/dev/null || true
 if [[ ! -d "$APP/.git" ]]; then
-  sudo -u "$APP_USER" -H git clone -q --filter=blob:none --no-checkout "$(git_url)" "$APP" \
+  sudo -u "$APP_USER" -H git clone -q --filter=blob:none --no-checkout "$(git_url)" "$APP" 2>>"$LOG" \
     || die 'Clone gagal. Repo privat memerlukan WA_TOKEN dengan akses baca.'
   sudo -u "$APP_USER" -H git -C "$APP" sparse-checkout set whatsapp deploy
 fi
 # chmod +x pada skrip deploy tidak boleh dianggap perubahan lokal.
 sudo -u "$APP_USER" -H git -C "$APP" config core.fileMode false
-sudo -u "$APP_USER" -H git -C "$APP" fetch -q --tags origin
+sudo -u "$APP_USER" -H git -C "$APP" fetch -q --tags origin 2>>"$LOG"
 VERSION="${WA_VERSION:-$(latest_tag)}"
 if [[ -z "$VERSION" ]]; then
   VERSION=main
   warn "Belum ada rilis v3.x; memakai branch $VERSION."
 fi
 if git -C "$APP" show-ref -q --verify "refs/tags/$VERSION"; then
-  sudo -u "$APP_USER" -H git -C "$APP" checkout -q -f --detach "tags/$VERSION"
+  sudo -u "$APP_USER" -H git -C "$APP" checkout -q -f --detach "tags/$VERSION" 2>>"$LOG"
 else
-  sudo -u "$APP_USER" -H git -C "$APP" checkout -q -f -B "$VERSION" "origin/$VERSION"
+  sudo -u "$APP_USER" -H git -C "$APP" checkout -q -f -B "$VERSION" "origin/$VERSION" 2>>"$LOG"
 fi
 chmod +x "$APP"/deploy/*.sh
-say "Versi: $VERSION"
+step 20 "Versi $VERSION"
 
 # ---------------------------------------------------------------- database ---
 DB_NAME=wa
@@ -194,7 +203,7 @@ PY
   [[ -n "$pw" ]] || die 'Password root MySQL aaPanel tidak terbaca. Jalankan ulang dengan WA_DB_ROOT_PASSWORD=...'
   MYSQL_PWD="$pw" mysql -uroot "$@"
 }
-say 'Menyiapkan database'
+step 22 'Menyiapkan database'
 mysql_root <<SQL
 CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
@@ -205,7 +214,7 @@ SQL
 
 # -------------------------------------------------------------------- .env ---
 if [[ ! -f "$ENV_FILE" ]]; then
-  say 'Menulis whatsapp/.env'
+  step 25 'Menulis konfigurasi'
   cat > "$ENV_FILE" <<ENV
 TZ=Asia/Jakarta
 PORT=$PORT
@@ -255,11 +264,10 @@ SUDO
 chmod 440 /etc/sudoers.d/wa
 
 # ----------------------------------------------------------- supervisor ------
-say 'Mendaftarkan proses WEB dan WORKER (Supervisor)'
+step 28 'Mendaftarkan proses WEB & WORKER'
 bash "$APP/deploy/wa.sh" _supervisor-install
 
 # -------------------------------------------------------------- build --------
-say 'Build aplikasi (beberapa menit pada pemasangan pertama)'
 bash "$APP/deploy/wa.sh" _build --first
 
 # -------------------------------------------------------------- domain -------
@@ -282,12 +290,9 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
 fi
 
 echo 'WA_INSTALLED=1' >> "$CONF"
-say 'Selesai.'
 cat <<DONE
 
   Buka:      $( [[ -n "$DOMAIN" ]] && echo "https://$DOMAIN/setup" || echo "http://$IP:$PORT/setup" )   (buat akun pemilik pertama)
-  Domain:    wa domain nama-domain.com   (pasang domain + SSL kapan saja)
-  Perintah:  wa            (menu: status, update, domain, user, log, backup, ...)
-  Versi:     $VERSION
+  Perintah:  wa   (menu bernomor: status, update, domain, port, user, log, backup)
 $( [[ "$MODE" == aapanel ]] && printf '\n  aaPanel: buka port %s di menu Security bila belum terbuka.\n' "$PORT" )
 DONE

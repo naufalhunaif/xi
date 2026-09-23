@@ -19,6 +19,21 @@ export PATH="$WA_NODE_BIN:$PATH:/www/server/mysql/bin:/www/server/nginx/sbin:/us
 say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31mGAGAL:\033[0m %s\n' "$*" >&2; exit 1; }
+step() { printf '\033[1;32m[%3d%%]\033[0m %s\n' "$1" "$2"; }   # step 40 "Membangun aplikasi"
+BUILD_LOG=/var/log/wa/build.log
+run_logged() { # run_logged "label" cmd... — jalankan diam-diam, tampilkan log hanya bila gagal
+  local label="$1"; shift
+  mkdir -p "$(dirname "$BUILD_LOG")"
+  { printf '\n===== %s · %s =====\n' "$(date '+%F %T')" "$label"; "$@"; } >>"$BUILD_LOG" 2>&1 &
+  local pid=$! t=0
+  while kill -0 "$pid" 2>/dev/null; do sleep 2; t=$((t + 2)); printf '\r       %s… %ds' "$label" "$t"; done
+  printf '\r\033[K'
+  if ! wait "$pid"; then
+    printf '\033[1;31mGAGAL:\033[0m %s. 30 baris log terakhir (%s):\n' "$label" "$BUILD_LOG" >&2
+    tail -n 30 "$BUILD_LOG" >&2
+    exit 1
+  fi
+}
 as_app() { # jalankan sebagai user aplikasi; proxy/CA dari lingkungan root ikut diteruskan bila ada
   # Cache npm milik user aplikasi (aaPanel mengarahkan cache global ke folder milik root).
   local pass=(PATH="$PATH" npm_config_cache="$DIR/.npm" HOME="$DIR")
@@ -95,7 +110,7 @@ selfsigned() {
       -keyout /etc/wa/ssl/selfsigned.key -out /etc/wa/ssl/selfsigned.crt >/dev/null 2>&1
   fi
 }
-nginx_reload() { nginx -t >/dev/null 2>&1 && (systemctl reload nginx 2>/dev/null || nginx -s reload); }
+nginx_reload() { nginx -t >/dev/null 2>&1 && (systemctl reload nginx >/dev/null 2>&1 || nginx -s reload >/dev/null 2>&1); }
 nginx_write_bare() {
   local le="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
   if [[ -f "$le" ]]; then SSL_CERT="$le"; SSL_KEY="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
@@ -107,7 +122,7 @@ nginx_write_bare() {
   ln -sf /etc/nginx/sites-available/wa.conf /etc/nginx/sites-enabled/wa.conf
   rm -f /etc/nginx/sites-enabled/default
   mkdir -p /var/www/html
-  nginx -t || die 'Konfigurasi Nginx tidak valid.'
+  nginx -t >/dev/null 2>&1 || { nginx -t; die 'Konfigurasi Nginx tidak valid.'; }
   nginx_reload
 }
 nginx_write_aapanel() {
@@ -121,7 +136,7 @@ nginx_write_aapanel() {
     awk -v ins="$line" 'BEGIN{d=0} /^[[:space:]]*location/ && !d {print ins; d=1} {print} END{if(!d) print ins}' \
       "$vhost.bak-wa" > "$vhost"
   fi
-  nginx -t || { cp "$vhost.bak-wa" "$vhost"; die 'Konfigurasi Nginx aaPanel tidak valid; dikembalikan.'; }
+  nginx -t >/dev/null 2>&1 || { nginx -t; cp "$vhost.bak-wa" "$vhost"; die 'Konfigurasi Nginx aaPanel tidak valid; dikembalikan.'; }
   nginx_reload
 }
 nginx_install() { [[ -n "$DOMAIN" ]] || die 'Belum ada domain.'; if [[ "$MODE" == aapanel ]]; then nginx_write_aapanel; else nginx_write_bare; fi; }
@@ -150,14 +165,21 @@ ssl_issue() {
 # ---------------------------------------------------------------- build ------
 build() { # build [--first]
   cd "$APP"
+  step 30 'Mengunduh dependensi & membangun aplikasi (beberapa menit)'
   # Build sebagai user aplikasi tanpa menyentuh proses; restart dilakukan root lewat Supervisor.
-  as_app bash deploy/build.sh --no-restart
+  run_logged 'Build' as_app bash deploy/build.sh --no-restart
+  step 80 'Menyalakan ulang WEB & WORKER'
   supctl reread >/dev/null; supctl update >/dev/null || true
   supctl restart wa-web wa-worker >/dev/null 2>&1 || supctl start wa-web wa-worker >/dev/null
   sleep 3
   # Pembersihan release lama perlu membaca /proc semua user, jadi dijalankan root.
   node deploy/whatsapp-aapanel.mjs --cleanup >/dev/null 2>&1 || true
-  supctl status wa-web wa-worker || true
+  local st; st="$(supctl status wa-web wa-worker 2>/dev/null || true)"
+  if [[ "$(grep -c RUNNING <<<"$st")" == 2 ]]; then
+    step 100 "Selesai · WhatsApp v$(current_version) berjalan"
+  else
+    warn 'Proses belum RUNNING semua:'; echo "$st"; echo "Log: wa logs web | wa logs worker"
+  fi
 }
 
 # --------------------------------------------------------------- update ------
@@ -167,15 +189,15 @@ git_url() {
 }
 fetch_all() {
   as_app git -C "$APP" remote set-url origin "$(git_url)"
-  as_app git -C "$APP" fetch -q --tags --prune origin
+  as_app git -C "$APP" fetch -q --tags --prune origin 2>/dev/null
 }
 latest_tag() { git -C "$APP" tag -l 'v3.*' | sort -V | tail -n1; }
 checkout_ref() {
   local ref="$1"
   if git -C "$APP" show-ref -q --verify "refs/tags/$ref"; then
-    as_app git -C "$APP" checkout -q -f --detach "tags/$ref"
+    as_app git -C "$APP" checkout -q -f --detach "tags/$ref" 2>/dev/null
   elif git -C "$APP" show-ref -q --verify "refs/remotes/origin/$ref"; then
-    as_app git -C "$APP" checkout -q -f -B "$ref" "origin/$ref"
+    as_app git -C "$APP" checkout -q -f -B "$ref" "origin/$ref" 2>/dev/null
   else
     die "Versi/branch '$ref' tidak ditemukan."
   fi
@@ -191,23 +213,23 @@ update() {
     say "Sudah versi terbaru ($target)."; return 0
   fi
   save_conf WA_PREVIOUS "$before"
-  say "Memperbarui $before -> $target"
+  step 10 "Memperbarui $before → $target"
   checkout_ref "$target"
   # Skrip ini sendiri ikut diperbarui; lanjutkan dengan versi yang baru.
   exec bash "$APP/deploy/wa.sh" _post-update
 }
 post_update() {
+  step 20 'Kode terbaru siap'
   # Aturan sudo untuk pengaturan domain dari halaman Pengaturan (pemasangan lama belum punya).
   if [[ ! -f /etc/sudoers.d/wa ]]; then
     printf '%s ALL=(root) NOPASSWD: /usr/local/bin/wa domain *\n' "$U" > /etc/sudoers.d/wa; chmod 440 /etc/sudoers.d/wa
   fi
   build
-  say "Versi aktif: $(current_version) ($(git_ref))"
 }
 rollback() {
   local prev="${WA_PREVIOUS:-}"
   [[ -n "$prev" ]] || die 'Belum ada versi sebelumnya yang tercatat.'
-  say "Kembali ke $prev"
+  step 10 "Kembali ke $prev"
   fetch_all; save_conf WA_PREVIOUS "$(git_ref)"; checkout_ref "$prev"
   exec bash "$APP/deploy/wa.sh" _post-update
 }
@@ -323,24 +345,25 @@ menu() {
   while true; do
     cat <<M
 
-  WhatsApp v$(current_version) · $(app_url) · $MODE
-  ─────────────────────────────────────────────
-   1) Status              7) Pasang/ganti domain
-   2) Restart             8) Perbarui SSL
-   3) Update ke rilis terbaru
-   4) Rollback versi      9) Backup sekarang
-   5) Log WEB            10) Restore backup
-   6) Log WORKER         11) Reset password user
-                         12) Shell database
-                          0) Keluar
+  WhatsApp v$(current_version) · $(app_url)
+  ─────────────────────────────────────────
+   1) Status               6) Pasang / ganti domain
+   2) Update ke versi terbaru
+   3) Restart              7) Lepas domain (pakai IP:port)
+   4) Log WEB              8) Ganti port
+   5) Log WORKER           9) Reset password user
+                          10) Backup     11) Restore
+                          12) Rollback   13) Shell database
+                           0) Keluar
 M
     read -r -p '  Pilih nomor: ' n < /dev/tty
     case "$n" in
-      1) status ;; 2) supctl restart wa-web wa-worker ;; 3) update ;; 4) rollback ;;
-      5) tail -n 100 -f /var/log/wa/web.log ;; 6) tail -n 100 -f /var/log/wa/worker.log ;;
-      7) read -r -p '  Domain baru: ' d < /dev/tty; set_domain "$d" ;; 8) ssl_issue ;;
-      9) backup ;; 10) read -r -p '  File backup: ' f < /dev/tty; restore "$f" ;;
-      11) user_reset ;; 12) MYSQL_PWD="$WA_DB_PASS" mysql -u"$WA_DB_USER" "$WA_DB_NAME" ;;
+      1) status ;; 2) update ;; 3) supctl restart wa-web wa-worker ;;
+      4) tail -n 100 -f /var/log/wa/web.log ;; 5) tail -n 100 -f /var/log/wa/worker.log ;;
+      6) read -r -p '  Domain (mis. wa.contoh.com): ' d < /dev/tty; set_domain "$d" ;;
+      7) unset_domain ;; 8) read -r -p '  Port baru (mis. 3343): ' p < /dev/tty; set_port "$p" ;;
+      9) user_reset ;; 10) backup ;; 11) read -r -p '  File backup: ' f < /dev/tty; restore "$f" ;;
+      12) rollback ;; 13) MYSQL_PWD="$WA_DB_PASS" mysql -u"$WA_DB_USER" "$WA_DB_NAME" ;;
       0|q|'') return 0 ;; *) echo '  Pilihan tidak dikenal.' ;;
     esac
   done

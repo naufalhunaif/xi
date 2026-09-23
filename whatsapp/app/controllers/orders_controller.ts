@@ -25,7 +25,6 @@ export default class OrdersController {
       leanMode,
       beta3Mode,
       account: session.get('account'),
-      appUrl: env.get('APP_URL').replace(/\/$/, ''),
       bundle: (env.get('ACCOUNT_URL') || '')
         .replace(/\/$/, '')
         .replace(/\/account$/, ''),

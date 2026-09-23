@@ -9,7 +9,6 @@ export default class ContactDirectoryController {
     return view.render('pages/dashboard', {
       page: 'directory',
       account: session.get('account'),
-      appUrl: env.get('APP_URL').replace(/\/$/, ''),
       bundle: (env.get('ACCOUNT_URL') || '')
         .replace(/\/$/, '')
         .replace(/\/account$/, ''),

@@ -46,7 +46,6 @@ export default class Beta3Controller {
     return view.render('pages/dashboard', {
       page: 'beta3',
       account: session.get('account'),
-      appUrl: env.get('APP_URL').replace(/\/$/, ''),
       bundle: (env.get('ACCOUNT_URL') || '')
         .replace(/\/$/, '')
         .replace(/\/account$/, ''),
