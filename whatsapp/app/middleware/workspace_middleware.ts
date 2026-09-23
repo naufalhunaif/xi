@@ -4,7 +4,7 @@ import { activeWorkspace, workspaceState } from '#services/workspace_service'
 import { withChatMutationLock } from '#services/chat_cleanup_service'
 import { inWorkspace } from '#services/workspace_context'
 import { ensureDefaults } from '#services/settings_service'
-import { appVersion } from '#services/app_version'
+import { appVersionLabel } from '#services/app_version'
 import { publicAppUrl } from '#services/public_url'
 
 export default class WorkspaceMiddleware {
@@ -15,7 +15,7 @@ export default class WorkspaceMiddleware {
     ctx.view.share({
       workspaceVersion: scope.version,
       workspaceId: scope.id,
-      appVersion: appVersion(),
+      appVersion: appVersionLabel(),
       appUrl: publicAppUrl(ctx.request),
     })
     const expected = ctx.request.header('X-WhatsApp-Workspace')

@@ -7,7 +7,7 @@ import { orderMessages } from '#services/order_message_evidence'
 import db from '#services/workspace_database'
 import { isAiWorking } from '#services/ai_work_schedule'
 import env from '#start/env'
-import { appVersion } from '#services/app_version'
+import { appVersion, appChannel, appVersionLabel } from '#services/app_version'
 import { readAccess, setDomain, unsetDomain } from '#services/access_service'
 import { readUsage } from '#services/usage_service'
 import { evaluationOverview } from '#services/conversation_evaluation_service'
@@ -241,7 +241,12 @@ export default class DashboardController {
 
   async version({ response }: HttpContext) {
     response.header('cache-control', 'no-store')
-    return response.json({ version: appVersion(), node: process.versions.node })
+    return response.json({
+      version: appVersion(),
+      channel: appChannel(),
+      label: appVersionLabel(),
+      node: process.versions.node,
+    })
   }
 
   async settingsPage({ view, session }: HttpContext) {

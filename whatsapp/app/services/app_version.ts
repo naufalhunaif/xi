@@ -15,3 +15,24 @@ export function appVersion() {
   }
   return cached
 }
+
+let channel: string | null = null
+
+/** Kanal rilis dari file CHANNEL ("beta", "stable"); kosong = stabil. */
+export function appChannel() {
+  if (channel !== null) return channel
+  try {
+    const root = fileURLToPath(new URL('../../', import.meta.url))
+    const value = readFileSync(join(root, 'CHANNEL'), 'utf8').trim().toLowerCase()
+    channel = value === 'stable' ? '' : value
+  } catch {
+    channel = ''
+  }
+  return channel
+}
+
+/** Teks versi untuk tampilan: "3.3.3 beta". */
+export function appVersionLabel() {
+  const c = appChannel()
+  return c ? `${appVersion()} ${c}` : appVersion()
+}

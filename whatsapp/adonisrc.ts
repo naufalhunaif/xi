@@ -112,6 +112,7 @@ export default defineConfig({
     { pattern: 'resources/lean/**', reloadServer: false },
     { pattern: 'skills/**', reloadServer: false },
     { pattern: 'VERSION', reloadServer: false },
+    { pattern: 'CHANNEL', reloadServer: false },
     { pattern: 'skills-beta3/**', reloadServer: false },
     { pattern: 'resources/beta3/**', reloadServer: false },
     {

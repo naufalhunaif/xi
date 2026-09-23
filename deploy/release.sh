@@ -19,7 +19,11 @@ git tag -a "v$v" -m "WhatsApp v$v"
 git push -q origin HEAD "v$v"
 echo "Tag v$v dipush."
 if [[ -n "$token" ]]; then
-  body="$(python3 -c 'import json,sys; print(json.dumps({"tag_name":"v"+sys.argv[1],"name":"WhatsApp v"+sys.argv[1],"body":sys.argv[2],"generate_release_notes":sys.argv[2]==""}))' "$v" "$notes")"
+  channel="$(tr -d '[:space:]' < whatsapp/CHANNEL 2>/dev/null || true)"
+  body="$(python3 -c 'import json,sys
+v,notes,ch=sys.argv[1:4]
+label="WhatsApp v"+v+(" "+ch if ch and ch!="stable" else "")
+print(json.dumps({"tag_name":"v"+v,"name":label,"body":notes,"generate_release_notes":notes=="","prerelease":bool(ch and ch!="stable")}))' "$v" "$notes" "$channel")"
   code="$(curl -sS -o /tmp/wa-release.json -w '%{http_code}' -X POST \
     -H "Authorization: Bearer $token" -H 'Accept: application/vnd.github+json' \
     "https://api.github.com/repos/$repo/releases" -d "$body")"

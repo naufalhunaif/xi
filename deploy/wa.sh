@@ -45,7 +45,11 @@ as_app() { # jalankan sebagai user aplikasi; proxy/CA dari lingkungan root ikut 
 save_conf() { # save_conf KEY VALUE
   if grep -q "^$1=" "$CONF"; then sed -i "s|^$1=.*|$1=$2|" "$CONF"; else echo "$1=$2" >> "$CONF"; fi
 }
-current_version() { cat "$APP/whatsapp/VERSION" 2>/dev/null || echo '?'; }
+current_version() {
+  local v c; v="$(cat "$APP/whatsapp/VERSION" 2>/dev/null || echo '?')"
+  c="$(cat "$APP/whatsapp/CHANNEL" 2>/dev/null | tr -d '[:space:]')"
+  [[ -n "$c" && "$c" != stable ]] && v="$v $c"; echo "$v"
+}
 git_ref() { git -C "$APP" describe --tags --exact-match 2>/dev/null || git -C "$APP" rev-parse --abbrev-ref HEAD; }
 
 # ------------------------------------------------------------ supervisor -----
