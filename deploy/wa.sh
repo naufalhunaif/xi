@@ -162,9 +162,9 @@ latest_tag() { git -C "$APP" tag -l 'v3.*' | sort -V | tail -n1; }
 checkout_ref() {
   local ref="$1"
   if git -C "$APP" show-ref -q --verify "refs/tags/$ref"; then
-    as_app git -C "$APP" checkout -q --detach "tags/$ref"
+    as_app git -C "$APP" checkout -q -f --detach "tags/$ref"
   elif git -C "$APP" show-ref -q --verify "refs/remotes/origin/$ref"; then
-    as_app git -C "$APP" checkout -q -B "$ref" "origin/$ref"
+    as_app git -C "$APP" checkout -q -f -B "$ref" "origin/$ref"
   else
     die "Versi/branch '$ref' tidak ditemukan."
   fi

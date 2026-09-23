@@ -149,6 +149,8 @@ if [[ ! -d "$APP/.git" ]]; then
     || die 'Clone gagal. Repo privat memerlukan WA_TOKEN dengan akses baca.'
   sudo -u "$APP_USER" -H git -C "$APP" sparse-checkout set whatsapp deploy
 fi
+# chmod +x pada skrip deploy tidak boleh dianggap perubahan lokal.
+sudo -u "$APP_USER" -H git -C "$APP" config core.fileMode false
 sudo -u "$APP_USER" -H git -C "$APP" fetch -q --tags origin
 VERSION="${WA_VERSION:-$(latest_tag)}"
 if [[ -z "$VERSION" ]]; then
@@ -156,9 +158,9 @@ if [[ -z "$VERSION" ]]; then
   warn "Belum ada rilis v3.x; memakai branch $VERSION."
 fi
 if git -C "$APP" show-ref -q --verify "refs/tags/$VERSION"; then
-  sudo -u "$APP_USER" -H git -C "$APP" checkout -q --detach "tags/$VERSION"
+  sudo -u "$APP_USER" -H git -C "$APP" checkout -q -f --detach "tags/$VERSION"
 else
-  sudo -u "$APP_USER" -H git -C "$APP" checkout -q -B "$VERSION" "origin/$VERSION"
+  sudo -u "$APP_USER" -H git -C "$APP" checkout -q -f -B "$VERSION" "origin/$VERSION"
 fi
 chmod +x "$APP"/deploy/*.sh
 say "Versi: $VERSION"
