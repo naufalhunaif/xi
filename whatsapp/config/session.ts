@@ -50,8 +50,11 @@ const sessionConfig = defineConfig({
      * When true, the cookie is only sent over HTTPS connections.
      * Enabled in production for security.
      */
-    // Cookie aman hanya bila aplikasi diakses lewat https (standalone boleh http://IP:PORT).
-    secure: app.inProduction && env.get('APP_URL').startsWith('https://'),
+    // Standalone bisa dibuka lewat http://IP:PORT dan https://domain sekaligus,
+    // jadi cookie tidak dipaksa Secure di sana; bundle tetap Secure di produksi.
+    secure:
+      app.inProduction &&
+      !(env.get('AUTH_MODE') === 'local' || !String(env.get('ACCOUNT_URL') || '').trim()),
 
     /**
      * Controls when cookies are sent with cross-site requests.
