@@ -113,6 +113,11 @@
       const state = await api('/api/status')
       const status = String(state.status || 'disconnected')
       renderConnectionStatus(status, state.phone)
+      const badge = byId('ordersBadge')
+      if (badge && state.pendingOrders !== undefined) {
+        badge.textContent = String(state.pendingOrders)
+        badge.hidden = !Number(state.pendingOrders)
+      }
       const qrPanel = byId('qrPanel')
       const qrImage = byId('qrImage')
       qrPanel.hidden = !(status === 'qr' && state.qr_data_url)
@@ -535,6 +540,23 @@
       contacts.append(empty)
     }
   }
+  // Filter kotak masuk: geser ke samping; panah ▾ membuka semua bila tidak muat.
+  const inboxMore = byId('inboxFiltersMore')
+  const inboxTabs = document.querySelector('#inboxFilters .wa-inbox-tabs')
+  function syncInboxMore() {
+    if (!inboxMore || !inboxTabs) return
+    const expanded = inboxMore.getAttribute('aria-expanded') === 'true'
+    inboxMore.hidden = !expanded && inboxTabs.scrollWidth <= inboxTabs.clientWidth + 2
+  }
+  inboxMore?.addEventListener('click', () => {
+    const open = inboxMore.getAttribute('aria-expanded') !== 'true'
+    inboxMore.setAttribute('aria-expanded', String(open))
+    byId('inboxFilters').classList.toggle('expanded', open)
+    syncInboxMore()
+  })
+  window.addEventListener('resize', syncInboxMore)
+  setTimeout(syncInboxMore, 0)
+  setTimeout(syncInboxMore, 1500)
   byId('inboxFilters')?.addEventListener('click', (event) => {
     const button = event.target.closest('button')
     if (!button) return
