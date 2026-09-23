@@ -55,7 +55,18 @@ fi
 [[ "$MODE" == bare || "$MODE" == aapanel ]] || die 'WA_MODE harus auto, bare, atau aapanel.'
 if [[ "$MODE" == aapanel ]]; then DIR="${WA_DIR:-/www/wwwroot/wa}"; else DIR="${WA_DIR:-/opt/wa}"; fi
 APP="$DIR/app"
-PORT="${WA_PORT:-3333}"
+# Port WEB: pakai WA_PORT, atau cari yang kosong mulai 3333 (port+1 dipakai callback MCP).
+port_free() { ! (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+PORT="${WA_PORT:-}"
+if [[ -z "$PORT" ]]; then
+  PORT="$(sed -n 's/^WA_PORT=//p' "$CONF" 2>/dev/null | head -n1)"
+fi
+if [[ -z "$PORT" ]]; then
+  for p in 3333 3343 3353 3363 3373 3383; do
+    if port_free "$p" && port_free "$((p + 1))"; then PORT="$p"; break; fi
+  done
+  [[ -n "$PORT" ]] || die 'Tidak menemukan port kosong 3333-3384. Tentukan WA_PORT=....'
+fi
 
 # Sudah terpasang lengkap? Arahkan ke `wa update`. Pemasangan yang gagal di tengah boleh diulang.
 if [[ -f "$CONF" ]] && grep -q '^WA_INSTALLED=1' "$CONF" && [[ -x "$APP/deploy/wa.sh" ]]; then
@@ -75,7 +86,7 @@ fi
 EMAIL="${WA_EMAIL:-admin@$DOMAIN}"
 TOKEN="${WA_TOKEN:-}"
 
-say "Mode: $MODE · folder: $DIR · domain: $DOMAIN"
+say "Mode: $MODE · folder: $DIR · domain: $DOMAIN · port: $PORT"
 
 # ---------------------------------------------------------- paket OS ---------
 say 'Memasang paket sistem'
@@ -209,7 +220,7 @@ APP_URL=https://$DOMAIN
 APP_BASE_PATH=
 ACCOUNT_URL=
 AUTH_MODE=local
-MCP_OAUTH_CALLBACK_PORT=3334
+MCP_OAUTH_CALLBACK_PORT=$((PORT + 1))
 SESSION_DRIVER=cookie
 DB_HOST=127.0.0.1
 DB_PORT=3306

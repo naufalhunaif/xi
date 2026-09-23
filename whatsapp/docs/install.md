@@ -47,6 +47,7 @@ Setelah selesai buka **`https://wa.domainku.com/setup`** untuk membuat akun pemi
 | `wa update [v3.0.1\|main]` | ambil rilis v3 terbaru (atau versi/branch tertentu), build, restart |
 | `wa rollback` | kembali ke versi sebelum `update` terakhir |
 | `wa domain wa-baru.domainku.com` | ganti domain (`APP_URL`, vhost, SSL) |
+| `wa port 3343` | ganti port lokal WEB (bila 3333 dipakai aplikasi lain; callback MCP = port+1) |
 | `wa ssl` | minta/perbarui sertifikat Let's Encrypt (mode bare) |
 | `wa user [email]` | reset password akun; akun dibuat bila belum ada |
 | `wa backup` / `wa restore FILE` | backup database + media (otomatis tiap hari 03:00, simpan 7 hari) |

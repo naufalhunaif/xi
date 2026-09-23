@@ -4,7 +4,7 @@
 #    wa            menu interaktif
 #    wa status | restart | stop | start | logs [web|worker]
 #    wa update [VERSI] | rollback | version
-#    wa domain DOMAIN | ssl | user [EMAIL] | backup | restore FILE | db
+#    wa domain DOMAIN | port NOMOR | ssl | user [EMAIL] | backup | restore FILE | db
 #    wa mode | uninstall
 # =============================================================================
 set -euo pipefail
@@ -241,7 +241,7 @@ status() {
   echo "Mode    : $MODE · folder $APP"
   echo "Domain  : https://$DOMAIN (port lokal $PORT)"
   echo "Node    : $(node -v 2>/dev/null || echo '-')"
-  supctl status wa-web wa-worker 2>/dev/null || warn 'Supervisor belum berjalan.'
+  supctl status wa-web wa-worker 2>/dev/null || [[ -S /var/run/supervisor.sock ]] || warn 'Supervisor belum berjalan.'
   if curl -fsS -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/login"; then echo 'WEB     : merespons'; else echo 'WEB     : tidak merespons'; fi
 }
 user_reset() {
@@ -260,6 +260,17 @@ set_domain() {
   supctl restart wa-web wa-worker >/dev/null || true
   say "Domain diganti ke https://$new"
   [[ "$MODE" == bare ]] && ssl_issue || true
+}
+set_port() {
+  local p="$1"
+  [[ "$p" =~ ^[0-9]{4,5}$ ]] || die 'Port harus angka, mis. wa port 3343'
+  PORT="$p"; save_conf WA_PORT "$p"
+  sed -i "s|^PORT=.*|PORT=$p|; s|^MCP_OAUTH_CALLBACK_PORT=.*|MCP_OAUTH_CALLBACK_PORT=$((p + 1))|" "$APP/whatsapp/.env"
+  grep -q '^MCP_OAUTH_CALLBACK_PORT=' "$APP/whatsapp/.env" || echo "MCP_OAUTH_CALLBACK_PORT=$((p + 1))" >> "$APP/whatsapp/.env"
+  nginx_install
+  supctl restart wa-web wa-worker >/dev/null || true
+  sleep 3; supctl status wa-web wa-worker || true
+  say "Port WEB sekarang $p (callback MCP $((p + 1)))."
 }
 uninstall() {
   read -r -p "Hapus WhatsApp dari server ini? Database dan media ikut dihapus. Ketik 'HAPUS' untuk lanjut: " ok < /dev/tty
@@ -311,6 +322,7 @@ case "${1:-menu}" in
   rollback) rollback ;;
   version) echo "$(current_version) ($(git_ref))" ;;
   domain) [[ -n "${2:-}" ]] || die 'wa domain DOMAIN'; set_domain "$2" ;;
+  port) [[ -n "${2:-}" ]] || die 'wa port NOMOR'; set_port "$2" ;;
   ssl) ssl_issue ;;
   user) user_reset "${2:-}" ;;
   backup) backup "${2:-}" ;;
