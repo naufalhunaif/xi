@@ -130,18 +130,24 @@
 }
 .workspace-ui .wa-inbox-filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: flex-start;
   gap: 4px;
   padding: 0 10px 10px;
   margin: 0;
   border-bottom: 1px solid var(--line);
 }
+/* Satu baris, digeser ke samping; tombol ▾ (inboxFiltersMore) membuka semua. */
 .workspace-ui .wa-inbox-tabs {
-  width: 100%;
-  flex-wrap: wrap;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
+.workspace-ui .wa-inbox-filters.expanded { flex-wrap: wrap; }
+.workspace-ui .wa-inbox-filters.expanded .wa-inbox-tabs { flex-wrap: wrap; overflow: visible; width: 100%; }
+.workspace-ui .wa-inbox-filters #unansweredFilter { flex: 0 0 auto; }
 .workspace-ui .wa-inbox-filters button {
   padding: 6px 9px;
   border-radius: 16px;
