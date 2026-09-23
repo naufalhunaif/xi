@@ -37,6 +37,7 @@ import {
   syncLeanCatalog,
 } from '#beta3/mcp'
 import { describeCatalogPhotos } from '#beta3/catalog_vision'
+import { attachOrderPhotos } from '#beta3/order_photos'
 import env from '#start/env'
 
 /** Beta 2: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
@@ -146,7 +147,7 @@ export default class Beta3Controller {
       listLeanOrders(status || undefined, q || undefined),
       countLeanOrders(),
     ])
-    return response.json({ orders, counts })
+    return response.json({ orders: await attachOrderPhotos(orders), counts })
   }
 
   /** CS mengisi ongkir + subtotal → sistem kirim total lalu rekening ke pelanggan. */

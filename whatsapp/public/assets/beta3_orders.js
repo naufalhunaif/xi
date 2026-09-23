@@ -162,13 +162,29 @@
       row.append(el('dt', label), el('dd', value))
       info.append(row)
     }
-    box.append(info)
+    box.append(el('h2', t('Pelanggan')), info)
     box.append(el('h2', t('Pesanan')))
-    box.append(el('pre', String(order.spec || order.items || '—'), 'wa-lean-chatnote'))
-    if (order.chat_note) {
+    if (Array.isArray(order.photos) && order.photos.length) {
+      const photos = el('div', undefined, 'wa-order-photos')
+      for (const photo of order.photos) {
+        const figure = el('figure')
+        const img = el('img')
+        img.src = photo.url
+        img.alt = `${photo.product} ${photo.color}`.trim()
+        img.loading = 'lazy'
+        img.addEventListener('error', () => figure.remove())
+        figure.append(img, el('figcaption', [photo.product, photo.color].filter(Boolean).join(' · ')))
+        photos.append(figure)
+      }
+      box.append(photos)
+    }
+    const orderText = String(order.spec || order.items || '—')
+    box.append(el('pre', orderText, 'wa-lean-chatnote'))
+    if (order.chat_note && String(order.chat_note).trim() !== orderText.trim()) {
       box.append(el('h2', t('Catatan chat saat form masuk')))
       box.append(el('pre', order.chat_note, 'wa-lean-chatnote'))
     }
+    box.append(el('h2', t('Biaya')))
     const summary = el('dl', undefined, 'wa-cart-summary')
     for (const [label, amount, cls] of [
       [t('Subtotal'), order.subtotal, ''],

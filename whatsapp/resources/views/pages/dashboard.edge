@@ -21,6 +21,7 @@
       <a class="nav-item {{ page === 'orders' ? 'active' : '' }}" href="{{ appUrl }}/orders" aria-label="Order" title="Order" aria-current="{{ page === 'orders' ? 'page' : 'false' }}" data-i18n-aria-label="Order" data-i18n-title="Order">
         <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7 5l10 4"/></svg></span>
         <span class="nav-text" data-i18n="Order">Order</span>
+        <span class="nav-badge" id="ordersBadge" {{ pendingOrders ? '' : 'hidden' }} title="Order menunggu total" data-i18n-title="Order menunggu total">{{ pendingOrders }}</span>
       </a>
       @if(bundle)
       <a class="nav-item {{ page === 'lean' ? 'active' : '' }}" href="{{ appUrl }}/lean" aria-label="Beta 2" title="Beta 2" aria-current="{{ page === 'lean' ? 'page' : 'false' }}">
@@ -277,6 +278,9 @@
                   </button>
                 @end
               </div>
+              <button id="inboxFiltersMore" class="wa-inbox-more" type="button" aria-expanded="false" aria-label="Tampilkan semua filter" title="Tampilkan semua filter" data-i18n-aria-label="Tampilkan semua filter" data-i18n-title="Tampilkan semua filter" hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
               <button
                 id="unansweredFilter"
                 type="button"

@@ -9,6 +9,7 @@ import { isAiWorking } from '#services/ai_work_schedule'
 import env from '#start/env'
 import { appVersion, appChannel, appVersionLabel } from '#services/app_version'
 import { readAccess, setDomain, unsetDomain } from '#services/access_service'
+import { pendingOrderCount } from '#services/pending_orders'
 import { readUsage } from '#services/usage_service'
 import { evaluationOverview } from '#services/conversation_evaluation_service'
 import { readTrace } from '#services/trace_service'
@@ -275,7 +276,8 @@ export default class DashboardController {
   }
   async status({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
-    return response.json(await readConnectionStatus())
+    const [state, pendingOrders] = await Promise.all([readConnectionStatus(), pendingOrderCount()])
+    return response.json({ ...state, pendingOrders })
   }
   async usage({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')

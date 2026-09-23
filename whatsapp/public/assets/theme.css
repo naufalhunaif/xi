@@ -370,3 +370,26 @@ html[data-theme="dark"] .workspace-ui .wa-trace-sizes {
 .workspace-ui .wa-access-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 .workspace-ui .wa-access-form input { flex: 1 1 220px; min-width: 0; }
 .workspace-ui .wa-access-card pre#accessLog { max-height: 220px; font-size: 12px; white-space: pre-wrap; }
+
+/* Badge jumlah order menunggu total di menu samping */
+.workspace-ui .nav-item .nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--wa-amber, #b4650f); color: #fff; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: var(--wa-amber); color: var(--wa-amber-bg); }
+
+/* Filter kotak masuk: geser ke samping, panah ▾ membuka semua */
+.workspace-ui .wa-inbox-tabs { scrollbar-width: none; scroll-snap-type: x proximity; }
+.workspace-ui .wa-inbox-tabs::-webkit-scrollbar { display: none; }
+.workspace-ui .wa-inbox-tabs > button { scroll-snap-align: start; }
+.workspace-ui .wa-inbox-filters.expanded { flex-wrap: wrap; }
+.workspace-ui .wa-inbox-filters.expanded .wa-inbox-tabs { flex-wrap: wrap; overflow: visible; width: 100%; }
+.workspace-ui .wa-inbox-more { flex: 0 0 auto; padding: 6px !important; display: inline-flex; align-items: center; }
+.workspace-ui .wa-inbox-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+/* Detail order: panel menempel penuh di kanan (bukan mengambang) */
+.workspace-ui .wa-order-drawer { inset: 0 0 0 auto; height: 100dvh; border-radius: 0; border-width: 0 0 0 1px; width: min(560px, 100vw); }
+.workspace-ui .wa-order-editor h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 18px 0 8px; }
+.workspace-ui .wa-order-editor h2:first-child { margin-top: 0; }
+.workspace-ui .wa-order-photos { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+.workspace-ui .wa-order-photos figure { margin: 0; width: 112px; }
+.workspace-ui .wa-order-photos img { width: 112px; height: 140px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--wa-raised, #f3f4f2); display: block; }
+.workspace-ui .wa-order-photos figcaption { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.3; }
+.workspace-ui .wa-order-editor .wa-order-fields { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }

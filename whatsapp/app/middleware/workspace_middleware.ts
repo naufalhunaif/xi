@@ -6,6 +6,7 @@ import { inWorkspace } from '#services/workspace_context'
 import { ensureDefaults } from '#services/settings_service'
 import { appVersionLabel } from '#services/app_version'
 import { publicAppUrl } from '#services/public_url'
+import { pendingOrderCount } from '#services/pending_orders'
 
 export default class WorkspaceMiddleware {
   async handle(ctx: HttpContext, next: NextFn) {
@@ -17,6 +18,7 @@ export default class WorkspaceMiddleware {
       workspaceId: scope.id,
       appVersion: appVersionLabel(),
       appUrl: publicAppUrl(ctx.request),
+      pendingOrders: 0,
     })
     const expected = ctx.request.header('X-WhatsApp-Workspace')
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(ctx.request.method())
@@ -38,6 +40,8 @@ export default class WorkspaceMiddleware {
     }
     return inWorkspace(scope, async () => {
       await ensureDefaults()
+      if (!ctx.request.url().startsWith('/api/') && ctx.request.method() === 'GET')
+        ctx.view.share({ pendingOrders: await pendingOrderCount() })
       if (!mutation || !scope.id) return next()
       try {
         return await withChatMutationLock(async () => {
