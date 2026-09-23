@@ -56,8 +56,8 @@ APP="$DIR/app"
 # Port WEB: pakai WA_PORT, atau cari yang kosong mulai 3333 (port+1 dipakai callback MCP).
 port_free() { ! (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 PORT="${WA_PORT:-}"
-if [[ -z "$PORT" ]]; then
-  PORT="$(sed -n 's/^WA_PORT=//p' "$CONF" 2>/dev/null | head -n1)"
+if [[ -z "$PORT" && -f "$CONF" ]]; then
+  PORT="$(sed -n 's/^WA_PORT=//p' "$CONF" | head -n1)"
 fi
 if [[ -z "$PORT" ]]; then
   for p in 3333 3343 3353 3363 3373 3383; do
@@ -178,7 +178,8 @@ say "Versi: $VERSION"
 DB_NAME=wa
 DB_USER=wa
 ENV_FILE="$APP/whatsapp/.env"
-DB_PASS="$(sed -n 's/^DB_PASSWORD=//p' "$ENV_FILE" 2>/dev/null | head -n1)"
+DB_PASS=''
+[[ -f "$ENV_FILE" ]] && DB_PASS="$(sed -n 's/^DB_PASSWORD=//p' "$ENV_FILE" | head -n1)"
 [[ -n "$DB_PASS" ]] || DB_PASS="$(openssl rand -hex 16)"
 mysql_root() {
   if [[ "$MODE" == bare ]]; then mysql --protocol=socket -uroot "$@"; return; fi
