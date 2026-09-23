@@ -1,7 +1,8 @@
 # xi — WhatsApp AI CS (standalone)
 
 Aplikasi WhatsApp balas otomatis berbasis AI (AdonisJS + Baileys), berjalan sendiri di server Anda:
-login lokal, dipasang di akar domain, dikendalikan lewat perintah `wa`.
+login lokal, langsung bisa dibuka lewat `http://IP:PORT` (seperti aaPanel), domain dipasang belakangan,
+dikendalikan lewat perintah `wa`.
 
 ## Pasang (Ubuntu 22.04/24.04, Debian 12, atau aaPanel)
 
@@ -9,8 +10,8 @@ login lokal, dipasang di akar domain, dikendalikan lewat perintah `wa`.
 curl -fsSL https://raw.githubusercontent.com/naufalhunaif/xi/main/deploy/install.sh | sudo bash
 ```
 
-Domain dan email ditanya saat berjalan. Di aaPanel, buat dulu website untuk domain tersebut (dengan SSL).
-Lalu buka `https://wa.domainku.com/setup` untuk membuat akun pemilik.
+Tidak ada yang ditanya. Setelah selesai buka `http://IP-SERVER:PORT/setup` (alamat dicetak di akhir)
+untuk membuat akun pemilik. Pasang domain kapan saja: `wa domain wa.domainku.com`.
 
 - Panduan lengkap: [`whatsapp/docs/install.md`](whatsapp/docs/install.md)
 - Perintah server: `wa` (menu), `wa update`, `wa status`, `wa backup`, `wa user`, …
