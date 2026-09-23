@@ -248,6 +248,11 @@ CFG
 chmod 600 "$CONF"
 ln -sf "$APP/deploy/wa.sh" /usr/local/bin/wa
 chmod +x "$APP/deploy/wa.sh"
+# Halaman Pengaturan boleh memasang/melepas domain: user aplikasi hanya boleh `wa domain ...`.
+cat > /etc/sudoers.d/wa <<SUDO
+$APP_USER ALL=(root) NOPASSWD: /usr/local/bin/wa domain *
+SUDO
+chmod 440 /etc/sudoers.d/wa
 
 # ----------------------------------------------------------- supervisor ------
 say 'Mendaftarkan proses WEB dan WORKER (Supervisor)'

@@ -22,10 +22,12 @@
         <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7 5l10 4"/></svg></span>
         <span class="nav-text" data-i18n="Order">Order</span>
       </a>
+      @if(bundle)
       <a class="nav-item {{ page === 'lean' ? 'active' : '' }}" href="{{ appUrl }}/lean" aria-label="Beta 2" title="Beta 2" aria-current="{{ page === 'lean' ? 'page' : 'false' }}">
         <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M4 6h16M4 18h10"/></svg></span>
         <span class="nav-text">Beta 2</span>
       </a>
+      @end
       <a class="nav-item {{ page === 'beta3' ? 'active' : '' }}" href="{{ appUrl }}/beta3" aria-label="Beta 3" title="Beta 3" aria-current="{{ page === 'beta3' ? 'page' : 'false' }}">
         <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M4 6h16M4 18h10"/></svg></span>
         <span class="nav-text">Beta 3</span>
@@ -727,12 +729,18 @@
                 <section id="settings-general" data-settings-panel="general" aria-labelledby="settings-title-general" hidden>
                   <h2 id="settings-title-general" data-i18n="Umum">Umum</h2>
                   @if(!bundle)
-                    <div class="wa-access-card">
+                    <div class="wa-access-card" id="accessCard" data-app-url="{{ appUrl }}">
                       <strong data-i18n="Alamat akses & domain">Alamat akses & domain</strong>
-                      <p><span data-i18n="Saat ini aplikasi diakses lewat">Saat ini aplikasi diakses lewat</span> <code>{{ appUrl }}</code></p>
-                      <p data-i18n="Untuk memasang domain (dengan SSL), jalankan di terminal server:">Untuk memasang domain (dengan SSL), jalankan di terminal server:</p>
-                      <pre><code>wa domain nama-domain.com</code></pre>
-                      <p data-i18n="Perintah lain: wa (menu), wa status, wa update, wa backup, wa user.">Perintah lain: <code>wa</code> (menu), <code>wa status</code>, <code>wa update</code>, <code>wa backup</code>, <code>wa user</code>.</p>
+                      <p><span data-i18n="Saat ini aplikasi diakses lewat">Saat ini aplikasi diakses lewat</span> <code id="accessUrl">{{ appUrl }}</code></p>
+                      <form id="accessDomainForm" class="wa-access-form">
+                        <input id="accessDomain" name="domain" type="text" placeholder="wa.contoh.com" autocomplete="off" spellcheck="false" />
+                        <button type="submit" class="button" id="accessDomainSave" data-i18n="Pasang domain">Pasang domain</button>
+                        <button type="button" class="button secondary" id="accessDomainUnset" hidden data-i18n="Lepas domain">Lepas domain</button>
+                      </form>
+                      <p id="accessHint" data-i18n="Arahkan A record domain ke IP server ini dulu. SSL dipasang otomatis (Let's Encrypt).">Arahkan A record domain ke IP server ini dulu. SSL dipasang otomatis (Let's Encrypt).</p>
+                      <p id="accessHintPanel" hidden data-i18n="aaPanel: buat dulu website untuk domain ini di aaPanel (aktifkan SSL), lalu pasang di sini.">aaPanel: buat dulu website untuk domain ini di aaPanel (aktifkan SSL), lalu pasang di sini.</p>
+                      <pre id="accessLog" hidden></pre>
+                      <small id="accessStatus" role="status" aria-live="polite"></small>
                     </div>
                   @end
                   @include('partials/settings/appearance')

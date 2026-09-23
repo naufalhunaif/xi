@@ -8,6 +8,7 @@ import db from '#services/workspace_database'
 import { isAiWorking } from '#services/ai_work_schedule'
 import env from '#start/env'
 import { appVersion } from '#services/app_version'
+import { readAccess, setDomain, unsetDomain } from '#services/access_service'
 import { readUsage } from '#services/usage_service'
 import { evaluationOverview } from '#services/conversation_evaluation_service'
 import { readTrace } from '#services/trace_service'
@@ -214,6 +215,29 @@ export default class DashboardController {
       appUrl: env.get('APP_URL').replace(/\/$/, ''),
       bundle: accountUrl.replace(/\/account$/, ''),
     })
+  }
+
+  async access({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    return response.json(readAccess())
+  }
+
+  async setAccessDomain({ request, response }: HttpContext) {
+    try {
+      const domain = setDomain(String(request.input('domain', '')))
+      return response.json({ ok: true, requested: domain, ...readAccess() })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
+  }
+
+  async unsetAccessDomain({ response }: HttpContext) {
+    try {
+      unsetDomain()
+      return response.json({ ok: true, ...readAccess() })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
   }
 
   async version({ response }: HttpContext) {

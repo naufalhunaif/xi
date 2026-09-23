@@ -367,3 +367,6 @@ html[data-theme="dark"] .workspace-ui .wa-trace-sizes {
 .workspace-ui .wa-access-card p { margin: 6px 0; color: var(--muted); font-size: 13px; }
 .workspace-ui .wa-access-card pre { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: var(--wa-raised, #f3f4f2); overflow: auto; }
 .workspace-ui .wa-access-card code { font-size: 13px; }
+.workspace-ui .wa-access-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.workspace-ui .wa-access-form input { flex: 1 1 220px; min-width: 0; }
+.workspace-ui .wa-access-card pre#accessLog { max-height: 220px; font-size: 12px; white-space: pre-wrap; }

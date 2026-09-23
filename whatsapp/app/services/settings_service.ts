@@ -66,11 +66,13 @@ export function ensureDefaults() {
   defaults = (async () => {
     await initializeDatabase()
     const now = new Date()
+    // Standalone: mulai langsung di Beta 3 (Beta 1/2 tidak dipakai di pemasangan ini).
+    const beta3Default = isLocalAuth() ? 1 : 0
     await db.rawQuery(
       `INSERT IGNORE INTO whatsapp_settings
-       (id, ai_enabled, mcp_seeded, skill_name, skill_content, chatgpt_reasoning, claude_reasoning, chatgpt_speed, claude_speed, updated_at)
-       VALUES (1, 0, 0, NULL, NULL, 'auto', 'auto', 'standard', 'standard', ?)`,
-      [now]
+       (id, ai_enabled, mcp_seeded, skill_name, skill_content, chatgpt_reasoning, claude_reasoning, chatgpt_speed, claude_speed, lean_mode, beta3_mode, updated_at)
+       VALUES (1, 0, 0, NULL, NULL, 'auto', 'auto', 'standard', 'standard', ?, ?, ?)`,
+      [beta3Default ? 0 : 1, beta3Default, now]
     )
     await db.rawQuery(
       `INSERT IGNORE INTO whatsapp_connection (id, desired_connected, status, phone, qr_data_url, last_error, updated_at)

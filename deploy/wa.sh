@@ -197,6 +197,10 @@ update() {
   exec bash "$APP/deploy/wa.sh" _post-update
 }
 post_update() {
+  # Aturan sudo untuk pengaturan domain dari halaman Pengaturan (pemasangan lama belum punya).
+  if [[ ! -f /etc/sudoers.d/wa ]]; then
+    printf '%s ALL=(root) NOPASSWD: /usr/local/bin/wa domain *\n' "$U" > /etc/sudoers.d/wa; chmod 440 /etc/sudoers.d/wa
+  fi
   build
   say "Versi aktif: $(current_version) ($(git_ref))"
 }
@@ -312,7 +316,7 @@ uninstall() {
   rm -f "$SUP_DIR/wa-web.$SUP_EXT" "$SUP_DIR/wa-worker.$SUP_EXT"; supctl reread >/dev/null 2>&1; supctl update >/dev/null 2>&1 || true
   [[ -n "$DOMAIN" ]] && unset_domain >/dev/null 2>&1 || true
   MYSQL_PWD="$WA_DB_PASS" mysql -u"$WA_DB_USER" -e "DROP DATABASE IF EXISTS \`$WA_DB_NAME\`" 2>/dev/null || true
-  rm -f /etc/cron.d/wa-backup /usr/local/bin/wa
+  rm -f /etc/cron.d/wa-backup /usr/local/bin/wa /etc/sudoers.d/wa
   say "Kode dan data ada di $DIR (backup terakhir di $DIR/backups). Hapus manual bila sudah tidak perlu: rm -rf $DIR /etc/wa"
 }
 menu() {

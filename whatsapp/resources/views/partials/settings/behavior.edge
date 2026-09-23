@@ -1,8 +1,10 @@
 <label>
   <span data-i18n="Mode AI">Mode AI</span>
   <select name="aiMode">
+    @if(bundle)
     <option value="beta1" {{ settings.aiMode === 'beta1' ? 'selected' : '' }}>Beta 1 · analisis penuh + MCP</option>
     <option value="beta2" {{ settings.aiMode === 'beta2' ? 'selected' : '' }}>Beta 2 · jalur ramping</option>
+    @end
     <option value="beta3" {{ settings.aiMode === 'beta3' ? 'selected' : '' }}>Beta 3 · jalur ramping, terisolasi (tabel, skill, halaman sendiri)</option>
   </select>
 </label>
