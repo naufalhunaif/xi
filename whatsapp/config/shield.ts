@@ -1,4 +1,5 @@
 import { defineConfig } from '@adonisjs/shield'
+import env from '#start/env'
 
 /**
  * Security configuration using Shield.
@@ -93,7 +94,7 @@ const shieldConfig = defineConfig({
      * Enable HTTP Strict Transport Security.
      * Tells browsers to always use HTTPS for this site.
      */
-    enabled: true,
+    enabled: env.get('APP_URL').startsWith('https://'),
 
     /**
      * How long browsers should remember to use HTTPS.

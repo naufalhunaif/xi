@@ -4,7 +4,7 @@
 #    wa            menu interaktif
 #    wa status | restart | stop | start | logs [web|worker]
 #    wa update [VERSI] | rollback | version
-#    wa domain DOMAIN | port NOMOR | ssl | user [EMAIL] | backup | restore FILE | db
+#    wa domain DOMAIN | domain --lepas | port NOMOR | ssl | user [EMAIL] | backup | restore FILE | db
 #    wa mode | uninstall
 # =============================================================================
 set -euo pipefail
@@ -124,7 +124,7 @@ nginx_write_aapanel() {
   nginx -t || { cp "$vhost.bak-wa" "$vhost"; die 'Konfigurasi Nginx aaPanel tidak valid; dikembalikan.'; }
   nginx_reload
 }
-nginx_install() { if [[ "$MODE" == aapanel ]]; then nginx_write_aapanel; else nginx_write_bare; fi; }
+nginx_install() { [[ -n "$DOMAIN" ]] || die 'Belum ada domain.'; if [[ "$MODE" == aapanel ]]; then nginx_write_aapanel; else nginx_write_bare; fi; }
 
 # ------------------------------------------------------------------ ssl ------
 public_ip() { curl -fsS --max-time 8 https://api.ipify.org 2>/dev/null || curl -fsS --max-time 8 https://ifconfig.me 2>/dev/null || true; }
@@ -134,6 +134,7 @@ dns_ok() {
   getent ahostsv4 "$DOMAIN" | awk '{print $1}' | grep -qx "$ip"
 }
 ssl_issue() {
+  [[ -n "$DOMAIN" ]] || die 'Belum ada domain. Pasang dulu: wa domain nama-domain.com'
   [[ "$MODE" == bare ]] || { echo "aaPanel: aktifkan SSL untuk $DOMAIN di menu Website aaPanel."; return 0; }
   if ! dns_ok; then
     warn "DNS $DOMAIN belum mengarah ke IP server ini ($(public_ip)). Arahkan A record lalu jalankan: wa ssl"
@@ -239,7 +240,7 @@ restore() {
 status() {
   echo "Versi   : $(current_version) ($(git_ref))"
   echo "Mode    : $MODE · folder $APP"
-  echo "Domain  : https://$DOMAIN (port lokal $PORT)"
+  echo "Alamat  : $(app_url)${DOMAIN:+ (domain $DOMAIN)} · port $PORT"
   echo "Node    : $(node -v 2>/dev/null || echo '-')"
   supctl status wa-web wa-worker 2>/dev/null || [[ -S /var/run/supervisor.sock ]] || warn 'Supervisor belum berjalan.'
   if curl -fsS -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/login"; then echo 'WEB     : merespons'; else echo 'WEB     : tidak merespons'; fi
@@ -251,15 +252,46 @@ user_reset() {
   [[ -d "$APP/whatsapp/current" ]] || die 'Build belum ada. Jalankan: wa update'
   (cd -P "$APP/whatsapp/current" && as_app env NODE_ENV=production node ace.js auth:reset "$email")
 }
+app_url() { sed -n 's/^APP_URL=//p' "$APP/whatsapp/.env" | head -n1; }
+server_ip() { curl -fsS --max-time 6 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}'; }
+set_env() { # set_env KEY VALUE (di whatsapp/.env)
+  if grep -q "^$1=" "$APP/whatsapp/.env"; then sed -i "s|^$1=.*|$1=$2|" "$APP/whatsapp/.env"; else echo "$1=$2" >> "$APP/whatsapp/.env"; fi
+}
 set_domain() {
   local new="$1"
-  [[ "$new" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || die 'Domain tidak valid.'
+  if [[ "$new" == --lepas || "$new" == off ]]; then unset_domain; return; fi
+  [[ "$new" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || die 'Domain tidak valid. Contoh: wa domain wa.contoh.com'
+  if [[ "$MODE" == aapanel ]]; then
+    [[ -f "/www/server/panel/vhost/nginx/$new.conf" ]] || die "Website $new belum ada di aaPanel. Buat dulu di menu Website (aktifkan SSL), lalu ulangi."
+  else
+    if ! command -v nginx >/dev/null 2>&1 || ! command -v certbot >/dev/null 2>&1; then
+      say 'Memasang Nginx dan certbot'
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends nginx certbot python3-certbot-nginx >/dev/null
+      systemctl enable --now nginx >/dev/null 2>&1 || true
+    fi
+    if [[ -z "${WA_EMAIL:-}" || "$WA_EMAIL" == *@localhost ]]; then
+      local email=''
+      [[ -r /dev/tty ]] && read -r -p "Email untuk sertifikat SSL [admin@$new]: " email < /dev/tty || true
+      WA_EMAIL="${email:-admin@$new}"; save_conf WA_EMAIL "$WA_EMAIL"
+    fi
+  fi
   DOMAIN="$new"; save_conf WA_DOMAIN "$new"
-  sed -i "s|^APP_URL=.*|APP_URL=https://$new|" "$APP/whatsapp/.env"
+  set_env APP_URL "https://$new"
   nginx_install
   supctl restart wa-web wa-worker >/dev/null || true
-  say "Domain diganti ke https://$new"
-  [[ "$MODE" == bare ]] && ssl_issue || true
+  say "Domain terpasang: https://$new"
+  if [[ "$MODE" == bare ]]; then ssl_issue || true; else echo "aaPanel: pastikan SSL untuk $new aktif di menu Website."; fi
+}
+unset_domain() {
+  local ip; ip="$(server_ip)"
+  if [[ -n "$DOMAIN" ]]; then
+    if [[ "$MODE" == bare ]]; then rm -f /etc/nginx/sites-enabled/wa.conf /etc/nginx/sites-available/wa.conf; nginx_reload || true
+    else local v="/www/server/panel/vhost/nginx/$DOMAIN.conf"; [[ -f "$v" ]] && sed -i "\|nginx-wa-locations.conf|d" "$v"; nginx_reload || true; fi
+  fi
+  DOMAIN=''; save_conf WA_DOMAIN ''
+  set_env APP_URL "http://$ip:$PORT"; set_env HOST 0.0.0.0
+  supctl restart wa-web wa-worker >/dev/null || true
+  say "Domain dilepas. Akses lewat http://$ip:$PORT"
 }
 set_port() {
   local p="$1"
@@ -267,7 +299,7 @@ set_port() {
   PORT="$p"; save_conf WA_PORT "$p"
   sed -i "s|^PORT=.*|PORT=$p|; s|^MCP_OAUTH_CALLBACK_PORT=.*|MCP_OAUTH_CALLBACK_PORT=$((p + 1))|" "$APP/whatsapp/.env"
   grep -q '^MCP_OAUTH_CALLBACK_PORT=' "$APP/whatsapp/.env" || echo "MCP_OAUTH_CALLBACK_PORT=$((p + 1))" >> "$APP/whatsapp/.env"
-  nginx_install
+  if [[ -n "$DOMAIN" ]]; then nginx_install; else set_env APP_URL "http://$(server_ip):$p"; set_env HOST 0.0.0.0; fi
   supctl restart wa-web wa-worker >/dev/null || true
   sleep 3; supctl status wa-web wa-worker || true
   say "Port WEB sekarang $p (callback MCP $((p + 1)))."
@@ -278,8 +310,7 @@ uninstall() {
   backup || true
   supctl stop wa-web wa-worker >/dev/null 2>&1 || true
   rm -f "$SUP_DIR/wa-web.$SUP_EXT" "$SUP_DIR/wa-worker.$SUP_EXT"; supctl reread >/dev/null 2>&1; supctl update >/dev/null 2>&1 || true
-  if [[ "$MODE" == bare ]]; then rm -f /etc/nginx/sites-enabled/wa.conf /etc/nginx/sites-available/wa.conf; nginx_reload || true
-  else local v="/www/server/panel/vhost/nginx/$DOMAIN.conf"; [[ -f "$v" ]] && sed -i "\|nginx-wa-locations.conf|d" "$v"; nginx_reload || true; fi
+  [[ -n "$DOMAIN" ]] && unset_domain >/dev/null 2>&1 || true
   MYSQL_PWD="$WA_DB_PASS" mysql -u"$WA_DB_USER" -e "DROP DATABASE IF EXISTS \`$WA_DB_NAME\`" 2>/dev/null || true
   rm -f /etc/cron.d/wa-backup /usr/local/bin/wa
   say "Kode dan data ada di $DIR (backup terakhir di $DIR/backups). Hapus manual bila sudah tidak perlu: rm -rf $DIR /etc/wa"
@@ -288,9 +319,9 @@ menu() {
   while true; do
     cat <<M
 
-  WhatsApp v$(current_version) · $DOMAIN · $MODE
+  WhatsApp v$(current_version) · $(app_url) · $MODE
   ─────────────────────────────────────────────
-   1) Status              7) Ganti domain
+   1) Status              7) Pasang/ganti domain
    2) Restart             8) Perbarui SSL
    3) Update ke rilis terbaru
    4) Rollback versi      9) Backup sekarang

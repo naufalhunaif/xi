@@ -1,13 +1,14 @@
 # Pasang WhatsApp standalone (satu perintah)
 
 Aplikasi WhatsApp berjalan sendiri: tanpa bundle PHP (Store/Material/Invoice/Fit/Account),
-login memakai email + password milik aplikasi ini, dipasang di akar domain
-(`https://wa.domainku.com`), dan dikendalikan lewat perintah `wa`.
+login memakai email + password milik aplikasi ini, dan dikendalikan lewat perintah `wa`.
+Alurnya seperti aaPanel: setelah install langsung bisa dibuka lewat `http://IP:PORT`,
+domain (dengan SSL) dipasang belakangan dengan `wa domain nama-domain.com`.
 
 ## Kebutuhan
 
 - VPS Linux **Ubuntu 22.04 / 24.04** atau **Debian 12**, akses root, RAM ≥ 2 GB.
-- Domain/subdomain yang A record-nya sudah mengarah ke IP server (untuk SSL otomatis).
+- Domain tidak wajib. Bila nanti mau pasang domain: A record-nya mengarah ke IP server.
 - Kode standalone ada di repo publik **github.com/naufalhunaif/xi** (tanpa token).
 
 ## Server kosong (tanpa aaPanel)
@@ -16,24 +17,28 @@ login memakai email + password milik aplikasi ini, dipasang di akar domain
 curl -fsSL https://raw.githubusercontent.com/naufalhunaif/xi/main/deploy/install.sh | sudo bash
 ```
 
-Domain dan email ditanya saat berjalan (bisa juga lewat `WA_DOMAIN=... WA_EMAIL=...`).
+Tidak ada yang ditanya. Installer memasang MariaDB, Supervisor, Node.js 24, membuat user sistem
+`wa`, menaruh kode di `/opt/wa/app`, membuat database + `.env`, build, lalu menyalakan proses
+WEB dan WORKER di port kosong pertama mulai 3333.
 
-Installer memasang Nginx, MariaDB, Supervisor, certbot, Node.js 24, membuat user sistem
-`wa`, menaruh kode di `/opt/wa/app`, membuat database + `.env`, build, menyalakan proses
-WEB dan WORKER, lalu meminta sertifikat Let's Encrypt. Bila DNS belum mengarah, sementara
-dipakai sertifikat self-signed; jalankan `wa ssl` setelah DNS beres.
+Setelah selesai buka **`http://IP-SERVER:PORT/setup`** (alamatnya dicetak di akhir) untuk
+membuat akun pemilik pertama.
 
-Setelah selesai buka **`https://wa.domainku.com/setup`** untuk membuat akun pemilik pertama.
+Pasang domain kapan saja (Nginx + certbot dipasang otomatis saat itu):
+
+```bash
+wa domain wa.domainku.com
+```
 
 ## Server aaPanel
 
-1. Di aaPanel → Website → tambah site untuk `wa.domainku.com`, aktifkan SSL (Let's Encrypt).
-2. Node.js 24 sebaiknya sudah ada (App Store → Node.js version manager); bila tidak, installer
-   memasang sendiri. Supervisor dipasang otomatis bila belum ada.
-3. Jalankan perintah yang sama seperti di atas. Installer mendeteksi aaPanel, menaruh kode di
-   `/www/wwwroot/wa`, memakai MySQL aaPanel (password root dibaca dari panel; bila gagal
-   tambahkan `WA_DB_ROOT_PASSWORD=...`), mendaftarkan proses ke Supervisor aaPanel, dan
-   menyisipkan `include .../nginx-wa-locations.conf;` ke vhost site tersebut.
+1. Jalankan perintah yang sama. Installer mendeteksi aaPanel, menaruh kode di `/www/wwwroot/wa`,
+   memakai MySQL aaPanel (password root dibaca dari panel; bila gagal tambahkan
+   `WA_DB_ROOT_PASSWORD=...`), dan mendaftarkan proses ke Supervisor (plugin aaPanel atau
+   Supervisor sistem). Node.js 24 dari aaPanel dipakai bila ada.
+2. Buka port yang dicetak installer di aaPanel → Security, lalu buka `http://IP:PORT/setup`.
+3. Untuk domain: buat site di aaPanel → Website (aktifkan SSL), lalu `wa domain nama-domain.com`.
+   Installer menyisipkan `include .../nginx-wa-locations.conf;` ke vhost site itu.
 
 ## Perintah `wa`
 
@@ -46,7 +51,8 @@ Setelah selesai buka **`https://wa.domainku.com/setup`** untuk membuat akun pemi
 | `wa logs [web\|worker]` | ikuti log |
 | `wa update [v3.0.1\|main]` | ambil rilis v3 terbaru (atau versi/branch tertentu), build, restart |
 | `wa rollback` | kembali ke versi sebelum `update` terakhir |
-| `wa domain wa-baru.domainku.com` | ganti domain (`APP_URL`, vhost, SSL) |
+| `wa domain wa.domainku.com` | pasang/ganti domain (`APP_URL`, vhost Nginx, SSL) |
+| `wa domain --lepas` | lepas domain, kembali ke `http://IP:PORT` |
 | `wa port 3343` | ganti port lokal WEB (bila 3333 dipakai aplikasi lain; callback MCP = port+1) |
 | `wa ssl` | minta/perbarui sertifikat Let's Encrypt (mode bare) |
 | `wa user [email]` | reset password akun; akun dibuat bila belum ada |

@@ -4,13 +4,11 @@
 #
 #  Server kosong (Ubuntu 22.04/24.04, Debian 12) maupun aaPanel:
 #    curl -fsSL https://raw.githubusercontent.com/naufalhunaif/xi/main/deploy/install.sh | sudo bash
-#  Domain dan email ditanya saat berjalan (atau isi lewat variabel di bawah).
+#  Seperti aaPanel: tanpa domain, langsung bisa dibuka lewat http://IP:PORT.
+#  Domain dipasang belakangan: wa domain nama-domain.com
 #
-#  Server aaPanel: buat dulu website untuk domain di aaPanel (dengan SSL). Installer
-#  mendeteksi aaPanel dan memakai Nginx/MySQL-nya; Supervisor dipasang bila belum ada.
-#
-#  Variabel (opsional; ditanya bila terminal interaktif):
-#    WA_DOMAIN     domain aplikasi, mis. wa.contoh.com
+#  Variabel (opsional):
+#    WA_DOMAIN     langsung pasang domain setelah install (aaPanel: website-nya harus sudah ada)
 #    WA_EMAIL      email untuk Let's Encrypt (bare)
 #    WA_TOKEN      GitHub token (hanya bila repo privat)
 #    WA_VERSION    tag rilis (v3.0.0) atau branch (main); default: rilis v3 terbaru
@@ -74,19 +72,20 @@ if [[ -f "$CONF" ]] && grep -q '^WA_INSTALLED=1' "$CONF" && [[ -x "$APP/deploy/w
   exit 0
 fi
 
-ask WA_DOMAIN 'Domain aplikasi (mis. wa.contoh.com)'
 DOMAIN="${WA_DOMAIN:-}"
-[[ "$DOMAIN" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || die 'Domain tidak valid.'
-if [[ "$MODE" == aapanel && ! -f "/www/server/panel/vhost/nginx/$DOMAIN.conf" ]]; then
-  die "Website $DOMAIN belum ada di aaPanel. Buat dulu di menu Website (aktifkan SSL), lalu jalankan lagi."
+if [[ -n "$DOMAIN" ]]; then
+  [[ "$DOMAIN" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || die 'WA_DOMAIN tidak valid.'
+  if [[ "$MODE" == aapanel && ! -f "/www/server/panel/vhost/nginx/$DOMAIN.conf" ]]; then
+    die "Website $DOMAIN belum ada di aaPanel. Buat dulu di menu Website (aktifkan SSL), atau pasang tanpa WA_DOMAIN lalu: wa domain $DOMAIN"
+  fi
 fi
-if [[ "$MODE" == bare ]]; then
-  ask WA_EMAIL "Email untuk sertifikat SSL (Let's Encrypt)" "admin@$DOMAIN"
-fi
-EMAIL="${WA_EMAIL:-admin@$DOMAIN}"
+EMAIL="${WA_EMAIL:-admin@${DOMAIN:-localhost}}"
 TOKEN="${WA_TOKEN:-}"
+server_ip() { hostname -I 2>/dev/null | awk '{print $1}'; }
+IP="$(curl -fsS --max-time 6 https://api.ipify.org 2>/dev/null || server_ip)"
+[[ -n "$IP" ]] || IP="$(server_ip)"
 
-say "Mode: $MODE · folder: $DIR · domain: $DOMAIN · port: $PORT"
+say "Mode: $MODE · folder: $DIR · IP: $IP · port: $PORT${DOMAIN:+ · domain: $DOMAIN}"
 
 # ---------------------------------------------------------- paket OS ---------
 say 'Memasang paket sistem'
@@ -94,9 +93,8 @@ apt-get update -qq
 apt-get install -y -qq --no-install-recommends ca-certificates curl gnupg git build-essential \
   python3 pkg-config libstdc++6 xz-utils openssl cron >/dev/null
 if [[ "$MODE" == bare ]]; then
-  apt-get install -y -qq --no-install-recommends nginx mariadb-server supervisor certbot \
-    python3-certbot-nginx >/dev/null
-  systemctl enable --now nginx mariadb supervisor >/dev/null 2>&1 || true
+  apt-get install -y -qq --no-install-recommends mariadb-server supervisor >/dev/null
+  systemctl enable --now mariadb supervisor >/dev/null 2>&1 || true
 elif [[ ! -f /www/server/panel/plugin/supervisor/supervisord.conf && ! -f /etc/supervisord.conf && ! -f /etc/supervisor/supervisord.conf ]]; then
   # aaPanel tanpa plugin Supervisor: pakai Supervisor sistem.
   apt-get install -y -qq --no-install-recommends supervisor >/dev/null
@@ -205,18 +203,16 @@ FLUSH PRIVILEGES;
 SQL
 
 # -------------------------------------------------------------------- .env ---
-if [[ -f "$ENV_FILE" ]]; then
-  sed -i "s|^APP_URL=.*|APP_URL=https://$DOMAIN|" "$ENV_FILE"
-else
+if [[ ! -f "$ENV_FILE" ]]; then
   say 'Menulis whatsapp/.env'
   cat > "$ENV_FILE" <<ENV
 TZ=Asia/Jakarta
 PORT=$PORT
-HOST=127.0.0.1
+HOST=0.0.0.0
 NODE_ENV=production
 LOG_LEVEL=info
 APP_KEY=$(openssl rand -base64 32)
-APP_URL=https://$DOMAIN
+APP_URL=http://$IP:$PORT
 APP_BASE_PATH=
 ACCOUNT_URL=
 AUTH_MODE=local
@@ -256,17 +252,13 @@ chmod +x "$APP/deploy/wa.sh"
 say 'Mendaftarkan proses WEB dan WORKER (Supervisor)'
 bash "$APP/deploy/wa.sh" _supervisor-install
 
-# -------------------------------------------------------------- nginx --------
-say 'Mengatur Nginx'
-bash "$APP/deploy/wa.sh" _nginx-install
-
 # -------------------------------------------------------------- build --------
 say 'Build aplikasi (beberapa menit pada pemasangan pertama)'
 bash "$APP/deploy/wa.sh" _build --first
 
-# -------------------------------------------------------------- ssl ----------
-if [[ "$MODE" == bare ]]; then
-  bash "$APP/deploy/wa.sh" ssl || warn "SSL Let's Encrypt belum berhasil; sementara memakai sertifikat self-signed. Ulangi: wa ssl"
+# -------------------------------------------------------------- domain -------
+if [[ -n "$DOMAIN" ]]; then
+  bash "$APP/deploy/wa.sh" domain "$DOMAIN" || warn "Domain belum terpasang; ulangi nanti: wa domain $DOMAIN"
 fi
 
 # -------------------------------------------------------------- cron ---------
@@ -277,15 +269,19 @@ CRON
 
 # -------------------------------------------------------------- firewall -----
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
-  ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null
+  ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow "$PORT/tcp" >/dev/null
+fi
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+  firewall-cmd --permanent --add-port="$PORT/tcp" >/dev/null 2>&1; firewall-cmd --reload >/dev/null 2>&1 || true
 fi
 
 echo 'WA_INSTALLED=1' >> "$CONF"
 say 'Selesai.'
 cat <<DONE
 
-  Buka:      https://$DOMAIN/setup   (buat akun pemilik pertama)
-  Perintah:  wa            (menu: status, update, domain/SSL, user, log, backup, ...)
+  Buka:      $( [[ -n "$DOMAIN" ]] && echo "https://$DOMAIN/setup" || echo "http://$IP:$PORT/setup" )   (buat akun pemilik pertama)
+  Domain:    wa domain nama-domain.com   (pasang domain + SSL kapan saja)
+  Perintah:  wa            (menu: status, update, domain, user, log, backup, ...)
   Versi:     $VERSION
-$( [[ "$MODE" == aapanel ]] && printf '\n  aaPanel: pastikan SSL untuk %s sudah aktif di menu Website aaPanel.\n' "$DOMAIN" )
+$( [[ "$MODE" == aapanel ]] && printf '\n  aaPanel: buka port %s di menu Security bila belum terbuka.\n' "$PORT" )
 DONE

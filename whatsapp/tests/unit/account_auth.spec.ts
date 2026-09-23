@@ -213,7 +213,9 @@ test('standalone URLs accept the domain root and reject http or a mismatched bas
   assert.doesNotThrow(() => validateWorkspaceUrls('https://wa.shop.test', '', ''))
   assert.doesNotThrow(() => validateWorkspaceUrls('https://wa.shop.test/', '', '/'))
   assert.doesNotThrow(() => validateWorkspaceUrls('https://shop.test/wa', '', '/wa'))
-  assert.throws(() => validateWorkspaceUrls('http://wa.shop.test', '', ''))
+  // Standalone boleh http://IP:PORT sebelum domain dipasang.
+  assert.doesNotThrow(() => validateWorkspaceUrls('http://203.0.113.10:3343', '', ''))
+  assert.throws(() => validateWorkspaceUrls('ftp://wa.shop.test', '', ''))
   assert.throws(() => validateWorkspaceUrls('https://wa.shop.test', '', '/whatsapp'))
   assert.throws(() => validateWorkspaceUrls('https://wa.shop.test?x=1', '', ''))
 })

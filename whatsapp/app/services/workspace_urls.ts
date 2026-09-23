@@ -4,8 +4,8 @@ export function validateWorkspaceUrls(appUrl: string, accountUrl: string, basePa
   const path = app.pathname.replace(/\/$/, '')
   const base = basePath.replace(/\/$/, '')
   if (!accountUrl) {
-    // Standalone: hanya APP_URL yang dicek; path boleh akar ('') atau sub-folder.
-    if (app.protocol !== 'https:') throw new Error('Produksi memerlukan APP_URL dengan https://.')
+    // Standalone: boleh http://IP:PORT sebelum domain dipasang; path boleh akar ('') atau sub-folder.
+    if (!['http:', 'https:'].includes(app.protocol)) throw new Error('APP_URL harus http:// atau https://.')
     if (app.username || app.password || app.search || app.hash)
       throw new Error('APP_URL tidak boleh berisi kredensial, query, atau fragment.')
     if (path !== base) throw new Error('APP_BASE_PATH harus sama dengan path APP_URL (kosong bila di akar).')

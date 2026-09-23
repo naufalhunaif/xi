@@ -726,6 +726,15 @@
                 </section>
                 <section id="settings-general" data-settings-panel="general" aria-labelledby="settings-title-general" hidden>
                   <h2 id="settings-title-general" data-i18n="Umum">Umum</h2>
+                  @if(!bundle)
+                    <div class="wa-access-card">
+                      <strong data-i18n="Alamat akses & domain">Alamat akses & domain</strong>
+                      <p><span data-i18n="Saat ini aplikasi diakses lewat">Saat ini aplikasi diakses lewat</span> <code>{{ appUrl }}</code></p>
+                      <p data-i18n="Untuk memasang domain (dengan SSL), jalankan di terminal server:">Untuk memasang domain (dengan SSL), jalankan di terminal server:</p>
+                      <pre><code>wa domain nama-domain.com</code></pre>
+                      <p data-i18n="Perintah lain: wa (menu), wa status, wa update, wa backup, wa user.">Perintah lain: <code>wa</code> (menu), <code>wa status</code>, <code>wa update</code>, <code>wa backup</code>, <code>wa user</code>.</p>
+                    </div>
+                  @end
                   @include('partials/settings/appearance')
                   <label>
                     <span data-i18n="Bahasa tampilan">Bahasa tampilan</span>
