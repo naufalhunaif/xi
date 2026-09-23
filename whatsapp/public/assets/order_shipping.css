@@ -1,0 +1,6 @@
+.wa-shipping-progress { display: grid; gap: 3px; margin-top: 8px; font-size: 12px; color: #59645e; }
+.wa-shipping-progress-label { display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.wa-shipping-progress-meta { font-size: 11px; color: #777d78; }
+.wa-shipping-spinner { width: 10px; height: 10px; flex: 0 0 10px; border: 1.5px solid #cce2d6; border-top-color: #27835b; border-radius: 50%; animation: wa-shipping-spin .9s linear infinite; }
+@keyframes wa-shipping-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wa-shipping-spinner { animation: none; } }

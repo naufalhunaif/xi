@@ -1,0 +1,51 @@
+<div class="wa-usage-toolbar">
+  <strong data-i18n="Sisa kuota akun">Sisa kuota akun</strong>
+  <span class="wa-quota-help" tabindex="0" role="note" aria-label="Info" data-i18n-title="Kuota akun dari layanan AI, bukan token aplikasi atau kapasitas konteks." title="Kuota akun dari layanan AI, bukan token aplikasi atau kapasitas konteks.">ⓘ</span>
+</div>
+<div id="quotaCards" class="wa-usage-cards" aria-busy="true"></div>
+<p id="quotaStatus" class="wa-usage-caption" role="status" data-i18n="Memuat kuota…">Memuat kuota…</p>
+<div class="wa-usage-toolbar">
+  <span data-i18n="30 hari terakhir · WIB">30 hari terakhir · WIB</span>
+  <button id="usageRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button>
+</div>
+<div id="usageStatus" class="wa-usage-caption" role="status" data-i18n="Memuat penggunaan…">Memuat penggunaan…</div>
+<div id="usageCards" class="wa-usage-cards"></div>
+<div class="wa-usage-table-wrap">
+  <table class="wa-usage-table">
+    <caption data-i18n="Token per fase proses">Token per fase proses</caption>
+    <thead>
+      <tr>
+        <th data-i18n="Fase">Fase</th>
+        <th data-i18n="Proses">Proses</th>
+        <th>Input</th>
+        <th data-i18n="Cache dibaca">Cache dibaca</th>
+        <th data-i18n="Cache ditulis">Cache ditulis</th>
+        <th>Output</th>
+        <th data-i18n="Porsi">Porsi</th>
+      </tr>
+    </thead>
+    <tbody id="usagePhases"></tbody>
+  </table>
+</div>
+<p class="wa-usage-caption" data-i18n="Satu pesan pelanggan dapat memicu beberapa fase; tiap fase adalah satu panggilan penuh ke layanan AI.">
+  Satu pesan pelanggan dapat memicu beberapa fase; tiap fase adalah satu panggilan penuh ke layanan AI.
+</p>
+<div class="wa-usage-table-wrap">
+  <table class="wa-usage-table">
+    <caption data-i18n="Proses terbaru">Proses terbaru</caption>
+    <thead>
+      <tr>
+        <th data-i18n="Waktu">Waktu</th>
+        <th data-i18n="Fase">Fase</th>
+        <th>AI / Model</th>
+        <th>Token</th>
+        <th data-i18n="Durasi">Durasi</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="usageRecent"></tbody>
+  </table>
+</div>
+<p class="wa-usage-caption" data-i18n="Statistik token hanya mencakup penggunaan aplikasi ini.">
+  Statistik token hanya mencakup penggunaan aplikasi ini.
+</p>

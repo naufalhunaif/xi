@@ -1,0 +1,73 @@
+<div class="wa-mcp-add">
+  <input id="mcpName" type="text" maxlength="120" placeholder="Nama" / data-i18n-placeholder="Nama">
+  <input id="mcpUrl" type="url" maxlength="1000" placeholder="URL MCP" />
+  <button id="mcpAddButton" class="button" type="button" data-i18n="Tambah">Tambah</button>
+</div>
+<div id="mcpConnections" class="wa-mcp-list">
+  @each(connection in settings.mcpConnections)
+    <div class="wa-mcp-row" data-mcp-row="{{ connection.slug }}">
+      <div class="wa-mcp-source">
+        <span>
+          <strong>{{ connection.name }}</strong>
+          <small
+            data-mcp-status
+            class="wa-connection-indicator {{ connection.authenticated ? 'connected' : '' }}"
+            title="{{ connection.authenticated ? 'Terhubung' : 'Belum terhubung' }}"
+          >
+            {{
+              connection.authenticated
+                ? 'Terhubung'
+                : connection.pending
+                  ? 'Menunggu login'
+                  : connection.error
+                    ? 'Gagal'
+                    : 'Belum terhubung'
+            }}
+          </small>
+        </span>
+      </div>
+      <div class="wa-setting-actions">
+        <button
+          class="wa-setting-icon wa-icon-connect"
+          type="button"
+          title="Hubungkan {{ connection.name }}"
+          aria-label="Hubungkan {{ connection.name }}"
+          data-mcp-connect="{{ connection.slug }}"
+          {{ connection.sharedAuthenticated ? 'hidden' : '' }}
+         data-i18n="Hubungkan">
+          Hubungkan
+        </button>
+        <a
+          class="wa-mcp-login wa-setting-icon wa-icon-external"
+          data-mcp-login
+          title="Login {{ connection.name }}"
+          aria-label="Login {{ connection.name }}"
+          href="{{ connection.verificationUrl || '#' }}"
+          target="_blank"
+          rel="noopener"
+          {{ connection.verificationUrl ? '' : 'hidden' }}
+         data-i18n="Login">
+          Login
+        </a>
+        <button
+          class="wa-setting-icon wa-icon-delete"
+          type="button"
+          data-mcp-delete="{{ connection.slug }}"
+          aria-label="Hapus {{ connection.name }}"
+          title="Hapus {{ connection.name }}"
+         data-i18n="Hapus">
+          Hapus
+        </button>
+        <button
+          type="button"
+          class="wa-switch"
+          role="switch"
+          aria-label="Aktifkan {{ connection.name }}"
+          aria-checked="{{ connection.enabled ? 'true' : 'false' }}"
+          value="{{ connection.enabled ? 'true' : 'false' }}"
+          data-mcp-enabled="{{ connection.slug }}"
+        ></button>
+      </div>
+    </div>
+  @end
+</div>

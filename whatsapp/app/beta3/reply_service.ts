@@ -1,0 +1,643 @@
+// Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
+import db from '#services/workspace_database'
+import { estimateTokens } from '#services/prompt_size_service'
+import type { TraceSink } from '#services/trace_service'
+import { catalogDigest, findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
+import { listLeanExamples, pickExamples, seedLeanExamples } from '#beta3/examples_service'
+import { readCustomerNote, readOrderSpec, writeOrderSpec } from '#beta3/customer_service'
+import {
+  parseOrderForm,
+  saveLeanOrder,
+  updatePendingOrderSpec,
+  latestLeanOrder,
+  noteAutoTotalReason,
+  verifyAutoTotal,
+  updatePendingOrderRates,
+  type VerifiedAutoTotal,
+} from '#beta3/order_service'
+import {
+  buildLeanPrompt,
+  parseLeanDecision,
+  renderProductionEstimate,
+  type LeanDecision,
+  type LeanHistoryRow,
+} from '#beta3/prompt'
+import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
+import {
+  callLeanTool,
+  extractBodyMeasure,
+  extractShippingQuery,
+  type DestinationRow,
+  type DestinationArea,
+  groupDestinations,
+  normalizeCity,
+  pickArea,
+  type LeanMcpConfig,
+  renderDestinationChoices,
+  readLeanMcpConfig,
+  renderFitResult,
+  renderShippingRates,
+  type FitResult,
+  type ShippingRates,
+} from '#beta3/mcp'
+import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
+
+/**
+ * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
+ * token. Angka/tahap ditangani kode; AI hanya menulis kata-kata.
+ */
+export const LEAN_SKILL_NAME = 'beta3-cs-inti'
+export const LEAN_SKILL_TOKEN_LIMIT = 6000
+const HISTORY_LIMIT = 30
+
+export type LeanSettings = LeanProviderSettings & {
+  production?: Parameters<typeof renderProductionEstimate>[0]
+  skills: Array<{ name: string; content: string }>
+  paymentMethods: Array<{
+    name: string
+    destination: string
+    accountName: string
+    enabled: boolean
+  }>
+}
+
+export type LeanReply = {
+  decision: LeanDecision
+  photos: Array<{ caption: string; url: string }>
+  promptTokens: number
+  promptSections: Array<{ key: string; chars: number; tokens: number }>
+  usage: Awaited<ReturnType<typeof runLeanProvider>>['usage']
+  durationMs: number
+  orderId: number | null
+  autoTotal: VerifiedAutoTotal | null
+  skillName: string
+}
+
+const WAIT_NOTICE = 'waiting-notices'
+
+export function selectLeanSkill(skills: Array<{ name: string; content: string }>) {
+  const preferred = skills.find((skill) => skill.name === LEAN_SKILL_NAME)
+  const chosen =
+    preferred || skills.find((skill) => skill.name !== WAIT_NOTICE && skill.content.trim())
+  if (!chosen) throw new Error(`Import skill ${LEAN_SKILL_NAME} (satu file) terlebih dahulu.`)
+  return chosen
+}
+
+function stageFromNote(note: string) {
+  const match = note.match(/tahap\s*[:=]\s*([a-z_]+)/i)
+  return match ? match[1].toLowerCase() : ''
+}
+
+async function history(jid: string, currentIds: Set<string>): Promise<LeanHistoryRow[]> {
+  const rows = await db
+    .from('whatsapp_messages')
+    .select('message_id', 'direction', 'sender_type', 'body', 'media_type', 'created_at')
+    .where('jid', jid)
+    .whereNotIn('status', ['failed', 'queued'])
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(HISTORY_LIMIT)
+  return rows.reverse().map((row) => ({
+    direction: row.direction === 'in' ? 'in' : 'out',
+    senderType: row.sender_type,
+    body: row.body,
+    mediaType: row.media_type,
+    createdAt: row.created_at,
+    current: currentIds.has(String(row.message_id)),
+  }))
+}
+
+export function resolvePhotos(rows: LeanCatalogRow[], labels: string[]) {
+  const photos: Array<{ caption: string; url: string }> = []
+  for (const label of labels) {
+    const row = findCatalogVariant(rows, label)
+    if (!row?.photoUrl) continue
+    const caption = row.color ? `${row.product} - ${row.color}` : row.product
+    if (photos.some((photo) => photo.url === row.photoUrl)) continue
+    photos.push({ caption, url: row.photoUrl })
+  }
+  return photos.slice(0, 3)
+}
+
+export async function createLeanReply(input: {
+  jid: string
+  messageIds: string[]
+  text: string
+  imagePaths?: string[]
+  settings: LeanSettings
+  onTrace?: TraceSink
+}): Promise<LeanReply> {
+  const { jid, settings, onTrace } = input
+  const skill = selectLeanSkill(settings.skills)
+  const skillTokens = estimateTokens(skill.content)
+  if (skillTokens > LEAN_SKILL_TOKEN_LIMIT)
+    onTrace?.({
+      key: 'beta3-skill',
+      label: `Skill ${skill.name} terlalu panjang (~${skillTokens} token, batas ${LEAN_SKILL_TOKEN_LIMIT})`,
+      status: 'completed',
+      detail: { tokens: skillTokens, limit: LEAN_SKILL_TOKEN_LIMIT },
+    })
+
+  await seedLeanExamples().catch(() => 0)
+  const [digest, examples, customerNote, chatNote, rows, spec] = await Promise.all([
+    catalogDigest(),
+    listLeanExamples(),
+    readCustomerNote(jid),
+    readBeta3ChatNote(jid),
+    history(jid, new Set(input.messageIds)),
+    readOrderSpec(jid),
+  ])
+  const stage = stageFromNote(chatNote)
+
+  // Tool dipanggil KODE pada event: TB/BB → fit advisor, form → ongkir. Model tidak memanggil tool.
+  const mcp = await readLeanMcpConfig()
+  const toolNotes: string[] = []
+  const measure = extractBodyMeasure(input.text)
+  const fitLastKey = `fit:last:${jid}`
+  if (measure && mcp.url) {
+    // Jas dan celana sekaligus, supaya "celananya no berapa" nanti tidak ditebak model.
+    const cacheKey = `fit:${jid}:${measure.height}:${measure.weight}`
+    try {
+      let cached = await readLeanState(cacheKey)
+      if (!cached) {
+        const notes: string[] = []
+        for (const type of ['suit', 'pants'] as const) {
+          const fit = await callLeanTool<FitResult>('fit_advisor', { type, ...measure }, mcp)
+          if (fit?.recommended_size) notes.push(renderFitResult(fit, measure, type))
+        }
+        cached = notes.join('\n')
+        if (cached) await writeLeanState(cacheKey, cached)
+      }
+      if (cached) {
+        await writeLeanState(fitLastKey, JSON.stringify({ note: cached, at: Date.now() }))
+        toolNotes.push(cached)
+        onTrace?.({
+          key: 'beta3-fit',
+          label: `Fit advisor · ${cached.split(':')[1]?.trim().split('.')[0] || ''}`,
+          status: 'completed',
+          detail: { measure },
+        })
+      }
+    } catch (error) {
+      onTrace?.({
+        key: 'beta3-fit',
+        label: 'Fit advisor tidak tersedia',
+        status: 'failed',
+        detail: { error: error instanceof Error ? error.message : String(error) },
+      })
+    }
+  } else if (/\b(size|ukuran|celana|nomor|no)\b/i.test(input.text)) {
+    // Pertanyaan size/celana beberapa pesan setelah TB/BB: ulangi rekomendasi yang sama (3 jam).
+    const last = parseJson<{ note: string; at: number }>(await readLeanState(fitLastKey))
+    if (last?.note && Date.now() - last.at < 3 * 60 * 60_000) toolNotes.push(last.note)
+  }
+
+  // Jalur 2: form order dibaca kode, disimpan untuk CS. AI tetap menulis balasannya.
+  let orderId: number | null = null
+  let systemNote = ''
+  const form = parseOrderForm(input.text)
+
+  // Pertanyaan ongkir bebas ("ongkir ke cinyawang berapa"): kode cari tujuan lalu tarif.
+  // Lanjutannya ("kalo ke jakarta?", "mampang", "jakarta selatan") dikenali 30 menit.
+  // Tarif per KECAMATAN; kelurahan tidak ditanyakan.
+  const lastKey = `ongkir:last:${jid}`
+  const last = form ? null : parseJson<LastShipping>(await readLeanState(lastKey))
+  // Juga saat AI baru bertanya "pengiriman kemana": jawaban "ke pulogadung" langsung dicek.
+  const followUp = Boolean(last && Date.now() - last.at < 30 * 60_000) || stage === 'minta_alamat'
+  const place = form ? null : extractShippingQuery(input.text, followUp)
+  if (place && mcp.url) {
+    try {
+      let note = ''
+      let pending = false
+      let choices: DestinationArea[] = []
+      let resolved: DestinationArea | null = null
+      // Jawaban atas pilihan yang tadi ditanyakan: cocokkan dulu, tanpa cari ulang.
+      if (followUp && last?.pending && last.choices?.length)
+        resolved = pickArea(input.text, last.choices)
+      if (!resolved) {
+        let areas = groupDestinations(await findDestinations(place, mcp))
+        if (!areas.length && last?.pending && last.place && !place.includes(last.place))
+          areas = groupDestinations(await findDestinations(`${place} ${last.place}`, mcp))
+        if (!areas.length) {
+          pending = true
+          note = `TUJUAN "${place}" tidak ditemukan di data ekspedisi. Tanyakan kecamatan dan kabupatennya (satu pertanyaan).`
+        } else if (areas.length > 4) {
+          pending = true
+          note = `TUJUAN "${place}" terlalu luas (banyak kecamatan). Tanyakan kecamatannya (satu pertanyaan), jangan sebut ongkir dulu.`
+        } else if (areas.length > 1) {
+          pending = true
+          choices = areas
+          note = renderDestinationChoices(place, areas)
+        } else {
+          resolved = areas[0]
+        }
+      }
+      if (resolved) {
+        const cacheKey = `ongkir:${resolved.code}:${new Date().toISOString().slice(0, 10)}`
+        note = await readLeanState(cacheKey)
+        if (!note) {
+          const rates = await callLeanTool<ShippingRates>(
+            'check_shipping_rates',
+            { destination: resolved.code, weight_grams: 1000 },
+            mcp
+          )
+          note = rates ? renderShippingRates(rates) : ''
+          if (note) await writeLeanState(cacheKey, note)
+        }
+      }
+      await writeLeanState(
+        lastKey,
+        JSON.stringify({ place, pending, at: Date.now(), choices, resolved } satisfies LastShipping)
+      )
+      if (note) {
+        toolNotes.push(note)
+        onTrace?.({
+          key: 'beta3-rates',
+          label: `Ongkir dicek · ${resolved?.label || place}`,
+          status: 'completed',
+          detail: { place, note, followUp },
+        })
+      }
+    } catch (error) {
+      onTrace?.({
+        key: 'beta3-rates',
+        label: 'Ongkir tidak tersedia',
+        status: 'failed',
+        detail: { error: error instanceof Error ? error.message : String(error) },
+      })
+    }
+  }
+
+  if (form) {
+    let rates: ShippingRates | null = null
+    if (mcp.url && (form.district || form.postalCode)) {
+      try {
+        const lastResolved = parseJson<LastShipping>(await readLeanState(lastKey))?.resolved
+        rates = await ratesForAddress(
+          { district: form.district, regency: form.regency, postalCode: form.postalCode },
+          lastResolved || null,
+          mcp
+        )
+        onTrace?.({
+          key: 'beta3-rates',
+          label: `Ongkir dicek · ${rates?.destination?.district || form.district}`,
+          status: 'completed',
+          detail: rates,
+        })
+      } catch (error) {
+        onTrace?.({
+          key: 'beta3-rates',
+          label: 'Ongkir tidak tersedia',
+          status: 'failed',
+          detail: { error: error instanceof Error ? error.message : String(error) },
+        })
+      }
+    }
+    orderId = await saveLeanOrder({
+      jid,
+      sourceMessageId: input.messageIds[input.messageIds.length - 1],
+      form,
+      items: spec || [form.note, chatNote].filter(Boolean).join('\n'),
+      spec,
+      chatNote,
+      shippingOptions: rates?.prices?.length ? rates : null,
+    })
+    const rateText = rates ? renderShippingRates(rates) : ''
+    if (rateText) toolNotes.push(rateText)
+    systemNote =
+      '\n\nCATATAN SISTEM: form order pelanggan sudah tercatat (#' +
+      orderId +
+      '). Jangan menulis total atau rekening di pesan — sistem yang mengirimnya. ' +
+      'Isi field order (rincian per item dengan nama persis KATALOG + harga, subtotal, layanan ongkir yang dipilih pelanggan). ' +
+      'Kalau ada TB/BB dan size yang dipilih terlihat tidak cocok, konfirmasi size dulu (satu pertanyaan). ' +
+      (rateText
+        ? 'Kalau pelanggan belum memilih layanan dari bagian ONGKIR, tanyakan (satu pertanyaan) dan kosongkan layanan. Kalau sudah lengkap: balas "siap bos, datanya sudah masuk ya, ini totalnya" — total + rekening menyusul otomatis. tahap = tunggu_cs.'
+        : 'Ongkir belum bisa dihitung: balas singkat bahwa ongkir dan totalnya dikabari sebentar lagi; kosongkan layanan. tahap = tunggu_cs.')
+    onTrace?.({
+      key: 'beta3-order',
+      label: `Form order tercatat #${orderId} · menunggu CS isi ongkir/total`,
+      status: 'completed',
+      detail: { orderId, form },
+    })
+  }
+
+  // Form sudah masuk di giliran sebelumnya tapi total belum terkirim (mis. rincian
+  // belum cocok, layanan belum dipilih, ongkir gagal): tetap minta AI mengisi `order`
+  // supaya total bisa dikirim otomatis di giliran ini, dan coba hitung ongkir lagi.
+  if (!form && !orderId) {
+    const pending = await latestLeanOrder(jid)
+    if (pending && pending.status === 'pending' && mcp.url) {
+      orderId = Number(pending.id)
+      let rates: ShippingRates | null = pending.shipping_options
+        ? (parseJson<ShippingRates>(String(pending.shipping_options)) as ShippingRates | null)
+        : null
+      if (!rates?.prices?.length) {
+        try {
+          const lastResolved = parseJson<LastShipping>(await readLeanState(lastKey))?.resolved
+          rates = await ratesForAddress(
+            {
+              district: String(pending.district || ''),
+              regency: String(pending.regency || ''),
+              postalCode: String(pending.postal_code || ''),
+            },
+            lastResolved || null,
+            mcp
+          )
+          if (rates?.prices?.length) await updatePendingOrderRates(orderId, rates)
+        } catch (error) {
+          onTrace?.({
+            key: 'beta3-rates',
+            label: 'Ongkir tidak tersedia',
+            status: 'failed',
+            detail: { error: error instanceof Error ? error.message : String(error) },
+          })
+        }
+      }
+      const rateText = rates ? renderShippingRates(rates) : ''
+      if (rateText) toolNotes.push(rateText)
+      systemNote =
+        '\n\nCATATAN SISTEM: form order #' +
+        orderId +
+        ' sudah tercatat, total belum terkirim. Jangan menulis total atau rekening di pesan. ' +
+        'Isi field order (rincian per item dengan nama persis KATALOG + harga, subtotal, layanan ongkir pilihan pelanggan) supaya sistem mengirim total + rekening otomatis setelah pesanmu. ' +
+        (rateText
+          ? 'Kalau pelanggan belum memilih layanan dari bagian ONGKIR, tanyakan (satu pertanyaan) dan kosongkan layanan. Kalau sudah jelas: balas "siap bos, ini totalnya ya". tahap = tunggu_cs.'
+          : 'Ongkir belum bisa dihitung: balas singkat bahwa totalnya dikabari sebentar lagi; kosongkan layanan. tahap = tunggu_cs.')
+      onTrace?.({
+        key: 'beta3-order',
+        label: `Order #${orderId} masih menunggu total`,
+        status: 'completed',
+        detail: { orderId, rates: Boolean(rateText) },
+      })
+    }
+  }
+
+  const prompt = buildLeanPrompt({
+    skill: skill.content,
+    store: await readLeanState('store_profile'),
+    fabrics: await readLeanState('fabrics'),
+    sizeCharts: await readLeanState('size_charts'),
+    catalog: digest.text,
+    examples: pickExamples(examples, input.text, stage),
+    customerNote,
+    chatNote,
+    spec,
+    history: rows,
+    message: `${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
+    paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
+    production: settings.production ? renderProductionEstimate(settings.production) : '',
+    imageCount: input.imagePaths?.length || 0,
+  })
+  onTrace?.({
+    key: 'prompt-size',
+    label: `Ukuran prompt ≈ ${prompt.size.tokens} token (skill ~${skillTokens})`,
+    status: 'completed',
+    detail: { ...prompt.size, skillName: skill.name, catalogRows: digest.rows.length },
+  })
+
+  onTrace?.({ key: 'beta3-ai', label: 'Menyusun balasan · tanpa tool', status: 'running' })
+  const result = await runLeanProvider(settings, prompt, input.imagePaths || [])
+  const decision = parseLeanDecision(result.text)
+  if (decision.spesifikasi !== spec) {
+    // Lembar spesifikasi menggantikan cart: ditulis ulang AI, disimpan kode.
+    await writeOrderSpec(jid, decision.spesifikasi)
+    if (decision.spesifikasi) await updatePendingOrderSpec(jid, decision.spesifikasi)
+  }
+  // Total otomatis: rincian AI diverifikasi kode ke katalog + tarif; dikirim listener setelah bubble.
+  let autoTotal: VerifiedAutoTotal | null = null
+  // Order pending yang tertinggal (mis. sebelum fitur ini) dicoba lagi saat pelanggan
+  // menanyakan totalnya atau memilih layanan.
+  let totalOrderId = orderId
+  if (
+    !totalOrderId &&
+    /\b(total|berapa|jadi|bayar|transfer|tf|ongkir|pakai|yang)\b/i.test(input.text)
+  ) {
+    const pending = await latestLeanOrder(jid)
+    if (pending && pending.status === 'pending') totalOrderId = Number(pending.id)
+  }
+  if (totalOrderId) {
+    // Cadangan bila AI tidak mengisi field order: rincian dari lembar spesifikasi,
+    // subtotal dihitung kode dari katalog (0 = jangan bandingkan), layanan dicari
+    // di catatan/spesifikasi/pesan ("ongkir: CTCYES", "pakai YES").
+    const specNow = decision.spesifikasi || spec
+    const draft =
+      decision.order && decision.order.rincian
+        ? decision.order
+        : { rincian: specNow, subtotal: 0, layanan: '' }
+    const verdict = await verifyAutoTotal(totalOrderId, draft, digest.rows, [
+      decision.catatan,
+      specNow,
+      chatNote,
+      input.text,
+    ])
+    if (verdict.ok) autoTotal = verdict.total
+    await noteAutoTotalReason(totalOrderId, verdict.ok ? '' : verdict.reason)
+    onTrace?.({
+      key: 'beta3-total',
+      label: verdict.ok
+        ? `Total diverifikasi · ${verdict.total.subtotal + verdict.total.shippingCost}`
+        : `Total menunggu CS · ${verdict.reason}`,
+      status: 'completed',
+      detail: { draft, fromAi: Boolean(decision.order), verdict },
+    })
+  }
+  onTrace?.({
+    key: 'beta3-ai',
+    label: 'Balasan tersusun',
+    status: 'completed',
+    detail: {
+      provider: result.provider,
+      model: result.model,
+      usage: result.usage,
+      durationMs: result.durationMs,
+      decision,
+    },
+  })
+  return {
+    decision,
+    autoTotal,
+    photos: resolvePhotos(digest.rows, decision.foto),
+    promptTokens: prompt.size.tokens,
+    promptSections: prompt.size.sections,
+    usage: result.usage,
+    durationMs: result.durationMs,
+    orderId,
+    skillName: skill.name,
+  }
+}
+
+export const LEAN_NUDGE_DELAY_MS = 10 * 60_000
+export const LEAN_NUDGE_MAX_PER_CHAT = 2
+
+/**
+ * Tutup goal giliran ini: status ikut tahap. Kalau AI menyiapkan `susulan`,
+ * dijadwalkan sekali (tanpa panggilan AI) dan hanya terkirim bila pelanggan
+ * diam; pesan baru apa pun membatalkannya.
+ */
+export async function finishLeanGoal(
+  run: { jid: string; version: string; anchor_id: number },
+  decision: LeanDecision
+) {
+  const previous = await db.from('whatsapp_chat_goals').where('jid', run.jid).first()
+  const nudges = Number(previous?.followup_count || 0)
+  const status = decision.serah_cs
+    ? 'paused'
+    : decision.tahap.startsWith('tunggu') ||
+        decision.tahap.startsWith('tanya') ||
+        decision.tahap === 'minta_alamat' ||
+        decision.tahap === 'tawar_celana' ||
+        decision.tahap === 'kirim_form'
+      ? 'waiting'
+      : 'completed'
+  const nudge =
+    status === 'waiting' && decision.susulan && nudges < LEAN_NUDGE_MAX_PER_CHAT
+      ? decision.susulan
+      : ''
+  const values = {
+    analyzed_anchor_id: run.anchor_id,
+    status,
+    objective: decision.tahap,
+    waiting_for: status === 'waiting' ? decision.tahap : '',
+    next_action: nudge,
+    policy_json: nudge ? JSON.stringify({ lean: true, nudge, stage: decision.tahap }) : null,
+    skill_hash: null,
+    next_run_at: nudge ? new Date(Date.now() + LEAN_NUDGE_DELAY_MS) : null,
+    last_error: null,
+    updated_at: new Date(),
+  }
+  const changed = await db
+    .from('whatsapp_chat_goals')
+    .where('jid', run.jid)
+    .where('version', run.version)
+    .update(values)
+  return Number(changed)
+    ? {
+        ...values,
+        next_run_at: values.next_run_at?.toISOString() || null,
+        updated_at: values.updated_at.toISOString(),
+      }
+    : null
+}
+
+/**
+ * Ambil susulan yang jatuh tempo. Hanya bila: goal masih menunggu, tidak ada
+ * pesan baru sejak balasan AI (pesan terakhir di room adalah AI), dan room
+ * tidak dipegang CS. Mengembalikan teks susulan atau null.
+ */
+export async function claimLeanNudge(jid: string, now = new Date()) {
+  const goal = await db.from('whatsapp_chat_goals').where('jid', jid).first()
+  if (!goal || goal.status !== 'waiting' || !goal.next_run_at || new Date(goal.next_run_at) > now)
+    return null
+  let policy: { lean?: boolean; nudge?: string } | null = null
+  try {
+    policy = JSON.parse(String(goal.policy_json || 'null'))
+  } catch {}
+  const clear = () =>
+    db
+      .from('whatsapp_chat_goals')
+      .where('jid', jid)
+      .where('version', goal.version)
+      .update({ next_run_at: null, policy_json: null, next_action: '', updated_at: now })
+  if (!policy?.lean || !policy.nudge) {
+    await clear()
+    return null
+  }
+  const last = await db
+    .from('whatsapp_messages')
+    .where('jid', jid)
+    .whereNotIn('status', ['queued', 'failed'])
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .first()
+  const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
+  if (
+    !last ||
+    last.direction !== 'out' ||
+    last.sender_type !== 'ai' ||
+    contact?.handling_mode === 'cs' ||
+    contact?.ai_excluded
+  ) {
+    await clear()
+    return null
+  }
+  const changed = await db
+    .from('whatsapp_chat_goals')
+    .where('jid', jid)
+    .where('version', goal.version)
+    .where('status', 'waiting')
+    .update({
+      next_run_at: null,
+      policy_json: null,
+      next_action: '',
+      followup_count: Number(goal.followup_count || 0) + 1,
+      last_followup_at: now,
+      updated_at: now,
+    })
+  return Number(changed) ? { text: String(policy.nudge), anchorId: Number(goal.anchor_id) } : null
+}
+
+type LastShipping = {
+  place: string
+  pending: boolean
+  at: number
+  choices?: DestinationArea[]
+  resolved?: DestinationArea | null
+}
+
+function parseJson<T>(raw: string): T | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return null
+  }
+}
+
+async function findDestinations(q: string, mcp: LeanMcpConfig): Promise<DestinationRow[]> {
+  const found = await callLeanTool<{ destinations?: DestinationRow[] }>(
+    'check_destination',
+    { q },
+    mcp
+  )
+  return found?.destinations || []
+}
+
+/**
+ * Tarif untuk alamat form: kode tujuan dari obrolan (bila kecamatannya sama) →
+ * nama kecamatan + kota → nama kecamatan saja. Null bila semuanya gagal.
+ */
+async function ratesForAddress(
+  address: { district: string; regency: string; postalCode: string },
+  lastResolved: DestinationArea | null,
+  mcp: LeanMcpConfig
+): Promise<ShippingRates | null> {
+  const city = address.regency ? normalizeCity(address.regency) : ''
+  const districtMatchesLast =
+    lastResolved &&
+    address.district &&
+    lastResolved.district.toLowerCase().includes(address.district.toLowerCase().split(' ')[0])
+  const attempts: Array<Record<string, unknown>> = []
+  if (districtMatchesLast && lastResolved) attempts.push({ destination: lastResolved.code })
+  if (address.district || address.regency)
+    attempts.push({
+      destination: address.district || address.regency,
+      ...(city ? { city } : {}),
+      ...(address.postalCode ? { zip_code: address.postalCode } : {}),
+    })
+  if (address.district && city) attempts.push({ destination: address.district })
+  let lastError: unknown = null
+  for (const args of attempts) {
+    try {
+      const rates = await callLeanTool<ShippingRates>(
+        'check_shipping_rates',
+        { ...args, weight_grams: 1000 },
+        mcp
+      )
+      if (rates?.prices?.length) return rates
+    } catch (error) {
+      lastError = error
+    }
+  }
+  if (lastError) throw lastError
+  return null
+}

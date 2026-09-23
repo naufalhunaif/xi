@@ -1,0 +1,46 @@
+.wa-work-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.wa-work-summary [data-active='true'] {
+  color: var(--wa-success, #238160);
+}
+.wa-work-fields {
+  display: grid;
+  gap: 16px;
+}
+.wa-work-fields[hidden],
+.wa-work-fields [hidden] {
+  display: none !important;
+}
+.wa-work-days {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.wa-work-days legend {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.wa-work-day-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wa-work-day-buttons .button {
+  min-width: 40px;
+  flex: 1 0 40px;
+}
+#settings-work-hours .wa-work-day-buttons .button[aria-pressed='true'] {
+  border-color: #43856b;
+  background: #e5f3eb;
+  color: #205d42;
+}
+html[data-theme='dark'] #settings-work-hours .wa-work-day-buttons .button[aria-pressed='true'] {
+  background: #183c2c;
+  color: #9ce0b8;
+}

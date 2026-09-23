@@ -1,0 +1,26 @@
+<section id="conversationLearning" class="wa-learning">
+  <div class="wa-toggle-row">
+    <span class="wa-info-label"><span data-i18n="Pembelajaran otomatis">Pembelajaran otomatis</span><button type="button" class="wa-info-button" data-info-target="learningInfo" aria-controls="learningInfo" aria-expanded="false" aria-label="Info" data-i18n-aria-label="Info">ⓘ</button></span>
+    <button id="learningToggle" type="button" class="wa-switch" role="switch" aria-checked="false" aria-label="Pembelajaran otomatis" data-i18n-aria-label="Pembelajaran otomatis" disabled></button>
+  </div>
+  <p id="learningStatus" class="wa-usage-caption" role="status" aria-live="polite"></p>
+  <section id="learningInfo" class="wa-handling-details wa-info-popover" role="region" aria-labelledby="learningInfoTitle" hidden>
+    <header><strong id="learningInfoTitle" data-i18n="Pembelajaran otomatis">Pembelajaran otomatis</strong><button type="button" data-info-close aria-label="Tutup" data-i18n-aria-label="Tutup">×</button></header>
+    <p data-i18n="Minimal 3 pelanggan, maksimal 1 kandidat per hari. Simulasi memakai kuota AI saat antrean chat kosong.">Minimal 3 pelanggan, maksimal 1 kandidat per hari. Simulasi memakai kuota AI saat antrean chat kosong.</p>
+    <p data-i18n="Hanya inisiatif, pertanyaan berulang, format pilihan, dan status goal. Skill utama serta kebijakan bisnis tidak diubah.">Hanya inisiatif, pertanyaan berulang, format pilihan, dan status goal. Skill utama serta kebijakan bisnis tidak diubah.</p>
+    <p data-i18n="Kandidat harus lebih baik dari baseline dan lolos semua uji. Hasil simulasi bukan bukti kenaikan order rate.">Kandidat harus lebih baik dari baseline dan lolos semua uji. Hasil simulasi bukan bukti kenaikan order rate.</p>
+    <p data-i18n="Nonaktifkan untuk menghentikan pembelajaran baru. Rollback memulihkan versi sebelumnya dan menjeda pembelajaran.">Nonaktifkan untuk menghentikan pembelajaran baru. Rollback memulihkan versi sebelumnya dan menjeda pembelajaran.</p>
+  </section>
+  <details class="wa-evaluation-card"><summary data-i18n="Pola & riwayat pembelajaran">Pola & riwayat pembelajaran</summary>
+    <div id="learningPatterns"></div>
+    <div id="learningVersions"></div>
+  </details>
+</section>
+<div class="wa-usage-toolbar">
+  <span data-i18n="Evaluasi percakapan">Evaluasi percakapan</span>
+  <button id="evaluationRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button>
+</div>
+<p id="evaluationStatus" class="wa-usage-caption" role="status" data-i18n="Memuat evaluasi…">Memuat evaluasi…</p>
+<div id="evaluationMetrics" class="wa-usage-cards"></div>
+<p class="wa-usage-caption" data-i18n="Order rate: pelanggan dengan order aktif terkonfirmasi (termasuk DP) ÷ pelanggan dengan pesan masuk, dari data aplikasi yang tersedia. Bukan perbandingan langsung dengan baseline arsip atau bukti peningkatan konversi.">Order rate: pelanggan dengan order aktif terkonfirmasi (termasuk DP) ÷ pelanggan dengan pesan masuk, dari data aplikasi yang tersedia. Bukan perbandingan langsung dengan baseline arsip atau bukti peningkatan konversi.</p>
+<div id="evaluationList" class="wa-evaluation-list"></div>

@@ -1,0 +1,125 @@
+<dialog id="cartDialog" class="wa-cart-dialog" aria-labelledby="cartTitle" data-lean-mode="{{ leanMode ? 'true' : 'false' }}" data-beta3-mode="{{ beta3Mode ? 'true' : 'false' }}">
+  <header class="wa-cart-header">
+    @if(leanMode || beta3Mode)
+    <strong id="cartTitle" data-i18n="Pesanan">Pesanan</strong>
+    @else
+    <strong id="cartTitle" data-i18n="Cart &amp; Order">Cart &amp; Order</strong>
+    @endif
+    <button type="button" id="cartClose" class="button" aria-label="Tutup cart" data-i18n-aria-label="Tutup cart">×</button>
+  </header>
+  <div class="wa-cart-layout">
+@if(beta3Mode)
+  <div class="wa-cart-body" id="beta3RoomPanel">
+    <div id="beta3RoomNotice" role="status" hidden></div>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading"><h3 data-i18n="Status chat">Status chat</h3><small id="beta3RoomHandling" class="wa-muted"></small></div>
+      <p id="beta3RoomStage" class="wa-lean-stage"></p>
+      <pre id="beta3RoomChatNote" class="wa-lean-chatnote"></pre>
+    </section>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading"><h3 data-i18n="Detail pesanan">Detail pesanan</h3><small class="wa-muted" data-i18n="Ditulis AI, boleh diedit">Ditulis AI, boleh diedit</small></div>
+      <textarea id="beta3RoomSpec" rows="8" placeholder="1. Produk - Warna, size, jas saja&#10;   kerah: ...&#10;   saku: ..."></textarea>
+      <div class="actions"><button id="beta3RoomSpecSave" type="button" class="button" data-i18n="Simpan detail">Simpan detail</button></div>
+    </section>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading"><h3 data-i18n="Order">Order</h3><small id="beta3RoomOrderStatus" class="wa-muted"></small></div>
+      <div id="beta3RoomOrder"></div>
+    </section>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading"><h3 data-i18n="Catatan pelanggan">Catatan pelanggan</h3><small class="wa-muted" data-i18n="Dipakai AI untuk order berikutnya">Dipakai AI untuk order berikutnya</small></div>
+      <textarea id="beta3RoomNote" rows="4" placeholder="Nama: ...&#10;Size: ...&#10;Alamat: ..."></textarea>
+      <div class="actions"><button id="beta3RoomNoteSave" type="button" class="button" data-i18n="Simpan catatan">Simpan catatan</button></div>
+    </section>
+  </div>
+@elseif(leanMode)
+  <div class="wa-cart-body" id="leanRoomPanel">
+    <div id="leanRoomNotice" role="status" hidden></div>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading"><h3 data-i18n="Status chat">Status chat</h3><small id="leanRoomHandling" class="wa-muted"></small></div>
+      <p id="leanRoomStage" class="wa-lean-stage"></p>
+      <pre id="leanRoomChatNote" class="wa-lean-chatnote"></pre>
+    </section>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading"><h3 data-i18n="Detail pesanan">Detail pesanan</h3><small class="wa-muted" data-i18n="Ditulis AI, boleh diedit">Ditulis AI, boleh diedit</small></div>
+      <textarea id="leanRoomSpec" rows="8" placeholder="1. Produk - Warna, size, jas saja&#10;   kerah: ...&#10;   saku: ..."></textarea>
+      <div class="actions"><button id="leanRoomSpecSave" type="button" class="button" data-i18n="Simpan detail">Simpan detail</button></div>
+    </section>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading"><h3 data-i18n="Order">Order</h3><small id="leanRoomOrderStatus" class="wa-muted"></small></div>
+      <div id="leanRoomOrder"></div>
+    </section>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading"><h3 data-i18n="Catatan pelanggan">Catatan pelanggan</h3><small class="wa-muted" data-i18n="Dipakai AI untuk order berikutnya">Dipakai AI untuk order berikutnya</small></div>
+      <textarea id="leanRoomNote" rows="4" placeholder="Nama: ...&#10;Size: ...&#10;Alamat: ..."></textarea>
+      <div class="actions"><button id="leanRoomNoteSave" type="button" class="button" data-i18n="Simpan catatan">Simpan catatan</button></div>
+    </section>
+  </div>
+@else
+    <section id="orderDetailPanel" class="wa-order-detail" aria-labelledby="orderDetailTitle" hidden>
+      <header class="wa-cart-header">
+        <div><small data-i18n="Detail order">Detail order</small><h3 id="orderDetailTitle"></h3></div>
+        <button id="orderDetailClose" class="button" type="button" aria-label="Kembali ke daftar order" data-i18n-aria-label="Kembali ke daftar order">→</button>
+      </header>
+      <div id="orderDetailContent" class="wa-order-detail-body"></div>
+    </section>
+  <div class="wa-cart-body" id="cartMainPanel">
+    <div id="cartNotice" role="status" hidden></div>
+    <section class="wa-cart-section wa-cart-balance" aria-label="Saldo pelanggan" data-i18n-aria-label="Saldo pelanggan">
+      <div class="wa-cart-heading"><h3 data-i18n="Saldo pelanggan">Saldo pelanggan</h3><strong id="cartCustomerBalance">—</strong></div>
+      <details id="cartBalanceHistory" hidden>
+        <summary data-i18n="Riwayat saldo">Riwayat saldo</summary>
+        <div id="cartBalanceEntries"></div>
+      </details>
+    </section>
+    <section class="wa-cart-section wa-cart-current">
+      <div class="wa-cart-heading">
+        <h3>Cart</h3>
+        <small class="wa-muted" data-i18n="Diisi AI">Diisi AI</small>
+      </div>
+      <div id="cartItems"></div>
+      <div id="cartDetails" class="wa-cart-order"></div>
+      <dl class="wa-cart-summary" aria-label="Rincian biaya" data-i18n-aria-label="Rincian biaya">
+        <div><dt>Subtotal</dt><dd id="cartSubtotal">Rp0</dd></div>
+        <div><dt data-i18n="Diskon">Diskon</dt><dd id="cartDiscount">Rp0</dd></div>
+        <div><dt data-i18n="Ongkir">Ongkir</dt><dd id="cartShipping">—</dd></div>
+        <div class="wa-cart-total"><dt>Total</dt><dd id="cartTotal">Rp0</dd></div>
+        <div id="cartCreditRow" hidden><dt data-i18n="Saldo digunakan">Saldo digunakan</dt><dd id="cartCredit"></dd></div>
+        <div id="cartDueRow" class="wa-cart-total" hidden><dt data-i18n="Perlu ditransfer">Perlu ditransfer</dt><dd id="cartDue"></dd></div>
+      </dl>
+      <div class="wa-cart-heading"><span id="cartPaymentStatus"></span></div>
+      <div class="actions">
+        <button id="cartConfirmPayment" type="button" class="button primary" hidden data-i18n="Konfirmasi pembayaran">
+          Konfirmasi pembayaran
+        </button>
+        <button id="cartCancel" type="button" class="button" data-i18n="Batalkan cart">Batalkan cart</button>
+      </div>
+    </section>
+    <form id="cartPaymentForm" class="wa-cart-form wa-cart-section wa-cart-payment" hidden>
+      <h3 id="cartPaymentTitle" data-i18n="Konfirmasi pembayaran">Konfirmasi pembayaran</h3>
+      <p id="cartPaymentReading" role="status"></p>
+      <a id="cartPaymentProofLink" target="_blank" rel="noopener" hidden>
+        <img id="cartPaymentProof" alt="Bukti transfer pelanggan" / data-i18n-alt="Bukti transfer pelanggan">
+      </a>
+      <dl id="cartPaymentReadingDetails" class="wa-cart-summary" hidden>
+        <div><dt data-i18n="Sisa tagihan">Sisa tagihan</dt><dd id="cartPaymentBill"></dd></div>
+        <div id="cartPaymentBalanceRow" hidden><dt data-i18n="Saldo digunakan">Saldo digunakan</dt><dd id="cartPaymentBalance"></dd></div>
+        <div><dt data-i18n="Perlu ditransfer">Perlu ditransfer</dt><dd id="cartPaymentDue"></dd></div>
+        <div><dt data-i18n="Nominal">Nominal</dt><dd id="cartPaymentAmount"></dd></div>
+        <div id="cartPaymentExcessRow" hidden><dt data-i18n="Kelebihan → saldo">Kelebihan → saldo</dt><dd id="cartPaymentExcess"></dd></div>
+        <div><dt data-i18n="Metode">Metode</dt><dd id="cartPaymentMethod"></dd></div>
+        <div><dt data-i18n="Rekening tujuan">Rekening tujuan</dt><dd id="cartPaymentDestination"></dd></div>
+        <div><dt data-i18n="Referensi">Referensi</dt><dd id="cartPaymentReference"></dd></div>
+      </dl>
+      <div class="actions">
+        <button id="cartPaymentApprove" class="button primary" type="submit" disabled data-i18n="Konfirmasi dana masuk">Konfirmasi dana masuk</button>
+        <button id="cartPaymentCancel" class="button" type="button" data-i18n="Batal">Batal</button>
+      </div>
+    </form>
+    <section class="wa-cart-section wa-cart-orders">
+      <h3>Order</h3>
+      <div id="cartOrders"></div>
+    </section>
+  </div>
+@endif
+  </div>
+</dialog>

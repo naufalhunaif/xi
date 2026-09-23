@@ -1,0 +1,9 @@
+Options -Indexes
+DirectoryIndex disabled
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule (^|/)\. - [F,L]
+  RewriteRule ^index\.php$ http://127.0.0.1:3333/ [P,L,QSA]
+  RewriteRule ^(.*)$ http://127.0.0.1:3333/$1 [P,L,QSA]
+</IfModule>

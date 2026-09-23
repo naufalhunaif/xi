@@ -1,0 +1,34 @@
+<section id="orderPage" class="wa-orders-page">
+  <div class="wa-orders-title"><h1 data-i18n="Order">Order</h1><div class="wa-orders-title-actions"><span id="orderCount" class="wa-muted"></span><button id="orderRoutingOpen" type="button" class="shell-icon-button" aria-label="Grup produksi default" title="Grup produksi default" data-i18n-aria-label="Grup produksi default" data-i18n-title="Grup produksi default" aria-haspopup="dialog" aria-controls="orderRoutingDialog" aria-expanded="false"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.4-2 .9L4 5.7 2 9l1.8 1.8v2.4L2 15l2 3.3 2.4-.6 2 .9L9 21h6l.6-2.4 2-.9 2.4.6 2-3.3-1.8-1.8v-2.4L22 9l-2-3.3-2.4.6-2-.9L15 3Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+  <dialog id="orderRoutingDialog" class="wa-order-routing" aria-labelledby="orderRoutingTitle">
+    <header class="wa-order-routing-header"><strong id="orderRoutingTitle" data-i18n="Grup produksi default">Grup produksi default</strong><button type="button" class="wa-info-button" data-info-target="orderRoutingInfo" aria-controls="orderRoutingInfo" aria-expanded="false" aria-label="Info" data-i18n-aria-label="Info"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg></button><button id="orderRoutingClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus>×</button></header>
+    <form id="orderRoutingForm" class="wa-order-fields">
+      <label><span data-i18n="Grup WhatsApp">Grup WhatsApp</span><select id="orderDefaultGroup"></select></label>
+      <label><span data-i18n="Kirim setelah">Kirim setelah</span><select id="orderDefaultTrigger"><option value="first_payment" data-i18n="Pembayaran pertama / DP">Pembayaran pertama / DP</option><option value="fully_paid" data-i18n="Lunas">Lunas</option></select></label>
+      <div class="actions"><button class="button" id="orderRefreshGroups" type="button" data-i18n="Perbarui grup">Perbarui grup</button><button class="button" type="submit" data-i18n="Terapkan untuk order baru">Terapkan untuk order baru</button></div>
+    </form>
+    <small id="orderGroupsStatus" class="wa-muted" role="status"></small>
+    <p id="orderRoutingNotice" role="status" aria-live="polite"></p>
+    <section id="orderRoutingInfo" class="wa-handling-details wa-info-popover" role="region" aria-labelledby="orderRoutingInfoTitle" hidden><header><strong id="orderRoutingInfoTitle" data-i18n="Grup produksi default">Grup produksi default</strong><button type="button" data-info-close aria-label="Tutup" data-i18n-aria-label="Tutup">×</button></header><p data-i18n="Hanya order baru. Nama, produk, foto, jumlah dan ukuran; tanpa alamat atau nomor telepon.">Hanya order baru. Nama, produk, foto, jumlah dan ukuran; tanpa alamat atau nomor telepon.</p></section>
+  </dialog>
+  <div class="wa-order-filters"><input id="orderSearch" type="search" placeholder="Cari nomor order / nama" data-i18n-placeholder="Cari nomor order / nama" aria-label="Cari nomor order / nama" data-i18n-aria-label="Cari nomor order / nama"><select id="orderStageFilter" aria-label="Status produksi" data-i18n-aria-label="Status produksi"></select><button id="orderRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button></div>
+  <div id="orderTabs" class="wa-order-tabs" role="group" aria-label="Filter order" data-i18n-aria-label="Filter order">
+    <button type="button" data-order-tab="active" aria-pressed="true" data-i18n="Aktif">Aktif</button>
+    <button type="button" data-order-tab="completed" aria-pressed="false" data-i18n="Selesai">Selesai</button>
+    <button type="button" data-order-tab="all" aria-pressed="false" data-i18n="Semua">Semua</button>
+  </div>
+  <p id="orderPageNotice" role="status" aria-live="polite"></p>
+  <div class="wa-order-workspace">
+    <div class="wa-order-table-scroll" tabindex="0" role="region" aria-label="Order" data-i18n-aria-label="Order">
+      <table class="wa-order-table">
+        <thead><tr><th scope="col" data-i18n="Order">Order</th><th scope="col" data-i18n="Pelanggan">Pelanggan</th><th scope="col" class="wa-order-amount" data-i18n="Total">Total</th><th scope="col" data-i18n="Pembayaran">Pembayaran</th><th scope="col" data-i18n="Status produksi">Status produksi</th></tr></thead>
+        <tbody id="orderList"></tbody>
+      </table>
+    </div>
+    <div class="wa-order-pagination"><button id="orderPrevious" class="button" type="button" data-i18n="Sebelumnya">Sebelumnya</button><span id="orderPageNumber" role="status"></span><button id="orderNext" class="button" type="button" data-i18n="Berikutnya">Berikutnya</button></div>
+  </div>
+  <dialog id="orderDrawer" class="wa-order-drawer" data-motion="sheet" aria-labelledby="orderDrawerTitle">
+    <header class="wa-order-drawer-header"><strong id="orderDrawerTitle" data-i18n="Detail order">Detail order</strong><button id="orderDrawerClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+    <section id="orderDetail" class="wa-order-editor"></section>
+  </dialog>
+</section>

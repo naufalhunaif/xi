@@ -1,0 +1,200 @@
+[
+  {
+    "situation": "pembuka tanpa isi",
+    "customerText": "Halo",
+    "csText": "Halo bos",
+    "tags": "lain"
+  },
+  {
+    "situation": "pembuka tanpa isi",
+    "customerText": "Kak",
+    "csText": "Iya bos",
+    "tags": "lain"
+  },
+  {
+    "situation": "pembuka tanpa isi",
+    "customerText": "Assalamualaikum",
+    "csText": "Waalaikumsalam bos",
+    "tags": "lain"
+  },
+  {
+    "situation": "pembuka tanpa isi",
+    "customerText": "Pagi min",
+    "csText": "Pagi bos",
+    "tags": "lain"
+  },
+  {
+    "situation": "pembuka, mau order",
+    "customerText": "Mau order jasnya",
+    "csText": "Siap bos, mau model apa?",
+    "tags": "tanya_model"
+  },
+  {
+    "situation": "tanya warna yang tidak ada",
+    "customerText": "Mau yang tuxedo warna grey ada?",
+    "csText": "Untuk tuxedo abu belum ada bos, yang abu adanya di Basic Suit, light gray sama dark gray",
+    "tags": "tanya_model"
+  },
+  {
+    "situation": "minta lihat foto",
+    "customerText": "Boleh liat",
+    "csText": "Ini bos",
+    "tags": "tanya_model,foto"
+  },
+  {
+    "situation": "tanya stok",
+    "customerText": "Ini masih readystock?",
+    "csText": "Masih ada bos, size S M XL ready. Biasanya pakai size apa bos?",
+    "tags": "tanya_size"
+  },
+  {
+    "situation": "tanya cara ukur",
+    "customerText": "Ngukur nya gimana?",
+    "csText": "Cukup biasa pakai size apa, atau tinggi dan berat badan berapa, kami tau rekomendasi perkiraan size yang di pakai",
+    "tags": "tanya_size"
+  },
+  {
+    "situation": "warna belum ada foto tapi bisa dibuat",
+    "customerText": "Tuxedo yang brown om",
+    "csText": "Untuk warna brown saat ini belum ada fotonya bos, kalau mau bisa di buatkan ya",
+    "tags": "tanya_model"
+  },
+  {
+    "situation": "pelanggan memutuskan pesan",
+    "customerText": "Pesan tuxedo brown om, yang size m",
+    "csText": "Oke siap, mau jas aja atau sekalian dengan celananya ya, biar serasi?",
+    "tags": "tawar_celana"
+  },
+  {
+    "situation": "jas saja",
+    "customerText": "Jas aja",
+    "csText": "Oke, untuk pengiriman kemana ya?",
+    "tags": "minta_alamat"
+  },
+  {
+    "situation": "tanya warna lain di tengah order",
+    "customerText": "Kalo yang navy warnanya ada?",
+    "csText": "Untuk tuxedo navy belum ada bos, navy adanya Bescap Cross Placket. Tetap lanjut tuxedo brown?",
+    "tags": "tanya_model"
+  },
+  {
+    "situation": "lanjut pesanan",
+    "customerText": "Saya lanjut yang tuxedo brown saja.",
+    "csText": "Oke siap\n\nBisa di bantu isi order formatnya bos\n\nNama :\nAlamat lengkap :\nKecamatan :\nKabupaten :\nKode Pos :\nNo. telp :\n\nNote :",
+    "tags": "kirim_form"
+  },
+  {
+    "situation": "form terisi, size tidak cocok dengan TB/BB",
+    "customerText": "Nama : Arif\nAlamat lengkap : Jalan Setapak No. 29 Kayu Manis\nKecamatan : Tanah Sereal\nKabupaten : Bogor\nKode pos : 16169\nNo telp : 0878xxxx\nNote : Tuxedo brown size M, tinggi 161 cm, berat 43 kg",
+    "csText": "oke bos, untuk size kami konfirmasi lagi, tinggi 161 berat 43 sudah benar bos?",
+    "tags": "tunggu_cs,tanya_size"
+  },
+  {
+    "situation": "rekomendasi size dari TB/BB",
+    "customerText": "Berat 43 kg",
+    "csText": "kalau lihat dari tinggi dan berat badan rekomendasi size XS bos, untuk size M takutnya kebesaran. mau di sesuaikan aja atau size M aja ya?",
+    "tags": "tanya_size"
+  },
+  {
+    "situation": "pelanggan terima rekomendasi",
+    "customerText": "Boleh xs saja.",
+    "csText": "Oke siap, ongkir dan totalnya saya kabari sebentar ya bos",
+    "tags": "tunggu_cs"
+  },
+  {
+    "situation": "tanya rekening",
+    "customerText": "Tf kemana?",
+    "csText": "Untuk pembayaran tf ke rek (REKENING RESMI) agar pesanan langsung kami proses",
+    "tags": "tunggu_bayar"
+  },
+  {
+    "situation": "konfirmasi pesanan sebelum bayar",
+    "customerText": "Tuxedo brown yaa?",
+    "csText": "Iya bos",
+    "tags": "tunggu_bayar"
+  },
+  {
+    "situation": "kirim bukti transfer",
+    "customerText": "(gambar bukti transfer)",
+    "csText": "Siap bos, kami cek dulu ya",
+    "tags": "bukti_dikirim"
+  },
+  {
+    "situation": "tanya sampai kapan untuk pre-order",
+    "customerText": "Sampai besok ya?",
+    "csText": "Engga bos, untuk size XS di buat dulu ya, nanti kami sesuaikan dengan tinggi dan berat badan biar pas",
+    "tags": "tunggu_bayar,selesai"
+  },
+  {
+    "situation": "nego harga",
+    "customerText": "Bisa kurang gak harganya?",
+    "csText": "Sudah harga pas bos",
+    "tags": "tanya_model"
+  },
+  {
+    "situation": "takut ditipu",
+    "customerText": "Ini amanah kan? takut ketipu",
+    "csText": "iya bos, aman",
+    "tags": "tunggu_bayar"
+  },
+  {
+    "situation": "size kosong",
+    "customerText": "Celana no 36 ada?",
+    "csText": "okee, untuk no 36 celana ga ready bos, yang ready no 32 sama 34",
+    "tags": "tanya_size"
+  },
+  {
+    "situation": "tanya ongkir sebelum alamat",
+    "customerText": "Ongkir ke Bandung berapa?",
+    "csText": "Kecamatannya apa bos?",
+    "tags": "minta_alamat"
+  },
+  {
+    "situation": "pelanggan pamer foto pakai",
+    "customerText": "(foto pakai jas) Pas banget bos makasih",
+    "csText": "Aamiin bos, terimakasih support nya",
+    "tags": "selesai"
+  },
+  {
+    "situation": "tanya lokasi toko",
+    "customerText": "Tokonya dimana? bisa datang?",
+    "csText": "Bisa bos, alamatnya (ALAMAT_TOKO)",
+    "tags": "tanya_model"
+  },
+  {
+    "situation": "komplain barang",
+    "customerText": "Jasnya sampe tapi kancingnya lepas",
+    "csText": "Maaf bos, boleh di fotokan bagian yang lepas ya, nanti kami bantu",
+    "tags": "serah_cs"
+  },
+  {
+    "situation": "penutup",
+    "customerText": "Oke makasih",
+    "csText": "siap sama sama bos",
+    "tags": "selesai"
+  },
+  {
+    "situation": "detail custom",
+    "customerText": "Kerahnya mau shanghai warna hitam, sakunya 3 pakai tutup",
+    "csText": "Siap bos, dicatat ya: kerah shanghai hitam, saku 3 pakai tutup",
+    "tags": "tanya_model,custom"
+  },
+  {
+    "situation": "tanya biaya custom",
+    "customerText": "Nambah biaya gak kalau kerahnya beda warna?",
+    "csText": "untuk tambahan detailnya nanti CS konfirmasi harganya ya bos",
+    "tags": "custom"
+  },
+  {
+    "situation": "ukuran custom",
+    "customerText": "Badan saya gede, size XL kayaknya sempit",
+    "csText": "bisa custom ukuran bos, lingkar dadanya berapa cm?",
+    "tags": "tanya_size,custom"
+  },
+  {
+    "situation": "tanya lama produksi",
+    "customerText": "Berapa hari kira kira?",
+    "csText": "biasanya 3-7 hari kerja bos, dihitung setelah pembayaran masuk",
+    "tags": "tunggu_cs"
+  }
+]

@@ -1,0 +1,43 @@
+.workspace-ui .wa-payment-editor,
+.workspace-ui .wa-payment-details {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.workspace-ui .wa-payment-list {
+  margin-top: 24px;
+}
+.workspace-ui .wa-payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid #e8e8e6;
+}
+.workspace-ui .wa-payment-details {
+  gap: 4px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.workspace-ui .wa-payment-details small {
+  color: #777;
+}
+.workspace-ui .wa-payment-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.workspace-ui #paymentStatus {
+  font-size: 12px;
+}
+.workspace-ui #paymentStatus.error {
+  color: #b42318;
+}
+@media (max-width: 600px) {
+  .workspace-ui .wa-payment-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

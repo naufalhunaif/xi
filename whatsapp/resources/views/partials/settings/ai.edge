@@ -1,0 +1,245 @@
+<label class="wa-toggle-row">
+  <span data-i18n="Balas otomatis">Balas otomatis</span>
+  <button
+    name="aiEnabled"
+    class="wa-switch"
+    type="button"
+    role="switch"
+    aria-label="Balas otomatis"
+    aria-checked="{{ settings.aiEnabled ? 'true' : 'false' }}"
+    value="{{ settings.aiEnabled ? 'true' : 'false' }}"
+   data-i18n-aria-label="Balas otomatis"></button>
+</label>
+<label>
+  <span data-i18n="Mesin AI">Mesin AI</span>
+  <select id="aiProvider" name="aiProvider">
+    <option value="chatgpt" {{ settings.aiProvider === 'chatgpt' ? 'selected' : '' }}>
+      ChatGPT
+    </option>
+    <option value="claude" {{ settings.aiProvider === 'claude' ? 'selected' : '' }}>Claude</option>
+  </select>
+</label>
+<label class="wa-toggle-row">
+  <span data-i18n="Alih otomatis saat kuota habis">Alih otomatis saat kuota habis</span>
+  <button
+    name="aiFailover"
+    class="wa-switch"
+    type="button"
+    role="switch"
+    aria-label="Alih otomatis saat kuota habis"
+    aria-checked="{{ settings.aiFailover ? 'true' : 'false' }}"
+    value="{{ settings.aiFailover ? 'true' : 'false' }}"
+   data-i18n-aria-label="Alih otomatis saat kuota habis"></button>
+</label>
+<small class="wa-muted" data-i18n="Saat mesin terpilih menolak karena batas pemakaian, giliran itu dijalankan ulang pada mesin satunya. Mesin cadangan harus sudah login dan punya akses MCP sendiri.">Saat mesin terpilih menolak karena batas pemakaian, giliran itu dijalankan ulang pada mesin satunya. Mesin cadangan harus sudah login dan punya akses MCP sendiri.</small>
+<div
+  class="wa-ai-provider"
+  data-ai-provider-panel="chatgpt"
+  {{ settings.aiProvider === 'chatgpt' ? '' : 'hidden' }}
+>
+  <div class="wa-oauth-row">
+    <span>ChatGPT OAuth</span>
+    <div class="wa-setting-actions">
+      <strong
+        id="oauthStatus"
+        class="wa-connection-indicator {{ oauth.connected ? 'connected' : '' }}"
+        title="{{ oauth.connected ? 'Terhubung' : 'Belum terhubung' }}"
+       data-i18n-auto>
+        {{ oauth.connected ? 'Terhubung' : 'Belum terhubung' }}
+      </strong>
+      <button
+        id="oauthButton"
+        class="wa-setting-icon wa-icon-connect"
+        type="button"
+        title="Hubungkan ChatGPT"
+        aria-label="Hubungkan ChatGPT"
+        {{ oauth.connected ? 'hidden' : '' }}
+       data-i18n="Hubungkan ChatGPT" data-i18n-title="Hubungkan ChatGPT" data-i18n-aria-label="Hubungkan ChatGPT">
+        Hubungkan ChatGPT
+      </button>
+    </div>
+  </div>
+  <div id="oauthDevice" class="wa-oauth-verification" {{ oauth.connected ? 'hidden' : '' }}>
+    <p id="oauthMessage" class="wa-muted" role="status" aria-live="polite" hidden></p>
+    <label for="oauthCode"><span data-i18n="Kode perangkat">Kode perangkat</span></label>
+    <div class="wa-oauth-controls">
+      <input id="oauthCode" type="text" readonly autocomplete="off" aria-describedby="oauthHelp" />
+      <button id="oauthCopy" class="button" type="button" data-i18n="Salin kode" disabled>Salin kode</button>
+      <a id="oauthLink" class="button primary" href="#" target="_blank" rel="noopener noreferrer" data-i18n="Login" hidden>Login</a>
+      <button id="oauthRestart" class="button" type="button" data-i18n="Mulai ulang">Mulai ulang</button>
+    </div>
+    <small id="oauthHelp" class="wa-muted" data-i18n="Masukkan kode ini di halaman OpenAI.">Masukkan kode ini di halaman OpenAI.</small>
+  </div>
+  <div class="wa-model-control" data-model-control="chatgpt">
+    <label for="chatgptModelPicker">
+      <span data-i18n="Model ChatGPT">Model ChatGPT</span>
+      <select id="chatgptModelPicker" data-model-picker aria-describedby="chatgptModelHint">
+        <option value="" data-i18n="Otomatis">Otomatis</option>
+        <option value="gpt-6-astra">gpt-6-astra</option>
+        <option value="gpt-5.6-sol">gpt-5.6-sol</option>
+        <option value="gpt-5.6-terra">gpt-5.6-terra</option>
+        <option value="gpt-5.6-luna">gpt-5.6-luna</option>
+        <option value="gpt-5.5">gpt-5.5</option>
+        <option value="__custom__" data-i18n="Model lainnya…">Model lainnya…</option>
+      </select>
+    </label>
+    <label data-model-custom hidden>
+      <span data-i18n="ID model">ID model</span>
+      <input name="chatgptModel" value="{{ settings.chatgptModel }}" type="text"
+        maxlength="120" pattern="[a-zA-Z0-9._-]*" autocomplete="off" spellcheck="false"
+        aria-describedby="chatgptModelHint" />
+    </label>
+    <span id="chatgptModelHint" class="wa-model-hint" data-i18n="Ketersediaan model mengikuti akun dan versi CLI.">Ketersediaan model mengikuti akun dan versi CLI.</span>
+  </div>
+  <div class="wa-ai-runtime-controls">
+    <label>
+      <span>Reasoning</span>
+      <select name="chatgptReasoning" title="Kedalaman analisis; terpisah dari kecepatan layanan." data-i18n-title="Kedalaman analisis; terpisah dari kecepatan layanan.">
+        <option value="auto" {{ settings.chatgptReasoning === 'auto' ? 'selected' : '' }} data-i18n="Otomatis">Otomatis</option>
+        <option value="minimal" {{ settings.chatgptReasoning === 'minimal' ? 'selected' : '' }}>Minimal</option>
+        <option value="low" {{ settings.chatgptReasoning === 'low' ? 'selected' : '' }}>Low</option>
+        <option value="medium" {{ settings.chatgptReasoning === 'medium' ? 'selected' : '' }}>Medium</option>
+        <option value="high" {{ settings.chatgptReasoning === 'high' ? 'selected' : '' }}>High</option>
+        <option value="xhigh" {{ settings.chatgptReasoning === 'xhigh' ? 'selected' : '' }}>Extra high</option>
+        <option value="max" {{ settings.chatgptReasoning === 'max' ? 'selected' : '' }}>Max</option>
+        <option value="ultra" {{ settings.chatgptReasoning === 'ultra' ? 'selected' : '' }}>Ultra</option>
+      </select>
+    </label>
+    <label>
+      <span>Speed</span>
+      <select name="chatgptSpeed" title="Fast tidak mengurangi reasoning. Memerlukan model dan akun yang mendukung, dengan pemakaian kuota tambahan." data-i18n-title="Fast tidak mengurangi reasoning. Memerlukan model dan akun yang mendukung, dengan pemakaian kuota tambahan.">
+        <option value="standard" {{ settings.chatgptSpeed !== 'fast' ? 'selected' : '' }}>Standard</option>
+        <option value="fast" {{ settings.chatgptSpeed === 'fast' ? 'selected' : '' }}>Fast</option>
+      </select>
+    </label>
+  </div>
+  <label>
+    <span data-i18n="Lokasi perintah codex">Lokasi perintah codex</span>
+    <input
+      name="codexBin"
+      type="text"
+      maxlength="500"
+      placeholder="codex"
+      value="{{ settings.codexBin }}"
+    />
+  </label>
+  <div class="wa-oauth-row">
+    <span data-i18n="Status codex">Status codex</span>
+    <div class="wa-setting-actions">
+      <strong id="codexStatus" data-i18n-auto data-i18n="memeriksa…">memeriksa…</strong>
+      <button
+        id="codexCheck"
+        class="wa-setting-icon wa-icon-refresh"
+        type="button"
+        title="Periksa codex"
+        aria-label="Periksa codex"
+       data-i18n="Periksa codex" data-i18n-title="Periksa codex" data-i18n-aria-label="Periksa codex">
+        Periksa codex
+      </button>
+    </div>
+  </div>
+</div>
+<div
+  class="wa-ai-provider"
+  data-ai-provider-panel="claude"
+  {{ settings.aiProvider === 'claude' ? '' : 'hidden' }}
+>
+  <div class="wa-oauth-row">
+    <span>Claude OAuth</span>
+    <div class="wa-setting-actions">
+      <strong
+        id="claudeOauthStatus"
+        class="wa-connection-indicator {{ claudeOauth.connected ? 'connected' : '' }}"
+        title="{{ claudeOauth.connected ? 'Terhubung' : 'Belum terhubung' }}"
+       data-i18n-auto>
+        {{ claudeOauth.connected ? 'Terhubung' : 'Belum terhubung' }}
+      </strong>
+      <button
+        id="claudeOauthButton"
+        class="wa-setting-icon wa-icon-connect"
+        title="Hubungkan Claude"
+        aria-label="Hubungkan Claude"
+        type="button"
+        {{ claudeOauth.connected ? 'hidden' : '' }}
+       data-i18n="Hubungkan Claude" data-i18n-title="Hubungkan Claude" data-i18n-aria-label="Hubungkan Claude">
+        Hubungkan Claude
+      </button>
+    </div>
+  </div>
+  <div id="claudeOauthDevice" class="wa-oauth-verification" hidden>
+    <div class="wa-oauth-controls">
+      <a id="claudeOauthLink" class="button" href="#" target="_blank" rel="noopener noreferrer" data-i18n="Login">Login</a>
+      <button id="claudeOauthRestart" class="button" type="button" data-i18n="Mulai ulang">Mulai ulang</button>
+    </div>
+    <label for="claudeOauthCode"><span data-i18n="Kode autentikasi">Kode autentikasi</span></label>
+    <div class="wa-oauth-controls">
+      <input id="claudeOauthCode" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="2561" aria-describedby="claudeOauthHelp" />
+      <button id="claudeOauthVerify" class="button primary" type="button" data-i18n="Verifikasi">Verifikasi</button>
+    </div>
+    <small id="claudeOauthHelp" class="wa-muted" role="status" aria-live="polite" data-i18n="Tempel kode dari halaman Claude.">Tempel kode dari halaman Claude.</small>
+  </div>
+  <div class="wa-model-control" data-model-control="claude">
+    <label for="claudeModelPicker">
+      <span data-i18n="Model Claude">Model Claude</span>
+      <select id="claudeModelPicker" data-model-picker aria-describedby="claudeModelHint">
+        <option value="" data-i18n="Otomatis">Otomatis</option>
+        <option value="opus">opus</option>
+        <option value="sonnet">sonnet</option>
+        <option value="haiku">haiku</option>
+        <option value="__custom__" data-i18n="Model lainnya…">Model lainnya…</option>
+      </select>
+    </label>
+    <label data-model-custom hidden>
+      <span data-i18n="ID model">ID model</span>
+      <input name="claudeModel" value="{{ settings.claudeModel }}" type="text"
+        maxlength="120" pattern="[a-zA-Z0-9._-]*" autocomplete="off" spellcheck="false"
+        aria-describedby="claudeModelHint" />
+    </label>
+    <span id="claudeModelHint" class="wa-model-hint" data-i18n="Ketersediaan model mengikuti akun dan versi CLI.">Ketersediaan model mengikuti akun dan versi CLI.</span>
+  </div>
+  <div class="wa-ai-runtime-controls">
+    <label>
+      <span>Reasoning</span>
+      <select name="claudeReasoning" title="Kedalaman analisis; terpisah dari kecepatan layanan." data-i18n-title="Kedalaman analisis; terpisah dari kecepatan layanan.">
+        <option value="auto" {{ settings.claudeReasoning === 'auto' ? 'selected' : '' }} data-i18n="Otomatis">Otomatis</option>
+        <option value="low" {{ settings.claudeReasoning === 'low' ? 'selected' : '' }}>Low</option>
+        <option value="medium" {{ settings.claudeReasoning === 'medium' ? 'selected' : '' }}>Medium</option>
+        <option value="high" {{ settings.claudeReasoning === 'high' ? 'selected' : '' }}>High</option>
+        <option value="xhigh" {{ settings.claudeReasoning === 'xhigh' ? 'selected' : '' }}>Extra high</option>
+        <option value="max" {{ settings.claudeReasoning === 'max' ? 'selected' : '' }}>Max</option>
+      </select>
+    </label>
+    <label>
+      <span>Speed</span>
+      <select name="claudeSpeed" title="Fast tidak mengurangi reasoning. Memerlukan model dan akun yang mendukung, dengan pemakaian kuota tambahan." data-i18n-title="Fast tidak mengurangi reasoning. Memerlukan model dan akun yang mendukung, dengan pemakaian kuota tambahan.">
+        <option value="standard" {{ settings.claudeSpeed !== 'fast' ? 'selected' : '' }}>Standard</option>
+        <option value="fast" {{ settings.claudeSpeed === 'fast' ? 'selected' : '' }}>Fast</option>
+      </select>
+    </label>
+  </div>
+  <label>
+    <span data-i18n="Lokasi perintah claude">Lokasi perintah claude</span>
+    <input
+      name="claudeBin"
+      type="text"
+      maxlength="500"
+      placeholder="claude"
+      value="{{ settings.claudeBin }}"
+    />
+  </label>
+  <div class="wa-oauth-row">
+    <span data-i18n="Status claude">Status claude</span>
+    <div class="wa-setting-actions">
+      <strong id="claudeStatus" data-i18n-auto data-i18n="memeriksa…">memeriksa…</strong>
+      <button
+        id="claudeCheck"
+        class="wa-setting-icon wa-icon-refresh"
+        type="button"
+        title="Periksa claude"
+        aria-label="Periksa claude"
+       data-i18n="Periksa claude" data-i18n-title="Periksa claude" data-i18n-aria-label="Periksa claude">
+        Periksa claude
+      </button>
+    </div>
+  </div>
+</div>

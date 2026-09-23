@@ -1,0 +1,26 @@
+<section id="beta3OrdersPage" class="wa-orders-page">
+  <div class="wa-orders-title"><h1 data-i18n="Order">Order</h1><div class="wa-orders-title-actions"><span id="beta3OrdersCount" class="wa-muted"></span><button id="beta3OrdersRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button></div></div>
+  <div class="wa-lean-toolbar">
+    <div id="beta3OrdersTabs" class="wa-order-tabs" role="group" aria-label="Filter order" data-i18n-aria-label="Filter order">
+      <button type="button" data-status="all" aria-pressed="true"><span data-i18n="Semua">Semua</span> <b class="wa-tab-count" data-count="all">0</b></button>
+      <button type="button" data-status="pending" aria-pressed="false"><span data-i18n="Menunggu total">Menunggu total</span> <b class="wa-tab-count" data-count="pending">0</b></button>
+      <button type="button" data-status="awaiting_payment" aria-pressed="false"><span data-i18n="Menunggu pembayaran">Menunggu pembayaran</span> <b class="wa-tab-count" data-count="awaiting_payment">0</b></button>
+      <button type="button" data-status="paid" aria-pressed="false"><span data-i18n="Lunas">Lunas</span> <b class="wa-tab-count" data-count="paid">0</b></button>
+      <button type="button" data-status="cancelled" aria-pressed="false"><span data-i18n="Dibatalkan">Dibatalkan</span> <b class="wa-tab-count" data-count="cancelled">0</b></button>
+    </div>
+    <div class="wa-order-filters"><input id="beta3OrdersSearch" type="search" placeholder="Cari nomor order / nama / telepon / produk" data-i18n-placeholder="Cari nomor order / nama / telepon / produk" aria-label="Cari order" data-i18n-aria-label="Cari order"></div>
+  </div>
+  <p id="beta3OrdersNotice" role="status" aria-live="polite"></p>
+  <div class="wa-order-workspace">
+    <div class="wa-order-table-scroll" tabindex="0" role="region" aria-label="Order" data-i18n-aria-label="Order">
+      <table class="wa-order-table">
+        <thead><tr><th scope="col" data-i18n="Order">Order</th><th scope="col" data-i18n="Pelanggan">Pelanggan</th><th scope="col" data-i18n="Pesanan">Pesanan</th><th scope="col" class="wa-order-amount" data-i18n="Total">Total</th><th scope="col" data-i18n="Status">Status</th></tr></thead>
+        <tbody id="beta3OrdersList"></tbody>
+      </table>
+    </div>
+  </div>
+  <dialog id="beta3OrderDrawer" class="wa-order-drawer" data-motion="sheet" aria-labelledby="beta3OrderDrawerTitle">
+    <header class="wa-order-drawer-header"><strong id="beta3OrderDrawerTitle" data-i18n="Detail order">Detail order</strong><button id="beta3OrderDrawerClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+    <section id="beta3OrderDetail" class="wa-order-editor"></section>
+  </dialog>
+</section>

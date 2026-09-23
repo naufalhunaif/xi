@@ -1,0 +1,35 @@
+<div class="wa-work-summary">
+  <strong id="aiWorkStatus" role="status" aria-live="polite" data-ai-enabled="{{ settings.aiEnabled ? 'true' : 'false' }}"></strong>
+  <span class="wa-muted" tabindex="0" title="Jadwal hanya mengatur balasan otomatis. Handoff CS dan kontak tanpa AI tetap dihormati." data-i18n-title="Jadwal hanya mengatur balasan otomatis. Handoff CS dan kontak tanpa AI tetap dihormati." aria-label="Info">ⓘ</span>
+</div>
+<label>
+  <span data-i18n="Jadwal AI">Jadwal AI</span>
+  <select name="aiWorkMode">
+    <option value="always" {{ settings.aiWorkMode === 'always' ? 'selected' : '' }} data-i18n="24 jam setiap hari">24 jam setiap hari</option>
+    <option value="scheduled" {{ settings.aiWorkMode === 'scheduled' ? 'selected' : '' }} data-i18n="Hari & jam tertentu">Hari & jam tertentu</option>
+  </select>
+</label>
+<div id="aiWorkFields" class="wa-work-fields" {{ settings.aiWorkMode === 'always' ? 'hidden' : '' }}>
+  <label>
+    <span data-i18n="Zona waktu">Zona waktu</span>
+    <input name="aiWorkTimezone" value="{{ settings.aiWorkTimezone }}" list="aiWorkZones" maxlength="80" required autocomplete="off" />
+    <datalist id="aiWorkZones">
+      <option value="Asia/Jakarta">WIB</option><option value="Asia/Makassar">WITA</option><option value="Asia/Jayapura">WIT</option><option value="UTC">UTC</option>
+    </datalist>
+  </label>
+  <fieldset class="wa-work-days">
+    <legend data-i18n="Hari mulai">Hari mulai</legend>
+    <input type="hidden" name="aiWorkDays" value="{{ settings.aiWorkDays }}" />
+    <div class="wa-work-day-buttons">
+      @each(day in [{value: '1', label: 'Sen'}, {value: '2', label: 'Sel'}, {value: '3', label: 'Rab'}, {value: '4', label: 'Kam'}, {value: '5', label: 'Jum'}, {value: '6', label: 'Sab'}, {value: '7', label: 'Min'}])
+        <button type="button" class="button" data-work-day="{{ day.value }}" aria-pressed="{{ settings.aiWorkDays.split(',').includes(day.value) ? 'true' : 'false' }}" data-i18n="{{ day.label }}">{{ day.label }}</button>
+      @end
+    </div>
+  </fieldset>
+  <div class="wa-ai-runtime-controls">
+    <label><span data-i18n="AI mulai">AI mulai</span><input name="aiWorkStart" type="time" value="{{ settings.aiWorkStart }}" required /></label>
+    <label><span data-i18n="AI selesai">AI selesai</span><input name="aiWorkEnd" type="time" value="{{ settings.aiWorkEnd }}" required /></label>
+  </div>
+  <small id="aiWorkOvernight" class="wa-muted" data-i18n="Selesai pada hari berikutnya." hidden>Selesai pada hari berikutnya.</small>
+  <small class="wa-muted" data-i18n="Di luar jadwal: manusia">Di luar jadwal: manusia</small>
+</div>

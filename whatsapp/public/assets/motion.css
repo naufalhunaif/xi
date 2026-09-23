@@ -1,0 +1,141 @@
+:root {
+  --wa-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --wa-fast: 160ms;
+  --wa-move: 340ms;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wa-motion-ready
+    .workspace-ui
+    :is(
+      .button,
+      .shell-icon-button,
+      .wa-icon-button,
+      .wa-setting-icon,
+      .wa-info-button,
+      .wa-order-copy,
+      .wa-order-open,
+      .wa-skill-download,
+      .message-actions > button,
+      .reaction-picker button,
+      .app-launcher-item,
+      .nav-item,
+      .wa-contact,
+      .wa-settings-menu a,
+      .wa-viewer-actions button,
+      .wa-viewer-actions a,
+      [data-inbox-filter]
+    ) {
+    transition:
+      background-color var(--wa-fast) ease,
+      border-color var(--wa-fast) ease,
+      color var(--wa-fast) ease,
+      box-shadow var(--wa-fast) ease,
+      opacity var(--wa-fast) ease,
+      translate 240ms var(--wa-ease),
+      scale 240ms var(--wa-ease);
+  }
+  /* Small, interruptible feedback; never move rows or reflow the message list. */
+  @media (hover: hover) and (pointer: fine) {
+    .wa-motion-ready .workspace-ui :is(.button, .shell-icon-button, .wa-icon-button,
+      .wa-setting-icon, .wa-info-button, .wa-order-copy, .wa-skill-download,
+      .message-actions > button, .reaction-picker button):not(:disabled):not([aria-disabled="true"]):hover {
+      translate: var(--wa-magnet-x, 0px) calc(var(--wa-magnet-y, 0px) - 1px);
+    }
+    .wa-motion-ready .workspace-ui .wa-contact:hover .wa-contact-avatar { scale: 1.045; }
+  }
+  .wa-motion-ready .workspace-ui :is(.button, .shell-icon-button, .wa-icon-button,
+    .wa-setting-icon, .wa-info-button, .wa-order-copy, .wa-order-open, .wa-skill-download,
+    .message-actions > button, .reaction-picker button, [data-inbox-filter],
+    .nav-item, .wa-settings-menu a, .app-launcher-item):not(:disabled):not([aria-disabled="true"]):active {
+    translate: 0 0;
+    scale: .97;
+    transition-duration: 90ms;
+  }
+  .wa-motion-ready .workspace-ui .wa-contact-avatar {
+    transition: scale 300ms var(--wa-ease);
+  }
+  .wa-motion-ready .workspace-ui :is(input, select, textarea):not([type="hidden"]) {
+    transition: border-color 180ms ease, box-shadow 220ms var(--wa-ease);
+  }
+  .wa-motion-ready .workspace-ui :is(input, select, textarea):focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--wa-form-focus, #398464) 20%, transparent);
+  }
+  .wa-motion-ready .workspace-ui .wa-order-table tr[data-order-id] {
+    transition: background-color 180ms ease;
+  }
+  .wa-motion-ready .workspace-ui .wa-switch {
+    transition:
+      background-color 240ms var(--wa-ease),
+      box-shadow 240ms var(--wa-ease);
+  }
+  .wa-motion-ready .workspace-ui .wa-switch::after {
+    transition: transform 300ms var(--wa-ease);
+  }
+  .wa-motion-ready .workspace-ui .wa-sidebar-toggle-arrow {
+    transition: transform var(--wa-move) var(--wa-ease);
+  }
+  .wa-motion-ready .workspace-ui .wa-cart-dialog {
+    transition: width 380ms var(--wa-ease);
+  }
+  .workspace-ui .wa-cart-body {
+    margin-left: auto;
+  }
+  .workspace-ui .wa-order-detail {
+    overflow: hidden;
+  }
+  .workspace-ui .message-actions {
+    transition:
+      opacity 180ms var(--wa-ease),
+      transform 180ms var(--wa-ease);
+  }
+  .workspace-ui :is(#cartDialog, #mediaViewer, #aiTraceDialog, #orderDrawer)[open]::backdrop {
+    animation: wa-backdrop-in 280ms ease both;
+  }
+  .workspace-ui
+    :is(#cartDialog, #mediaViewer, #aiTraceDialog, #orderDrawer).wa-dialog-leaving::backdrop {
+    animation: wa-backdrop-out 180ms ease both;
+  }
+  @media (min-width: 761px) {
+    .wa-motion-ready .workspace-ui .sidebar {
+      transition:
+        width var(--wa-move) var(--wa-ease),
+        padding var(--wa-move) var(--wa-ease);
+    }
+    .wa-motion-ready .workspace-ui .shell {
+      transition: margin-left var(--wa-move) var(--wa-ease);
+    }
+  }
+  @media (max-width: 760px) {
+    .wa-motion-ready .workspace-ui .sidebar {
+      transition:
+        transform var(--wa-move) var(--wa-ease),
+        visibility var(--wa-move);
+    }
+  }
+}
+@keyframes wa-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes wa-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-ui *,
+  .workspace-ui *::before,
+  .workspace-ui *::after,
+  .workspace-ui dialog::backdrop {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

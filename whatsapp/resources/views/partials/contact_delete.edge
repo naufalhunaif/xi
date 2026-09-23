@@ -1,0 +1,17 @@
+<dialog id="contactDeleteDialog" class="wa-contact-delete" aria-labelledby="contactDeleteTitle">
+  <header class="wa-trace-header">
+    <h2 id="contactDeleteTitle" data-i18n="Hapus data pelanggan">Hapus data pelanggan</h2>
+    <button id="contactDeleteClose" type="button" class="button" aria-label="Tutup" data-i18n-aria-label="Tutup">×</button>
+  </header>
+  <div class="wa-contact-delete-body">
+    <strong id="contactDeleteIdentity"></strong>
+    <p data-i18n="Chat, media, ingatan AI, cart, order, pembayaran dan saldo terkait pelanggan ini akan dihapus permanen dari aplikasi.">Chat, media, ingatan AI, cart, order, pembayaran dan saldo terkait pelanggan ini akan dihapus permanen dari aplikasi.</p>
+    <p class="wa-muted" data-i18n="Data pelanggan lain, kontak dasar dan pengaturan tetap disimpan. Chat di HP dan data pada layanan lain tidak dihapus.">Data pelanggan lain, kontak dasar dan pengaturan tetap disimpan. Chat di HP dan data pada layanan lain tidak dihapus.</p>
+    <dl id="contactDeleteCounts"></dl>
+    <label for="contactDeleteConfirmation" data-i18n="Ketik teks berikut untuk mengonfirmasi:">Ketik teks berikut untuk mengonfirmasi:</label>
+    <code id="contactDeleteExpected"></code>
+    <input id="contactDeleteConfirmation" type="text" autocomplete="off" spellcheck="false" disabled />
+    <p id="contactDeleteStatus" role="status" aria-live="polite"></p>
+    <button id="contactDeleteConfirm" type="button" class="button danger" disabled data-i18n="Hapus permanen">Hapus permanen</button>
+  </div>
+</dialog>

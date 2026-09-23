@@ -1,0 +1,235 @@
+:root {
+  --wa-control-height: 36px;
+  --wa-control-radius: 6px;
+  --wa-field-gap: 6px;
+  --wa-form-gap: 12px;
+  --wa-form-border: #dededb;
+  --wa-form-focus: #398464;
+}
+
+/* Explicit light controls also inside Safari's dark browser chrome. */
+.workspace-ui .wa-settings-panel select {
+  color-scheme: light;
+  -webkit-text-fill-color: #262626;
+}
+.workspace-ui .wa-settings-panel select option {
+  color: #262626;
+  background-color: #fff;
+}
+.workspace-ui .wa-model-control { display: grid; gap: 6px; }
+.workspace-ui .wa-model-control [hidden] { display: none !important; }
+.workspace-ui .wa-model-hint { color: #62665f; font-size: 11px; }
+.workspace-ui .wa-ai-runtime-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+/* Shared controls; intentionally excludes switches, radios and media/file pickers. */
+.workspace-ui
+  :is(.wa-settings-panel, .wa-orders-page, .wa-cart-body)
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
+    select
+  ) {
+  box-sizing: border-box;
+  height: var(--wa-control-height);
+  min-height: var(--wa-control-height);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--wa-form-border);
+  border-radius: var(--wa-control-radius);
+  background-color: #fff;
+  color: #262626;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+}
+.workspace-ui :is(.wa-settings-panel, .wa-orders-page, .wa-cart-body) select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2370706c' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 10px center;
+  background-repeat: no-repeat;
+  text-overflow: ellipsis;
+}
+.workspace-ui :is(.wa-settings-panel, .wa-orders-page, .wa-cart-body) textarea {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 88px;
+  max-width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--wa-form-border);
+  border-radius: var(--wa-control-radius);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  resize: vertical;
+}
+.workspace-ui :is(.wa-settings-panel, .wa-orders-page, .wa-cart-body) .button {
+  min-height: var(--wa-control-height);
+  height: auto;
+  border-radius: var(--wa-control-radius);
+  white-space: normal;
+}
+.workspace-ui
+  :is(.wa-settings-panel, .wa-orders-page, .wa-cart-body)
+  :is(input, select, textarea, button, summary):focus-visible {
+  outline: 2px solid var(--wa-form-focus);
+  outline-offset: 2px;
+}
+.workspace-ui
+  :is(.wa-settings-panel, .wa-orders-page, .wa-cart-body)
+  :is(input, select, textarea):disabled {
+  background-color: #f3f4f2;
+  color: #747771;
+  cursor: not-allowed;
+}
+.workspace-ui :is(.wa-production-days, .wa-production-options, .wa-order-fields) {
+  align-items: end;
+  gap: var(--wa-form-gap);
+}
+.workspace-ui :is(.wa-production-rule, .wa-order-fields) label {
+  display: grid;
+  align-content: end;
+  gap: var(--wa-field-gap);
+  margin: 0;
+  color: #555a54;
+  font-size: 12px;
+  line-height: 18px;
+}
+.workspace-ui :is(.wa-production-rule, .wa-order-fields) label > span {
+  min-height: 18px;
+}
+.workspace-ui .wa-info-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.workspace-ui .wa-info-button {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin: 0 0 0 3px;
+  border: 0;
+  border-radius: 6px;
+  color: #737873;
+  background: transparent;
+  cursor: pointer;
+}
+.workspace-ui .wa-info-button:hover,
+.workspace-ui .wa-info-button[aria-expanded='true'] {
+  color: #247350;
+  background: #e9f1eb;
+}
+.workspace-ui .wa-info-button:focus-visible {
+  outline: 2px solid #398464;
+  outline-offset: 2px;
+}
+.workspace-ui .wa-info-popover {
+  z-index: 95;
+}
+.workspace-ui .wa-info-popover p {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workspace-ui .wa-info-popover:not([hidden]) {
+    animation: wa-info-enter 160ms var(--wa-ease, ease-out);
+  }
+  .workspace-ui .wa-info-button {
+    transition:
+      color 160ms ease,
+      background-color 160ms ease;
+  }
+}
+@keyframes wa-info-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 600px) {
+  :root {
+    --wa-control-height: 40px;
+  }
+  .workspace-ui .wa-info-button {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+  .workspace-ui
+    :is(.wa-settings-panel, .wa-orders-page, .wa-cart-body)
+    :is(
+      input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
+      select,
+      textarea
+    ) {
+    font-size: 16px;
+  }
+}
+.workspace-ui .wa-oauth-verification {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 8px;
+  background: #fafafa;
+}
+.workspace-ui .wa-oauth-verification[hidden] { display: none; }
+.workspace-ui .wa-mcp-row > .wa-oauth-verification { grid-column: 1 / -1; box-sizing: border-box; }
+.workspace-ui [data-mcp-verification] label { margin: 0; }
+.workspace-ui [data-mcp-verification-result] { overflow-wrap: anywhere; }
+.workspace-ui .wa-oauth-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.workspace-ui .wa-oauth-controls input { flex: 1 1 160px; min-width: 0; width: 100%; }
+.workspace-ui .wa-oauth-controls .button { flex-shrink: 0; }
+.workspace-ui #oauthCode { font-family: monospace; letter-spacing: .1em; }
+.workspace-ui #oauthMessage { margin: 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.wa-item-production-details {
+  margin-top: 10px; padding: 10px; min-width: 0; box-sizing: border-box;
+  border: 1px solid #e2e5e8; border-radius: 10px; background: #f6f7f8;
+  font-size: 12px; line-height: 1.5; color: #263238;
+}
+.wa-item-production-details .wa-item-production-title {
+  margin: 0 0 8px; font-size: 12px; line-height: 1.5; font-weight: 600;
+}
+.wa-item-production-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.wa-item-production-field { min-width: 0; padding: 8px 10px; border: 1px solid #e7eaed; border-radius: 6px; background: #fff; }
+.wa-item-production-field dt { margin: 0 0 3px; font-size: 11px; color: #53616c; overflow-wrap: anywhere; }
+.wa-item-production-field dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wa-item-production-field--measurement { background: #edf4fb; border-color: #dbe7f3; }
+.wa-item-production-field--notes { grid-column: 1 / -1; background: #edf5ef; border-color: #dce9df; }
+.wa-item-production-field--pending { grid-column: 1 / -1; background: #fff5e4; border-color: #efdfbe; }
+.wa-item-production-field--pending dt { color: #795819; }
+@media (max-width: 480px) {
+  .wa-item-production-grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* Destructive data cleanup stays separate from ordinary autosave settings. */
+.wa-chat-cleanup { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e8e8e8; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.wa-chat-cleanup .wa-chat-cleanup-button { color: #b42318; border-color: #f3b8b3; background: #fff8f7; }
+.wa-chat-cleanup small { font-size: 12px; color: #666; }
+.wa-settings-menu .wa-danger-link { color: #b42318; }
+.wa-data-reset { padding: 20px; border: 1px solid #f3b8b3; border-radius: 12px; background: #fff8f7; color: #61231f; display: grid; gap: 16px; }
+.wa-data-reset-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.wa-data-reset p { margin: 0; line-height: 1.6; font-size: 13px; }
+.wa-data-reset-warning { font-size: 13px; }
+.wa-data-reset .button.danger { justify-self: start; background: #b42318; border-color: #b42318; color: #fff; min-height: 42px; white-space: normal; }
+.wa-data-reset .button.danger:hover:not(:disabled) { background: #912018; }
+.wa-data-reset small { font-size: 12px; }
+html[data-theme="dark"] .wa-data-reset { background: #241719; border-color: #753f45; color: #f0c7ca; }
+html[data-theme="dark"] .wa-danger-link { color: #f09a9a; }

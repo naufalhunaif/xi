@@ -1,0 +1,33 @@
+.wa-network-notice {
+  box-sizing: border-box;
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px;
+  border: 1px solid #e3d4b7;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #675028;
+  box-shadow: 0 4px 20px #0000000d;
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.wa-network-notice[hidden], .wa-network-notice [hidden] { display: none; }
+.wa-network-notice button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid #d8c6a6;
+  border-radius: 5px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.wa-network-notice button:disabled { opacity: .5; cursor: default; }
+.wa-network-notice textarea { flex: 1 0 100%; min-height: 180px; font-size: 12px; }

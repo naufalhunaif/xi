@@ -1,0 +1,363 @@
+/* WhatsApp-only theme layer. Shared PHP workspace styles stay unchanged. */
+:root {
+  --wa-page: #fff;
+  --wa-surface: #fff;
+  --wa-chat-bg: #f7f7f5;
+}
+html[data-theme="light"] { color-scheme: light; background: var(--wa-page); }
+html[data-theme="light"] .workspace-ui .wa-order-delivery .wa-muted { color: #596574; }
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --wa-page: #000;
+  --wa-surface: #171719;
+  --wa-raised: #222225;
+  --wa-hover: #303034;
+  --wa-chat-bg: #000;
+  --wa-green-bg: #0b2116;
+  --wa-green: #88d9ad;
+  --wa-blue-bg: #0d192b;
+  --wa-blue: #afcaf4;
+  --wa-amber-bg: #261d0b;
+  --wa-amber: #efd095;
+  --wa-red-bg: #280e11;
+  --wa-red: #f3aca8;
+  background: var(--wa-page);
+}
+html[data-theme="dark"] .workspace-ui {
+  --sidebar: #111113;
+  --text: #e6ebe7;
+  --muted: #abb8ae;
+  --line: #343438;
+  --border: #343438;
+  --accent: #88d9ad;
+  --wa-form-border: #48484e;
+  --wa-form-focus: #88d9ad;
+  background: var(--wa-page);
+  color: var(--text);
+}
+html[data-theme="dark"] .workspace-ui *, html[data-theme="dark"] .workspace-ui *::before, html[data-theme="dark"] .workspace-ui *::after {
+  border-color: var(--line);
+}
+html[data-theme="dark"] .workspace-ui .sidebar { background: var(--sidebar); }
+
+/* Surfaces */
+html[data-theme="dark"] .workspace-ui .topbar,
+html[data-theme="dark"] .workspace-ui .wa-panel,
+html[data-theme="dark"] .workspace-ui .wa-composer,
+html[data-theme="dark"] .workspace-ui .wa-handling-details,
+html[data-theme="dark"] .workspace-ui .wa-trace-dialog,
+html[data-theme="dark"] .workspace-ui .wa-cart-dialog,
+html[data-theme="dark"] .workspace-ui .wa-cart-current,
+html[data-theme="dark"] .workspace-ui .wa-cart-order,
+html[data-theme="dark"] .workspace-ui .wa-order-drawer,
+html[data-theme="dark"] .workspace-ui .wa-order-editor,
+html[data-theme="dark"] .workspace-ui .wa-order-routing,
+html[data-theme="dark"] .workspace-ui .wa-order-table-scroll,
+html[data-theme="dark"] .workspace-ui .wa-item-production-field,
+html[data-theme="dark"] .workspace-ui .app-launcher-popover,
+html[data-theme="dark"] .workspace-ui .language-switch form,
+html[data-theme="dark"] .workspace-ui .reaction-picker,
+html[data-theme="dark"] .workspace-ui .reaction-picker button,
+html[data-theme="dark"] .workspace-ui .message-actions > button,
+html[data-theme="dark"] .workspace-ui .wa-reply-composer button {
+  background-color: var(--wa-surface); color: var(--text);
+}
+
+/* Secondary surfaces */
+html[data-theme="dark"] .workspace-ui .wa-ai-provider,
+html[data-theme="dark"] .workspace-ui .wa-oauth-verification,
+html[data-theme="dark"] .workspace-ui .wa-production-rule,
+html[data-theme="dark"] .workspace-ui .wa-cart-body,
+html[data-theme="dark"] .workspace-ui .wa-order-detail,
+html[data-theme="dark"] .workspace-ui .wa-order-table th,
+html[data-theme="dark"] .workspace-ui .wa-order-editor pre,
+html[data-theme="dark"] .workspace-ui .wa-order-production-box,
+html[data-theme="dark"] .workspace-ui .wa-item-production-details,
+html[data-theme="dark"] .workspace-ui .message-media-placeholder {
+  background-color: var(--wa-raised); color: var(--text);
+}
+
+/* Neutral badges */
+html[data-theme="dark"] .workspace-ui .avatar,
+html[data-theme="dark"] .workspace-ui .nav-count,
+html[data-theme="dark"] .workspace-ui .heading-count,
+html[data-theme="dark"] .workspace-ui .wa-cart-stage,
+html[data-theme="dark"] .workspace-ui .wa-order-badge,
+html[data-theme="dark"] .workspace-ui .app-launcher-icon {
+  background-color: var(--wa-hover); color: var(--text);
+}
+
+/* Primary text */
+html[data-theme="dark"] .workspace-ui .brand,
+html[data-theme="dark"] .workspace-ui .breadcrumb strong,
+html[data-theme="dark"] .workspace-ui .wa-contact,
+html[data-theme="dark"] .workspace-ui .wa-skill-row strong,
+html[data-theme="dark"] .workspace-ui .wa-settings-divider,
+html[data-theme="dark"] .workspace-ui .wa-mcp-source strong,
+html[data-theme="dark"] .workspace-ui .wa-mcp-login,
+html[data-theme="dark"] .workspace-ui .wa-order-fields label,
+html[data-theme="dark"] .workspace-ui .wa-item-production-details {
+  color: var(--text);
+}
+
+/* Secondary text */
+html[data-theme="dark"] .workspace-ui .nav-item,
+html[data-theme="dark"] .workspace-ui .workspace-label,
+html[data-theme="dark"] .workspace-ui .nav-caption,
+html[data-theme="dark"] .workspace-ui .owner-info small,
+html[data-theme="dark"] .workspace-ui .breadcrumb,
+html[data-theme="dark"] .workspace-ui .topbar-meta,
+html[data-theme="dark"] .workspace-ui .wa-settings-menu a,
+html[data-theme="dark"] .workspace-ui .wa-settings-panel label,
+html[data-theme="dark"] .workspace-ui .wa-usage-caption,
+html[data-theme="dark"] .workspace-ui .wa-settings-save,
+html[data-theme="dark"] .workspace-ui .wa-oauth-row,
+html[data-theme="dark"] .workspace-ui .wa-model-hint,
+html[data-theme="dark"] .workspace-ui .wa-skill-updated,
+html[data-theme="dark"] .workspace-ui .wa-skill-empty,
+html[data-theme="dark"] .workspace-ui .wa-evaluation-details dt,
+html[data-theme="dark"] .workspace-ui .wa-payment-details small,
+html[data-theme="dark"] .workspace-ui .wa-cart-item small,
+html[data-theme="dark"] .workspace-ui .wa-order-detail .wa-cart-header small,
+html[data-theme="dark"] .workspace-ui .wa-item-production-field dt,
+html[data-theme="dark"] .workspace-ui .wa-contact-content small,
+html[data-theme="dark"] .workspace-ui .wa-empty,
+html[data-theme="dark"] .workspace-ui .message-meta,
+html[data-theme="dark"] .workspace-ui .message-status,
+html[data-theme="dark"] .workspace-ui .message-reply-preview,
+html[data-theme="dark"] .workspace-ui .new-message-divider,
+html[data-theme="dark"] .workspace-ui .wa-trace-link,
+html[data-theme="dark"] .workspace-ui .wa-trace-muted,
+html[data-theme="dark"] .workspace-ui .wa-trace-detail,
+html[data-theme="dark"] .workspace-ui .wa-trace-toggle,
+html[data-theme="dark"] .workspace-ui .wa-trace-current-state,
+html[data-theme="dark"] .workspace-ui .wa-trace-step-meta,
+html[data-theme="dark"] .workspace-ui #aiTraceStatus,
+html[data-theme="dark"] .workspace-ui .wa-shipping-progress,
+html[data-theme="dark"] .workspace-ui .wa-shipping-progress-meta,
+html[data-theme="dark"] .workspace-ui .wa-order-empty,
+html[data-theme="dark"] .workspace-ui #cartPaymentReading,
+html[data-theme="dark"] .workspace-ui .wa-chat-cleanup small,
+html[data-theme="dark"] .workspace-ui .app-footer,
+html[data-theme="dark"] .workspace-ui .app-launcher-item,
+html[data-theme="dark"] .workspace-ui .app-launcher-title {
+  color: var(--muted);
+}
+
+/* Neutral hover */
+html[data-theme="dark"] .workspace-ui .nav-item:hover,
+html[data-theme="dark"] .workspace-ui .nav-item.active,
+html[data-theme="dark"] .workspace-ui .shell-icon-button:hover,
+html[data-theme="dark"] .workspace-ui .wa-setting-icon:hover,
+html[data-theme="dark"] .workspace-ui .wa-icon-button:hover,
+html[data-theme="dark"] .workspace-ui .app-launcher-item:hover,
+html[data-theme="dark"] .workspace-ui .wa-settings-menu a:hover {
+  background-color: var(--wa-hover); color: var(--text);
+}
+
+/* Success surfaces */
+html[data-theme="dark"] .workspace-ui .wa-cart-balance,
+html[data-theme="dark"] .workspace-ui .wa-order-group-box,
+html[data-theme="dark"] .workspace-ui .wa-production-rule:last-child,
+html[data-theme="dark"] .workspace-ui .wa-item-production-field--notes,
+html[data-theme="dark"] .workspace-ui .wa-ai-progress,
+html[data-theme="dark"] .workspace-ui .wa-reply-composer,
+html[data-theme="dark"] .workspace-ui .wa-contact:hover,
+html[data-theme="dark"] .workspace-ui .wa-contact.active,
+html[data-theme="dark"] .workspace-ui .wa-settings-menu a[aria-current="page"],
+html[data-theme="dark"] .workspace-ui .wa-inbox-filters button[aria-pressed="true"],
+html[data-theme="dark"] .workspace-ui .wa-info-button:hover,
+html[data-theme="dark"] .workspace-ui .app-launcher-whatsapp .app-launcher-icon,
+html[data-theme="dark"] .workspace-ui .wa-room-mode,
+html[data-theme="dark"] .workspace-ui .wa-contact-mode,
+html[data-theme="dark"] .workspace-ui .message-source-badge,
+html[data-theme="dark"] .workspace-ui .wa-room-avatar,
+html[data-theme="dark"] .workspace-ui .wa-contact-avatar,
+html[data-theme="dark"] .workspace-ui .wa-order-status.paid,
+html[data-theme="dark"] .workspace-ui .wa-cart-approval.approved,
+html[data-theme="dark"] .workspace-ui .wa-order-badge[data-tone="success"],
+html[data-theme="dark"] .workspace-ui .wa-cart-order-progress:is([data-stage="ready"],[data-stage="shipped"],[data-stage="completed"]) .wa-cart-stage,
+html[data-theme="dark"] .workspace-ui .wa-order-detail .wa-cart-header {
+  background-color: var(--wa-green-bg); color: var(--wa-green); border-color: #305345;
+}
+
+/* Blue surfaces */
+html[data-theme="dark"] .workspace-ui .wa-order-delivery,
+html[data-theme="dark"] .workspace-ui .wa-cart-orders,
+html[data-theme="dark"] .workspace-ui .wa-item-production-field--measurement,
+html[data-theme="dark"] .workspace-ui .wa-room-mode.cs,
+html[data-theme="dark"] .workspace-ui .wa-contact-mode.cs,
+html[data-theme="dark"] .workspace-ui .source-cs .message-source-badge,
+html[data-theme="dark"] .workspace-ui .wa-order-badge[data-tone="active"],
+html[data-theme="dark"] .workspace-ui .wa-cart-order-progress:is([data-stage="production"],[data-stage="qc"]) .wa-cart-stage {
+  background-color: var(--wa-blue-bg); color: var(--wa-blue); border-color: #354660;
+}
+
+/* Warning surfaces */
+html[data-theme="dark"] .workspace-ui .wa-cart-payment,
+html[data-theme="dark"] .workspace-ui .wa-cart-approval,
+html[data-theme="dark"] .workspace-ui .wa-order-status.pending,
+html[data-theme="dark"] .workspace-ui .wa-order-badge[data-tone="waiting"],
+html[data-theme="dark"] .workspace-ui .wa-item-production-field--pending,
+html[data-theme="dark"] .workspace-ui .wa-notice,
+html[data-theme="dark"] .workspace-ui .wa-network-notice {
+  background-color: var(--wa-amber-bg); color: var(--wa-amber); border-color: #665336;
+}
+
+/* Error surfaces */
+html[data-theme="dark"] .workspace-ui .wa-notice.error,
+html[data-theme="dark"] .workspace-ui #cartNotice,
+html[data-theme="dark"] .workspace-ui .wa-cart-approval.rejected,
+html[data-theme="dark"] .workspace-ui .wa-order-status.cancelled,
+html[data-theme="dark"] .workspace-ui .wa-icon-exclude[aria-pressed="true"],
+html[data-theme="dark"] .workspace-ui .wa-chat-cleanup .wa-chat-cleanup-button {
+  background-color: var(--wa-red-bg); color: var(--wa-red); border-color: #714443;
+}
+
+/* Error text */
+html[data-theme="dark"] .workspace-ui .error,
+html[data-theme="dark"] .workspace-ui .wa-oauth-row strong,
+html[data-theme="dark"] .workspace-ui .wa-mcp-source small,
+html[data-theme="dark"] .workspace-ui .message-status.failed,
+html[data-theme="dark"] .workspace-ui .wa-trace-current.is-failed .wa-trace-current-state,
+html[data-theme="dark"] .workspace-ui .wa-trace-current.is-interrupted .wa-trace-current-state,
+html[data-theme="dark"] .workspace-ui #settingsSaveState.error,
+html[data-theme="dark"] .workspace-ui #paymentStatus.error,
+html[data-theme="dark"] .workspace-ui #productionSaveStatus.error,
+html[data-theme="dark"] .workspace-ui #orderPageNotice.error,
+html[data-theme="dark"] .workspace-ui #orderRoutingNotice.error,
+html[data-theme="dark"] .workspace-ui #exclusionStatus.error {
+  color: var(--wa-red);
+}
+
+/* Positive text */
+html[data-theme="dark"] .workspace-ui .message-status.read,
+html[data-theme="dark"] .workspace-ui .wa-oauth-row strong.connected,
+html[data-theme="dark"] .workspace-ui .wa-mcp-source small.connected,
+html[data-theme="dark"] .workspace-ui .wa-room-title small,
+html[data-theme="dark"] .workspace-ui .wa-contact-content small.active,
+html[data-theme="dark"] .workspace-ui .wa-order-open,
+html[data-theme="dark"] .workspace-ui .wa-order-copy.copied,
+html[data-theme="dark"] .workspace-ui .wa-trace-link:hover {
+  color: var(--wa-green);
+}
+
+html[data-theme="dark"] .workspace-ui input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+html[data-theme="dark"] .workspace-ui select, html[data-theme="dark"] .workspace-ui textarea, html[data-theme="dark"] .workspace-ui option {
+  color-scheme: dark;
+  background-color: var(--wa-surface);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  border-color: var(--wa-form-border);
+  accent-color: var(--wa-green);
+}
+/* Match shared form specificity (its :is contains four attribute exclusions). */
+html[data-theme="dark"] .workspace-ui :is(.wa-settings-panel, .wa-orders-page, .wa-cart-body)
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), select, textarea) {
+  background-color: var(--wa-surface);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  border-color: var(--wa-form-border);
+}
+html[data-theme="dark"] .workspace-ui :is(.wa-toggle-row, .wa-settings-save, .wa-skill-row, .wa-mcp-row,
+  .wa-skill-list, .wa-mcp-list, .wa-settings-divider, .wa-usage-card, .wa-payment-row, .owner-row) {
+  border-color: var(--line);
+}
+html[data-theme="dark"] .workspace-ui input::placeholder, html[data-theme="dark"] .workspace-ui textarea::placeholder { color: var(--muted); opacity: 1; }
+html[data-theme="dark"] .workspace-ui :is(input, select, textarea):disabled {
+  background-color: var(--wa-raised); color: var(--muted); -webkit-text-fill-color: var(--muted);
+}
+html[data-theme="dark"] .workspace-ui :is(.button:not(.primary):not(.danger), .btn:not(.primary):not(.danger), .wa-skill-download) {
+  background-color: var(--wa-raised); color: var(--text); border-color: var(--wa-form-border);
+}
+html[data-theme="dark"] .workspace-ui :is(.button.primary, .btn.primary) { background-color: #85d3a8; color: #12291c; border-color: #85d3a8; }
+html[data-theme="dark"] .workspace-ui :is(.button:not(.primary):not(.danger), .btn:not(.primary):not(.danger), .wa-skill-download):hover { background-color: var(--wa-hover); color: var(--text); }
+html[data-theme="dark"] .workspace-ui :is(.wa-icon-button, .shell-icon-button, .wa-setting-icon, .wa-info-button, .wa-order-copy) { color: var(--muted); }
+html[data-theme="dark"] .workspace-ui .wa-connection-indicator.connected { color: var(--wa-green) !important; }
+html[data-theme="dark"] .workspace-ui .wa-switch { background: #526057; }
+html[data-theme="dark"] .workspace-ui .wa-switch[aria-checked="true"] { background: #318958; }
+html[data-theme="dark"] .workspace-ui .wa-switch::after { background: #f4f8f5; }
+html[data-theme="dark"] .workspace-ui .wa-messages .message { background-color: var(--wa-surface); border-color: var(--line); color: var(--text); }
+html[data-theme="dark"] .workspace-ui .wa-messages .message.out { background-color: var(--wa-green-bg); border-color: #243b2d; }
+html[data-theme="dark"] .workspace-ui .wa-messages .message.out.source-cs { background-color: var(--wa-blue-bg); border-color: #28354a; }
+html[data-theme="dark"] .workspace-ui .message-reply-preview { background: #0002; border-left-color: var(--wa-green); }
+html[data-theme="dark"] .workspace-ui .wa-order-table tr[data-order-id]:is(:hover, :focus-within),
+html[data-theme="dark"] .workspace-ui .wa-order-table tr[data-selected="true"] { background: var(--wa-green-bg); }
+html[data-theme="dark"] .workspace-ui .wa-cart-approval.approved { background: var(--wa-green-bg); color: var(--wa-green); }
+html[data-theme="dark"] .workspace-ui .wa-cart-approval.rejected { background: var(--wa-red-bg); color: var(--wa-red); }
+html[data-theme="dark"] .workspace-ui .wa-item-production-field--pending dt, html[data-theme="dark"] .workspace-ui .wa-contact-pending { color: var(--wa-amber); }
+html[data-theme="dark"] .workspace-ui .wa-chat-cleanup .button.wa-chat-cleanup-button:not(.primary):not(.danger) { background: var(--wa-red-bg); color: var(--wa-red); }
+html[data-theme="dark"] .workspace-ui .wa-cart-money { background: var(--wa-amber-bg); color: var(--wa-amber); box-shadow: 0 0 0 2px var(--wa-surface); }
+html[data-theme="dark"] .workspace-ui .wa-order-shipping-wait { color: var(--wa-amber); }
+/* Native upload controls need their own surface (including Safari's button). */
+html[data-theme="dark"] .workspace-ui input[type="file"] {
+  color-scheme: dark;
+  background-color: var(--wa-surface);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  border-color: var(--wa-form-border);
+}
+html[data-theme="dark"] .workspace-ui input[type="file"]::file-selector-button {
+  background-color: var(--wa-raised);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  border: 1px solid var(--wa-form-border);
+  border-radius: 5px;
+}
+html[data-theme="dark"] .workspace-ui input[type="file"]:not(:disabled):hover::file-selector-button {
+  background-color: var(--wa-hover);
+}
+html[data-theme="dark"] .workspace-ui input[type="file"]:focus-visible::file-selector-button {
+  outline: 2px solid var(--wa-green);
+  outline-offset: 2px;
+}
+html[data-theme="dark"] .workspace-ui .wa-order-copy:hover { background-color: var(--wa-hover); color: var(--text); }
+html[data-theme="dark"] .workspace-ui [aria-invalid="true"] { border-color: var(--wa-red); }
+html[data-theme="dark"] .workspace-ui :focus-visible { outline-color: var(--wa-green); }
+html[data-theme="dark"] .workspace-ui .new-message-divider::before, html[data-theme="dark"] .workspace-ui .new-message-divider::after,
+html[data-theme="dark"] .workspace-ui .wa-trace-step::before { background: var(--line); }
+html[data-theme="dark"] .workspace-ui .wa-trace-step { --step-color: #abb8ae; }
+html[data-theme="dark"] .workspace-ui .wa-trace-step.is-running { --step-color: #efd095; }
+html[data-theme="dark"] .workspace-ui .wa-trace-step.is-completed { --step-color: #88d9ad; }
+html[data-theme="dark"] .workspace-ui .wa-trace-step:is(.is-failed, .is-interrupted) { --step-color: #f3aca8; }
+html[data-theme="dark"] .workspace-ui .wa-cart-count { box-shadow: 0 0 0 2px var(--wa-surface); }
+html[data-theme="dark"] .workspace-ui .wa-shipping-spinner { border-color: #456453; border-top-color: var(--wa-green); }
+/* Only monochrome UI icon assets, never product photos, avatars, emoji or QR. */
+html[data-theme="dark"] .workspace-ui :is(.sidebar, .topbar) .icon img { filter: brightness(0) invert(.82); }
+html[data-theme="dark"] .workspace-ui .app-launcher-item.active { background: var(--wa-green-bg); color: var(--wa-green); }
+/* Preserve a scannable QR quiet zone; never tint the QR image. */
+.workspace-ui #qrImage { background-color: #fff; }
+/* Wallpaper is a non-interactive background, not an overlay on content/media. */
+.workspace-ui .wa-messages {
+  background-color: var(--wa-chat-bg);
+  background-image: url('./chat-pattern.svg');
+  background-repeat: repeat;
+  background-size: 360px 360px;
+}
+@media (forced-colors: active) {
+  .workspace-ui .wa-messages { background-image: none; }
+}
+@media print {
+  html[data-theme] { color-scheme: light; background: white; }
+  .workspace-ui .wa-messages { background-image: none; }
+}
+
+html[data-theme="dark"] .workspace-ui .wa-trace-origin {
+  color: #9aa49d;
+  background: rgba(255, 255, 255, 0.07);
+}
+html[data-theme="dark"] .workspace-ui .wa-trace-origin[data-origin="live"] {
+  color: #7cb9ee;
+  background: rgba(124, 185, 238, 0.13);
+}
+html[data-theme="dark"] .workspace-ui .wa-trace-origin[data-origin="cache"] {
+  color: #77d1a6;
+  background: rgba(119, 209, 166, 0.13);
+}
+
+html[data-theme="dark"] .workspace-ui .wa-trace-sizes {
+  color: #9aa49d;
+}
+
+/* Versi aplikasi di sidebar */
+.workspace-ui .owner-info .wa-app-version { display: block; opacity: 0.6; font-size: 11px; }

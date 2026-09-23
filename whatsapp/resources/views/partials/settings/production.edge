@@ -1,0 +1,20 @@
+<div id="productionSettings">
+  <div class="wa-toggle-row">
+    <span class="wa-info-label"><span data-i18n="Penyesuaian AI eval">Penyesuaian AI eval</span><button type="button" class="wa-info-button" data-info-target="productionInfo" aria-controls="productionInfo" aria-expanded="false" aria-label="Info" data-i18n-aria-label="Info"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg></button></span>
+    <button id="productionAuto" type="button" class="wa-switch" role="switch" aria-checked="false" value="false" aria-label="Penyesuaian AI eval" data-i18n-aria-label="Penyesuaian AI eval" disabled></button>
+  </div>
+  <p id="productionEvaluationStatus" class="wa-usage-caption" role="status"></p>
+  <section id="productionInfo" class="wa-handling-details wa-info-popover" role="region" aria-labelledby="productionInfoTitle" hidden>
+    <header><strong id="productionInfoTitle" data-i18n="Produksi & Pre-order">Produksi & Pre-order</strong><button type="button" data-info-close aria-label="Tutup" data-i18n-aria-label="Tutup">×</button></header>
+    <p data-i18n="Maksimal 1 hari per 7 hari, minimal 3 pelanggan, dukungan 80%. Hanya dalam batas kemampuan produksi.">Maksimal 1 hari per 7 hari, minimal 3 pelanggan, dukungan 80%. Hanya dalam batas kemampuan produksi.</p>
+    <p data-i18n="Estimasi sampai siap dikirim, tidak termasuk kurir. Tidak mengubah janji order berjalan.">Estimasi sampai siap dikirim, tidak termasuk kurir. Tidak mengubah janji order berjalan.</p>
+    <p data-i18n="Isi batas yang benar-benar dapat dipenuhi sebelum mengaktifkan.">Isi batas yang benar-benar dapat dipenuhi sebelum mengaktifkan.</p>
+    <p id="productionEvaluationDetail"></p>
+  </section>
+  <div id="productionRules" class="wa-production-rules"></div>
+  <div class="wa-production-footer">
+    <span id="productionSaveStatus" class="wa-usage-caption" role="status" aria-live="polite"></span>
+    <button id="productionReload" class="button" type="button" data-i18n="Perbarui">Perbarui</button>
+  </div>
+  <details class="wa-production-history"><summary data-i18n="Riwayat penyesuaian">Riwayat penyesuaian</summary><div id="productionHistory"></div></details>
+</div>

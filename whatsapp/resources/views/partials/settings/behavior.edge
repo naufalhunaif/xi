@@ -1,0 +1,75 @@
+<label>
+  <span data-i18n="Mode AI">Mode AI</span>
+  <select name="aiMode">
+    <option value="beta1" {{ settings.aiMode === 'beta1' ? 'selected' : '' }}>Beta 1 · analisis penuh + MCP</option>
+    <option value="beta2" {{ settings.aiMode === 'beta2' ? 'selected' : '' }}>Beta 2 · jalur ramping</option>
+    <option value="beta3" {{ settings.aiMode === 'beta3' ? 'selected' : '' }}>Beta 3 · jalur ramping, terisolasi (tabel, skill, halaman sendiri)</option>
+  </select>
+</label>
+<label>
+  <span data-i18n="Tunggu pesan susulan (milidetik)">Tunggu pesan susulan (milidetik)</span>
+  <input
+    name="turnWindowMs"
+    type="number"
+    min="0"
+    max="60000"
+    step="500"
+    value="{{ settings.turnWindowMs }}"
+  />
+</label>
+<label>
+  <span data-i18n="Riwayat yang dibaca AI (jumlah pesan)">Riwayat yang dibaca AI (jumlah pesan)</span>
+  <input
+    name="historyLimit"
+    type="number"
+    min="5"
+    max="200"
+    step="5"
+    value="{{ settings.historyLimit }}"
+  />
+</label>
+<label class="wa-toggle-row">
+  <span data-i18n="Balas chat tertunda &amp; jalankan susulan sesuai skill">Balas chat tertunda &amp; jalankan susulan sesuai skill</span>
+  <button
+    name="sweepEnabled"
+    class="wa-switch"
+    type="button"
+    role="switch"
+    aria-label="Balas chat tertunda"
+    aria-checked="{{ settings.sweepEnabled ? 'true' : 'false' }}"
+    value="{{ settings.sweepEnabled ? 'true' : 'false' }}"
+   data-i18n-aria-label="Balas chat tertunda"></button>
+</label>
+<label>
+  <span data-i18n="Batas usia chat yang masih disapu (jam)">Batas usia chat yang masih disapu (jam)</span>
+  <input
+    name="sweepMaxAgeHours"
+    type="number"
+    min="1"
+    max="168"
+    step="1"
+    value="{{ settings.sweepMaxAgeHours }}"
+  />
+</label>
+<label>
+  <span data-i18n="Maksimal chat per sapuan">Maksimal chat per sapuan</span>
+  <input
+    name="sweepBatch"
+    type="number"
+    min="1"
+    max="50"
+    step="1"
+    value="{{ settings.sweepBatch }}"
+  />
+</label>
+<div class="wa-exclusions">
+  <h3 data-i18n="Jangan dibalas AI">Jangan dibalas AI</h3>
+  <div class="wa-exclusion-add">
+    <select id="exclusionContact" aria-label="Kontak yang tidak dibalas AI" data-i18n-aria-label="Kontak yang tidak dibalas AI">
+      <option value="" data-i18n="Pilih kontak">Pilih kontak</option>
+    </select>
+    <button id="exclusionAdd" class="button" type="button" data-i18n="Tambah">Tambah</button>
+  </div>
+  <span id="exclusionStatus" role="status" aria-live="polite"></span>
+  <div id="exclusionList"></div>
+</div>

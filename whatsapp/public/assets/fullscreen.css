@@ -1,0 +1,194 @@
+/* WhatsApp owns its full-screen shell; other workspace apps keep their layout. */
+.workspace-ui {
+  --wa-rail-width: 64px;
+  margin: 0;
+}
+.workspace-ui .sidebar {
+  width: var(--wa-rail-width);
+  padding: 12px 8px max(8px, env(safe-area-inset-bottom));
+  transform: none;
+  visibility: visible;
+  transition: none;
+  overflow-y: auto;
+}
+.workspace-ui .brand {
+  justify-content: center;
+  padding: 0;
+  margin: 0 0 20px;
+}
+.workspace-ui .brand-name,
+.workspace-ui .nav-text,
+.workspace-ui .nav-caption,
+.workspace-ui .owner-info {
+  display: none;
+}
+.workspace-ui .sidebar .nav-item {
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+  padding: 0;
+  margin: 0 0 6px;
+  border-radius: 12px;
+}
+.workspace-ui .sidebar .nav-item .icon {
+  width: 21px;
+  height: 21px;
+}
+.workspace-ui .sidebar .nav-item.active {
+  background: #18865b16;
+  color: #18865b;
+}
+.workspace-ui .sidebar .nav-item.active > .icon {
+  color: inherit;
+}
+.workspace-ui .owner-row {
+  flex-direction: column;
+  padding: 12px 0 0;
+  margin-top: 8px;
+  gap: 10px;
+}
+.workspace-ui .owner-actions {
+  margin: 0;
+}
+.workspace-ui .sidebar .app-launcher {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 8px;
+}
+.workspace-ui .sidebar .app-launcher-toggle {
+  width: 44px;
+  height: 44px;
+}
+.workspace-ui .sidebar .app-launcher-popover {
+  position: fixed;
+  top: auto;
+  right: auto;
+  bottom: 12px;
+  left: calc(var(--wa-rail-width) + 8px);
+  width: min(252px, calc(100vw - var(--wa-rail-width) - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+.workspace-ui .shell {
+  margin: 0 0 0 var(--wa-rail-width);
+}
+.workspace-ui .wa-shell-chat {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.workspace-ui .shell > .wa-main-chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+.workspace-ui .wa-chat-grid {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+  grid-template-columns: clamp(280px, 28vw, 380px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+.workspace-ui .wa-chat-grid > .wa-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.workspace-ui .wa-chat-grid > .wa-contact-panel {
+  border-right: 1px solid var(--line);
+}
+.workspace-ui .wa-inbox-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 62px;
+  padding: 12px 16px;
+}
+.workspace-ui .wa-inbox-heading > strong {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+.workspace-ui .wa-inbox-heading .wa-connection {
+  min-height: 0;
+  margin: 0;
+  gap: 2px;
+}
+.workspace-ui .wa-inbox-heading .wa-connection-status {
+  border: 0;
+}
+.workspace-ui .wa-inbox-heading #phoneText {
+  display: none;
+}
+.workspace-ui .wa-inbox-filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 0 10px 10px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+.workspace-ui .wa-inbox-tabs {
+  width: 100%;
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.workspace-ui .wa-inbox-filters button {
+  padding: 6px 9px;
+  border-radius: 16px;
+  font-size: 11px;
+}
+.workspace-ui .wa-main-chat > .wa-notice {
+  flex: 0 0 auto;
+  margin: 0;
+  border-radius: 0;
+}
+.workspace-ui .wa-contact-panel .wa-qr-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 50%;
+  overflow: auto;
+}
+.workspace-ui .wa-contact-panel .wa-qr-panel img {
+  max-width: 100%;
+}
+.workspace-ui .wa-room-title {
+  border-radius: 0;
+}
+.workspace-ui .wa-composer {
+  padding-bottom: max(11px, env(safe-area-inset-bottom));
+}
+@media (max-width: 900px) {
+  .workspace-ui .wa-chat-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .workspace-ui {
+    --wa-rail-width: 52px;
+  }
+  .workspace-ui .sidebar {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .workspace-ui .wa-room-title {
+    padding: 8px 10px;
+  }
+  .workspace-ui .wa-messages {
+    padding: 12px 10px;
+  }
+}
+@media print {
+  .workspace-ui .shell {
+    margin-left: 0;
+  }
+}

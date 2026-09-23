@@ -1,0 +1,816 @@
+@layout({ appUrl, bundle })
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{{ appUrl }}" aria-label="WhatsApp Workspace" title="WhatsApp Workspace">
+      <img class="brand-logo" src="{{ appUrl }}/assets/brand.svg" width="30" height="30" alt="" />
+      <span class="brand-name">WhatsApp<span class="workspace-label">Workspace</span></span>
+    </a>
+    <div class="nav-caption" data-i18n="PENGELOLAAN">PENGELOLAAN</div>
+    <nav aria-label="Navigasi utama" data-i18n-aria-label="Navigasi utama">
+      <a
+        class="nav-item {{ page === 'chat' ? 'active' : '' }}"
+        href="{{ appUrl }}/"
+        aria-label="Chat"
+        title="Chat"
+        aria-current="{{ page === 'chat' ? 'page' : 'false' }}"
+      >
+        <span class="icon">
+          <img src="{{ appUrl }}/assets/bundle/icons/send-outline.svg" alt="" />
+        </span>
+        <span class="nav-text">Chat</span>
+      </a>
+      <a class="nav-item {{ page === 'orders' ? 'active' : '' }}" href="{{ appUrl }}/orders" aria-label="Order" title="Order" aria-current="{{ page === 'orders' ? 'page' : 'false' }}" data-i18n-aria-label="Order" data-i18n-title="Order">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7 5l10 4"/></svg></span>
+        <span class="nav-text" data-i18n="Order">Order</span>
+      </a>
+      <a class="nav-item {{ page === 'lean' ? 'active' : '' }}" href="{{ appUrl }}/lean" aria-label="Beta 2" title="Beta 2" aria-current="{{ page === 'lean' ? 'page' : 'false' }}">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M4 6h16M4 18h10"/></svg></span>
+        <span class="nav-text">Beta 2</span>
+      </a>
+      <a class="nav-item {{ page === 'beta3' ? 'active' : '' }}" href="{{ appUrl }}/beta3" aria-label="Beta 3" title="Beta 3" aria-current="{{ page === 'beta3' ? 'page' : 'false' }}">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M4 6h16M4 18h10"/></svg></span>
+        <span class="nav-text">Beta 3</span>
+      </a>
+      <a class="nav-item {{ page === 'directory' ? 'active' : '' }}" href="{{ appUrl }}/contacts" aria-label="Kontak & Alamat" title="Kontak & Alamat" aria-current="{{ page === 'directory' ? 'page' : 'false' }}" data-i18n-aria-label="Kontak & Alamat" data-i18n-title="Kontak & Alamat">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 17v-1a4 4 0 0 1 8 0v1M2 7h3M2 12h3M2 17h3"/></svg></span>
+        <span class="nav-text" data-i18n="Kontak & Alamat">Kontak & Alamat</span>
+      </a>
+    </nav>
+    <div class="sidebar-bottom">
+      @if(bundle)
+      <div class="app-launcher" data-app-launcher>
+        <button
+          id="launcherButton"
+          class="shell-icon-button app-launcher-toggle"
+          type="button"
+          aria-label="Aplikasi"
+          title="Aplikasi"
+          data-i18n-title="Aplikasi"
+          aria-haspopup="menu"
+          aria-expanded="false"
+         data-i18n-aria-label="Aplikasi">
+          <span class="icon">
+            <img src="{{ appUrl }}/assets/bundle/icons/keypad-outline.svg" alt="" />
+          </span>
+        </button>
+        <div
+          id="launcherMenu"
+          class="app-launcher-popover"
+          role="menu"
+          aria-label="Aplikasi"
+          hidden
+         data-i18n-aria-label="Aplikasi">
+          <strong class="app-launcher-title" data-i18n="Aplikasi">Aplikasi</strong>
+          <div class="app-launcher-grid">
+            <a
+              class="app-launcher-item app-launcher-store"
+              href="{{ bundle }}/store/"
+              role="menuitem"
+            >
+              <span class="app-launcher-icon">
+                <span class="icon">
+                  <img src="{{ appUrl }}/assets/bundle/icons/business-outline.svg" alt="" />
+                </span>
+              </span><span>Store</span>
+            </a>
+            <a
+              class="app-launcher-item app-launcher-material"
+              href="{{ bundle }}/material/"
+              role="menuitem"
+            >
+              <span class="app-launcher-icon">
+                <span class="icon">
+                  <img src="{{ appUrl }}/assets/bundle/icons/archive-outline.svg" alt="" />
+                </span>
+              </span><span>Material</span>
+            </a>
+            <a
+              class="app-launcher-item app-launcher-invoice"
+              href="{{ bundle }}/invoice/"
+              role="menuitem"
+            >
+              <span class="app-launcher-icon">
+                <span class="icon">
+                  <img src="{{ appUrl }}/assets/bundle/icons/document-text-outline.svg" alt="" />
+                </span>
+              </span><span>Invoice</span>
+            </a>
+            <a class="app-launcher-item app-launcher-fit" href="{{ bundle }}/fit/" role="menuitem">
+              <span class="app-launcher-icon">
+                <span class="icon">
+                  <img src="{{ appUrl }}/assets/bundle/icons/analytics-outline.svg" alt="" />
+                </span>
+              </span><span>Fit Advisor</span>
+            </a>
+            <a
+              class="app-launcher-item app-launcher-whatsapp active"
+              href="{{ appUrl }}"
+              role="menuitem"
+              aria-current="page"
+            >
+              <span class="app-launcher-icon">
+                <span class="icon">
+                  <img src="{{ appUrl }}/assets/bundle/icons/send-outline.svg" alt="" />
+                </span>
+              </span><span>WhatsApp</span>
+            </a>
+            <a
+              class="app-launcher-item app-launcher-account"
+              href="{{ bundle }}/account/"
+              role="menuitem"
+            >
+              <span class="app-launcher-icon">
+                <span class="icon">
+                  <img src="{{ appUrl }}/assets/bundle/icons/key-outline.svg" alt="" />
+                </span>
+              </span><span>Account</span>
+            </a>
+          </div>
+        </div>
+      </div>
+      @end
+      <a
+        class="nav-item settings-link {{ page === 'settings' ? 'active' : '' }}"
+        href="{{ appUrl }}/settings"
+        aria-label="Pengaturan"
+        title="Pengaturan"
+        aria-current="{{ page === 'settings' ? 'page' : 'false' }}"
+       data-i18n-aria-label="Pengaturan" data-i18n-title="Pengaturan">
+        <span class="icon">
+          <img src="{{ appUrl }}/assets/bundle/icons/settings-outline.svg" alt="" />
+        </span>
+        <span class="nav-text" data-i18n="Pengaturan">Pengaturan</span>
+      </a>
+      <div class="owner-row" title="{{ account.name }} · {{ account.username }}">
+        @if(account.picture)
+          <img class="avatar" src="{{ account.picture }}" alt="" />
+        @else
+          <span class="avatar" aria-hidden="true">
+            {{ account.name.slice(0, 1).toUpperCase() }}
+          </span>
+        @end
+
+        <div class="owner-info">
+          <strong>{{ account.name }}</strong>
+          <small>{{ account.username }}</small>
+          <small class="wa-app-version" title="Versi aplikasi">v{{ appVersion }}</small>
+        </div>
+        <form class="owner-actions" action="{{ appUrl }}/logout" method="post">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}" />
+          <button class="shell-icon-button" type="submit" title="Keluar" aria-label="Keluar" data-i18n-title="Keluar" data-i18n-aria-label="Keluar">
+            <span class="icon">
+              <img src="{{ appUrl }}/assets/bundle/icons/log-out-outline.svg" alt="" />
+            </span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  <div class="shell {{ page === 'chat' ? 'wa-shell-chat' : 'wa-shell-settings' }}">
+    <main id="main" class="{{ page === 'chat' ? 'wa-main-chat' : '' }}" data-room="{{ selectedJid ? 'open' : 'list' }}">
+      <div id="notice" class="wa-notice" hidden></div>
+      @if(page === 'chat')
+        <div class="wa-chat-grid">
+          <aside class="wa-panel wa-contact-panel">
+            <div class="wa-inbox-heading">
+              <strong>Chat</strong>
+              <section class="wa-connection" aria-label="Koneksi WhatsApp" data-i18n-aria-label="Koneksi WhatsApp">
+                <div
+                  class="wa-connection-status"
+                  role="status"
+                  tabindex="0"
+                  title="WhatsApp · {{ connection.status_label }}"
+                >
+                  <span
+                    id="statusDot"
+                    class="wa-connection-symbol {{ connection.status }}"
+                    aria-hidden="true"
+                  ></span>
+                  <span id="statusText" class="sr-only" data-i18n-auto>{{ connection.status_label }}</span>
+                  <span id="phoneText" class="wa-muted">{{ connection.phone || '' }}</span>
+                </div>
+                <div class="actions">
+                  <button
+                    id="connectButton"
+                    class="wa-icon-button"
+                    type="button"
+                    title="Hubungkan WhatsApp"
+                    aria-label="Hubungkan WhatsApp"
+                    {{
+                      ['connected', 'connecting', 'qr'].includes(connection.status) ||
+                      connection.desired_connected
+                        ? 'hidden'
+                        : ''
+                    }}
+                   data-i18n-title="Hubungkan WhatsApp" data-i18n-aria-label="Hubungkan WhatsApp">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M10 13a5 5 0 0 0 7 .1l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7-.1l-3 3a5 5 0 0 0 7 7l1.7-1.7"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    id="disconnectButton"
+                    class="wa-icon-button"
+                    type="button"
+                    title="Putuskan WhatsApp"
+                    aria-label="Putuskan WhatsApp"
+                    {{
+                      ['connected', 'connecting', 'qr'].includes(connection.status) ||
+                      connection.desired_connected
+                        ? ''
+                        : 'hidden'
+                    }}
+                   data-i18n-title="Putuskan WhatsApp" data-i18n-aria-label="Putuskan WhatsApp">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 3v9M6.4 5.6a8 8 0 1 0 11.2 0" />
+                    </svg>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <section id="qrPanel" class="wa-panel wa-qr-panel" hidden>
+              <div class="wa-panel-title" data-i18n="Scan QR">Scan QR</div>
+              <img id="qrImage" alt="QR WhatsApp" />
+            </section>
+
+            <div id="inboxFilters" class="wa-inbox-filters" role="group" aria-label="Filter percakapan" data-i18n-aria-label="Filter percakapan">
+              <div class="wa-inbox-tabs">
+                @each(tab in
+                [
+                  { key: 'all', label: 'Semua' },
+                  { key: 'ai', label: 'Ditangani AI' },
+                  { key: 'cs', label: 'Perlu CS' },
+                  { key: 'payment', label: 'Pembayaran' },
+                  { key: 'order', label: 'Order' },
+                ])
+                  <button
+                    type="button"
+                    data-inbox-filter="{{ tab.key }}"
+                    aria-pressed="{{ tab.key === 'all' ? 'true' : 'false' }}"
+                   data-i18n-auto>
+                    {{ tab.label }}
+                    <span data-filter-count>0</span>
+                  </button>
+                @end
+              </div>
+              <button
+                id="unansweredFilter"
+                type="button"
+                aria-pressed="false"
+                title="Percakapan dengan pesan pelanggan yang belum mendapat balasan terkirim"
+               data-i18n="Belum dibalas" data-i18n-title="Percakapan dengan pesan pelanggan yang belum mendapat balasan terkirim">
+                Belum dibalas
+                <span id="unansweredCount">0</span>
+              </button>
+            </div>
+
+            <div id="contacts" class="wa-contacts" data-selected-jid="{{ selectedJid }}">
+              @each(contact in contacts)
+                <a
+                  class="wa-contact {{ contact.jid === selectedJid ? 'active' : '' }} {{ contact.ai_running ? 'ai-running' : '' }}"
+                  href="{{ appUrl }}/?jid={{ contact.jid }}"
+                  data-jid="{{ contact.jid }}"
+                  data-mode="{{ contact.handling_mode }}"
+                  data-payment="{{ contact.needs_payment ? 'true' : 'false' }}"
+                  data-order="{{ contact.has_order ? 'true' : 'false' }}"
+                  data-unanswered="{{ contact.unanswered_count }}"
+                >
+                  @if(contact.profile_picture_url)
+                    <img
+                      class="wa-contact-avatar"
+                      src="{{ contact.profile_picture_url }}"
+                      alt=""
+                      loading="lazy"
+                    />
+                  @else
+                    <span class="wa-contact-avatar">
+                      {{
+                        (contact.contact_name || contact.jid)
+                          .slice(0, 1)
+                          .toUpperCase()
+                      }}
+                    </span>
+                  @end
+
+                  <span class="wa-contact-content">
+                    <strong>{{ contact.contact_name || contact.jid.split('@')[0] }}</strong>
+                    <small class="{{ contact.activity ? 'active' : '' }}">
+                      {{ contact.activity || contact.body || '' }}
+                    </small>
+                  </span>
+                  <span class="wa-contact-meta">
+                    @if(contact.unanswered_count > 0)
+                      <span
+                        class="wa-contact-pending"
+                        title="{{ contact.unanswered_count }} pesan belum dibalas"
+                        aria-label="{{ contact.unanswered_count }} pesan belum dibalas"
+                      >
+                        {{ contact.unanswered_count }}
+                        ↩
+                      </span>
+                    @end
+                    @if(contact.unread_count > 0)
+                      <span
+                        class="wa-unread-count"
+                        aria-label="{{ contact.unread_count }} pesan belum dibaca"
+                      >
+                        {{ contact.unread_count }}
+                      </span>
+                    @end
+
+                    <span class="wa-contact-mode {{ contact.handling_mode }}">
+                      {{ contact.handling_mode === 'cs' ? 'CS' : 'AI' }}
+                    </span>
+                  </span>
+                </a>
+              @else
+                <div class="wa-empty" data-i18n="Belum ada kontak">Belum ada kontak</div>
+              @end
+            </div>
+          </aside>
+
+          <section id="chat" class="wa-panel wa-chat-panel">
+            <div class="wa-panel-title wa-room-title">
+              <a
+                id="roomBack"
+                class="wa-room-back"
+                href="{{ appUrl }}/"
+                aria-label="Kembali ke daftar chat"
+                data-i18n-aria-label="Kembali ke daftar chat"
+                title="Kembali ke daftar chat"
+                data-i18n-title="Kembali ke daftar chat"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </a>
+              @if(selectedContact)
+                @if(selectedContact.profile_picture_url)
+                  <img
+                    id="roomAvatar"
+                    class="wa-room-avatar"
+                    src="{{ selectedContact.profile_picture_url }}"
+                    alt=""
+                  />
+                @else
+                  <span id="roomAvatar" class="wa-room-avatar">
+                    {{
+                      (selectedContact.contact_name || selectedJid)
+                        .slice(0, 1)
+                        .toUpperCase()
+                    }}
+                  </span>
+                @end
+              @end
+
+              <div class="wa-room-identity">
+                <strong id="roomName">
+                  {{
+                    selectedContact
+                      ? selectedContact.contact_name || selectedJid.split('@')[0]
+                      : 'Chat'
+                  }}
+                </strong>
+                <div id="roomStatus" class="wa-room-status" {{ selectedContact ? '' : 'hidden' }}>
+                  <button id="roomMode" type="button" class="wa-room-mode {{ selectedContact?.handling_mode }}" data-i18n-auto
+                    aria-expanded="false" aria-controls="roomHandlingDetails"
+                    data-reason="{{ selectedContact?.handoff_reason || '' }}"
+                    data-schedule-paused="{{ selectedContact?.schedule_paused ? 'true' : 'false' }}"
+                    data-note="{{ selectedContact?.handling_note || '' }}"
+                    data-waiting="{{ selectedContact?.goal_waiting_for || '' }}"
+                    data-next="{{ selectedContact?.goal_next_action || '' }}">
+                    {{ selectedContact?.ai_excluded ? 'Tanpa AI' : selectedContact?.handling_mode === 'cs' ? 'Ditangani CS' : 'Ditangani AI' }}
+                  </button>
+                  <small id="roomGoalStatus" class="wa-muted" aria-live="polite"></small>
+                </div>
+              </div>
+              <div
+                id="roomHandling"
+                class="wa-room-handling"
+                role="group"
+                aria-label="Tindakan percakapan"
+                data-mode="{{ selectedContact ? selectedContact.handling_mode : 'ai' }}"
+                {{ selectedContact ? '' : 'hidden' }}
+               data-i18n-aria-label="Tindakan percakapan">
+                <button id="roomModeButton" class="button" type="button" data-i18n-auto {{ selectedContact?.schedule_paused ? 'disabled' : '' }}>
+                  {{ selectedContact?.handling_mode === 'cs' ? 'Aktifkan AI' : 'Ambil alih' }}
+                </button>
+                <button
+                  id="roomExclusionButton"
+                  class="wa-setting-icon wa-icon-exclude"
+                  type="button"
+                  aria-label="Jangan dibalas AI"
+                  title="Jangan dibalas AI"
+                  aria-pressed="{{ selectedContact?.ai_excluded ? 'true' : 'false' }}"
+                 data-i18n="Jangan dibalas AI" data-i18n-aria-label="Jangan dibalas AI" data-i18n-title="Jangan dibalas AI">
+                  Jangan dibalas AI
+                </button>
+                <button id="contactDeleteButton" class="wa-icon-button wa-contact-delete-trigger" type="button"
+                  aria-label="Hapus data pelanggan" title="Hapus data pelanggan"
+                  data-i18n-aria-label="Hapus data pelanggan" data-i18n-title="Hapus data pelanggan">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
+                  </svg>
+                </button>
+                <span class="wa-room-action-divider" aria-hidden="true"></span>
+                <button
+                  id="cartOpen"
+                  class="wa-icon-button wa-cart-trigger"
+                  type="button"
+                  title="{{ (leanMode || beta3Mode) ? 'Pesanan' : 'Cart & Order' }}"
+                  aria-label="{{ (leanMode || beta3Mode) ? 'Pesanan' : 'Cart dan order' }}"
+                  data-i18n-title="{{ (leanMode || beta3Mode) ? 'Pesanan' : 'Cart & Order' }}"
+                  data-i18n-aria-label="{{ (leanMode || beta3Mode) ? 'Pesanan' : 'Cart dan order' }}"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="19"
+                    height="19"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 3h2l2.4 12h11.2L21 7H6M8 15l-1 3h12" />
+                    <circle cx="9" cy="21" r="1" />
+                    <circle cx="18" cy="21" r="1" />
+                  </svg>
+                  <span id="cartCount" class="wa-cart-count" aria-hidden="true" hidden></span>
+                  <span id="cartMoney" class="wa-cart-money" aria-hidden="true" hidden>
+                    <svg viewBox="0 0 20 16" width="15" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="1" y="1" width="18" height="14" rx="2" />
+                      <circle cx="10" cy="8" r="3" />
+                      <path d="M4 8h1m10 0h1" />
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <section id="roomHandlingDetails" class="wa-handling-details" role="region" aria-labelledby="roomHandlingDetailsTitle" hidden>
+              <header>
+                <strong id="roomHandlingDetailsTitle" data-i18n="Detail penanganan">Detail penanganan</strong>
+                <button id="roomHandlingDetailsClose" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup">×</button>
+              </header>
+              <div id="roomHandlingDetailsBody"></div>
+            </section>
+            <div
+              id="messages"
+              class="wa-messages"
+              data-jid="{{ selectedJid }}"
+              data-last-id="{{ messages.length ? messages[messages.length - 1].id : 0 }}"
+            >
+              <div id="messageList" class="wa-message-list">
+              @each(message in messages)
+                <article
+                  class="message {{ message.direction === 'out' ? 'out' : 'in' }} source-{{ message.sender_type || (message.direction === 'out' ? 'cs' : 'customer') }} {{ message.media_type ? 'has-media' : '' }}"
+                  data-id="{{ message.id }}"
+                  data-message-id="{{ message.message_id }}"
+                  data-body="{{ message.body }}"
+                >
+                  <div class="message-actions">
+                    <button type="button" data-reply aria-label="Reply">↩</button>
+                    <button type="button" data-reaction-toggle aria-label="Reaction">☺</button>
+                    <div class="reaction-picker" hidden>
+                      @each(emoji in ['👍', '❤️', '😂', '😮', '😢', '🙏'])
+                        <button type="button" data-reaction="{{ emoji }}">{{ emoji }}</button>
+                      @end
+                    </div>
+                  </div>
+                  @if(message.reply)
+                    <div class="message-reply-preview">
+                      {{ message.reply.body || message.reply.media_type || 'Media' }}
+                    </div>
+                  @end
+                  @if(message.media_type)
+                    <div class="message-media-wrap">
+                      @if(message.media_url && message.media_type === 'document')
+                        <a class="message-document" href="{{ message.media_url }}" download>
+                          {{ message.media_name || 'Dokumen' }}
+                          ↓
+                        </a>
+                      @elseif(message.media_url && message.media_type === 'audio')
+                        <audio
+                          class="message-audio"
+                          src="{{ message.media_url }}"
+                          controls
+                          preload="metadata"
+                        ></audio>
+                      @elseif(message.media_url && message.media_type === 'image')
+                        <img class="message-media" src="{{ message.media_url }}" alt="" />
+                      @elseif(message.media_url && message.media_type === 'gif')
+                        <video
+                          class="message-media"
+                          src="{{ message.media_url }}"
+                          poster="{{ message.thumbnail_url || '' }}"
+                          autoplay
+                          loop
+                          muted
+                          playsinline
+                        ></video>
+                      @elseif(message.media_url && message.media_type === 'video')
+                        <video
+                          class="message-media"
+                          src="{{ message.media_url }}"
+                          poster="{{ message.thumbnail_url || '' }}"
+                          controls
+                          playsinline
+                          preload="metadata"
+                        ></video>
+                      @elseif(message.media_url && message.media_type === 'sticker')
+                        <img class="message-media sticker" src="{{ message.media_url }}" alt="" />
+                      @elseif(message.thumbnail_url)
+                        <img
+                          class="message-media thumbnail {{ message.media_type === 'sticker' ? 'sticker' : '' }}"
+                          src="{{ message.thumbnail_url }}"
+                          alt=""
+                        />
+                      @else
+                        <div class="message-media-placeholder" aria-hidden="true"></div>
+                      @end
+                      @if(message.media_status === 'downloading')
+                        <span class="message-media-state" data-i18n="Mengunduh…">Mengunduh…</span>
+                      @elseif(message.media_status === 'failed')
+                        <span class="message-media-state failed" data-i18n="Gagal dimuat">Gagal dimuat</span>
+                      @end
+                    </div>
+                  @end
+
+                  <div class="message-meta">
+                    @if(message.direction === 'out')
+                      <span class="message-source-badge">
+                        {{ message.sender_type === 'ai' ? 'AI' : 'CS' }}
+                      </span>
+                    @else
+                      {{ message.contact_name || message.jid }}
+                    @end
+                  </div>
+                  @if(message.body)
+                    <div class="message-body">{{ message.body }}</div>
+                  @end
+
+                  <div class="message-footer">
+                    <span class="message-reactions">
+                      @each(reaction in message.reactions)
+                        <span>{{ reaction.emoji }}</span>
+                      @end
+                    </span>
+                    @if(message.direction === 'out')
+                      <span class="message-status {{ message.status }}">
+                        {{
+                          ['read', 'delivered'].includes(message.status)
+                            ? '✓✓'
+                            : message.status === 'failed'
+                              ? '!'
+                              : '✓'
+                        }}
+                      </span>
+                    @end
+                  </div>
+                  @if(message.trace_id)
+                    <button
+                      type="button"
+                      class="wa-trace-link"
+                      data-trace-id="{{ message.trace_id }}"
+                     data-i18n="Detail proses">
+                      Detail proses
+                    </button>
+                  @end
+                </article>
+              @else
+                <div class="wa-empty" data-i18n="Pilih kontak">Pilih kontak</div>
+              @end
+              </div>
+            </div>
+            <button
+              id="aiProgress"
+              class="wa-ai-progress"
+              type="button"
+              aria-haspopup="dialog"
+              hidden
+            >
+              <span id="aiProgressLabel" role="status"></span>
+              <span data-i18n="Detail proses ›">Detail proses ›</span>
+            </button>
+            <form id="messageForm" class="wa-composer" enctype="multipart/form-data">
+              <div id="replyComposer" class="wa-reply-composer" hidden>
+                <span id="replyComposerText"></span>
+                <button type="button" id="cancelReply" aria-label="Batal reply" data-i18n-aria-label="Batal reply">×</button>
+              </div>
+              <div id="mediaComposer" class="wa-media-composer" hidden>
+                <img id="mediaPreview" alt="Pratinjau lampiran" hidden / data-i18n-alt="Pratinjau lampiran">
+                <span id="mediaFileName"></span>
+                <button type="button" id="cancelMedia" aria-label="Batal lampiran" data-i18n-aria-label="Batal lampiran">×</button>
+              </div>
+              <input
+                id="mediaInput"
+                name="media"
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.mp4,.mov,.mp3,.ogg,.m4a,.wav"
+                hidden
+                {{ selectedJid ? '' : 'disabled' }}
+              />
+              <button
+                id="attachMedia"
+                class="button wa-attach"
+                type="button"
+                aria-label="Lampirkan file"
+                title="Lampirkan file (maks. 16 MB)"
+                {{ selectedJid ? '' : 'disabled' }}
+               data-i18n-aria-label="Lampirkan file" data-i18n-title="Lampirkan file (maks. 16 MB)">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="m21 11-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.5-8.5"
+                  />
+                </svg>
+              </button>
+              <input name="jid" type="hidden" value="{{ selectedJid }}" />
+              <input name="replyToId" type="hidden" value="" />
+              <input name="replyToMessageId" type="hidden" value="" />
+              <input
+                name="body"
+                type="text"
+                maxlength="4096"
+                autocomplete="off"
+                placeholder="Pesan"
+                {{ selectedJid ? '' : 'disabled' }}
+              / data-i18n-placeholder="Pesan">
+              <button class="button primary" type="submit" {{ selectedJid ? '' : 'disabled' }} data-i18n="Kirim">
+                Kirim
+              </button>
+            </form>
+          </section>
+        </div>
+        @include('partials/process_detail')
+      @elseif(page === 'orders')
+        @if(beta3Mode)
+          @include('partials/orders_beta3')
+        @elseif(leanMode)
+          @include('partials/orders_lean')
+        @else
+          @include('partials/orders')
+        @endif
+      @elseif(page === 'lean')
+        @include('partials/lean')
+      @elseif(page === 'beta3')
+        @include('partials/beta3')
+      @elseif(page === 'directory')
+        @include('partials/contact_directory')
+      @else
+        <section id="settings" class="wa-settings-page">
+          <div class="wa-settings-header">
+            <h1 class="wa-settings-heading" data-i18n="Pengaturan">Pengaturan</h1>
+            <span id="settingsSaveState" role="status" aria-live="polite" data-i18n="Tersimpan otomatis" data-i18n-auto>Tersimpan otomatis</span>
+          </div>
+          <div class="wa-settings-layout">
+            <nav class="wa-settings-menu" aria-label="Menu pengaturan" data-i18n-aria-label="Menu pengaturan">
+              <a href="#general" data-settings-menu="general" data-i18n="Umum">Umum</a>
+              <a href="#ai" data-settings-menu="ai" aria-current="page">AI</a>
+              <a href="#work-hours" data-settings-menu="work-hours" data-i18n="Jam kerja AI">Jam kerja AI</a>
+              <a href="#skills" data-settings-menu="skills" data-i18n="Skill">Skill</a>
+              <a href="#evaluation" data-settings-menu="evaluation" data-i18n="Evaluasi">Evaluasi</a>
+              <a href="#business" data-settings-menu="business" data-i18n="Data bisnis">Data bisnis</a>
+              <a href="#production" data-settings-menu="production" data-i18n="Produksi & Pre-order">Produksi & Pre-order</a>
+              <a href="#payments" data-settings-menu="payments" data-i18n="Pembayaran">Pembayaran</a>
+              <a href="#behavior" data-settings-menu="behavior" data-i18n="Perilaku balasan">Perilaku balasan</a>
+              <a href="#usage" data-settings-menu="usage">Usage</a>
+              <a href="#danger" data-settings-menu="danger" class="wa-danger-link">Danger zone</a>
+            </nav>
+            <div class="wa-panel wa-settings-panel">
+              <form id="settingsForm">
+                <section id="settings-danger" data-settings-panel="danger" aria-labelledby="settings-title-danger" hidden>
+                  <h2 id="settings-title-danger">Danger zone</h2>
+                  <div class="wa-data-reset">
+                    <div class="wa-data-reset-heading"><strong data-i18n="Reset data">Reset data</strong><span id="dataResetPhone">—</span></div>
+                    <p data-i18n="Hapus percakapan, media, pesanan, pembayaran, saldo, alamat tersimpan, dan ingatan AI pada nomor aktif.">Hapus percakapan, media, pesanan, pembayaran, saldo, alamat tersimpan, dan ingatan AI pada nomor aktif.</p>
+                    <p data-i18n="Kontak dasar, skill, pengaturan, akun AI, dan koneksi WhatsApp tetap ada. Tidak menghapus data di Orion/MCP.">Kontak dasar, skill, pengaturan, akun AI, dan koneksi WhatsApp tetap ada. Tidak menghapus data di Orion/MCP.</p>
+                    <strong class="wa-data-reset-warning" data-i18n="Permanen. Cadangkan data penting sebelum melanjutkan.">Permanen. Cadangkan data penting sebelum melanjutkan.</strong>
+                    <button id="dataResetButton" type="button" class="button danger" disabled data-i18n="Hapus data & mulai dari nol">Hapus data & mulai dari nol</button>
+                    <small id="dataResetStatus" role="status" aria-live="polite"></small>
+                  </div>
+                </section>
+                <section id="settings-production" data-settings-panel="production" aria-labelledby="settings-title-production" hidden>
+                  <h2 id="settings-title-production" data-i18n="Produksi & Pre-order">Produksi & Pre-order</h2>
+                  @include('partials/settings/production')
+                </section>
+                <section id="settings-general" data-settings-panel="general" aria-labelledby="settings-title-general" hidden>
+                  <h2 id="settings-title-general" data-i18n="Umum">Umum</h2>
+                  @include('partials/settings/appearance')
+                  <label>
+                    <span data-i18n="Bahasa tampilan">Bahasa tampilan</span>
+                    <select id="uiLanguage" aria-label="Bahasa tampilan" data-i18n-aria-label="Bahasa tampilan">
+                      <option value="en">English</option>
+                      <option value="id">Bahasa Indonesia</option>
+                    </select>
+                  </label>
+                  <p class="wa-usage-caption" data-i18n="Bahasa antarmuka di browser ini. Tidak mengubah pesan atau skill AI.">Bahasa antarmuka di browser ini. Tidak mengubah pesan atau skill AI.</p>
+                  <div class="wa-chat-cleanup">
+                    <button id="chatCleanupButton" type="button" class="button wa-chat-cleanup-button" data-i18n="Hapus chat & media">Hapus chat & media</button>
+                    <small id="chatCleanupStatus" role="status" aria-live="polite"></small>
+                  </div>
+                </section>
+                <section
+                  id="settings-ai"
+                  data-settings-panel="ai"
+                  aria-labelledby="settings-title-ai"
+                >
+                  <h2 id="settings-title-ai">AI</h2>
+                  @include('partials/settings/ai')
+                </section>
+                <section id="settings-work-hours" data-settings-panel="work-hours" aria-labelledby="settings-title-work-hours" hidden>
+                  <h2 id="settings-title-work-hours" data-i18n="Jam kerja AI">Jam kerja AI</h2>
+                  @include('partials/settings/work_hours')
+                </section>
+                <section
+                  id="settings-skills"
+                  data-settings-panel="skills"
+                  aria-labelledby="settings-title-skills"
+                  hidden
+                >
+                  <h2 id="settings-title-skills" data-i18n="Skill">Skill</h2>
+                  @include('partials/settings/skills')
+                </section>
+                <section
+                  id="settings-evaluation"
+                  data-settings-panel="evaluation"
+                  aria-labelledby="settings-title-evaluation"
+                  hidden
+                >
+                  <h2 id="settings-title-evaluation" data-i18n="Evaluasi">Evaluasi</h2>
+                  @include('partials/settings/evaluation')
+                </section>
+                <section
+                  id="settings-business"
+                  data-settings-panel="business"
+                  aria-labelledby="settings-title-business"
+                  hidden
+                >
+                  <h2 id="settings-title-business" data-i18n="Data bisnis">Data bisnis</h2>
+                  @include('partials/settings/business')
+                </section>
+                <section
+                  id="settings-behavior"
+                  data-settings-panel="behavior"
+                  aria-labelledby="settings-title-behavior"
+                  hidden
+                >
+                  <h2 id="settings-title-behavior" data-i18n="Perilaku balasan">Perilaku balasan</h2>
+                  @include('partials/settings/behavior')
+                </section>
+                <section
+                  id="settings-payments"
+                  data-settings-panel="payments"
+                  aria-labelledby="settings-title-payments"
+                  hidden
+                >
+                  <h2 id="settings-title-payments" data-i18n="Pembayaran">Pembayaran</h2>
+                  @include('partials/settings/payments')
+                </section>
+                <section
+                  id="settings-usage"
+                  data-settings-panel="usage"
+                  aria-labelledby="settings-title-usage"
+                  hidden
+                >
+                  <h2 id="settings-title-usage">Usage</h2>
+                  @include('partials/settings/usage')
+                </section>
+              </form>
+            </div>
+          </div>
+        </section>
+      @end
+    </main>
+  </div>
+@end

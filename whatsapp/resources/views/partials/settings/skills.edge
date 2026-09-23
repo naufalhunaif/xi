@@ -1,0 +1,33 @@
+<div class="wa-skill-editor">
+  <label for="skillEditInstruction"><span data-i18n="Instruksi untuk skill">Instruksi untuk skill</span>
+    <textarea id="skillEditInstruction" rows="3" maxlength="8000" data-i18n-placeholder="Contoh: tampilkan total sebagai 100 + 100 = 200." placeholder="Contoh: tampilkan total sebagai 100 + 100 = 200."></textarea>
+  </label>
+  <div class="actions"><button id="skillEditSubmit" class="button primary" type="button" data-i18n="Update dengan AI">Update dengan AI</button></div>
+  <small id="skillEditStatus" class="wa-muted" role="status" aria-live="polite" hidden></small>
+</div>
+<label>
+  <span data-i18n="Import skill">Import skill</span>
+  <input id="skillFile" name="skillFile" type="file" accept=".md,text/markdown" multiple />
+</label>
+<div id="skillList" class="wa-skill-list">
+  @each(skill in settings.skills)
+    <div class="wa-skill-row" data-skill-row="{{ skill.id }}">
+      <div><strong>{{ skill.name }}</strong><small class="wa-skill-updated"><time datetime="{{ skill.updatedAt }}" data-relative-time title="Diperbarui {{ skill.updatedAtLabel }}">baru saja</time></small></div>
+      <div class="wa-skill-actions">
+      <a class="wa-skill-download" href="{{ appUrl }}/api/settings/skills/{{ skill.id }}/download" data-skill-download="{{ skill.id }}" title="Unduh skill" aria-label="Unduh skill" data-i18n-title="Unduh skill" data-i18n-aria-label="Unduh skill">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5"/></svg>
+      </a>
+      <button
+        class="button"
+        type="button"
+        data-skill-delete="{{ skill.id }}"
+        aria-label="Hapus {{ skill.name }}"
+       data-i18n="Hapus">
+        Hapus
+      </button>
+      </div>
+    </div>
+  @else
+    <div class="wa-skill-empty" data-i18n="Belum ada skill">Belum ada skill</div>
+  @end
+</div>

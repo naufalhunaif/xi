@@ -1,0 +1,69 @@
+<div id="paymentEditor" class="wa-payment-editor">
+  <label for="paymentName">
+    <span data-i18n="Bank / metode">Bank / metode</span>
+    <input id="paymentName" type="text" maxlength="120" autocomplete="off" />
+  </label>
+  <label for="paymentDestination">
+    <span data-i18n="Rekening / nomor / tautan">Rekening / nomor / tautan</span>
+    <input id="paymentDestination" type="text" maxlength="1000" autocomplete="off" />
+  </label>
+  <label for="paymentAccountName">
+    <span data-i18n="Atas nama">Atas nama</span>
+    <input id="paymentAccountName" type="text" maxlength="190" autocomplete="off" />
+  </label>
+  <label class="wa-toggle-row" for="paymentEnabled">
+    <span data-i18n="Aktif">Aktif</span>
+    <button
+      id="paymentEnabled"
+      class="wa-switch"
+      type="button"
+      role="switch"
+      aria-label="Metode pembayaran aktif"
+      aria-checked="true"
+      value="true"
+     data-i18n-aria-label="Metode pembayaran aktif"></button>
+  </label>
+  <div class="wa-payment-actions">
+    <button id="paymentSave" class="button primary" type="button" data-i18n-auto data-i18n="Tambah">Tambah</button>
+    <button id="paymentCancel" class="button" type="button" hidden data-i18n="Batal">Batal</button>
+    <span id="paymentStatus" role="status" aria-live="polite" data-i18n-auto></span>
+  </div>
+</div>
+<div id="paymentList" class="wa-payment-list">
+  @if(!settings.paymentMethods.length)
+    <div class="wa-skill-empty" data-i18n="Belum ada metode pembayaran">Belum ada metode pembayaran</div>
+  @end
+  @each(method in settings.paymentMethods)
+    <div
+      class="wa-payment-row"
+      data-payment-id="{{ method.id }}"
+      data-name="{{ method.name }}"
+      data-destination="{{ method.destination }}"
+      data-account-name="{{ method.accountName }}"
+      data-enabled="{{ method.enabled ? 'true' : 'false' }}"
+    >
+      <div class="wa-payment-details">
+        <strong>{{ method.name }}</strong>
+        <span>{{ method.destination }}</span>
+        @if(method.accountName)
+          <span>{{ method.accountName }}</span>
+        @end
+
+        <small>{{ method.enabled ? 'Aktif' : 'Nonaktif' }}</small>
+      </div>
+      <div class="wa-payment-actions">
+        <button class="button" type="button" data-payment-edit aria-label="Edit {{ method.name }}">
+          Edit
+        </button>
+        <button
+          class="button"
+          type="button"
+          data-payment-delete
+          aria-label="Hapus {{ method.name }}"
+         data-i18n="Hapus">
+          Hapus
+        </button>
+      </div>
+    </div>
+  @end
+</div>

@@ -1,0 +1,5 @@
+.wa-skill-editor { display: grid; gap: 10px; margin-bottom: 20px; }
+.wa-skill-editor label { display: grid; gap: 6px; }
+.wa-skill-editor textarea { width: 100%; min-height: 88px; resize: vertical; }
+.wa-skill-editor [role="status"] { white-space: pre-wrap; overflow-wrap: anywhere; }
+.wa-skill-editor .error { color: #b42318; }

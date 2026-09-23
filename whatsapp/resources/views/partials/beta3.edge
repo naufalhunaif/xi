@@ -1,0 +1,73 @@
+<section id="beta3Page" class="wa-orders-page wa-lean-page">
+  <div class="wa-orders-title">
+    <h1>Beta 3</h1>
+    <div class="wa-orders-title-actions">
+      <button id="beta3Sync" class="button" type="button" title="Tarik katalog terbaru dari MCP" data-i18n="Sync katalog" data-i18n-title="Tarik katalog terbaru dari MCP">Sync katalog</button>
+      <button id="beta3McpOpen" type="button" class="shell-icon-button" aria-label="Sumber data" title="Sumber data" data-i18n-aria-label="Sumber data" data-i18n-title="Sumber data" aria-haspopup="dialog" aria-controls="beta3McpDialog" aria-expanded="false"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.4-2 .9L4 5.7 2 9l1.8 1.8v2.4L2 15l2 3.3 2.4-.6 2 .9L9 21h6l.6-2.4 2-.9 2.4.6 2-3.3-1.8-1.8v-2.4L22 9l-2-3.3-2.4.6-2-.9L15 3Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+  </div>
+  <p id="beta3Notice" role="status" aria-live="polite"></p>
+
+  <dialog id="beta3McpDialog" class="wa-order-routing" aria-labelledby="beta3McpTitle">
+    <header class="wa-order-routing-header"><strong id="beta3McpTitle" data-i18n="Sumber data">Sumber data</strong><button id="beta3McpClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus>×</button></header>
+    <p class="wa-muted" data-i18n="Beta 3 memakai koneksi MCP yang sama dengan Pengaturan → Data bisnis. Pilih sumbernya di sini; kalau statusnya belum Terhubung, tekan Hubungkan di Data bisnis dulu.">Beta 3 memakai koneksi MCP yang sama dengan Pengaturan → Data bisnis. Pilih sumbernya di sini; kalau statusnya belum Terhubung, tekan Hubungkan di Data bisnis dulu.</p>
+    <form id="beta3McpForm" class="wa-order-fields">
+      <label><span data-i18n="Koneksi">Koneksi</span><select id="beta3McpSlug"><option value="" data-i18n="— otomatis —">— otomatis —</option></select></label>
+      <div class="actions"><button class="button" type="submit" data-i18n="Simpan & uji">Simpan & uji</button></div>
+    </form>
+    <small id="beta3McpStatus" class="wa-muted" role="status"></small>
+  </dialog>
+
+  <section class="wa-lean-card">
+    <div class="wa-lean-card-head">
+      <div><h2 data-i18n="Katalog">Katalog</h2><span id="beta3CatalogStatus" class="wa-muted" role="status" data-i18n="Memuat…">Memuat…</span></div>
+      <div class="actions">
+        <button id="beta3DigestOpen" class="button" type="button" data-i18n="Lihat digest">Lihat digest</button>
+        <button id="beta3ImportOpen" class="button" type="button" data-i18n="Impor JSON">Impor JSON</button>
+      </div>
+    </div>
+    <p class="wa-muted" data-i18n="Ringkasan katalog yang dibaca AI saat membalas. Ditarik otomatis tiap 30 menit dari sumber data; Sync katalog memaksa sekarang.">Ringkasan katalog yang dibaca AI saat membalas. Ditarik otomatis tiap 30 menit dari sumber data; Sync katalog memaksa sekarang.</p>
+  </section>
+
+  <dialog id="beta3DigestDialog" class="wa-order-drawer" data-motion="sheet" aria-labelledby="beta3DigestTitle">
+    <header class="wa-order-drawer-header"><strong id="beta3DigestTitle" data-i18n="Digest katalog">Digest katalog</strong><button id="beta3DigestClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus>×</button></header>
+    <section class="wa-order-editor"><pre id="beta3CatalogDigest" class="wa-lean-digest wa-lean-digest--full"></pre></section>
+  </dialog>
+
+  <dialog id="beta3ImportDialog" class="wa-order-routing" aria-labelledby="beta3ImportTitle">
+    <header class="wa-order-routing-header"><strong id="beta3ImportTitle" data-i18n="Impor katalog dari JSON">Impor katalog dari JSON</strong><button id="beta3ImportClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus>×</button></header>
+    <p class="wa-muted" data-i18n="Pilih file .json berisi array produk (atau objek dengan field items). Satu objek per varian: product, color, price, sizesReady, photoUrl, materialAvailable.">Pilih file .json berisi array produk (atau objek dengan field items). Satu objek per varian: product, color, price, sizesReady, photoUrl, materialAvailable.</p>
+    <form id="beta3CatalogForm" class="wa-order-fields">
+      <label><span data-i18n="File JSON">File JSON</span><input id="beta3CatalogFile" type="file" accept=".json,application/json" required></label>
+      <small id="beta3CatalogFileInfo" class="wa-muted"></small>
+      <label class="wa-lean-check"><input id="beta3CatalogReplace" type="checkbox"> <span data-i18n="Ganti semua (hapus katalog lama)">Ganti semua (hapus katalog lama)</span></label>
+      <div class="actions"><button class="button" type="submit" data-i18n="Impor">Impor</button></div>
+    </form>
+  </dialog>
+
+  <section class="wa-lean-card">
+    <div class="wa-lean-card-head">
+      <div><h2 data-i18n="Contoh jawaban CS">Contoh jawaban CS</h2><span id="beta3ExampleCount" class="wa-muted"></span></div>
+      <div class="actions"><button id="beta3ExampleOpen" class="button" type="button" data-i18n="Tambah contoh">Tambah contoh</button></div>
+    </div>
+    <p class="wa-muted" data-i18n="Gaya yang ditiru AI. Jawaban CS saat mengambil alih chat otomatis masuk ke sini.">Gaya yang ditiru AI. Jawaban CS saat mengambil alih chat otomatis masuk ke sini.</p>
+    <div class="wa-order-filters"><input id="beta3ExampleSearch" type="search" placeholder="Cari contoh" data-i18n-placeholder="Cari contoh" aria-label="Cari contoh" data-i18n-aria-label="Cari contoh"></div>
+    <div class="wa-order-table-scroll" tabindex="0" role="region" aria-label="Contoh jawaban CS" data-i18n-aria-label="Contoh jawaban CS">
+      <table class="wa-order-table wa-lean-example-table">
+        <thead><tr><th scope="col" data-i18n="Situasi">Situasi</th><th scope="col" data-i18n="Pesan pelanggan">Pesan pelanggan</th><th scope="col" data-i18n="Jawaban CS">Jawaban CS</th><th scope="col" data-i18n="Tag">Tag</th><th scope="col"></th></tr></thead>
+        <tbody id="beta3ExampleList"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <dialog id="beta3ExampleDialog" class="wa-order-routing" aria-labelledby="beta3ExampleTitle">
+    <header class="wa-order-routing-header"><strong id="beta3ExampleTitle" data-i18n="Tambah contoh">Tambah contoh</strong><button id="beta3ExampleClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus>×</button></header>
+    <form id="beta3ExampleForm" class="wa-order-fields">
+      <label><span data-i18n="Pesan pelanggan">Pesan pelanggan</span><textarea id="beta3ExampleCustomer" rows="2" required></textarea></label>
+      <label><span data-i18n="Jawaban CS">Jawaban CS</span><textarea id="beta3ExampleCs" rows="2" required></textarea></label>
+      <label><span data-i18n="Situasi (opsional)">Situasi (opsional)</span><input id="beta3ExampleSituation" type="text" maxlength="255" placeholder="pelanggan tanya cara ukur" data-i18n-placeholder="pelanggan tanya cara ukur"></label>
+      <label><span data-i18n="Tag (koma; boleh tahap: tanya_size, minta_alamat, tunggu_bayar)">Tag (koma; boleh tahap: tanya_size, minta_alamat, tunggu_bayar)</span><input id="beta3ExampleTags" type="text" maxlength="255"></label>
+      <div class="actions"><button class="button" type="submit" data-i18n="Simpan contoh">Simpan contoh</button></div>
+    </form>
+  </dialog>
+</section>
