@@ -1,0 +1,12 @@
+node_modules/
+whatsapp/build/
+whatsapp/current
+whatsapp/.deploy/
+whatsapp/public/media/
+whatsapp/storage/
+whatsapp/tmp/*
+!whatsapp/tmp/.gitkeep
+.env
+.env.*
+!.env.example
+.DS_Store
