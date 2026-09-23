@@ -559,7 +559,7 @@
   setTimeout(syncInboxMore, 1500)
   byId('inboxFilters')?.addEventListener('click', (event) => {
     const button = event.target.closest('button')
-    if (!button) return
+    if (!button || button.id === 'inboxFiltersMore') return
     const state = inboxState()
     const url = new URL(location.href)
     if (button.dataset.inboxFilter) {

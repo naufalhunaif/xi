@@ -371,18 +371,62 @@ html[data-theme="dark"] .workspace-ui .wa-trace-sizes {
 .workspace-ui .wa-access-form input { flex: 1 1 220px; min-width: 0; }
 .workspace-ui .wa-access-card pre#accessLog { max-height: 220px; font-size: 12px; white-space: pre-wrap; }
 
-/* Badge jumlah order menunggu total di menu samping */
-.workspace-ui .nav-item .nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--wa-amber, #b4650f); color: #fff; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
-html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: var(--wa-amber); color: var(--wa-amber-bg); }
+/* Badge jumlah order menunggu total: menempel di pojok ikon (rail sidebar maupun sidebar lebar). */
+.workspace-ui .sidebar .nav-item { position: relative; }
+.workspace-ui .nav-item .nav-badge {
+  position: absolute; top: 5px; left: calc(50% + 4px);
+  min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+  border-radius: 8px; border: 2px solid var(--sidebar, #f7f7f6);
+  background: #d9480f; color: #fff;
+  font-size: 9px; font-weight: 700; line-height: 12px; text-align: center;
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a; color: #1a0e05; border-color: var(--sidebar); }
 
-/* Filter kotak masuk: geser ke samping, panah ▾ membuka semua */
-.workspace-ui .wa-inbox-tabs { scrollbar-width: none; scroll-snap-type: x proximity; }
+/* Filter kotak masuk: satu baris chip yang digeser; tombol ▾ membuka semua. */
+.workspace-ui .wa-inbox-filters { flex-wrap: nowrap !important; align-items: flex-start; gap: 4px; }
+.workspace-ui .wa-inbox-tabs {
+  position: relative; flex: 1 1 auto; min-width: 0;
+  display: flex; flex-wrap: nowrap; gap: 4px; align-items: center;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none; scroll-snap-type: x proximity;
+  container-type: scroll-state;
+}
 .workspace-ui .wa-inbox-tabs::-webkit-scrollbar { display: none; }
-.workspace-ui .wa-inbox-tabs > button { scroll-snap-align: start; }
-.workspace-ui .wa-inbox-filters.expanded { flex-wrap: wrap; }
-.workspace-ui .wa-inbox-filters.expanded .wa-inbox-tabs { flex-wrap: wrap; overflow: visible; width: 100%; }
-.workspace-ui .wa-inbox-more { flex: 0 0 auto; padding: 6px !important; display: inline-flex; align-items: center; }
+.workspace-ui .wa-inbox-tabs > button {
+  flex: 0 0 auto; scroll-snap-align: start;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 10px !important; border-radius: 15px !important;
+  font-size: 12px !important; line-height: 1;
+}
+.workspace-ui .wa-inbox-tabs > button span,
+.workspace-ui .wa-inbox-tabs > button #unansweredCount {
+  margin: 0 !important; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 9px; background: var(--wa-raised, #efefec); color: var(--muted);
+  font-size: 10px !important; font-weight: 600; line-height: 18px; text-align: center;
+}
+.workspace-ui .wa-inbox-tabs > button[aria-pressed="true"] span,
+.workspace-ui .wa-inbox-tabs > button[aria-pressed="true"] #unansweredCount { background: #18865b; color: #fff; }
+.workspace-ui .wa-inbox-tabs > .wa-inbox-unanswered { margin-left: 4px; position: relative; }
+.workspace-ui .wa-inbox-tabs > .wa-inbox-unanswered::before {
+  content: ""; position: absolute; left: -5px; top: 7px; bottom: 7px; width: 1px; background: var(--line);
+}
+/* Petunjuk ada chip lain di kanan (scroll-state query; browser lain cukup tanpa petunjuk). */
+.workspace-ui .wa-inbox-fade {
+  position: sticky; right: 0; flex: 0 0 28px; align-self: stretch; margin-left: -28px;
+  background: linear-gradient(to left, var(--wa-surface, #fff), transparent);
+  opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+@container scroll-state(scrollable: right) { .workspace-ui .wa-inbox-fade { opacity: 1; } }
+.workspace-ui .wa-inbox-more {
+  flex: 0 0 auto; width: 30px; height: 30px; padding: 0 !important; border-radius: 15px !important;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--muted);
+}
+.workspace-ui .wa-inbox-more:hover { background: var(--wa-raised, #efefec); }
+.workspace-ui .wa-inbox-more svg { transition: transform .2s; }
 .workspace-ui .wa-inbox-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.workspace-ui .wa-inbox-filters.expanded .wa-inbox-tabs { flex-wrap: wrap; overflow: visible; row-gap: 6px; }
+.workspace-ui .wa-inbox-filters.expanded .wa-inbox-fade { display: none; }
 
 /* Detail order: panel menempel penuh di kanan (bukan mengambang) */
 .workspace-ui .wa-order-drawer { inset: 0 0 0 auto; height: 100dvh; border-radius: 0; border-width: 0 0 0 1px; width: min(560px, 100vw); }
