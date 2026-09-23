@@ -167,8 +167,18 @@ ssl_issue() {
 }
 
 # ---------------------------------------------------------------- build ------
+clear_stale_lock() {
+  # Lock tertinggal bila build sebelumnya terputus (mis. SSH putus). Hapus hanya jika tidak ada build yang berjalan.
+  local lock="$APP/whatsapp/.deploy/lock"
+  [[ -d "$lock" ]] || return 0
+  if pgrep -f "deploy/whatsapp-aapanel.mjs" >/dev/null 2>&1 || pgrep -f "$APP/whatsapp/.deploy/release-" >/dev/null 2>&1; then
+    die 'Build lain masih berjalan. Tunggu sampai selesai, lalu ulangi.'
+  fi
+  rm -rf "$lock"
+}
 build() { # build [--first]
   cd "$APP"
+  clear_stale_lock
   step 30 'Mengunduh dependensi & membangun aplikasi (beberapa menit)'
   # Build sebagai user aplikasi tanpa menyentuh proses; restart dilakukan root lewat Supervisor.
   run_logged 'Build' as_app bash deploy/build.sh --no-restart
@@ -180,6 +190,7 @@ build() { # build [--first]
   node deploy/whatsapp-aapanel.mjs --cleanup >/dev/null 2>&1 || true
   local st; st="$(supctl status wa-web wa-worker 2>/dev/null || true)"
   if [[ "$(grep -c RUNNING <<<"$st")" == 2 ]]; then
+    save_conf WA_BUILT "$(git_ref)"
     step 100 "Selesai · WhatsApp v$(current_version) berjalan"
   else
     warn 'Proses belum RUNNING semua:'; echo "$st"; echo "Log: wa logs web | wa logs worker"
@@ -214,7 +225,10 @@ update() {
   target="${1:-$(latest_tag)}"
   [[ -n "$target" ]] || die 'Belum ada rilis v3.x. Sebutkan branch: wa update main'
   if [[ -z "${1:-}" && "$target" == "$before" ]]; then
-    say "Sudah versi terbaru ($target)."; return 0
+    if [[ "${WA_BUILT:-}" == "$target" ]]; then say "Sudah versi terbaru ($target)."; return 0; fi
+    # Kode sudah versi terbaru tapi build sebelumnya belum selesai: bangun ulang.
+    step 20 "Melanjutkan build $target yang belum selesai"
+    exec bash "$APP/deploy/wa.sh" _post-update
   fi
   save_conf WA_PREVIOUS "$before"
   step 10 "Memperbarui $before → $target"
