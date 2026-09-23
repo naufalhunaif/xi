@@ -192,6 +192,10 @@ update() {
   save_conf WA_PREVIOUS "$before"
   say "Memperbarui $before -> $target"
   checkout_ref "$target"
+  # Skrip ini sendiri ikut diperbarui; lanjutkan dengan versi yang baru.
+  exec bash "$APP/deploy/wa.sh" _post-update
+}
+post_update() {
   build
   say "Versi aktif: $(current_version) ($(git_ref))"
 }
@@ -199,7 +203,8 @@ rollback() {
   local prev="${WA_PREVIOUS:-}"
   [[ -n "$prev" ]] || die 'Belum ada versi sebelumnya yang tercatat.'
   say "Kembali ke $prev"
-  fetch_all; save_conf WA_PREVIOUS "$(git_ref)"; checkout_ref "$prev"; build
+  fetch_all; save_conf WA_PREVIOUS "$(git_ref)"; checkout_ref "$prev"
+  exec bash "$APP/deploy/wa.sh" _post-update
 }
 
 # ---------------------------------------------------------------- backup -----
@@ -316,6 +321,7 @@ case "${1:-menu}" in
   _supervisor-install) supervisor_install ;;
   _nginx-install) nginx_install ;;
   _build) build "${2:-}" ;;
+  _post-update) post_update ;;
   help|-h|--help) sed -n 2,10p "$0" ;;
   *) die "Perintah '$1' tidak dikenal. Lihat: wa help" ;;
 esac
