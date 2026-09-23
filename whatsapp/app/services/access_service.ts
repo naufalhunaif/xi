@@ -44,7 +44,14 @@ export function readAccess() {
   }
 }
 
-type Job = { action: 'domain' | 'unset'; domain: string; startedAt: number; done: boolean; ok: boolean | null; log: string }
+type Job = {
+  action: 'domain' | 'unset'
+  domain: string
+  startedAt: number
+  done: boolean
+  ok: boolean | null
+  log: string
+}
 
 function readJob(): Job | null {
   try {
@@ -57,16 +64,23 @@ function readJob(): Job | null {
     const done = /\n__WA_DONE__ (\d+)\n?$/.exec(log)
     const clean = log
       .replace(/\n__WA_DONE__ \d+\n?$/, '')
+      // eslint-disable-next-line no-control-regex
       .replace(/\x1b\[[0-9;]*m/g, '')
       .trim()
-    return { ...state, done: Boolean(done), ok: done ? done[1] === '0' : null, log: clean.slice(-4000) }
+    return {
+      ...state,
+      done: Boolean(done),
+      ok: done ? done[1] === '0' : null,
+      log: clean.slice(-4000),
+    }
   } catch {
     return null
   }
 }
 
 function run(action: 'domain' | 'unset', domain: string) {
-  if (!accessAvailable()) throw new Error('Pengaturan domain hanya tersedia pada pemasangan standalone (perintah wa).')
+  if (!accessAvailable())
+    throw new Error('Pengaturan domain hanya tersedia pada pemasangan standalone (perintah wa).')
   const job = readJob()
   if (job && !job.done && Date.now() - job.startedAt < 15 * 60_000)
     throw new Error('Proses domain sebelumnya masih berjalan.')
@@ -84,7 +98,11 @@ function run(action: 'domain' | 'unset', domain: string) {
 }
 
 export function setDomain(input: string) {
-  const domain = String(input || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+  const domain = String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
   if (!DOMAIN_RE.test(domain)) throw new Error('Domain tidak valid. Contoh: wa.contoh.com')
   run('domain', domain)
   return domain

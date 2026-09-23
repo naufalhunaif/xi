@@ -74,6 +74,12 @@ export function ensureDefaults() {
        VALUES (1, 0, 0, NULL, NULL, 'auto', 'auto', 'standard', 'standard', ?, ?, ?)`,
       [beta3Default ? 0 : 1, beta3Default, now]
     )
+    if (beta3Default)
+      await db
+        .from('whatsapp_settings')
+        .where('id', 1)
+        .where('beta3_mode', 0)
+        .update({ beta3_mode: 1, lean_mode: 0 })
     await db.rawQuery(
       `INSERT IGNORE INTO whatsapp_connection (id, desired_connected, status, phone, qr_data_url, last_error, updated_at)
        VALUES (1, 0, 'disconnected', NULL, NULL, NULL, ?)`,
