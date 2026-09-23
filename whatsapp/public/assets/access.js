@@ -34,8 +34,14 @@
     save.disabled = busy
     unset.disabled = busy
     if (!job) return
-    log.hidden = !job.log
+    // Log hanya perlu saat proses berjalan atau gagal; hasil lama tidak ditampilkan.
+    const recent = Date.now() - Number(job.startedAt || 0) < 10 * 60_000
     log.textContent = job.log
+    log.hidden = !job.log || (job.done && job.ok)
+    if (job.done && !recent) {
+      status.textContent = ''
+      if (job.ok) return
+    }
     if (!job.done) {
       status.textContent = job.action === 'unset' ? t('Sedang melepas domain…') : t('Sedang memasang domain…')
       if (!timer) timer = window.setTimeout(poll, 3000)

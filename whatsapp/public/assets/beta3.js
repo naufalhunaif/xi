@@ -153,7 +153,7 @@
       const row = el('tr')
       const situation = el('td')
       situation.append(el('span', example.situation || '—'), el('br'), el('small', example.source, 'wa-muted'))
-      const remove = el('button', t('Hapus'), 'button')
+      const remove = el('button', t('Hapus'), 'button small')
       remove.type = 'button'
       remove.addEventListener('click', async () => {
         if (!confirm(t('Hapus contoh ini?'))) return

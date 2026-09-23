@@ -1,0 +1,67 @@
+/* Penghalusan tampilan lintas halaman (dimuat terakhir). */
+
+/* Teks kecil yang ditumpuk di bawah label tidak menjorok. */
+.workspace-ui br + .wa-muted,
+.workspace-ui br + small { margin-left: 0; }
+.workspace-ui td small { display: inline-block; margin-top: 3px; line-height: 1.35; }
+
+/* Judul halaman seragam dan tidak pecah baris di HP. */
+.workspace-ui .wa-orders-title h1,
+.workspace-ui .wa-directory-heading h1,
+.workspace-ui .wa-settings-heading { font-size: 22px; letter-spacing: -.4px; line-height: 1.25; }
+.workspace-ui .wa-orders-title-actions { display: flex; align-items: center; gap: 10px; }
+.workspace-ui .wa-orders-title-actions .wa-muted { margin-left: 0; white-space: nowrap; }
+
+/* Tab status order: chip satu baris, digeser bila sempit. */
+.wa-order-tabs {
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  overscroll-behavior-x: contain; scroll-snap-type: x proximity; gap: 4px;
+}
+.wa-order-tabs::-webkit-scrollbar { display: none; }
+.wa-order-tabs button {
+  flex: 0 0 auto; scroll-snap-align: start; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px; border-radius: 16px;
+}
+.wa-order-tabs .wa-tab-count {
+  min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px;
+  background: var(--wa-raised, #efefec); color: var(--muted); font-size: 10px; font-weight: 600;
+  line-height: 18px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.wa-order-tabs button[aria-pressed='true'] .wa-tab-count { background: #18865b; color: #fff; }
+.wa-lean-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.wa-lean-toolbar .wa-order-tabs { margin: 12px 0; min-width: 0; max-width: 100%; }
+.wa-lean-toolbar .wa-order-filters input { width: min(320px, 100%); }
+
+/* Tabel order: kolom inti tidak terjepit; tabel digeser di layar sempit. */
+.wa-order-table { min-width: 680px; }
+.wa-order-table td:first-child { white-space: nowrap; }
+.wa-order-table .wa-order-items {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  max-width: 420px; line-height: 1.45;
+}
+.wa-order-table td.wa-order-amount { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wa-order-badge { white-space: nowrap; }
+
+/* Beta 3 / Beta 2: tabel contoh lebih ringkas. */
+.wa-lean-example-table td { padding-top: 10px; padding-bottom: 10px; }
+.wa-lean-example-table td:last-child { width: 1%; white-space: nowrap; }
+.workspace-ui .button.small { height: 28px; padding: 0 10px; font-size: 11px; }
+
+/* Pengaturan: kolom isi lebih lega di layar lebar. */
+.workspace-ui .wa-settings-page { width: min(100%, 1040px); }
+.workspace-ui [data-settings-panel] > h2 { font-size: 16px; }
+
+/* Kartu alamat & domain. */
+.workspace-ui .wa-access-card code { word-break: break-all; }
+.workspace-ui .wa-access-card #accessStatus a { margin-left: 4px; }
+
+@media (max-width: 600px) {
+  .workspace-ui .wa-orders-title h1,
+  .workspace-ui .wa-directory-heading h1,
+  .workspace-ui .wa-settings-heading { font-size: 19px; }
+  .wa-orders-title h1 { margin-bottom: 8px; }
+  .wa-lean-toolbar .wa-order-filters,
+  .wa-lean-toolbar .wa-order-filters input { width: 100%; }
+  .wa-order-table th, .wa-order-table td { padding: 12px; }
+}
