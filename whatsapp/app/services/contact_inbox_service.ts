@@ -1,3 +1,4 @@
+import { isBeta3Mode } from '#services/settings_service'
 import db from '#services/workspace_database'
 import { initializeDatabase } from '#services/init_model'
 
@@ -37,8 +38,27 @@ export async function markRoomRead(jid: string, throughId: number) {
   )
 }
 
+const PAYMENT_SQL = `COALESCE(cart.payment_status = 'reported', 0) OR EXISTS (
+        SELECT 1 FROM whatsapp_payment_reviews review
+        JOIN whatsapp_orders o ON o.id = review.order_id AND o.jid = m.jid
+        WHERE review.jid = m.jid AND o.status = 'active'
+          AND review.cart_version = cart.version AND review.order_paid = o.paid
+          AND NOT EXISTS (SELECT 1 FROM whatsapp_order_payments p
+            WHERE p.proof_message_id = review.proof_message_id)
+      )`
+const ORDER_SQL = `COALESCE(JSON_LENGTH(CASE WHEN JSON_VALID(cart.items_json) THEN cart.items_json ELSE '[]' END), 0) > 0
+        OR EXISTS (SELECT 1 FROM whatsapp_orders o WHERE o.jid = m.jid AND o.status = 'active')`
+
 export async function latestInboxMessages() {
   await initializeDatabase()
+  // Beta 3: filter Pembayaran/Order memakai order Beta 3 (bukan keranjang Beta 1).
+  const beta3 = await isBeta3Mode().catch(() => false)
+  const paymentSql = beta3
+    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'awaiting_payment')`
+    : PAYMENT_SQL
+  const orderSql = beta3
+    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status IN ('pending', 'awaiting_payment'))`
+    : ORDER_SQL
   const result = await db.rawQuery(`WITH successful_replies AS (
       SELECT jid, id, created_at,
         ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
@@ -51,16 +71,8 @@ export async function latestInboxMessages() {
       (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid AND u.direction = 'in'
         AND (r.id IS NULL OR u.created_at > r.created_at
           OR (u.created_at = r.created_at AND u.id > r.id))) AS unanswered_count,
-      (COALESCE(cart.payment_status = 'reported', 0) OR EXISTS (
-        SELECT 1 FROM whatsapp_payment_reviews review
-        JOIN whatsapp_orders o ON o.id = review.order_id AND o.jid = m.jid
-        WHERE review.jid = m.jid AND o.status = 'active'
-          AND review.cart_version = cart.version AND review.order_paid = o.paid
-          AND NOT EXISTS (SELECT 1 FROM whatsapp_order_payments p
-            WHERE p.proof_message_id = review.proof_message_id)
-      )) AS needs_payment,
-      (COALESCE(JSON_LENGTH(CASE WHEN JSON_VALID(cart.items_json) THEN cart.items_json ELSE '[]' END), 0) > 0
-        OR EXISTS (SELECT 1 FROM whatsapp_orders o WHERE o.jid = m.jid AND o.status = 'active')) AS has_order
+      (${paymentSql}) AS needs_payment,
+      (${orderSql}) AS has_order
     FROM whatsapp_messages m
     JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages) ranked ON ranked.id = m.id AND ranked.position = 1

@@ -1,4 +1,4 @@
-<label>
+<label {{ bundle ? '' : 'hidden' }}>
   <span data-i18n="Mode AI">Mode AI</span>
   <select name="aiMode">
     @if(bundle)
@@ -42,7 +42,7 @@
     value="{{ settings.sweepEnabled ? 'true' : 'false' }}"
    data-i18n-aria-label="Balas chat tertunda"></button>
 </label>
-<label>
+<label {{ bundle ? '' : 'hidden' }}>
   <span data-i18n="Batas usia chat yang masih disapu (jam)">Batas usia chat yang masih disapu (jam)</span>
   <input
     name="sweepMaxAgeHours"
@@ -53,7 +53,7 @@
     value="{{ settings.sweepMaxAgeHours }}"
   />
 </label>
-<label>
+<label {{ bundle ? '' : 'hidden' }}>
   <span data-i18n="Maksimal chat per sapuan">Maksimal chat per sapuan</span>
   <input
     name="sweepBatch"
