@@ -11,10 +11,20 @@ export default class WorkspaceMiddleware {
     const scope = await activeWorkspace()
     ctx.response.header('X-WhatsApp-Workspace', scope.version)
     ctx.response.header('Cache-Control', 'no-store')
-    ctx.view.share({ workspaceVersion: scope.version, workspaceId: scope.id, appVersion: appVersion() })
+    ctx.view.share({
+      workspaceVersion: scope.version,
+      workspaceId: scope.id,
+      appVersion: appVersion(),
+    })
     const expected = ctx.request.header('X-WhatsApp-Workspace')
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(ctx.request.method())
-    const allowed = ['/api/connect', '/api/disconnect', '/logout'].includes(ctx.request.url())
+    const allowed = [
+      '/api/connect',
+      '/api/disconnect',
+      '/logout',
+      '/api/access/domain',
+      '/api/access/domain/unset',
+    ].includes(ctx.request.url())
     if (
       (expected && expected !== scope.version) ||
       (mutation && !allowed && (!scope.id || expected !== scope.version))
@@ -30,7 +40,8 @@ export default class WorkspaceMiddleware {
       try {
         return await withChatMutationLock(async () => {
           const current = await workspaceState()
-          if (current.version !== scope.version) return ctx.response.conflict({ workspaceChanged: true })
+          if (current.version !== scope.version)
+            return ctx.response.conflict({ workspaceChanged: true })
           if (current.cleanup_workspace_id)
             return ctx.response.status(423).json({ error: 'Penghapusan chat sedang berjalan.' })
           return next()
