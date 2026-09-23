@@ -2,12 +2,12 @@
 # =============================================================================
 #  WhatsApp — installer satu perintah (standalone, tanpa bundle PHP)
 #
-#  Server kosong (Ubuntu 22.04/24.04, Debian 12):
-#    curl -fsSL https://raw.githubusercontent.com/naufalhunaif/xi/main/deploy/install.sh \
-#      | sudo WA_DOMAIN=wa.contoh.com WA_EMAIL=admin@contoh.com bash
+#  Server kosong (Ubuntu 22.04/24.04, Debian 12) maupun aaPanel:
+#    curl -fsSL https://raw.githubusercontent.com/naufalhunaif/xi/main/deploy/install.sh | sudo bash
+#  Domain dan email ditanya saat berjalan (atau isi lewat variabel di bawah).
 #
-#  Server aaPanel: buat dulu website untuk domain di aaPanel (dengan SSL), lalu jalankan
-#  perintah yang sama. Installer mendeteksi aaPanel dan memakai Nginx/MySQL/Supervisor-nya.
+#  Server aaPanel: buat dulu website untuk domain di aaPanel (dengan SSL). Installer
+#  mendeteksi aaPanel dan memakai Nginx/MySQL-nya; Supervisor dipasang bila belum ada.
 #
 #  Variabel (opsional; ditanya bila terminal interaktif):
 #    WA_DOMAIN     domain aplikasi, mis. wa.contoh.com
@@ -45,6 +45,7 @@ ask()  { # ask VAR "Pertanyaan" [default]
 [[ "$(uname -s)" == Linux ]] || die 'Installer ini untuk Linux.'
 command -v apt-get >/dev/null 2>&1 || die 'Distro harus berbasis Debian/Ubuntu (apt-get).'
 export DEBIAN_FRONTEND=noninteractive
+export PATH="$PATH:/www/server/mysql/bin:/www/server/nginx/sbin:/usr/local/bin"
 
 # ---------------------------------------------------------------- mode -------
 MODE="${WA_MODE:-auto}"
@@ -56,15 +57,18 @@ if [[ "$MODE" == aapanel ]]; then DIR="${WA_DIR:-/www/wwwroot/wa}"; else DIR="${
 APP="$DIR/app"
 PORT="${WA_PORT:-3333}"
 
-# Sudah terpasang? Arahkan ke `wa update`.
-if [[ -f "$CONF" && -x "$APP/deploy/wa.sh" ]]; then
-  warn "WhatsApp sudah terpasang ($CONF). Gunakan: wa update"
+# Sudah terpasang lengkap? Arahkan ke `wa update`. Pemasangan yang gagal di tengah boleh diulang.
+if [[ -f "$CONF" ]] && grep -q '^WA_INSTALLED=1' "$CONF" && [[ -x "$APP/deploy/wa.sh" ]]; then
+  warn "WhatsApp sudah terpasang ($CONF). Gunakan: wa update, atau: wa domain DOMAIN"
   exit 0
 fi
 
 ask WA_DOMAIN 'Domain aplikasi (mis. wa.contoh.com)'
 DOMAIN="${WA_DOMAIN:-}"
 [[ "$DOMAIN" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || die 'Domain tidak valid.'
+if [[ "$MODE" == aapanel && ! -f "/www/server/panel/vhost/nginx/$DOMAIN.conf" ]]; then
+  die "Website $DOMAIN belum ada di aaPanel. Buat dulu di menu Website (aktifkan SSL), lalu jalankan lagi."
+fi
 if [[ "$MODE" == bare ]]; then
   ask WA_EMAIL "Email untuk sertifikat SSL (Let's Encrypt)" "admin@$DOMAIN"
 fi
@@ -82,6 +86,10 @@ if [[ "$MODE" == bare ]]; then
   apt-get install -y -qq --no-install-recommends nginx mariadb-server supervisor certbot \
     python3-certbot-nginx >/dev/null
   systemctl enable --now nginx mariadb supervisor >/dev/null 2>&1 || true
+elif [[ ! -f /www/server/panel/plugin/supervisor/supervisord.conf && ! -f /etc/supervisor/supervisord.conf ]]; then
+  # aaPanel tanpa plugin Supervisor: pakai Supervisor sistem.
+  apt-get install -y -qq --no-install-recommends supervisor >/dev/null
+  systemctl enable --now supervisor >/dev/null 2>&1 || true
 fi
 
 # ------------------------------------------------------------- Node 24 -------
@@ -158,7 +166,9 @@ say "Versi: $VERSION"
 # ---------------------------------------------------------------- database ---
 DB_NAME=wa
 DB_USER=wa
-DB_PASS="$(openssl rand -hex 16)"
+ENV_FILE="$APP/whatsapp/.env"
+DB_PASS="$(sed -n 's/^DB_PASSWORD=//p' "$ENV_FILE" 2>/dev/null | head -n1)"
+[[ -n "$DB_PASS" ]] || DB_PASS="$(openssl rand -hex 16)"
 mysql_root() {
   if [[ "$MODE" == bare ]]; then mysql --protocol=socket -uroot "$@"; return; fi
   local pw="${WA_DB_ROOT_PASSWORD:-}"
@@ -182,8 +192,9 @@ FLUSH PRIVILEGES;
 SQL
 
 # -------------------------------------------------------------------- .env ---
-ENV_FILE="$APP/whatsapp/.env"
-if [[ ! -f "$ENV_FILE" ]]; then
+if [[ -f "$ENV_FILE" ]]; then
+  sed -i "s|^APP_URL=.*|APP_URL=https://$DOMAIN|" "$ENV_FILE"
+else
   say 'Menulis whatsapp/.env'
   cat > "$ENV_FILE" <<ENV
 TZ=Asia/Jakarta
@@ -256,6 +267,7 @@ if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: 
   ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null
 fi
 
+echo 'WA_INSTALLED=1' >> "$CONF"
 say 'Selesai.'
 cat <<DONE
 

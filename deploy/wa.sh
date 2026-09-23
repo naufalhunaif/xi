@@ -14,7 +14,7 @@ CONF=/etc/wa/wa.conf
 # shellcheck disable=SC1090
 source "$CONF"
 APP="$WA_APP"; DIR="$WA_DIR"; U="$WA_USER"; MODE="$WA_MODE"; DOMAIN="$WA_DOMAIN"; PORT="${WA_PORT:-3333}"
-export PATH="$WA_NODE_BIN:$PATH"
+export PATH="$WA_NODE_BIN:$PATH:/www/server/mysql/bin:/www/server/nginx/sbin:/usr/local/bin"
 
 say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
@@ -38,6 +38,7 @@ if [[ "$MODE" == aapanel && -f /www/server/panel/plugin/supervisor/supervisord.c
   SUP_DIR=/www/server/panel/plugin/supervisor/profile
   SUP_EXT=ini
   SUPCTL="$(command -v supervisorctl || echo /www/server/panel/pyenv/bin/supervisorctl)"
+  [[ -x "$SUPCTL" ]] || SUPCTL=/www/server/panel/pyenv/bin/supervisorctl
 else
   SUP_CONF=/etc/supervisor/supervisord.conf
   SUP_DIR=/etc/supervisor/conf.d

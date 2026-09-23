@@ -13,9 +13,10 @@ login memakai email + password milik aplikasi ini, dipasang di akar domain
 ## Server kosong (tanpa aaPanel)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/naufalhunaif/xi/main/deploy/install.sh \
-  | sudo WA_DOMAIN=wa.domainku.com WA_EMAIL=admin@domainku.com bash
+curl -fsSL https://raw.githubusercontent.com/naufalhunaif/xi/main/deploy/install.sh | sudo bash
 ```
+
+Domain dan email ditanya saat berjalan (bisa juga lewat `WA_DOMAIN=... WA_EMAIL=...`).
 
 Installer memasang Nginx, MariaDB, Supervisor, certbot, Node.js 24, membuat user sistem
 `wa`, menaruh kode di `/opt/wa/app`, membuat database + `.env`, build, menyalakan proses
@@ -27,8 +28,8 @@ Setelah selesai buka **`https://wa.domainku.com/setup`** untuk membuat akun pemi
 ## Server aaPanel
 
 1. Di aaPanel → Website → tambah site untuk `wa.domainku.com`, aktifkan SSL (Let's Encrypt).
-2. Pastikan plugin **Supervisor** terpasang di aaPanel dan Node.js 24 tersedia
-   (App Store → Node.js version manager) — bila tidak ada, installer memasang Node sendiri.
+2. Node.js 24 sebaiknya sudah ada (App Store → Node.js version manager); bila tidak, installer
+   memasang sendiri. Supervisor dipasang otomatis bila belum ada.
 3. Jalankan perintah yang sama seperti di atas. Installer mendeteksi aaPanel, menaruh kode di
    `/www/wwwroot/wa`, memakai MySQL aaPanel (password root dibaca dari panel; bila gagal
    tambahkan `WA_DB_ROOT_PASSWORD=...`), mendaftarkan proses ke Supervisor aaPanel, dan
