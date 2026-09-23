@@ -1,0 +1,18 @@
+/* Halaman login/setup (standalone). Inline style diblokir CSP. */
+:root { color-scheme: light dark; --bg:#f4f5f3; --card:#fff; --text:#16201a; --muted:#5f6b64; --line:#dfe4e0; --accent:#1f8a5b; --accent-text:#fff; --err-bg:#fdecec; --err:#a33; }
+html[data-theme="dark"] { --bg:#000; --card:#171719; --text:#e6ebe7; --muted:#abb8ae; --line:#343438; --accent:#88d9ad; --accent-text:#0b2116; --err-bg:#280e11; --err:#f3aca8; }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) { --bg:#000; --card:#171719; --text:#e6ebe7; --muted:#abb8ae; --line:#343438; --accent:#88d9ad; --accent-text:#0b2116; --err-bg:#280e11; --err:#f3aca8; } }
+* { box-sizing: border-box; }
+body { margin:0; min-height:100vh; display:grid; place-items:center; padding:16px; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+.card { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:28px 24px; }
+.brand { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+.brand img { width:32px; height:32px; }
+.brand strong { font-size:17px; }
+h1 { font-size:18px; margin:0 0 4px; }
+p.hint { margin:0 0 18px; color:var(--muted); font-size:13px; }
+label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
+input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; font:inherit; }
+input:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:transparent; }
+button { width:100%; margin-top:18px; padding:11px; border:0; border-radius:8px; background:var(--accent); color:var(--accent-text); font:inherit; font-weight:600; cursor:pointer; }
+.error { background:var(--err-bg); color:var(--err); border-radius:8px; padding:9px 12px; font-size:13px; margin-bottom:6px; }
+footer { margin-top:16px; text-align:center; color:var(--muted); font-size:11px; }
