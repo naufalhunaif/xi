@@ -22,7 +22,8 @@ cp -f "$ROOT/whatsapp/.env.example" "$XI_DIR/whatsapp/.env.example"
 cd "$XI_DIR"
 git add -A whatsapp deploy
 if git diff --cached --quiet; then echo 'xi sudah sinkron.'; else
-  git commit -q -m "Sinkron dari alogaritm--app $(git -C "$ROOT" rev-parse --short HEAD)"
+  git -c user.name="$(git -C "$ROOT" log -1 --format=%an)" -c user.email="$(git -C "$ROOT" log -1 --format=%ae)" \
+    commit -q -m "Sinkron dari alogaritm--app $(git -C "$ROOT" rev-parse --short HEAD)"
   git push -q origin HEAD:main
   echo "xi diperbarui."
 fi

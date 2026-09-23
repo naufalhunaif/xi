@@ -14,7 +14,7 @@ repo="$(sed -E 's#.*github\.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#' <<<"$remote")"
 token="${GITHUB_TOKEN:-$(sed -nE 's#https://[^:]+:([^@]+)@github\.com/.*#\1#p' <<<"$remote")}"
 printf '%s\n' "$v" > whatsapp/VERSION
 git add whatsapp/VERSION
-git commit -q -m "Rilis v$v"
+git diff --cached --quiet || git commit -q -m "Rilis v$v"
 git tag -a "v$v" -m "WhatsApp v$v"
 git push -q origin HEAD "v$v"
 echo "Tag v$v dipush."
