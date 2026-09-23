@@ -33,23 +33,32 @@ current_version() { cat "$APP/whatsapp/VERSION" 2>/dev/null || echo '?'; }
 git_ref() { git -C "$APP" describe --tags --exact-match 2>/dev/null || git -C "$APP" rev-parse --abbrev-ref HEAD; }
 
 # ------------------------------------------------------------ supervisor -----
-if [[ "$MODE" == aapanel && -f /www/server/panel/plugin/supervisor/supervisord.conf ]]; then
-  SUP_CONF=/www/server/panel/plugin/supervisor/supervisord.conf
-  SUP_DIR=/www/server/panel/plugin/supervisor/profile
-  SUP_EXT=ini
-  SUPCTL="$(command -v supervisorctl || echo /www/server/panel/pyenv/bin/supervisorctl)"
-  [[ -x "$SUPCTL" ]] || SUPCTL=/www/server/panel/pyenv/bin/supervisorctl
-else
-  SUP_CONF=/etc/supervisor/supervisord.conf
-  SUP_DIR=/etc/supervisor/conf.d
-  SUP_EXT=conf
-  SUPCTL="$(command -v supervisorctl || echo /usr/bin/supervisorctl)"
+# Cari konfigurasi Supervisor: plugin aaPanel, /etc/supervisord.conf, atau paket Debian.
+SUP_CONF=''
+for c in "${WHATSAPP_SUPERVISOR_CONFIG:-}" /www/server/panel/plugin/supervisor/supervisord.conf \
+         /etc/supervisord.conf /etc/supervisor/supervisord.conf; do
+  [[ -n "$c" && -f "$c" ]] && { SUP_CONF="$c"; break; }
+done
+SUPCTL=''
+for c in "${WHATSAPP_SUPERVISORCTL:-}" "$(command -v supervisorctl 2>/dev/null || true)" \
+         /www/server/panel/pyenv/bin/supervisorctl /usr/bin/supervisorctl /usr/local/bin/supervisorctl; do
+  [[ -n "$c" && -x "$c" ]] && { SUPCTL="$c"; break; }
+done
+# Folder program: dari baris "files = .../*.ini" pada [include]; cadangan conf.d.
+SUP_DIR=''; SUP_EXT=conf
+if [[ -n "$SUP_CONF" ]]; then
+  inc="$(sed -nE 's/^[[:space:]]*files[[:space:]]*=[[:space:]]*([^[:space:];#]+).*/\1/p' "$SUP_CONF" | head -n1)"
+  if [[ -n "$inc" ]]; then
+    SUP_DIR="$(dirname "$inc")"; [[ "$SUP_DIR" = /* ]] || SUP_DIR="$(dirname "$SUP_CONF")/$SUP_DIR"
+    case "$inc" in *.ini) SUP_EXT=ini ;; *.conf) SUP_EXT=conf ;; esac
+  fi
 fi
+[[ -n "$SUP_DIR" ]] || SUP_DIR=/etc/supervisor/conf.d
 export WHATSAPP_SUPERVISORCTL="$SUPCTL" WHATSAPP_SUPERVISOR_CONFIG="$SUP_CONF"
 supctl() { "$SUPCTL" -c "$SUP_CONF" "$@"; }
 
 supervisor_install() {
-  [[ -x "$SUPCTL" && -f "$SUP_CONF" ]] || die "Supervisor tidak ditemukan ($SUP_CONF). aaPanel: pasang plugin Supervisor dulu."
+  [[ -n "$SUP_CONF" && -n "$SUPCTL" ]] || die "Supervisor tidak ditemukan (conf: ${SUP_CONF:-tidak ada}, supervisorctl: ${SUPCTL:-tidak ada}). Pasang plugin Supervisor di aaPanel atau: apt-get install supervisor"
   mkdir -p "$SUP_DIR"
   for role in web worker; do
     cat > "$SUP_DIR/wa-$role.$SUP_EXT" <<INI

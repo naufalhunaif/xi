@@ -86,7 +86,7 @@ if [[ "$MODE" == bare ]]; then
   apt-get install -y -qq --no-install-recommends nginx mariadb-server supervisor certbot \
     python3-certbot-nginx >/dev/null
   systemctl enable --now nginx mariadb supervisor >/dev/null 2>&1 || true
-elif [[ ! -f /www/server/panel/plugin/supervisor/supervisord.conf && ! -f /etc/supervisor/supervisord.conf ]]; then
+elif [[ ! -f /www/server/panel/plugin/supervisor/supervisord.conf && ! -f /etc/supervisord.conf && ! -f /etc/supervisor/supervisord.conf ]]; then
   # aaPanel tanpa plugin Supervisor: pakai Supervisor sistem.
   apt-get install -y -qq --no-install-recommends supervisor >/dev/null
   systemctl enable --now supervisor >/dev/null 2>&1 || true
