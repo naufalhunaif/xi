@@ -30,7 +30,7 @@
 }
 .wa-order-tabs button[aria-pressed='true'] .wa-tab-count { background: #18865b; color: #fff; }
 .wa-lean-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.wa-lean-toolbar .wa-order-tabs { margin: 12px 0; min-width: 0; max-width: 100%; }
+.wa-lean-toolbar .wa-order-tabs { margin: 12px 0; min-width: 0; max-width: 100%; flex-wrap: nowrap; }
 .wa-lean-toolbar .wa-order-filters input { width: min(320px, 100%); }
 
 /* Tabel order: kolom inti tidak terjepit; tabel digeser di layar sempit. */
@@ -64,4 +64,7 @@
   .wa-lean-toolbar .wa-order-filters,
   .wa-lean-toolbar .wa-order-filters input { width: 100%; }
   .wa-order-table th, .wa-order-table td { padding: 12px; }
+  .workspace-ui .wa-directory-heading h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .workspace-ui .wa-directory-heading #directoryExport span { display: none; }
+  .wa-lean-toolbar .wa-order-tabs { margin: 4px 0 8px; }
 }
