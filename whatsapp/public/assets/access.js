@@ -60,8 +60,8 @@
       timer = window.setTimeout(poll, 3000)
     }
   }
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault()
+  async function attach(event) {
+    event?.preventDefault?.()
     const domain = input.value.trim().toLowerCase()
     if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
       status.textContent = t('Domain tidak valid. Contoh: wa.contoh.com')
@@ -75,6 +75,10 @@
       save.disabled = false
       status.textContent = error.message
     }
+  }
+  save.addEventListener('click', attach)
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') attach(event)
   })
   unset.addEventListener('click', async () => {
     if (!window.confirm(t('Lepas domain dan kembali ke alamat IP:port?'))) return

@@ -732,11 +732,11 @@
                     <div class="wa-access-card" id="accessCard" data-app-url="{{ appUrl }}">
                       <strong data-i18n="Alamat akses & domain">Alamat akses & domain</strong>
                       <p><span data-i18n="Saat ini aplikasi diakses lewat">Saat ini aplikasi diakses lewat</span> <code id="accessUrl">{{ appUrl }}</code></p>
-                      <form id="accessDomainForm" class="wa-access-form">
-                        <input id="accessDomain" name="domain" type="text" placeholder="wa.contoh.com" autocomplete="off" spellcheck="false" />
-                        <button type="submit" class="button" id="accessDomainSave" data-i18n="Pasang domain">Pasang domain</button>
+                      <div id="accessDomainForm" class="wa-access-form">
+                        <input id="accessDomain" type="text" placeholder="wa.contoh.com" autocomplete="off" spellcheck="false" data-settings-ignore />
+                        <button type="button" class="button" id="accessDomainSave" data-i18n="Pasang domain">Pasang domain</button>
                         <button type="button" class="button secondary" id="accessDomainUnset" hidden data-i18n="Lepas domain">Lepas domain</button>
-                      </form>
+                      </div>
                       <p id="accessHint" data-i18n="Arahkan A record domain ke IP server ini dulu. SSL dipasang otomatis (Let's Encrypt).">Arahkan A record domain ke IP server ini dulu. SSL dipasang otomatis (Let's Encrypt).</p>
                       <p id="accessHintPanel" hidden data-i18n="aaPanel: buat dulu website untuk domain ini di aaPanel (aktifkan SSL), lalu pasang di sini.">aaPanel: buat dulu website untuk domain ini di aaPanel (aktifkan SSL), lalu pasang di sini.</p>
                       <pre id="accessLog" hidden></pre>
