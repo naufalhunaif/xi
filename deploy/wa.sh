@@ -20,7 +20,8 @@ say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31mGAGAL:\033[0m %s\n' "$*" >&2; exit 1; }
 as_app() { # jalankan sebagai user aplikasi; proxy/CA dari lingkungan root ikut diteruskan bila ada
-  local pass=(PATH="$PATH")
+  # Cache npm milik user aplikasi (aaPanel mengarahkan cache global ke folder milik root).
+  local pass=(PATH="$PATH" npm_config_cache="$DIR/.npm" HOME="$DIR")
   for k in http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY NODE_EXTRA_CA_CERTS SSL_CERT_FILE; do
     [[ -n "${!k:-}" ]] && pass+=("$k=${!k}")
   done
