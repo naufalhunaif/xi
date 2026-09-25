@@ -149,11 +149,15 @@ test.group('beta3 · form order', () => {
       total: 502000,
       shipping_service: 'REG',
     })
-    assert.include(text, 'PESANAN BARU PO-20260923-001')
-    assert.include(text, 'kerah: shanghai hitam')
-    assert.include(text, 'lunas 502.000 (REG)')
+    assert.equal(text, 'Beskap Clean Look - Choco, size M, jas saja\nKerah: shanghai hitam\noyen')
     assert.notInclude(text, 'lapangan bola')
     assert.notInclude(text, '0822')
+    assert.notInclude(text, 'PO-20260923-001')
+    const simple = renderGroupOrderMessage({
+      customer_name: 'Deva Hidayat',
+      spec: 'Tuxedo Double Breasted - Maroon 755.000\nJas, Celana\nSize M/31\nTinggi 164/68\nHarga 755.000',
+    })
+    assert.equal(simple, 'Tuxedo Double Breasted - Maroon\nJas, Celana\nSize M/31\nTinggi 164/68\nDeva Hidayat')
   })
 
   test('pesan total meniru format CS', ({ assert }) => {

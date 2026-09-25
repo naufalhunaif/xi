@@ -216,7 +216,13 @@ export async function renderRefImages(ref: LeanRef) {
   return { marked, zoom: await zoom.jpeg({ quality: 92 }).toBuffer() }
 }
 
+/** Caption singkat untuk penjahit: "Model kerah seperti ini". */
 export function refCaption(ref: LeanRef) {
-  const part = ref.part ? ref.part.charAt(0).toUpperCase() + ref.part.slice(1) : 'Referensi'
-  return `${part}: ${ref.note || 'samakan seperti foto'}${ref.box ? ' (yang ditandai merah)' : ''}`
+  const part = ref.part.trim().toLowerCase().replace(/^model\s+/, '')
+  return part ? `Model ${part} seperti ini` : 'Model seperti ini'
+}
+
+export function refZoomCaption(ref: LeanRef) {
+  const part = ref.part.trim().toLowerCase().replace(/^model\s+/, '')
+  return part ? `${part.charAt(0).toUpperCase()}${part.slice(1)} diperbesar` : 'Diperbesar'
 }

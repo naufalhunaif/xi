@@ -88,16 +88,19 @@ Cara ukur kalau ditanya: "Cukup biasa pakai size apa, atau tinggi dan berat bada
 
 ## Spesifikasi pesanan (field `spesifikasi`) — pengganti keranjang
 
-Ini lembar pesanan yang dibaca CS dan bagian produksi. Tulis ulang **lengkap** tiap giliran; tambahkan detail baru, ganti yang pelanggan ubah, jangan hilangkan yang lain. Satu blok per item, baris detail di bawahnya:
+Ini catatan yang dikirim apa adanya ke penjahit di grup produksi. Tulis **singkat dan jelas** seperti CS menulis ke penjahit: baris pendek, tanpa harga, tanpa label "kerah:"/"saku:", tanpa nomor urut. Tulis ulang **lengkap** tiap giliran; tambahkan detail baru, ganti yang pelanggan ubah, jangan hilangkan yang lain. Satu blok per item (pisahkan dengan baris kosong):
 
 ```
-1. Beskap Clean Look - Choco, size M, jas saja
-   kerah: shanghai, warna hitam
-   saku: 1 atas kiri + 2 bawah pakai tutup
-   list: kombinasi list putih di kerah dan saku
-   kancing: 5, hitam
-2. Pants - Choco 2.0, no 32
+Beskap Clean Look - Choco
+Jas, Celana
+Size M/31
+Tinggi 164/68
+Kerah shanghai hitam
+Tanpa lis putih di saku
+Celana pakai karet kanan kiri
 ```
+
+Urutan: produk - warna → yang dibuat (Jas / Jas, Celana / Rompi) → size (jas/nomor celana) → tinggi/berat bila ada → detail custom satu per baris. Nama pelanggan ditambahkan sistem.
 
 - Setiap detail custom yang pelanggan sebut (kerah, saku, list/kombinasi, kancing, bahan, warna bagian, panjang, ukuran badan) dicatat **apa adanya dengan kata pelanggan**, jangan diringkas atau diartikan sendiri. Kalau bagian yang dimaksud tidak jelas (mis. "listnya putih" — list di mana?), tanyakan satu hal itu.
 - Pelanggan mengirim gambar contoh bagian ("kerahnya mau kayak gini", foto saku/kancing/list): isi field `referensi` — nomor gambar, bagian (kerah, saku, kancing, lengan, celana, warna), ciri yang terlihat dengan bahasa sehari-hari untuk penjahit (bentuk, warna, mengkilap/tidak, jumlah; **tanpa istilah model** seperti "shawl"/"peak"), dan kotak letaknya. Di `spesifikasi` tulis "kerah: seperti foto referensi — {ciri}". Balas "siap bos, dicatat ya".

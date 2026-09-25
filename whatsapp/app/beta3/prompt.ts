@@ -54,7 +54,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     spesifikasi: {
       type: 'string',
       description:
-        'Lembar spesifikasi pesanan, ditulis ulang LENGKAP tiap giliran (bukan hanya perubahan): satu blok per item — produk, warna, size atau ukuran badan, jas saja/setelan, lalu setiap detail custom yang pelanggan sebut (kerah, saku, list/kombinasi, kancing, bahan, warna bagian) apa adanya. Kosong bila pelanggan belum memilih apa pun.',
+        'Catatan untuk penjahit, ditulis ulang LENGKAP tiap giliran, baris pendek tanpa harga/label/nomor: per item "Produk - Warna", "Jas, Celana" (yang dibuat), "Size M/31", "Tinggi 164/68" bila ada, lalu tiap detail custom satu baris dengan kata sehari-hari. Item dipisah baris kosong. Kosong bila pelanggan belum memilih apa pun.',
     },
     referensi: {
       type: 'array',

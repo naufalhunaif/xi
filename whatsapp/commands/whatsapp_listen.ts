@@ -574,7 +574,7 @@ export default class WhatsappListen extends BaseCommand {
           if (images.zoom)
             await socket.sendMessage(groupJid, {
               image: images.zoom,
-              caption: `${ref.part || 'Referensi'} (diperbesar)`,
+              caption: beta3Refs.refZoomCaption(ref),
               mimetype: 'image/jpeg',
             })
         } catch (error) {

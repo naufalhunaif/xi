@@ -25,7 +25,7 @@ export const RECAP_SCHEMA = {
     rincian: {
       type: 'string',
       description:
-        'Rincian pesanan per item: produk, warna, size (atau ukuran badan), jas saja/setelan, nomor celana, lalu detail custom apa adanya (kerah, saku, kancing, dll). Satu blok per item. Kosong bila belum_order.',
+        'Catatan untuk penjahit, baris pendek tanpa harga/label: per item "Produk - Warna", "Jas, Celana" (yang dibuat), "Size M/31", "Tinggi 164/68" bila ada, lalu detail custom satu per baris. Item dipisah baris kosong. Kosong bila belum_order.',
     },
     nama: { type: 'string', description: 'Nama penerima; kosong bila tidak disebut.' },
     hp: { type: 'string', description: 'Nomor HP penerima; kosong bila tidak disebut.' },

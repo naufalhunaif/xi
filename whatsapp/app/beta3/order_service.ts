@@ -540,20 +540,32 @@ export async function requeueLeanOrderGroup(id: number) {
   })
 }
 
-/** Teks untuk grup produksi: tanpa alamat, telepon, dan bukti transfer. */
+/**
+ * Teks untuk grup produksi — singkat seperti catatan CS ke penjahit:
+ * produk/warna, jas/celana, size, tinggi/berat, detail custom, lalu nama pelanggan.
+ * Tanpa harga, alamat, telepon, nomor order, dan info pembayaran.
+ */
 export function renderGroupOrderMessage(order: Record<string, any>) {
-  const lines = [
-    `PESANAN BARU ${order.order_number || `#${order.id}`}`,
-    `Nama: ${order.customer_name || '-'}`,
-    '',
-    String(order.spec || order.items || '-').trim(),
-  ]
-  if (order.note) lines.push('', `Catatan pelanggan: ${String(order.note).trim()}`)
-  if (order.cs_note) lines.push(`Catatan CS: ${String(order.cs_note).trim()}`)
-  lines.push(
-    '',
-    `Pembayaran: lunas${order.total ? ` ${rupiah(Number(order.total))}` : ''}${order.shipping_service ? ` (${order.shipping_service})` : ''}`
-  )
+  const money = /\s*\(?\b(?:rp\.?\s*)?\d{1,3}(?:[.,]\d{3})+\)?|\s*\b\d{2,4}\s*(?:rb|ribu|k)\b/gi
+  const lines: string[] = []
+  for (const raw of String(order.spec || order.items || '').split('\n')) {
+    const line = raw
+      .replace(/^\s*\d+[.)]\s*/, '')
+      .replace(money, '')
+      .replace(/\s+/g, ' ')
+      .replace(/[,\s]+$/, '')
+      .trim()
+    if (!line) {
+      if (lines.length && lines[lines.length - 1] !== '') lines.push('')
+      continue
+    }
+    if (/^(harga|total|subtotal|ongkir|dp|pembayaran|bayar|rekening)\b/i.test(line)) continue
+    lines.push(line.charAt(0).toUpperCase() + line.slice(1))
+  }
+  while (lines.length && lines[lines.length - 1] === '') lines.pop()
+  const extra = [order.note, order.cs_note].map((value) => String(value || '').trim()).filter(Boolean)
+  for (const value of extra) if (!lines.some((line) => line.includes(value))) lines.push(value)
+  if (order.customer_name) lines.push(String(order.customer_name).trim())
   return lines.join('\n')
 }
 
@@ -680,6 +692,7 @@ export function matchAutoTotal(
       // terlihat seperti produk lain tetap menahan total supaya tidak ada item terlewat.
       const detail =
         /^[-•*]?\s*(size|ukuran|celana\s*(?:no|nomor)|warna|bahan|model|kirim|pre\s?-?order|po\b|dp|tb|bb|lingkar|panjang|lebar|kerah|saku|list|kancing|catatan|note|custom|detail)/i.test(line) ||
+        /^(jas|celana|rompi|vest|setelan)(\s*[,+&/]\s*(jas|celana|rompi|vest))*(\s+saja)?$/i.test(line) ||
         !/\b(jas|celana|setelan|tuxedo|tux|rompi|vest|beskap|suit|blazer|kemeja)\b/i.test(line)
       if (!linePrices.length && detail) continue
       return { ok: false, reason: `baris tidak cocok katalog: ${line}` }
