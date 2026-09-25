@@ -56,6 +56,7 @@ import * as beta3Vision from '#beta3/catalog_vision'
 import * as beta3Examples from '#beta3/examples_service'
 import * as beta3Catalog from '#beta3/catalog_service'
 import * as beta3Refs from '#beta3/refs_service'
+import * as beta3Recap from '#beta3/recap_service'
 const beta3 = {
   ...beta3Reply,
   ...beta3Order,
@@ -225,6 +226,8 @@ export default class WhatsappListen extends BaseCommand {
   private sweeping = false
   private sweepTimer?: NodeJS.Timeout
   private leanSyncTimer?: NodeJS.Timeout
+  private recapTimer?: NodeJS.Timeout
+  private recapRunning = false
   private goalSweepRunning = false
   private lastGoalSweepAt = 0
   private evaluationRunning = false
@@ -287,6 +290,7 @@ export default class WhatsappListen extends BaseCommand {
       await stopWorkerHeartbeat(workerId).catch(() => {})
       if (this.sweepTimer) clearInterval(this.sweepTimer)
       if (this.leanSyncTimer) clearInterval(this.leanSyncTimer)
+      if (this.recapTimer) clearInterval(this.recapTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
       this.pendingTurns.clear()
       this.socket?.end(undefined)
@@ -741,6 +745,26 @@ export default class WhatsappListen extends BaseCommand {
           if (this.sessionScope && this.socketOpen)
             void inWorkspace(this.sessionScope, () => this.track(() => this.sweepUnanswered()))
         }, SWEEP_INTERVAL_MS)
+      }
+      if (!this.recapTimer) {
+        // Beta 3: rekap order dari chat CS manusia (tombol di halaman Order) dan mode
+        // pengamat — satu chat per menit, tanpa pesan ke pelanggan.
+        this.recapTimer = setInterval(() => {
+          if (!this.sessionScope || this.recapRunning) return
+          this.recapRunning = true
+          void inWorkspace(this.sessionScope, async () => {
+            try {
+              const settings = await readSettings(true)
+              if (!settings.beta3Mode || !settings.aiEnabled || !settings.hasSkill) return
+              const worked = await beta3Recap.runRecapStep()
+              if (!worked) await beta3Recap.observeHumanChats(1)
+            } catch (error) {
+              this.logger.error(`Rekap order: ${error instanceof Error ? error.message : String(error)}`)
+            } finally {
+              this.recapRunning = false
+            }
+          })
+        }, 60_000)
       }
       if (!this.leanSyncTimer) {
         // Beta 2: katalog/TOKO/bahan ditarik sendiri tiap 30 menit (murah: if_version), lalu ciri foto di latar.

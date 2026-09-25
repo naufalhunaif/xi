@@ -1053,4 +1053,12 @@ window.waLocales.id = {
   "Dikirim toko": "Dikirim toko",
   "Belum ada gambar di chat ini.": "Belum ada gambar di chat ini.",
   "Diisi AI otomatis dan ikut terkirim ke grup produksi. Ubah hanya bila perlu.": "Diisi AI otomatis dan ikut terkirim ke grup produksi. Ubah hanya bila perlu.",
+  "Rentang rekap": "Rentang rekap",
+  "Rekap dari chat": "Rekap dari chat",
+  "7 hari": "7 hari",
+  "30 hari": "30 hari",
+  "90 hari": "90 hari",
+  "AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan.": "AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan.",
+  "Rekap berjalan: {0}/{1} chat dibaca, {2} order dicatat. Tidak ada pesan ke pelanggan.": "Rekap berjalan: {0}/{1} chat dibaca, {2} order dicatat. Tidak ada pesan ke pelanggan.",
+  "Rekap selesai: {0} chat dibaca, {1} order dicatat.": "Rekap selesai: {0} chat dibaca, {1} order dicatat.",
 }

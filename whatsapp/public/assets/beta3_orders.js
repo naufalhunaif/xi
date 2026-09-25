@@ -103,6 +103,7 @@
       state.append(badge)
       if (order.status === 'pending' && order.auto_total_reason) state.append(el('br'), el('small', order.auto_total_reason, 'wa-muted'))
       if (groupLabel[order.group_status]) state.append(el('br'), el('small', groupLabel[order.group_status], 'wa-muted'))
+      if (order.source === 'rekap') state.append(el('br'), el('small', t('Rekap dari chat'), 'wa-order-source'))
       row.append(head, who, items, total, state)
       const open = () => openOrder(order)
       row.addEventListener('click', open)
@@ -132,6 +133,40 @@
     selected = null
     render()
   }
+  // Rekap order lama: dikerjakan worker satu chat per menit; progres dipantau di sini.
+  let recapTimer
+  function showRecap(progress) {
+    clearTimeout(recapTimer)
+    if (!progress) return
+    if (progress.running) {
+      notice(t('Rekap berjalan: {0}/{1} chat dibaca, {2} order dicatat. Tidak ada pesan ke pelanggan.', progress.done, progress.total || '…', progress.created))
+      byId('beta3RecapStart').disabled = true
+      recapTimer = setTimeout(checkRecap, 15000)
+    } else {
+      byId('beta3RecapStart').disabled = false
+      if (progress.finishedAt && Date.now() - progress.finishedAt < 10 * 60_000)
+        notice(t('Rekap selesai: {0} chat dibaca, {1} order dicatat.', progress.done, progress.created))
+    }
+  }
+  async function checkRecap() {
+    try {
+      const result = await api('/api/beta3/recap')
+      const before = byId('beta3RecapStart').disabled
+      showRecap(result.progress)
+      if (before && !result.progress?.running) load()
+      else if (result.progress?.running) load()
+    } catch {}
+  }
+  byId('beta3RecapStart').addEventListener('click', async () => {
+    try {
+      const result = await api('/api/beta3/recap', 'POST', { days: Number(byId('beta3RecapDays').value) })
+      showRecap(result.progress)
+    } catch (error) {
+      notice(error.message, true)
+    }
+  })
+  checkRecap()
+
   byId('beta3OrderDrawerClose').addEventListener('click', closeOrder)
   drawer.addEventListener('click', (event) => {
     if (event.target === drawer) closeOrder()

@@ -80,7 +80,8 @@ export const LEAN_TABLE_STATEMENTS = [
     ADD COLUMN IF NOT EXISTS group_sent_at DATETIME NULL AFTER group_status,
     ADD COLUMN IF NOT EXISTS group_error TEXT NULL AFTER group_sent_at,
     ADD COLUMN IF NOT EXISTS shipping_options TEXT NULL AFTER shipping_cost,
-    ADD COLUMN IF NOT EXISTS auto_total_reason VARCHAR(190) NULL AFTER shipping_options`,
+    ADD COLUMN IF NOT EXISTS auto_total_reason VARCHAR(190) NULL AFTER shipping_options,
+    ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'form' AFTER auto_total_reason`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_chats (
     jid VARCHAR(190) NOT NULL PRIMARY KEY,
     note TEXT NOT NULL,

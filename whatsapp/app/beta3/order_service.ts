@@ -303,7 +303,7 @@ export async function updatePendingOrderSpec(jid: string, spec: string) {
     .update({ spec: spec.slice(0, 4000), items: spec.slice(0, 4000), updated_at: new Date() })
 }
 
-async function nextOrderNumber() {
+export async function nextOrderNumber() {
   const stamp = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' })
     .format(new Date())
     .replace(/-/g, '')

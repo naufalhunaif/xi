@@ -62,6 +62,8 @@ router
     router.get('/api/beta3/room', [Beta3Controller, 'room'])
     router.post('/api/beta3/room/spec', [Beta3Controller, 'saveSpec'])
     router.post('/api/beta3/room/paid', [Beta3Controller, 'paidWithoutForm'])
+    router.get('/api/beta3/recap', [Beta3Controller, 'recapStatus'])
+    router.post('/api/beta3/recap', [Beta3Controller, 'startRecap'])
     router.post('/api/beta3/refs', [Beta3Controller, 'addReference'])
     router.post('/api/beta3/refs/:id', [Beta3Controller, 'updateReference'])
     router.post('/api/beta3/refs/:id/delete', [Beta3Controller, 'removeReference'])

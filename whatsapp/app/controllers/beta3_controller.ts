@@ -31,6 +31,7 @@ import { queueOutgoingMessage } from '#services/message_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { addRef, listActiveRefs, recentChatImages, removeRef, updateRef } from '#beta3/refs_service'
+import { readRecapProgress, requestRecap } from '#beta3/recap_service'
 import { ensureDefaults } from '#services/settings_service'
 import {
   readLeanMcpConfig,
@@ -262,6 +263,17 @@ export default class Beta3Controller {
         at: contact?.handoff_at || null,
       },
     })
+  }
+
+  /** Rekap order dari chat lama yang dilayani CS manusia (dikerjakan worker di latar). */
+  async recapStatus({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    return response.json({ progress: await readRecapProgress() })
+  }
+
+  async startRecap({ request, response }: HttpContext) {
+    const body = request.body() as Record<string, unknown>
+    return response.json({ progress: await requestRecap(Number(body.days) || 30) })
   }
 
   /** Referensi gambar per bagian: CS menambah dari gambar chat, mengubah label/kotak, menghapus. */

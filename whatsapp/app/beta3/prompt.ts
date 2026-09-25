@@ -149,7 +149,11 @@ export function renderHistory(rows: LeanHistoryRow[]) {
   if (!rows.length) return 'RIWAYAT: chat baru, belum ada pesan sebelumnya.'
   const lines = rows.map((row) => {
     const who =
-      row.direction === 'in' ? 'Pelanggan' : row.senderType === 'cs' ? 'CS (manusia)' : 'AI'
+      row.direction === 'in'
+        ? 'Pelanggan'
+        : row.senderType === 'cs' || row.senderType === 'owner'
+          ? 'CS (manusia)'
+          : 'AI'
     const media = row.mediaType ? `[${row.mediaType}] ` : ''
     const body = (row.body || '')
       .trim()

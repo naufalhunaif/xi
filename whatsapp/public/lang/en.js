@@ -1053,4 +1053,12 @@ window.waLocales.en = {
   "Dikirim toko": "Sent by store",
   "Belum ada gambar di chat ini.": "No images in this chat yet.",
   "Diisi AI otomatis dan ikut terkirim ke grup produksi. Ubah hanya bila perlu.": "Filled by the AI and sent to the production group. Edit only if needed.",
+  "Rentang rekap": "Recap range",
+  "Rekap dari chat": "Recap from chats",
+  "7 hari": "7 days",
+  "30 hari": "30 days",
+  "90 hari": "90 days",
+  "AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan.": "The AI reads chats handled by CS and records their orders. No messages are sent to customers.",
+  "Rekap berjalan: {0}/{1} chat dibaca, {2} order dicatat. Tidak ada pesan ke pelanggan.": "Recap running: {0}/{1} chats read, {2} orders recorded. No messages to customers.",
+  "Rekap selesai: {0} chat dibaca, {1} order dicatat.": "Recap finished: {0} chats read, {1} orders recorded.",
 }
