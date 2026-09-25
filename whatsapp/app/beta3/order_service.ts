@@ -369,11 +369,17 @@ export async function readLeanOrder(id: number) {
 }
 
 /** Pesan total yang dikirim kode setelah CS mengisi ongkir. Formatnya meniru CS. */
+/** Patokan DP pre-order (persen dari total); tidak harus pas. */
+export const PREORDER_DP_PERCENT = 50
+
+export const isPreorder = (text: unknown) => /pre\s*-?\s*order|\bpo\b/i.test(String(text || ''))
+
 export function renderTotalMessage(input: {
   items: string
   subtotal: number
   shippingService: string
   shippingCost: number
+  preorder?: boolean
 }) {
   const total = input.subtotal + input.shippingCost
   const lines = [
@@ -382,6 +388,7 @@ export function renderTotalMessage(input: {
     '',
     `Total ${rupiah(input.subtotal)} + ${rupiah(input.shippingCost)} = ${rupiah(total)} bos`,
   ]
+  if (input.preorder) lines.push(`Pre order bisa DP dulu sekitar ${PREORDER_DP_PERCENT}%, pelunasan saat siap kirim`)
   return lines.join('\n')
 }
 
@@ -448,7 +455,7 @@ export async function approveLeanOrder(input: {
   }
 }
 
-export async function markLeanOrderPaid(id: number, csNote?: string) {
+export async function markLeanOrderPaid(id: number, csNote?: string, paidAmount?: number) {
   await ensureLeanTables()
   const order = await readLeanOrder(id)
   if (!order) throw new Error('Order tidak ditemukan.')
@@ -460,6 +467,7 @@ export async function markLeanOrderPaid(id: number, csNote?: string) {
     .where('id', id)
     .update({
       status: 'paid',
+      paid_amount: paidAmount && paidAmount > 0 ? Math.round(paidAmount) : order.total || null,
       cs_note: csNote || order.cs_note,
       order_number: order.order_number || (await nextOrderNumber()),
       group_jid: groupJid,
@@ -470,6 +478,51 @@ export async function markLeanOrderPaid(id: number, csNote?: string) {
   await writeOrderSpec(String(order.jid), '')
   await attachRefsToOrder(String(order.jid), id)
   return { ...order, group_jid: groupJid }
+}
+
+/**
+ * Total atau pembayaran yang ditangani CS langsung di chat (bukan lewat tombol) ikut
+ * tercatat: AI membaca maksud chat tiap giliran lalu mengisi field `pembayaran`.
+ * Tidak mengirim pesan apa pun ke pelanggan.
+ */
+export async function syncOrderFromChat(
+  jid: string,
+  info: { total: number; ongkir: number; layanan: string; dibayar: number; dikonfirmasi: boolean } | undefined
+) {
+  if (!info) return null
+  await ensureLeanTables()
+  const order = await db
+    .from('whatsapp_beta3_orders')
+    .where('jid', jid)
+    .whereIn('status', ['pending', 'awaiting_payment'])
+    .orderBy('id', 'desc')
+    .first()
+  if (!order) return null
+  let status = String(order.status)
+  if (status === 'pending' && info.total > 0) {
+    const shipping = info.ongkir > 0 && info.ongkir < info.total ? info.ongkir : null
+    await db
+      .from('whatsapp_beta3_orders')
+      .where('id', order.id)
+      .update({
+        order_number: order.order_number || (await nextOrderNumber()),
+        total: info.total,
+        shipping_cost: shipping,
+        subtotal: shipping ? info.total - shipping : null,
+        shipping_service: info.layanan ? info.layanan.slice(0, 40) : order.shipping_service,
+        auto_total_reason: null,
+        status: 'awaiting_payment',
+        updated_at: new Date(),
+      })
+    status = 'awaiting_payment'
+  }
+  if (status === 'awaiting_payment' && info.dikonfirmasi && info.dibayar > 0) {
+    const total = Number(order.total || info.total || 0)
+    const note = total && info.dibayar < total ? `DP ${rupiah(info.dibayar)}, sisa ${rupiah(total - info.dibayar)}` : undefined
+    await markLeanOrderPaid(Number(order.id), note, info.dibayar)
+    return 'paid'
+  }
+  return status
 }
 
 export async function requeueLeanOrderGroup(id: number) {
@@ -731,6 +784,7 @@ export async function sendLeanTotal(input: VerifiedAutoTotal & { csNote?: string
       subtotal: input.subtotal,
       shippingService: input.shippingService,
       shippingCost: input.shippingCost,
+      preorder: isPreorder(`${order.spec || ''}\n${order.items || ''}\n${input.items}`),
     }),
   })
   const allMethods = await listPaymentMethods()

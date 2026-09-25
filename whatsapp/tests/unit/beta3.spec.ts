@@ -169,6 +169,8 @@ test.group('beta3 · form order', () => {
     })
     assert.include(text, 'Ongkir one day 19.000')
     assert.include(text, 'Total 485.000 + 19.000 = 504.000 bos')
+    const po = renderTotalMessage({ items: 'Jas broken white size L 500.000', subtotal: 500000, shippingService: 'REG', shippingCost: 25000, preorder: true })
+    assert.include(po, 'Pre order bisa DP dulu sekitar 50%, pelunasan saat siap kirim')
   })
 })
 

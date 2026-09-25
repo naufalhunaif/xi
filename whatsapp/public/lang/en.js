@@ -1083,4 +1083,6 @@ window.waLocales.en = {
   "Mengambil skill terbaru…": "Fetching the latest skill…",
   "Skill diperbarui.": "Skill updated.",
   "Skill sudah yang terbaru.": "Skill is already up to date.",
+  "Dibayar (DP)": "Paid (deposit)",
+  "Sisa": "Remaining",
 }

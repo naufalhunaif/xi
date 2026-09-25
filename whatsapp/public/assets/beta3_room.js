@@ -103,7 +103,8 @@
       box.append(el('p', t('Belum ada order. Order tercatat otomatis saat pelanggan mengirim alamat.'), 'wa-muted'))
       return
     }
-    status.textContent = [order.order_number || `#${order.id}`, statusLabel[order.status], groupLabel[order.group_status]]
+    const dp = order.status === 'paid' && order.paid_amount && order.total && Number(order.paid_amount) < Number(order.total)
+    status.textContent = [order.order_number || `#${order.id}`, dp ? t('DP') : statusLabel[order.status], groupLabel[order.group_status]]
       .filter(Boolean)
       .join(' · ')
     const to = [order.customer_name, order.phone, order.address].filter(Boolean).join(' · ')
@@ -119,6 +120,13 @@
         const row = el('div', undefined, cls || '')
         row.append(el('dt', label), el('dd', money(amount)))
         sum.append(row)
+      }
+      if (dp) {
+        for (const [label, amount] of [[t('Dibayar (DP)'), order.paid_amount], [t('Sisa'), Number(order.total) - Number(order.paid_amount)]]) {
+          const row = el('div')
+          row.append(el('dt', label), el('dd', money(amount)))
+          sum.append(row)
+        }
       }
       box.append(sum)
     }

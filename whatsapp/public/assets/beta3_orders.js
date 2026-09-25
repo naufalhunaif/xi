@@ -105,7 +105,8 @@
       items.append(el('span', summary.slice(0, 140), 'wa-order-items'))
       const total = el('td', order.total ? money(order.total) : '—', 'wa-order-amount')
       const state = el('td')
-      const badge = el('span', statusLabel[order.status] || order.status, 'wa-order-badge')
+      const dp = order.status === 'paid' && order.paid_amount && order.total && Number(order.paid_amount) < Number(order.total)
+      const badge = el('span', dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, 'wa-order-badge')
       badge.dataset.tone = statusTone[order.status] || ''
       state.append(badge)
       if (order.status === 'pending' && order.auto_total_reason) state.append(el('br'), el('small', order.auto_total_reason, 'wa-muted'))
@@ -219,6 +220,13 @@
         const row = el('div', undefined, cls || '')
         row.append(el('dt', label), el('dd', money(amount)))
         summary.append(row)
+      }
+      if (order.status === 'paid' && order.paid_amount && Number(order.paid_amount) < Number(order.total)) {
+        for (const [label, amount] of [[t('Dibayar (DP)'), order.paid_amount], [t('Sisa'), Number(order.total) - Number(order.paid_amount)]]) {
+          const row = el('div')
+          row.append(el('dt', label), el('dd', money(amount)))
+          summary.append(row)
+        }
       }
       box.append(summary)
     }

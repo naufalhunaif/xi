@@ -70,6 +70,20 @@ export const LEAN_OUTPUT_SCHEMA = {
         required: ['gambar', 'bagian'],
       },
     },
+    pembayaran: {
+      type: 'object',
+      additionalProperties: false,
+      description:
+        'Isi dari maksud chat (termasuk pesan CS manusia): total yang SUDAH dikirim toko ke pelanggan, dan pembayaran yang SUDAH dikonfirmasi toko. 0/false bila belum ada. Jangan mengarang angka.',
+      properties: {
+        total: { type: 'integer', description: 'Total yang sudah dikirim toko (rupiah), 0 bila belum.' },
+        ongkir: { type: 'integer', description: 'Ongkir di total itu, 0 bila tidak jelas.' },
+        layanan: { type: 'string', description: 'Layanan kirim di total itu (REG/YES/JTR), kosong bila tidak jelas.' },
+        dibayar: { type: 'integer', description: 'Nominal yang sudah ditransfer pelanggan (DP atau lunas), 0 bila belum/tidak jelas.' },
+        dikonfirmasi: { type: 'boolean', description: 'true hanya bila toko sudah menyatakan dana masuk (mis. "pembayaran sudah kami konfirmasi, prosess ya").' },
+      },
+      required: ['total', 'ongkir', 'layanan', 'dibayar', 'dikonfirmasi'],
+    },
     susulan: {
       type: 'string',
       description:
@@ -103,8 +117,11 @@ export type LeanOrderDraft = { rincian: string; subtotal: number; layanan: strin
 
 export type LeanRefDraft = { gambar: number; bagian: string }
 
+export type LeanPaymentInfo = { total: number; ongkir: number; layanan: string; dibayar: number; dikonfirmasi: boolean }
+
 export type LeanDecision = {
   order?: LeanOrderDraft
+  pembayaran?: LeanPaymentInfo
   referensi?: LeanRefDraft[]
   pesan: string[]
   foto: string[]
@@ -254,6 +271,17 @@ export function parseLeanDecision(text: string): LeanDecision {
     spesifikasi: String(raw.spesifikasi || '')
       .trim()
       .slice(0, 3000),
+    ...(raw.pembayaran && typeof raw.pembayaran === 'object'
+      ? {
+          pembayaran: {
+            total: Math.max(0, Math.round(Number((raw.pembayaran as Record<string, unknown>).total) || 0)),
+            ongkir: Math.max(0, Math.round(Number((raw.pembayaran as Record<string, unknown>).ongkir) || 0)),
+            layanan: String((raw.pembayaran as Record<string, unknown>).layanan || '').trim().slice(0, 40),
+            dibayar: Math.max(0, Math.round(Number((raw.pembayaran as Record<string, unknown>).dibayar) || 0)),
+            dikonfirmasi: (raw.pembayaran as Record<string, unknown>).dikonfirmasi === true,
+          },
+        }
+      : {}),
     referensi: (Array.isArray(raw.referensi) ? raw.referensi : [])
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
       .map((item) => ({

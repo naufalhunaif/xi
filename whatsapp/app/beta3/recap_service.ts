@@ -194,7 +194,8 @@ export async function saveRecap(jid: string, recap: ChatRecap) {
 }
 
 /**
- * Chat yang pernah dibalas CS manusia dalam rentang hari dan belum punya order.
+ * Chat yang pernah dibalas CS manusia dalam rentang hari dan belum punya order
+ * (atau order-nya masih tertahan "menunggu total", mis. total dikirim CS manual).
  * Tidak memakai kata kunci: AI yang menilai dari maksud chat apakah ada pesanan.
  */
 export async function recapCandidates(days: number) {
@@ -207,7 +208,8 @@ export async function recapCandidates(days: number) {
       GROUP BY m.jid
      HAVING SUM(m.direction = 'out' AND m.sender_type IN ('cs', 'owner')) > 0
         AND SUM(m.direction = 'in') > 0 AND COUNT(*) >= 4
-        AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.created_at >= ?)
+        AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.created_at >= ?
+          AND b.status <> 'pending')
       ORDER BY MAX(m.created_at) DESC
       LIMIT 500`,
     [since, since]

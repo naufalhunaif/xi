@@ -11,6 +11,7 @@ import {
   parseLooseAddress,
   tidyLooseAddress,
   looseAddressForm,
+  syncOrderFromChat,
   parsePrices,
   saveLeanOrder,
   updatePendingOrderSpec,
@@ -537,6 +538,12 @@ export async function createLeanReply(input: {
       status: 'completed',
       detail: { draft, fromAi: Boolean(decision.order), verdict },
     })
+  }
+  // Total/pembayaran yang dikerjakan CS langsung di chat ikut tercatat di order.
+  if (!autoTotal && decision.pembayaran) {
+    const synced = await syncOrderFromChat(jid, decision.pembayaran).catch(() => null)
+    if (synced)
+      onTrace?.({ key: 'beta3-order-sync', label: `Order diperbarui dari chat · ${synced}`, status: 'completed', detail: decision.pembayaran })
   }
   onTrace?.({
     key: 'beta3-ai',
