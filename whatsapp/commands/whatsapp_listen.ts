@@ -57,6 +57,7 @@ import * as beta3Examples from '#beta3/examples_service'
 import * as beta3Catalog from '#beta3/catalog_service'
 import * as beta3Refs from '#beta3/refs_service'
 import * as beta3Recap from '#beta3/recap_service'
+import * as beta3SkillSync from '#beta3/skill_sync'
 const beta3 = {
   ...beta3Reply,
   ...beta3Order,
@@ -563,20 +564,14 @@ export default class WhatsappListen extends BaseCommand {
         image ? { image: image.bytes, caption: image.caption, mimetype: 'image/jpeg' } : { text }
       )
       if (!sent?.key.id) throw new Error('Pengiriman ke grup belum dikonfirmasi.')
-      // Gambar referensi per bagian: gambar utuh bertanda merah + bagian diperbesar,
-      // dikirim terpisah supaya resolusinya tetap.
+      // Gambar referensi per bagian, apa adanya: "Model kerah seperti ini".
       for (const ref of await beta3Refs.refsForOrder(Number(order.id)).catch(() => [])) {
         if (this.stopping || this.socket !== socket) break
         try {
-          const images = await beta3Refs.renderRefImages(ref)
-          const caption = beta3Refs.refCaption(ref)
-          await socket.sendMessage(groupJid, { image: images.marked, caption, mimetype: 'image/jpeg' })
-          if (images.zoom)
-            await socket.sendMessage(groupJid, {
-              image: images.zoom,
-              caption: beta3Refs.refZoomCaption(ref),
-              mimetype: 'image/jpeg',
-            })
+          await socket.sendMessage(groupJid, {
+            image: await beta3Refs.loadImage(ref.image_url),
+            caption: beta3Refs.refCaption(ref),
+          })
         } catch (error) {
           this.logger.error(
             `Referensi #${ref.id} order #${order.id} gagal ke grup: ${error instanceof Error ? error.message : String(error)}`
@@ -747,8 +742,8 @@ export default class WhatsappListen extends BaseCommand {
         }, SWEEP_INTERVAL_MS)
       }
       if (!this.recapTimer) {
-        // Beta 3: rekap order dari chat CS manusia (tombol di halaman Order) dan mode
-        // pengamat — satu chat per menit, tanpa pesan ke pelanggan.
+        // Beta 3: rekap order dari chat CS manusia (tombol di halaman Order), satu chat
+        // per menit, tanpa pesan ke pelanggan. Hanya berjalan setelah tombol ditekan.
         this.recapTimer = setInterval(() => {
           if (!this.sessionScope || this.recapRunning) return
           this.recapRunning = true
@@ -756,8 +751,7 @@ export default class WhatsappListen extends BaseCommand {
             try {
               const settings = await readSettings(true)
               if (!settings.beta3Mode || !settings.aiEnabled || !settings.hasSkill) return
-              const worked = await beta3Recap.runRecapStep()
-              if (!worked) await beta3Recap.observeHumanChats(1)
+              await beta3Recap.runRecapStep()
             } catch (error) {
               this.logger.error(`Rekap order: ${error instanceof Error ? error.message : String(error)}`)
             } finally {
@@ -786,6 +780,9 @@ export default class WhatsappListen extends BaseCommand {
                   if (settings.beta3Mode) await beta3.describeCatalogPhotos()
                   else await describeCatalogPhotos()
                 }
+                // Update ringan: skill terbaru dari rilis online, tanpa `wa update`.
+                if (settings.beta3Mode)
+                  await beta3SkillSync.syncRemoteSkills((line) => this.logger.info(line)).catch(() => {})
               } catch (error) {
                 this.logger.warning(
                   `Beta 2: sync katalog gagal: ${error instanceof Error ? error.message : String(error)}`

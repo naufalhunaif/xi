@@ -2,7 +2,6 @@
 import { readFile } from 'node:fs/promises'
 import { basename } from 'node:path'
 import app from '@adonisjs/core/services/app'
-import sharp from 'sharp'
 import db from '#services/workspace_database'
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
 import { ensureLeanTables } from '#beta3/tables'
@@ -85,23 +84,6 @@ export async function addRef(input: {
   return Number(id)
 }
 
-export async function updateRef(id: number, input: { part?: unknown; note?: unknown; box?: unknown }) {
-  await ensureLeanTables()
-  const values: Record<string, unknown> = { updated_at: new Date() }
-  if (input.part !== undefined) values.part = String(input.part || '').trim().slice(0, 80)
-  if (input.note !== undefined) values.note = String(input.note || '').trim().slice(0, 300)
-  if (input.box !== undefined) {
-    const box = normalizeBox(input.box)
-    values.box = box ? JSON.stringify(box) : null
-  }
-  await db.from('whatsapp_beta3_refs').where('id', id).whereNull('order_id').update(values)
-}
-
-export async function removeRef(id: number) {
-  await ensureLeanTables()
-  await db.from('whatsapp_beta3_refs').where('id', id).whereNull('order_id').delete()
-}
-
 /** Order lunas: referensi chat ini ikut ke order (dikirim ke grup bersama order). */
 export async function attachRefsToOrder(jid: string, orderId: number) {
   await ensureLeanTables()
@@ -118,7 +100,7 @@ export async function attachRefsToOrder(jid: string, orderId: number) {
  */
 export async function saveAiRefs(
   jid: string,
-  refs: Array<{ gambar: number; bagian: string; catatan: string; kotak?: unknown }>,
+  refs: Array<{ gambar: number; bagian: string }>,
   imageIds: string[]
 ) {
   if (!refs.length || !imageIds.length) return 0
@@ -142,78 +124,17 @@ export async function saveAiRefs(
       .where('message_id', messageId)
       .where('part', part)
       .first()
-    if (existing) await updateRef(Number(existing.id), { note: ref.catatan, box: ref.kotak })
-    else
-      await addRef({
-        jid,
-        messageId,
-        imageUrl: String(message.media_url),
-        part,
-        note: ref.catatan,
-        box: ref.kotak,
-      })
+    if (!existing) await addRef({ jid, messageId, imageUrl: String(message.media_url), part })
     saved++
   }
   return saved
 }
 
-/** Gambar chat terakhir (masuk & keluar) untuk dipilih CS sebagai referensi. */
-export async function recentChatImages(jid: string, limit = 12) {
-  return db
-    .from('whatsapp_messages')
-    .where('jid', jid)
-    .where('media_type', 'image')
-    .whereNotNull('media_url')
-    .orderBy('id', 'desc')
-    .limit(limit)
-    .select('message_id', 'media_url', 'direction', 'created_at')
-}
-
-async function loadImage(url: string) {
+/** Gambar referensi apa adanya (resolusi asli) untuk dikirim ke grup produksi. */
+export async function loadImage(url: string) {
   if (/^https?:\/\//i.test(url)) return downloadOutgoingImage(url)
   // Media chat tersimpan di public/media; URL-nya "<base>/media/<file>".
   return readFile(app.makePath('public', 'media', basename(url.split('?')[0])))
-}
-
-/**
- * Gambar untuk grup produksi, resolusi asli: (1) gambar utuh dengan kotak merah,
- * (2) bagian yang ditandai diperbesar. Tanpa kotak → hanya gambar utuh.
- */
-export async function renderRefImages(ref: LeanRef) {
-  // Orientasi EXIF diterapkan dulu supaya koordinat kotak sesuai gambar yang terlihat.
-  const source = await sharp(await loadImage(ref.image_url)).rotate().toBuffer()
-  const base = sharp(source)
-  const meta = await base.metadata()
-  const width = meta.width || 0
-  const height = meta.height || 0
-  if (!ref.box || !width || !height) {
-    return { marked: await base.jpeg({ quality: 92 }).toBuffer(), zoom: null as Buffer | null }
-  }
-  // Letak dari AI hanya perkiraan: kotak dilebarkan sedikit supaya bagiannya pasti
-  // masuk, tanpa perlu CS menggeser.
-  const [bx, by, bw, bh] = ref.box
-  const grow = 0.12
-  const x0 = Math.max(0, Math.round(((bx - bw * grow) / 1000) * width))
-  const y0 = Math.max(0, Math.round(((by - bh * grow) / 1000) * height))
-  const x = x0
-  const y = y0
-  const w = Math.max(8, Math.min(width - x0, Math.round(((bw * (1 + grow * 2)) / 1000) * width)))
-  const h = Math.max(8, Math.min(height - y0, Math.round(((bh * (1 + grow * 2)) / 1000) * height)))
-  const stroke = Math.max(4, Math.round(Math.min(width, height) * 0.008))
-  const svg = Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#e11d2e" stroke-width="${stroke}" rx="${stroke}"/></svg>`
-  )
-  const marked = await sharp(source).composite([{ input: svg }]).jpeg({ quality: 92 }).toBuffer()
-  // Perbesaran dengan sedikit ruang di sekitar bagian supaya konteksnya terbaca.
-  const padX = Math.round(w * 0.3)
-  const padY = Math.round(h * 0.3)
-  const left = Math.max(0, x - padX)
-  const top = Math.max(0, y - padY)
-  const cropW = Math.min(width - left, w + padX * 2)
-  const cropH = Math.min(height - top, h + padY * 2)
-  let zoom = sharp(source).extract({ left, top, width: cropW, height: cropH })
-  if (cropW < 900) zoom = zoom.resize({ width: 900, kernel: 'lanczos3' })
-  return { marked, zoom: await zoom.jpeg({ quality: 92 }).toBuffer() }
 }
 
 /** Caption singkat untuk penjahit: "Model kerah seperti ini". */
@@ -222,7 +143,3 @@ export function refCaption(ref: LeanRef) {
   return part ? `Model ${part} seperti ini` : 'Model seperti ini'
 }
 
-export function refZoomCaption(ref: LeanRef) {
-  const part = ref.part.trim().toLowerCase().replace(/^model\s+/, '')
-  return part ? `${part.charAt(0).toUpperCase()}${part.slice(1)} diperbesar` : 'Diperbesar'
-}

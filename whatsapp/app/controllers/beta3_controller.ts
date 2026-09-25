@@ -18,7 +18,6 @@ import {
   requeueLeanOrderGroup,
   updatePendingOrderSpec,
   renderGroupOrderMessage,
-  createPaidLeanOrder,
 } from '#beta3/order_service'
 import {
   readCustomerNote,
@@ -30,8 +29,9 @@ import db from '#services/workspace_database'
 import { queueOutgoingMessage } from '#services/message_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
-import { addRef, listActiveRefs, recentChatImages, removeRef, updateRef } from '#beta3/refs_service'
+import { listActiveRefs, refCaption, refsForOrder } from '#beta3/refs_service'
 import { readRecapProgress, requestRecap } from '#beta3/recap_service'
+import { skillStatus, syncRemoteSkills } from '#beta3/skill_sync'
 import { ensureDefaults } from '#services/settings_service'
 import {
   readLeanMcpConfig,
@@ -151,7 +151,14 @@ export default class Beta3Controller {
       listLeanOrders(status || undefined, q || undefined),
       countLeanOrders(),
     ])
-    return response.json({ orders: await attachOrderPhotos(orders), counts })
+    const withText = orders.map((order: Record<string, any>) => ({
+      spec: order.spec as unknown,
+      ...order,
+      // Foto dicocokkan dari isi pesanan saja, bukan dari catatan chat.
+      chat_note: '',
+      text: renderGroupOrderMessage(order),
+    }))
+    return response.json({ orders: await attachOrderPhotos(withText), counts })
   }
 
   /** CS mengisi ongkir + subtotal → sistem kirim total lalu rekening ke pelanggan. */
@@ -212,18 +219,12 @@ export default class Beta3Controller {
   async room({ request, response }: HttpContext) {
     const jid = String(request.qs().jid || '')
     if (!jid) return response.badRequest({ error: 'jid wajib.' })
-    const [spec, note, order, contact, chatNote] = await Promise.all([
+    const [spec, order, contact, chatNote] = await Promise.all([
       readOrderSpec(jid),
-      readCustomerNote(jid),
       latestLeanOrder(jid),
       db.from('whatsapp_contacts').where('jid', jid).first(),
       readBeta3ChatNote(jid),
     ])
-    const chatRow = await db.from('whatsapp_beta3_chats').where('jid', jid).select('updated_at').first()
-    let shippingAddress: Record<string, unknown> | null = null
-    try {
-      shippingAddress = JSON.parse((await readLeanState(`alamat:${jid}`)) || 'null')
-    } catch {}
     // Bukti transfer: gambar pelanggan setelah total dikirim (untuk dicek sebelum Lunas).
     const proofs =
       order && order.status === 'awaiting_payment'
@@ -236,33 +237,38 @@ export default class Beta3Controller {
             .whereNotNull('media_url')
             .orderBy('id', 'desc')
             .limit(3)
-            .select('message_id', 'media_url', 'thumbnail_url', 'created_at')
+            .select('media_url')
         : []
+    // Pesanan yang tampil: order aktif; kalau tidak ada, detail yang sedang ditulis AI;
+    // kalau kosong juga, order terakhir yang sudah lunas.
     const active = order && ['pending', 'awaiting_payment'].includes(String(order.status))
-    const [withPhotos] = await attachOrderPhotos([
-      { spec: spec || (active ? order.spec || order.items : ''), items: '', chat_note: chatNote },
-    ])
+    const shown = active ? order : spec ? null : order && order.status === 'paid' ? order : null
+    const text = shown ? renderGroupOrderMessage(shown) : spec
+    const refs = shown && shown.status === 'paid' ? await refsForOrder(Number(shown.id)) : await listActiveRefs(jid)
+    const [withPhotos] = await attachOrderPhotos([{ spec: text, items: '', chat_note: '' }])
     response.header('cache-control', 'no-store')
     return response.json({
       jid,
       spec,
-      note,
       order,
       proofs,
       photos: withPhotos.photos,
-      contactName: contact?.name ? String(contact.name) : '',
-      chatUpdatedAt: chatRow?.updated_at || null,
-      shippingAddress,
-      refs: await listActiveRefs(jid),
-      chatImages: await recentChatImages(jid),
-      groupPreview: order && order.status !== 'cancelled' ? renderGroupOrderMessage(order) : '',
+      refs: refs.map((ref) => ({ image_url: ref.image_url, caption: refCaption(ref) })),
+      groupPreview: text,
       chatNote: chatNote || (contact?.chat_note ? String(contact.chat_note) : ''),
-      handling: {
-        mode: contact?.handling_mode === 'cs' ? 'cs' : 'ai',
-        reason: contact?.handoff_reason ? String(contact.handoff_reason) : '',
-        at: contact?.handoff_at || null,
-      },
+      handling: { mode: contact?.handling_mode === 'cs' ? 'cs' : 'ai' },
     })
+  }
+
+  /** Pengaturan → Skill: status skill + tombol ambil skill terbaru dari rilis online. */
+  async skill({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    return response.json(await skillStatus())
+  }
+
+  async updateSkill({ response }: HttpContext) {
+    const result = await syncRemoteSkills()
+    return response.json({ updated: result.updated, ...(await skillStatus()) })
   }
 
   /** Rekap order dari chat lama yang dilayani CS manusia (dikerjakan worker di latar). */
@@ -274,68 +280,6 @@ export default class Beta3Controller {
   async startRecap({ request, response }: HttpContext) {
     const body = request.body() as Record<string, unknown>
     return response.json({ progress: await requestRecap(Number(body.days) || 30) })
-  }
-
-  /** Referensi gambar per bagian: CS menambah dari gambar chat, mengubah label/kotak, menghapus. */
-  async addReference({ request, response }: HttpContext) {
-    const body = request.body() as Record<string, unknown>
-    const jid = String(body.jid || '')
-    const messageId = String(body.messageId || '')
-    if (!jid || !messageId) return response.badRequest({ error: 'jid dan gambar wajib.' })
-    const message = await db
-      .from('whatsapp_messages')
-      .where('jid', jid)
-      .where('message_id', messageId)
-      .whereNotNull('media_url')
-      .first()
-    if (!message) return response.badRequest({ error: 'Gambar tidak ditemukan.' })
-    const id = await addRef({
-      jid,
-      messageId,
-      imageUrl: String(message.media_url),
-      part: body.part ? String(body.part) : '',
-      note: body.note ? String(body.note) : '',
-      box: body.box,
-    })
-    return response.json({ id })
-  }
-
-  async updateReference({ params, request, response }: HttpContext) {
-    const body = request.body() as Record<string, unknown>
-    await updateRef(Number(params.id), { part: body.part, note: body.note, box: body.box })
-    return response.json({ ok: true })
-  }
-
-  async removeReference({ params, response }: HttpContext) {
-    await removeRef(Number(params.id))
-    return response.noContent()
-  }
-
-  /** Konfirmasi lunas tanpa form: buat order dari ringkasan chat lalu antre ke grup. */
-  async paidWithoutForm({ request, response }: HttpContext) {
-    const body = request.body() as Record<string, unknown>
-    const jid = String(body.jid || '')
-    if (!jid) return response.badRequest({ error: 'jid wajib.' })
-    try {
-      const order = await createPaidLeanOrder({
-        jid,
-        customerName: String(body.customerName || ''),
-        address: String(body.address || ''),
-        spec: String(body.spec || ''),
-        total: Number(String(body.total || '').replace(/\D/g, '')),
-        phone: body.phone ? String(body.phone) : undefined,
-        district: body.district ? String(body.district) : undefined,
-        regency: body.regency ? String(body.regency) : undefined,
-        postalCode: body.postalCode ? String(body.postalCode) : undefined,
-        shippingService: body.shippingService ? String(body.shippingService) : undefined,
-        shippingCost: Number(String(body.shippingCost || '').replace(/\D/g, '')) || undefined,
-      })
-      if (body.notify !== false)
-        await queueOutgoingMessage({ jid, body: 'Terimakasih bos, prosess ya' })
-      return response.json({ ok: true, groupQueued: Boolean(order.group_jid) })
-    } catch (error) {
-      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
-    }
   }
 
   async saveSpec({ request, response }: HttpContext) {

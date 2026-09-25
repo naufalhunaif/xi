@@ -59,26 +59,15 @@ export const LEAN_OUTPUT_SCHEMA = {
     referensi: {
       type: 'array',
       description:
-        'Opsional. Isi bila pelanggan mengirim gambar di giliran ini untuk menunjukkan bagian yang diinginkan (kerah, saku, kancing, lengan, celana, warna, dll). Satu entri per bagian. Kosongkan bila gambar tidak dipakai sebagai contoh bagian.',
+        'Opsional. Isi bila pelanggan mengirim gambar di giliran ini sebagai contoh bagian yang diinginkan. Gambar diteruskan ke penjahit dengan caption "Model {bagian} seperti ini".',
       items: {
         type: 'object',
         additionalProperties: false,
         properties: {
           gambar: { type: 'integer', description: 'Nomor lampiran gambar giliran ini (1 = gambar pertama).' },
-          bagian: { type: 'string', description: 'Nama bagian dengan kata sehari-hari: kerah, saku, kancing, lengan, celana, warna, dll.' },
-          catatan: {
-            type: 'string',
-            description:
-              'Ciri yang terlihat dengan bahasa sehari-hari untuk penjahit (bentuk, warna, mengkilap/tidak, jumlah), TANPA istilah model. Mis. "melengkung tanpa lekukan, warna hitam mengkilap".',
-          },
-          kotak: {
-            type: 'array',
-            items: { type: 'integer' },
-            description:
-              'Letak bagian itu di gambar: [x, y, lebar, tinggi] skala 0–1000 dari kiri-atas, cukup mencakup bagian itu. Kosongkan ([]) bila tidak yakin — gambar dikirim utuh.',
-          },
+          bagian: { type: 'string', description: 'Satu-dua kata sehari-hari: kerah, badan, saku, kancing, lengan, celana, warna.' },
         },
-        required: ['gambar', 'bagian', 'catatan', 'kotak'],
+        required: ['gambar', 'bagian'],
       },
     },
     susulan: {
@@ -112,7 +101,7 @@ export const LEAN_OUTPUT_SCHEMA = {
 
 export type LeanOrderDraft = { rincian: string; subtotal: number; layanan: string }
 
-export type LeanRefDraft = { gambar: number; bagian: string; catatan: string; kotak: number[] }
+export type LeanRefDraft = { gambar: number; bagian: string }
 
 export type LeanDecision = {
   order?: LeanOrderDraft
@@ -269,9 +258,7 @@ export function parseLeanDecision(text: string): LeanDecision {
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
       .map((item) => ({
         gambar: Math.round(Number(item.gambar) || 0),
-        bagian: String(item.bagian || '').trim().slice(0, 80),
-        catatan: String(item.catatan || '').trim().slice(0, 300),
-        kotak: Array.isArray(item.kotak) ? item.kotak.map((n) => Number(n)) : [],
+        bagian: String(item.bagian || '').trim().slice(0, 40),
       }))
       .filter((item) => item.gambar > 0 && item.bagian)
       .slice(0, 6),

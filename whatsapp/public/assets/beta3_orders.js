@@ -91,11 +91,18 @@
       row.dataset.selected = String(order.id === selected)
       row.tabIndex = 0
       const head = el('td')
-      head.append(el('strong', order.order_number || `#${order.id}`), el('br'), el('small', when(order.created_at), 'wa-muted'))
+      head.append(el('span', when(order.created_at)), el('br'), el('small', order.order_number || `#${order.id}`, 'wa-muted'))
       const who = el('td')
-      who.append(el('span', order.customer_name || '-'), el('br'), el('small', [order.district, order.regency].filter(Boolean).join(', '), 'wa-muted'))
+      who.append(el('span', order.customer_name || '-'), el('br'), el('small', order.regency || order.district || '', 'wa-muted'))
       const items = el('td')
-      items.append(el('span', String(order.spec || order.items || '').split('\n').slice(0, 3).join(' · ').slice(0, 200), 'wa-order-items'))
+      // Satu baris ringkas dari teks pesanan: produk · jas/celana · size.
+      const summary = String(order.text || order.spec || order.items || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(' · ')
+      items.append(el('span', summary.slice(0, 140), 'wa-order-items'))
       const total = el('td', order.total ? money(order.total) : '—', 'wa-order-amount')
       const state = el('td')
       const badge = el('span', statusLabel[order.status] || order.status, 'wa-order-badge')
@@ -176,30 +183,10 @@
     closeOrder()
   })
 
-  function field(label, node) {
-    const wrap = el('label')
-    wrap.append(el('span', label), node)
-    return wrap
-  }
   function renderDetail(order) {
     const box = byId('beta3OrderDetail')
     box.replaceChildren()
-    byId('beta3OrderDrawerTitle').textContent = `${order.order_number || `#${order.id}`} · ${statusLabel[order.status] || order.status}`
-    const info = el('dl', undefined, 'wa-cart-summary')
-    for (const [label, value] of [
-      [t('Pelanggan'), order.customer_name || '-'],
-      [t('Telepon'), order.phone || '-'],
-      [t('Alamat'), [order.address, order.district, order.regency, order.postal_code].filter(Boolean).join(', ')],
-      [t('Dibuat'), when(order.created_at)],
-      [t('Catatan pelanggan'), order.note || ''],
-    ]) {
-      if (!value) continue
-      const row = el('div')
-      row.append(el('dt', label), el('dd', value))
-      info.append(row)
-    }
-    box.append(el('h2', t('Pelanggan')), info)
-    box.append(el('h2', t('Pesanan')))
+    byId('beta3OrderDrawerTitle').textContent = `${order.customer_name || '-'} · ${statusLabel[order.status] || order.status}`
     if (Array.isArray(order.photos) && order.photos.length) {
       const photos = el('div', undefined, 'wa-order-photos')
       for (const photo of order.photos) {
@@ -209,97 +196,73 @@
         img.alt = `${photo.product} ${photo.color}`.trim()
         img.loading = 'lazy'
         img.addEventListener('error', () => figure.remove())
-        figure.append(img, el('figcaption', [photo.product, photo.color].filter(Boolean).join(' · ')))
+        figure.append(img)
         photos.append(figure)
       }
       box.append(photos)
     }
-    const orderText = String(order.spec || order.items || '—')
-    box.append(el('pre', orderText, 'wa-lean-chatnote'))
-    if (order.chat_note && String(order.chat_note).trim() !== orderText.trim()) {
-      box.append(el('h2', t('Catatan chat saat form masuk')))
-      box.append(el('pre', order.chat_note, 'wa-lean-chatnote'))
-    }
-    box.append(el('h2', t('Biaya')))
-    const summary = el('dl', undefined, 'wa-cart-summary')
-    for (const [label, amount, cls] of [
-      [t('Subtotal'), order.subtotal, ''],
-      [`${t('Ongkir')}${order.shipping_service ? ` (${order.shipping_service})` : ''}`, order.shipping_cost, ''],
-      [t('Total'), order.total, 'wa-cart-total'],
-    ]) {
-      const row = el('div', undefined, cls)
-      row.append(el('dt', label), el('dd', amount === null || amount === undefined ? '—' : money(amount)))
-      summary.append(row)
-    }
-    box.append(summary)
-    if (order.cs_note) box.append(el('p', `${t('Catatan CS')}: ${order.cs_note}`, 'wa-muted'))
-
-    const actions = el('div', undefined, 'actions')
-    if (order.status === 'pending') {
-      let options = []
-      try {
-        options = JSON.parse(order.shipping_options || 'null')?.prices || []
-      } catch {}
-      const priced = options.filter((row) => Number(row.price) > 0)
-      if (order.auto_total_reason) box.append(el('p', `${t('Total otomatis gagal')}: ${order.auto_total_reason}`, 'wa-order-shipping-wait'))
-      const form = el('form', undefined, 'wa-order-fields')
-      const items = el('textarea')
-      items.rows = 3
-      items.value = order.spec || order.items || ''
-      items.placeholder = t('Rincian barang untuk pesan total, mis. Tuxedo Brown 485.000')
-      const subtotal = el('input')
-      subtotal.type = 'number'
-      subtotal.required = true
-      subtotal.placeholder = t('Subtotal barang (Rp)')
-      const service = el('input')
-      service.type = 'text'
-      service.placeholder = t('Layanan (REG / YES / one day)')
-      const shipping = el('input')
-      shipping.type = 'number'
-      shipping.required = true
-      shipping.placeholder = t('Ongkir (Rp)')
-      form.append(field(t('Rincian'), items), field(t('Subtotal barang (Rp)'), subtotal))
-      if (priced.length) {
-        const picks = el('div', undefined, 'actions')
-        for (const row of priced) {
-          const name = String(row.service).replace(/\d+$/, '')
-          picks.append(
-            button(`${name} ${money(row.price)}${row.etd ? ` (${String(row.etd).replace('day', t('hari'))})` : ''}`, () => {
-              service.value = name
-              shipping.value = Math.round(row.price)
-            })
-          )
-        }
-        form.append(field(t('Ongkir tersedia'), picks))
+    box.append(el('pre', String(order.text || order.spec || order.items || '—'), 'wa-b3-spec'))
+    const address = [order.address, order.district, order.regency, order.postal_code]
+      .filter(Boolean)
+      .filter((part, index, all) => index === 0 || !String(all[0]).toLowerCase().includes(String(part).toLowerCase()))
+      .join(', ')
+    const to = [order.phone, address].filter(Boolean).join(' · ')
+    if (to) box.append(el('p', `${t('Kirim ke')}: ${to}`, 'wa-muted'))
+    if (order.total) {
+      const summary = el('dl', undefined, 'wa-cart-summary')
+      for (const [label, amount, cls] of [
+        [t('Subtotal'), order.subtotal],
+        [`${t('Ongkir')}${order.shipping_service ? ` ${order.shipping_service}` : ''}`, order.shipping_cost],
+        [t('Total'), order.total, 'wa-cart-total'],
+      ]) {
+        if (amount === null || amount === undefined) continue
+        const row = el('div', undefined, cls || '')
+        row.append(el('dt', label), el('dd', money(amount)))
+        summary.append(row)
       }
-      form.append(field(t('Layanan'), service), field(t('Ongkir (Rp)'), shipping))
-      const submit = button(t('Kirim total + rekening'), () => {}, true)
-      submit.type = 'submit'
-      const cancel = button(t('Batalkan order'), async () => {
-        if (!confirm(t('Batalkan order ini?'))) return
+      box.append(summary)
+    }
+    const actions = el('div', undefined, 'actions')
+    const act = (label, path, done, primary = true) =>
+      button(label, async () => {
+        if (path.endsWith('/cancel') && !confirm(t('Batalkan order ini?'))) return
         try {
-          await api(`/api/beta3/orders/${order.id}/cancel`, 'POST', {})
-          notice(t('Order dibatalkan.'))
-          closeOrder()
+          await api(path, 'POST', {})
+          notice(done)
           await load()
         } catch (error) {
           notice(error.message, true)
         }
-      })
-      const row = el('div', undefined, 'actions')
-      row.append(submit, cancel)
-      form.append(row)
+      }, primary)
+    if (order.status === 'pending') {
+      if (order.auto_total_reason) box.append(el('p', `${t('Total belum otomatis')}: ${order.auto_total_reason}`, 'wa-muted'))
+      let options = []
+      try {
+        options = (JSON.parse(order.shipping_options || 'null')?.prices || []).filter((row) => Number(row.price) > 0)
+      } catch {}
+      const form = el('form', undefined, 'wa-cart-form')
+      const subtotal = el('input'); subtotal.inputMode = 'numeric'; subtotal.required = true; subtotal.placeholder = t('Harga barang (Rp)')
+      const shipping = el('select')
+      for (const row of options) {
+        const name = String(row.service).replace(/\d+$/, '')
+        const option = new Option(`${name} ${money(row.price)}`, name)
+        option.dataset.cost = String(row.price)
+        shipping.append(option)
+      }
+      const manual = el('input'); manual.inputMode = 'numeric'; manual.placeholder = t('Ongkir (Rp)')
+      const submit = el('button', t('Kirim total + rekening'), 'button primary'); submit.type = 'submit'
+      form.append(subtotal, options.length ? shipping : manual, submit)
       form.addEventListener('submit', async (event) => {
         event.preventDefault()
         submit.disabled = true
         try {
           await api(`/api/beta3/orders/${order.id}/approve`, 'POST', {
-            itemsText: items.value,
+            itemsText: order.spec || order.items,
             subtotal: subtotal.value,
-            shippingService: service.value,
-            shippingCost: shipping.value,
+            shippingService: options.length ? shipping.value : '',
+            shippingCost: options.length ? shipping.selectedOptions[0]?.dataset.cost : manual.value,
           })
-          notice(t('Total dan rekening dikirim untuk order #{0}.', order.id))
+          notice(t('Total dan rekening dikirim ke pelanggan.'))
           await load()
         } catch (error) {
           notice(error.message, true)
@@ -308,39 +271,18 @@
         }
       })
       box.append(form)
+      actions.append(act(t('Batalkan'), `/api/beta3/orders/${order.id}/cancel`, t('Order dibatalkan.'), false))
     } else if (order.status === 'awaiting_payment') {
-      actions.append(
-        button(t('Dana masuk · Lunas'), async () => {
-          try {
-            await api(`/api/beta3/orders/${order.id}/paid`, 'POST', {})
-            notice(t('Order #{0} lunas, pelanggan dikabari.', order.id))
-            await load()
-          } catch (error) {
-            notice(error.message, true)
-          }
-        }, true)
-      )
+      actions.append(act(t('Dana masuk · Lunas'), `/api/beta3/orders/${order.id}/paid`, t('Lunas. Pesanan dikirim ke grup produksi.')))
+      actions.append(act(t('Batalkan'), `/api/beta3/orders/${order.id}/cancel`, t('Order dibatalkan.'), false))
     } else if (order.status === 'paid') {
       actions.append(
-        button(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), async () => {
-          try {
-            await api(`/api/beta3/orders/${order.id}/resend-group`, 'POST', {})
-            notice(t('Order {0} diantrekan ke grup produksi.', order.order_number || `#${order.id}`))
-            await load()
-          } catch (error) {
-            notice(error.message, true)
-          }
-        })
+        act(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), `/api/beta3/orders/${order.id}/resend-group`, t('Diantrekan ke grup produksi.'), false)
       )
-    }
-    if (order.jid) {
-      const chat = el('a', t('Buka chat'), 'button')
-      chat.href = `${base}/?jid=${encodeURIComponent(order.jid)}`
-      actions.append(chat)
+      if (order.group_error) box.append(el('p', `${t('Grup gagal')}: ${order.group_error}`, 'error'))
     }
     if (actions.childElementCount) box.append(actions)
   }
-
   byId('beta3OrdersRefresh').addEventListener('click', load)
   byId('beta3OrdersSearch').addEventListener('input', () => {
     clearTimeout(searchTimer)

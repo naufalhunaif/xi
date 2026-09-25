@@ -472,59 +472,6 @@ export async function markLeanOrderPaid(id: number, csNote?: string) {
   return { ...order, group_jid: groupJid }
 }
 
-/**
- * Pelanggan sudah bayar tapi tidak mengisi form (mis. alamat ditempel bebas):
- * CS mengonfirmasi dari panel, order dibuat lalu langsung Lunas → antre ke grup.
- */
-export async function createPaidLeanOrder(input: {
-  jid: string
-  customerName: string
-  address: string
-  spec: string
-  total: number
-  csNote?: string
-  phone?: string
-  district?: string
-  regency?: string
-  postalCode?: string
-  shippingService?: string
-  shippingCost?: number
-}) {
-  await ensureLeanTables()
-  const spec = input.spec.trim()
-  if (!spec) throw new Error('Rincian pesanan masih kosong.')
-  if (!(input.total > 0)) throw new Error('Isi total yang dibayar.')
-  const parsed = parseLooseAddress(input.address) || { district: '', regency: '', postalCode: '' }
-  const place = {
-    district: input.district || parsed.district,
-    regency: input.regency || parsed.regency,
-    postalCode: input.postalCode || parsed.postalCode,
-  }
-  const now = new Date()
-  const [id] = await db.table('whatsapp_beta3_orders').insert({
-    jid: input.jid,
-    customer_name: input.customerName.trim().slice(0, 190),
-    address: input.address.trim() || null,
-    district: place.district.slice(0, 120),
-    regency: place.regency.slice(0, 120),
-    postal_code: place.postalCode.slice(0, 20),
-    phone: (input.phone || input.jid.split('@')[0]).replace(/\D/g, '').slice(0, 40),
-    shipping_service: (input.shippingService || '').slice(0, 40),
-    shipping_cost: input.shippingCost && input.shippingCost > 0 ? Math.round(input.shippingCost) : null,
-    subtotal:
-      input.shippingCost && input.shippingCost > 0 && input.total > input.shippingCost
-        ? Math.round(input.total - input.shippingCost)
-        : null,
-    items: spec.slice(0, 4000),
-    spec: spec.slice(0, 4000),
-    total: Math.round(input.total),
-    status: 'awaiting_payment',
-    created_at: now,
-    updated_at: now,
-  })
-  return markLeanOrderPaid(Number(id), input.csNote)
-}
-
 export async function requeueLeanOrderGroup(id: number) {
   await ensureLeanTables()
   const order = await readLeanOrder(id)

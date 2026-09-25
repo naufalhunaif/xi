@@ -102,7 +102,7 @@ test.group('beta3 · form order', () => {
     assert.isNull(normalizeBox([1, 2, 3]))
     const decision = parseLeanDecision(
       JSON.stringify({ pesan: ['siap bos, dicatat ya'], foto: [], catatan: '', tahap: 'lain', serah_cs: false, alasan: '', susulan: '', spesifikasi: '',
-        referensi: [{ gambar: 1, bagian: 'kerah', catatan: 'hitam mengkilap', kotak: [350, 170, 300, 280] }, { gambar: 0, bagian: 'x', catatan: '', kotak: [] }] })
+        referensi: [{ gambar: 1, bagian: 'kerah' }, { gambar: 0, bagian: 'x' }] })
     )
     assert.lengthOf(decision.referensi!, 1)
     assert.equal(decision.referensi![0].bagian, 'kerah')

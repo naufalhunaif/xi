@@ -111,7 +111,8 @@ export async function importLeanCatalog(list: unknown[], replace = false) {
   const items = list.map(normalizeCatalogInput)
   const now = new Date()
   await db.transaction(async (trx) => {
-    if (replace) await trx.from('whatsapp_beta3_catalog').delete()
+    // Upsert per varian (bukan hapus semua) supaya ciri foto dari AI tidak hilang tiap
+    // katalog berubah; ciri hanya dibuat ulang untuk foto yang benar-benar baru.
     for (const item of items) {
       const values: Record<string, unknown> = {
         product: item.product,
@@ -149,6 +150,16 @@ export async function importLeanCatalog(list: unknown[], replace = false) {
           'active',
           'updated_at',
         ])
+    }
+    if (replace) {
+      const key = (product: unknown, color: unknown) =>
+        `${String(product).trim().toLowerCase()}\u0000${String(color || '').trim().toLowerCase()}`
+      const keep = new Set(items.map((item) => key(item.product, item.color)))
+      const existing = await trx.from('whatsapp_beta3_catalog').select('id', 'product', 'color')
+      const stale = existing
+        .filter((row: any) => !keep.has(key(row.product, row.color)))
+        .map((row: any) => row.id)
+      if (stale.length) await trx.from('whatsapp_beta3_catalog').whereIn('id', stale).delete()
     }
   })
   digestCache.delete(workspaceScope().prefix)

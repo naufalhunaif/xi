@@ -529,3 +529,5 @@ html[data-theme='dark'] .wa-b3-chip--stage[data-stage="selesai"] { background: #
 .wa-b3-pick-item.is-used { outline: 2px solid #e11d2e; outline-offset: -2px; }
 .wa-order-source { display: inline-block; margin-top: 2px; padding: 0 6px; border-radius: 999px; font-size: 11px; background: var(--wa-raised, #eef1ee); color: var(--muted, #5d665f); border: 1px solid var(--line, #e2e6e3); }
 #beta3RecapDays { font: inherit; font-size: 13px; padding: 4px 6px; }
+.wa-b3-status { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted, #5d665f); }
+.wa-b3-photos figcaption { max-width: 104px; }

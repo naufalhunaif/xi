@@ -252,20 +252,9 @@ export async function createLeanReply(input: {
   // Alamat lengkap yang ditempel tanpa format form: ongkirnya langsung dicek,
   // supaya balasan menyebut tarif, bukan hanya "alamatnya sudah dicatat".
   const loose = form ? null : parseLooseAddress(input.text)
-  if (loose) {
-    // Alamat rapi untuk panel pesanan/order tanpa form; dilengkapi nama resmi dari cek ongkir.
-    const tidy = tidyLooseAddress(input.text)
-    if (tidy) await writeLeanState(`alamat:${jid}`, JSON.stringify({ ...tidy, prices: [], at: Date.now() }))
-  }
   if (loose && mcp.url) {
     try {
       const rates = await ratesForAddress(loose, last?.resolved || null, mcp)
-      const tidy = tidyLooseAddress(input.text, rates?.destination || null)
-      if (tidy)
-        await writeLeanState(
-          `alamat:${jid}`,
-          JSON.stringify({ ...tidy, prices: (rates?.prices || []).filter((row) => row.price > 0), at: Date.now() })
-        )
       const rateText = rates ? renderShippingRates(rates) : ''
       if (rateText) {
         toolNotes.push(rateText)
@@ -367,10 +356,6 @@ export async function createLeanReply(input: {
           form.address = tidy.full
           form.district = tidy.district || form.district
           form.regency = tidy.regency || form.regency
-          await writeLeanState(
-            `alamat:${jid}`,
-            JSON.stringify({ ...tidy, name: form.customerName, phone: form.phone, prices: (rates?.prices || []).filter((row) => row.price > 0), at: Date.now() })
-          )
         }
         onTrace?.({
           key: 'beta3-rates',
