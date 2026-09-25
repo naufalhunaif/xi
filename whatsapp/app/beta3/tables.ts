@@ -86,6 +86,20 @@ export const LEAN_TABLE_STATEMENTS = [
     note TEXT NOT NULL,
     updated_at DATETIME NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS whatsapp_beta3_refs (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    jid VARCHAR(190) NOT NULL,
+    order_id INT UNSIGNED NULL,
+    message_id VARCHAR(190) NULL,
+    image_url VARCHAR(1000) NOT NULL,
+    part VARCHAR(80) NOT NULL DEFAULT '',
+    note VARCHAR(300) NOT NULL DEFAULT '',
+    box VARCHAR(60) NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    KEY whatsapp_beta3_refs_jid (jid, order_id),
+    KEY whatsapp_beta3_refs_order (order_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_state (
     name VARCHAR(64) NOT NULL PRIMARY KEY,
     value TEXT NULL,
@@ -130,6 +144,7 @@ export async function deleteLeanChatData(trx: any, jids?: string[]) {
     'whatsapp_beta3_specs',
     'whatsapp_beta3_orders',
     'whatsapp_beta3_chats',
+    'whatsapp_beta3_refs',
   ]) {
     const query = trx.from(table)
     if (jids) query.whereIn('jid', jids)
@@ -142,6 +157,7 @@ export async function deleteLeanChatData(trx: any, jids?: string[]) {
         q.orWhere('name', `ongkir:last:${jid}`)
           .orWhere('name', `fit:last:${jid}`)
           .orWhere('name', 'like', `fit:${jid}:%`)
+          .orWhere('name', `alamat:${jid}`)
     })
   } else {
     state.where((q: any) =>

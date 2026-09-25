@@ -18,6 +18,7 @@ import {
   requeueLeanOrderGroup,
   updatePendingOrderSpec,
   renderGroupOrderMessage,
+  createPaidLeanOrder,
 } from '#beta3/order_service'
 import {
   readCustomerNote,
@@ -29,6 +30,7 @@ import db from '#services/workspace_database'
 import { queueOutgoingMessage } from '#services/message_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
+import { addRef, listActiveRefs, recentChatImages, removeRef, updateRef } from '#beta3/refs_service'
 import { ensureDefaults } from '#services/settings_service'
 import {
   readLeanMcpConfig,
@@ -216,6 +218,11 @@ export default class Beta3Controller {
       db.from('whatsapp_contacts').where('jid', jid).first(),
       readBeta3ChatNote(jid),
     ])
+    const chatRow = await db.from('whatsapp_beta3_chats').where('jid', jid).select('updated_at').first()
+    let shippingAddress: Record<string, unknown> | null = null
+    try {
+      shippingAddress = JSON.parse((await readLeanState(`alamat:${jid}`)) || 'null')
+    } catch {}
     // Bukti transfer: gambar pelanggan setelah total dikirim (untuk dicek sebelum Lunas).
     const proofs =
       order && order.status === 'awaiting_payment'
@@ -230,6 +237,10 @@ export default class Beta3Controller {
             .limit(3)
             .select('message_id', 'media_url', 'thumbnail_url', 'created_at')
         : []
+    const active = order && ['pending', 'awaiting_payment'].includes(String(order.status))
+    const [withPhotos] = await attachOrderPhotos([
+      { spec: spec || (active ? order.spec || order.items : ''), items: '', chat_note: chatNote },
+    ])
     response.header('cache-control', 'no-store')
     return response.json({
       jid,
@@ -237,6 +248,12 @@ export default class Beta3Controller {
       note,
       order,
       proofs,
+      photos: withPhotos.photos,
+      contactName: contact?.name ? String(contact.name) : '',
+      chatUpdatedAt: chatRow?.updated_at || null,
+      shippingAddress,
+      refs: await listActiveRefs(jid),
+      chatImages: await recentChatImages(jid),
       groupPreview: order && order.status !== 'cancelled' ? renderGroupOrderMessage(order) : '',
       chatNote: chatNote || (contact?.chat_note ? String(contact.chat_note) : ''),
       handling: {
@@ -245,6 +262,68 @@ export default class Beta3Controller {
         at: contact?.handoff_at || null,
       },
     })
+  }
+
+  /** Referensi gambar per bagian: CS menambah dari gambar chat, mengubah label/kotak, menghapus. */
+  async addReference({ request, response }: HttpContext) {
+    const body = request.body() as Record<string, unknown>
+    const jid = String(body.jid || '')
+    const messageId = String(body.messageId || '')
+    if (!jid || !messageId) return response.badRequest({ error: 'jid dan gambar wajib.' })
+    const message = await db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('message_id', messageId)
+      .whereNotNull('media_url')
+      .first()
+    if (!message) return response.badRequest({ error: 'Gambar tidak ditemukan.' })
+    const id = await addRef({
+      jid,
+      messageId,
+      imageUrl: String(message.media_url),
+      part: body.part ? String(body.part) : '',
+      note: body.note ? String(body.note) : '',
+      box: body.box,
+    })
+    return response.json({ id })
+  }
+
+  async updateReference({ params, request, response }: HttpContext) {
+    const body = request.body() as Record<string, unknown>
+    await updateRef(Number(params.id), { part: body.part, note: body.note, box: body.box })
+    return response.json({ ok: true })
+  }
+
+  async removeReference({ params, response }: HttpContext) {
+    await removeRef(Number(params.id))
+    return response.noContent()
+  }
+
+  /** Konfirmasi lunas tanpa form: buat order dari ringkasan chat lalu antre ke grup. */
+  async paidWithoutForm({ request, response }: HttpContext) {
+    const body = request.body() as Record<string, unknown>
+    const jid = String(body.jid || '')
+    if (!jid) return response.badRequest({ error: 'jid wajib.' })
+    try {
+      const order = await createPaidLeanOrder({
+        jid,
+        customerName: String(body.customerName || ''),
+        address: String(body.address || ''),
+        spec: String(body.spec || ''),
+        total: Number(String(body.total || '').replace(/\D/g, '')),
+        phone: body.phone ? String(body.phone) : undefined,
+        district: body.district ? String(body.district) : undefined,
+        regency: body.regency ? String(body.regency) : undefined,
+        postalCode: body.postalCode ? String(body.postalCode) : undefined,
+        shippingService: body.shippingService ? String(body.shippingService) : undefined,
+        shippingCost: Number(String(body.shippingCost || '').replace(/\D/g, '')) || undefined,
+      })
+      if (body.notify !== false)
+        await queueOutgoingMessage({ jid, body: 'Terimakasih bos, prosess ya' })
+      return response.json({ ok: true, groupQueued: Boolean(order.group_jid) })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
   }
 
   async saveSpec({ request, response }: HttpContext) {

@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import { readFile } from 'node:fs/promises'
-import { parseOrderForm, parseLooseAddress, renderGroupOrderMessage, renderTotalMessage } from '#beta3/order_service'
+import { parseOrderForm, parseLooseAddress, tidyLooseAddress, looseAddressForm, renderGroupOrderMessage, renderTotalMessage } from '#beta3/order_service'
 import {
   findCatalogVariant,
   renderCatalogDigest,
@@ -11,6 +11,7 @@ import { keywords, pickExamples, type LeanExample } from '#beta3/examples_servic
 import { addProductionDays, buildLeanPrompt, closedDaysFromStore, parseLeanDecision, renderProductionEstimate } from '#beta3/prompt'
 import { mergeCustomerNote } from '#beta3/customer_service'
 import { dropRepeatedQuestions, resolvePhotos, selectLeanSkill } from '#beta3/reply_service'
+import { normalizeBox } from '#beta3/refs_service'
 import { matchAutoTotal } from '#beta3/order_service'
 import {
   extractBodyMeasure,
@@ -82,6 +83,41 @@ test.group('beta3 · form order', () => {
     assert.deepEqual(closedDaysFromStore(store), [0])
     assert.equal(addProductionDays(now, 3, true, [0]).toISOString().slice(0, 10), '2026-09-29')
     assert.include(renderProductionEstimate({ rules: {} }, now, store + '\nLIBUR: x'), 'belum diatur')
+  })
+
+  test('alamat tempelan dirapikan tanpa pengulangan', ({ assert }) => {
+    const text =
+      'Deva Wahyu Hidayat\n085157754566\nJalan Kapt Tendean, Balong Barat (Dekost 2 ), KAB. NGAWI, NGAWI, JAWA TIMUR, ID, 63216'
+    const tidy = tidyLooseAddress(text, { district: 'NGAWI', city: 'NGAWI', province: 'JAWA TIMUR' })!
+    assert.equal(tidy.name, 'Deva Wahyu Hidayat')
+    assert.equal(tidy.phone, '085157754566')
+    assert.equal(tidy.full, 'Jl. Kapt. Tendean, Balong Barat (Dekost 2), Kec. Ngawi, Kab. Ngawi, Jawa Timur 63216')
+    const inline = tidyLooseAddress('Budi\nJl. Merdeka No 10 RT 02/RW 03 Kec. Serpong, Kota Tangerang Selatan, Banten 15310 hp 08123456789')!
+    assert.equal(inline.full, 'Jl. Merdeka No. 10 RT 02/RW 03, Kec. Serpong, Kota Tangerang Selatan, Banten 15310')
+  })
+
+  test('referensi gambar: kotak dinormalkan dan dibaca dari keputusan AI', ({ assert }) => {
+    assert.deepEqual(normalizeBox([350, 170, 300, 280]), [350, 170, 300, 280])
+    assert.deepEqual(normalizeBox([-5, 900, 50, 400]), [0, 900, 50, 100])
+    assert.isNull(normalizeBox([1, 2, 3]))
+    const decision = parseLeanDecision(
+      JSON.stringify({ pesan: ['siap bos, dicatat ya'], foto: [], catatan: '', tahap: 'lain', serah_cs: false, alasan: '', susulan: '', spesifikasi: '',
+        referensi: [{ gambar: 1, bagian: 'kerah', catatan: 'hitam mengkilap', kotak: [350, 170, 300, 280] }, { gambar: 0, bagian: 'x', catatan: '', kotak: [] }] })
+    )
+    assert.lengthOf(decision.referensi!, 1)
+    assert.equal(decision.referensi![0].bagian, 'kerah')
+  })
+
+  test('alamat tempelan menjadi form order', ({ assert }) => {
+    const form = looseAddressForm(
+      'Deva Wahyu Hidayat\n085157754566\nJalan Kapt Tendean, Balong Barat (Dekost 2 ), KAB. NGAWI, NGAWI, JAWA TIMUR, ID, 63216'
+    )!
+    assert.equal(form.customerName, 'Deva Wahyu Hidayat')
+    assert.equal(form.phone, '085157754566')
+    assert.equal(form.postalCode, '63216')
+    const noName = looseAddressForm('Jl. Merdeka No 10 Kec. Serpong, Kota Tangerang Selatan 15310', 'Budi', '0812')!
+    assert.equal(noName.customerName, 'Budi')
+    assert.isNull(looseAddressForm('size M ada bos? kalau ke kota bandung ongkirnya berapa'))
   })
 
   test('pertanyaan yang baru saja ditanyakan tidak diulang', ({ assert }) => {

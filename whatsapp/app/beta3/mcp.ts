@@ -356,7 +356,7 @@ export function renderFitResult(
 }
 
 export type ShippingRates = {
-  destination?: { code?: string; district?: string; city?: string; zip_code?: string }
+  destination?: { code?: string; district?: string; city?: string; province?: string; zip_code?: string }
   prices?: Array<{ service: string; name?: string; price: number; etd?: string }>
 }
 

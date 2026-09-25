@@ -1,5 +1,6 @@
 // Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
 import db from '#services/workspace_database'
+import { phoneFromJid } from '#services/customer_identity_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import type { TraceSink } from '#services/trace_service'
 import { catalogDigest, findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
@@ -8,6 +9,8 @@ import { readCustomerNote, readOrderSpec, writeOrderSpec } from '#beta3/customer
 import {
   parseOrderForm,
   parseLooseAddress,
+  tidyLooseAddress,
+  looseAddressForm,
   saveLeanOrder,
   updatePendingOrderSpec,
   latestLeanOrder,
@@ -42,6 +45,7 @@ import {
   type ShippingRates,
 } from '#beta3/mcp'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
+import { saveAiRefs } from '#beta3/refs_service'
 
 /**
  * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
@@ -149,6 +153,8 @@ export async function createLeanReply(input: {
   messageIds: string[]
   text: string
   imagePaths?: string[]
+  /** message_id tiap gambar di imagePaths (urutan sama), untuk referensi per bagian. */
+  imageIds?: string[]
   settings: LeanSettings
   onTrace?: TraceSink
 }): Promise<LeanReply> {
@@ -220,7 +226,19 @@ export async function createLeanReply(input: {
   // Jalur 2: form order dibaca kode, disimpan untuk CS. AI tetap menulis balasannya.
   let orderId: number | null = null
   let systemNote = ''
-  const form = parseOrderForm(input.text)
+  const typedForm = parseOrderForm(input.text)
+  // Alamat yang ditempel bebas juga dianggap form order supaya total terkirim otomatis.
+  let pasted: ReturnType<typeof looseAddressForm> = null
+  if (!typedForm) {
+    const contact = await db.from('whatsapp_contacts').where('jid', jid).select('name').first()
+    const waPhone = phoneFromJid(jid)
+    pasted = looseAddressForm(
+      input.text,
+      contact?.name ? String(contact.name) : '',
+      waPhone ? `0${waPhone.replace(/^62/, '')}` : ''
+    )
+  }
+  const form = typedForm || pasted
 
   // Pertanyaan ongkir bebas ("ongkir ke cinyawang berapa"): kode cari tujuan lalu tarif.
   // Lanjutannya ("kalo ke jakarta?", "mampang", "jakarta selatan") dikenali 30 menit.
@@ -233,9 +251,20 @@ export async function createLeanReply(input: {
   // Alamat lengkap yang ditempel tanpa format form: ongkirnya langsung dicek,
   // supaya balasan menyebut tarif, bukan hanya "alamatnya sudah dicatat".
   const loose = form ? null : parseLooseAddress(input.text)
+  if (loose) {
+    // Alamat rapi untuk panel pesanan/order tanpa form; dilengkapi nama resmi dari cek ongkir.
+    const tidy = tidyLooseAddress(input.text)
+    if (tidy) await writeLeanState(`alamat:${jid}`, JSON.stringify({ ...tidy, prices: [], at: Date.now() }))
+  }
   if (loose && mcp.url) {
     try {
       const rates = await ratesForAddress(loose, last?.resolved || null, mcp)
+      const tidy = tidyLooseAddress(input.text, rates?.destination || null)
+      if (tidy)
+        await writeLeanState(
+          `alamat:${jid}`,
+          JSON.stringify({ ...tidy, prices: (rates?.prices || []).filter((row) => row.price > 0), at: Date.now() })
+        )
       const rateText = rates ? renderShippingRates(rates) : ''
       if (rateText) {
         toolNotes.push(rateText)
@@ -331,6 +360,17 @@ export async function createLeanReply(input: {
           lastResolved || null,
           mcp
         )
+        // Alamat tempelan dirapikan ulang dengan nama resmi tujuan dari cek ongkir.
+        const tidy = pasted ? tidyLooseAddress(input.text, rates?.destination || null) : null
+        if (tidy) {
+          form.address = tidy.full
+          form.district = tidy.district || form.district
+          form.regency = tidy.regency || form.regency
+          await writeLeanState(
+            `alamat:${jid}`,
+            JSON.stringify({ ...tidy, name: form.customerName, phone: form.phone, prices: (rates?.prices || []).filter((row) => row.price > 0), at: Date.now() })
+          )
+        }
         onTrace?.({
           key: 'beta3-rates',
           label: `Ongkir dicek · ${rates?.destination?.district || form.district}`,
@@ -453,6 +493,11 @@ export async function createLeanReply(input: {
   const result = await runLeanProvider(settings, prompt, input.imagePaths || [])
   const decision = parseLeanDecision(result.text)
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
+  if (decision.referensi?.length && input.imageIds?.length) {
+    const saved = await saveAiRefs(jid, decision.referensi, input.imageIds).catch(() => 0)
+    if (saved)
+      onTrace?.({ key: 'beta3-refs', label: `Referensi gambar dicatat · ${saved}`, status: 'completed', detail: decision.referensi })
+  }
   if (decision.spesifikasi !== spec) {
     // Lembar spesifikasi menggantikan cart: ditulis ulang AI, disimpan kode.
     await writeOrderSpec(jid, decision.spesifikasi)

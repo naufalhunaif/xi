@@ -55,6 +55,7 @@ import * as beta3Mcp from '#beta3/mcp'
 import * as beta3Vision from '#beta3/catalog_vision'
 import * as beta3Examples from '#beta3/examples_service'
 import * as beta3Catalog from '#beta3/catalog_service'
+import * as beta3Refs from '#beta3/refs_service'
 const beta3 = {
   ...beta3Reply,
   ...beta3Order,
@@ -558,6 +559,26 @@ export default class WhatsappListen extends BaseCommand {
         image ? { image: image.bytes, caption: image.caption, mimetype: 'image/jpeg' } : { text }
       )
       if (!sent?.key.id) throw new Error('Pengiriman ke grup belum dikonfirmasi.')
+      // Gambar referensi per bagian: gambar utuh bertanda merah + bagian diperbesar,
+      // dikirim terpisah supaya resolusinya tetap.
+      for (const ref of await beta3Refs.refsForOrder(Number(order.id)).catch(() => [])) {
+        if (this.stopping || this.socket !== socket) break
+        try {
+          const images = await beta3Refs.renderRefImages(ref)
+          const caption = beta3Refs.refCaption(ref)
+          await socket.sendMessage(groupJid, { image: images.marked, caption, mimetype: 'image/jpeg' })
+          if (images.zoom)
+            await socket.sendMessage(groupJid, {
+              image: images.zoom,
+              caption: `${ref.part || 'Referensi'} (diperbesar)`,
+              mimetype: 'image/jpeg',
+            })
+        } catch (error) {
+          this.logger.error(
+            `Referensi #${ref.id} order #${order.id} gagal ke grup: ${error instanceof Error ? error.message : String(error)}`
+          )
+        }
+      }
       await beta3.finishLeanGroupOrder(Number(order.id))
     } catch (error) {
       await beta3.finishLeanGroupOrder(
@@ -1681,14 +1702,16 @@ export default class WhatsappListen extends BaseCommand {
       const downloadedB3 = new Map<string, string | null>()
       for (const item of visualItems) downloadedB3.set(item.id, await item.mediaDownload)
       for (const item of items) if (!visualItems.includes(item)) void item.mediaDownload
+      const imagesB3 = visualItems
+        .map((item) => ({ id: item.id, path: downloadedB3.get(item.id) }))
+        .filter((image): image is { id: string; path: string } => Boolean(image.path))
+        .slice(0, 3)
       await this.runBeta3Turn(jid, goalRun, turnSocket, settings, {
         text,
         messageIds: items.map((item) => item.id),
         keys: items.map((item) => item.message.key),
-        imagePaths: visualItems
-          .map((item) => downloadedB3.get(item.id))
-          .filter((path): path is string => Boolean(path))
-          .slice(0, 3),
+        imagePaths: imagesB3.map((image) => image.path),
+        imageIds: imagesB3.map((image) => image.id),
       })
       return
     }
@@ -2048,7 +2071,13 @@ export default class WhatsappListen extends BaseCommand {
     run: GoalRun,
     socket: WASocket,
     settings: Awaited<ReturnType<typeof readSettings>>,
-    input: { text: string; messageIds: string[]; keys: WAMessageKey[]; imagePaths: string[] }
+    input: {
+      text: string
+      messageIds: string[]
+      keys: WAMessageKey[]
+      imagePaths: string[]
+      imageIds?: string[]
+    }
   ) {
     let trace: Awaited<ReturnType<typeof startTrace>> | undefined
     const canSend = async () =>
@@ -2070,6 +2099,7 @@ export default class WhatsappListen extends BaseCommand {
         messageIds: input.messageIds,
         text: input.text,
         imagePaths: input.imagePaths,
+        imageIds: input.imageIds,
         settings: {
           ...settings,
           aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
@@ -2253,7 +2283,7 @@ export default class WhatsappListen extends BaseCommand {
     try {
       const settings = await readSettings(true)
       if (!isAiWorking(settings) || !settings.hasSkill || !settings.sweepEnabled) return
-      if (settings.leanMode || settings.beta3Mode) return // Beta 2/3: sapuan memakai analisis penuh Beta 1; susulan ada di runLeanNudge/runBeta3Nudge.
+      if (settings.leanMode) return // Beta 2 dihentikan.
       const maxAgeMs = Math.max(1, settings.sweepMaxAgeHours) * 3_600_000
       // Jangan menyerobot giliran yang masih dalam jendela penggabungan.
       const minAgeMs = Math.max(60_000, (settings.turnWindowMs || 6000) * 3)
@@ -2294,7 +2324,16 @@ export default class WhatsappListen extends BaseCommand {
         // Diperiksa ulang: mode bisa berubah antara kueri dan giliran ini.
         const contact = await db.from('whatsapp_contacts').where('jid', candidate.jid).first()
         if (contact?.handling_mode === 'cs' || contact?.ai_excluded) continue
-        await this.answerBacklog(candidate.jid, settings)
+        if (settings.beta3Mode) {
+          const task = this.answerBacklogBeta3(candidate.jid, settings)
+          this.chatLocks.set(candidate.jid, task)
+          try {
+            await task
+          } finally {
+            if (this.chatLocks.get(candidate.jid) === task) this.chatLocks.delete(candidate.jid)
+            await this.setActivity(candidate.jid, null).catch(() => {})
+          }
+        } else await this.answerBacklog(candidate.jid, settings)
         handled += 1
       }
     } catch (error) {
@@ -2466,6 +2505,62 @@ export default class WhatsappListen extends BaseCommand {
     }
   }
 
+  /**
+   * Beta 3: jawab pesan pelanggan yang belum dibalas (telat sinkron, masuk saat
+   * offline, sapuan). Chat yang pesan terakhirnya sudah dianalisis (selesai, diam,
+   * menunggu) dilewati oleh beginGoalTurn, jadi tidak dijawab dua kali.
+   */
+  private async answerBacklogBeta3(jid: string, settings: Awaited<ReturnType<typeof readSettings>>) {
+    if (!this.socket || !isAiWorking(settings) || !settings.hasSkill) return
+    const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
+    if (contact?.ai_excluded || contact?.handling_mode === 'cs') return
+    const lastOut = await db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'out')
+      .whereNotIn('status', ['failed', 'queued'])
+      .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc')
+      .first()
+    const unanswered = await db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'in')
+      .where((query) => {
+        if (lastOut)
+          query
+            .where('created_at', '>', lastOut.created_at)
+            .orWhere((sameTime) =>
+              sameTime.where('created_at', lastOut.created_at).where('id', '>', lastOut.id)
+            )
+      })
+      .orderBy('created_at', 'asc')
+      .orderBy('id', 'asc')
+    if (!unanswered.length) return
+    const newest = new Date(unanswered.at(-1).created_at).getTime()
+    if (Date.now() - newest > Math.max(1, settings.sweepMaxAgeHours) * 3_600_000) return
+    const goalRun = await beginGoalTurn(jid, String(unanswered.at(-1).message_id))
+    if (!goalRun) return
+    const images: Array<{ id: string; path: string }> = []
+    for (const row of [...unanswered].reverse()) {
+      if (images.length >= 3) break
+      if (row.media_type !== 'image') continue
+      const path = await this.imagePathOfMessage(String(row.message_id))
+      if (path) images.unshift({ id: String(row.message_id), path })
+    }
+    const text = unanswered
+      .map((row) => String(row.body || '').trim() || (row.media_type ? `[${row.media_type}]` : ''))
+      .filter(Boolean)
+      .join('\n')
+    await this.runBeta3Turn(jid, goalRun, this.socket, settings, {
+      text,
+      messageIds: unanswered.map((row) => String(row.message_id)),
+      keys: unanswered.map((row) => ({ remoteJid: jid, id: String(row.message_id), fromMe: false })),
+      imagePaths: images.map((image) => image.path),
+      imageIds: images.map((image) => image.id),
+    })
+  }
+
   private async canSendAiReply(jid: string, socket: WASocket) {
     if (this.stopping || this.socket !== socket || !this.readyForAi()) return false
     const settings = await readSettings()
@@ -2502,8 +2597,8 @@ export default class WhatsappListen extends BaseCommand {
     this.reviewing = true
     try {
       const settings = await readSettings(true)
-      if (settings.leanMode || settings.beta3Mode) {
-        // Beta 2/3: pemeriksaan ulang ala Beta 1 (analisis penuh + MCP) tidak dipakai.
+      if (settings.leanMode) {
+        // Beta 2: pemeriksaan ulang ala Beta 1 (analisis penuh + MCP) tidak dipakai.
         await db
           .from('whatsapp_ai_reviews')
           .where('status', 'pending')
@@ -2547,7 +2642,11 @@ export default class WhatsappListen extends BaseCommand {
           .where('status', 'pending')
           .update({ status: 'processing' })
         if (!Number(claimed)) continue
-        const task = this.reviewChat(request, settings)
+        // Beta 3: pesan yang telat tersinkron / masuk saat offline / di luar jam kerja
+        // dijawab lewat jalur Beta 3 (bukan analisis penuh Beta 1).
+        const task = settings.beta3Mode
+          ? this.answerBacklogBeta3(request.jid, settings)
+          : this.reviewChat(request, settings)
         this.chatLocks.set(request.jid, task)
         try {
           await task

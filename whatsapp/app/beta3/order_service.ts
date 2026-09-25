@@ -10,6 +10,7 @@ import {
   writeOrderSpec,
 } from '#beta3/customer_service'
 import { rupiah } from '#beta3/catalog_service'
+import { attachRefsToOrder } from '#beta3/refs_service'
 
 /**
  * Jalur 2 (event): form order dari pelanggan dibaca KODE, disimpan sebagai order
@@ -114,6 +115,129 @@ export function parseLooseAddress(
   }
   if (!district && !regency && !postal) return null
   return { district, regency, postalCode: postal }
+}
+
+export type TidyAddress = {
+  name: string
+  phone: string
+  street: string
+  district: string
+  regency: string
+  province: string
+  postalCode: string
+  full: string
+}
+
+const ABBR: Record<string, string> = {
+  jl: 'Jl.', 'jl.': 'Jl.', jln: 'Jl.', 'jln.': 'Jl.', jalan: 'Jl.', gg: 'Gg.', 'gg.': 'Gg.', gang: 'Gg.',
+  no: 'No.', 'no.': 'No.', rt: 'RT', rw: 'RW', kapt: 'Kapt.', 'kapt.': 'Kapt.', dr: 'Dr.', 'dr.': 'Dr.',
+  kel: 'Kel.', 'kel.': 'Kel.', ds: 'Ds.', dsn: 'Dsn.', perum: 'Perum', blok: 'Blok',
+}
+
+/** "JALAN KAPT TENDEAN" → "Jl. Kapt. Tendean"; kode seperti A3/ABY4 tetap kapital. */
+function tidyWords(text: string) {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([),])/g, '$1')
+    .replace(/\(\s+/g, '(')
+    .trim()
+    .split(' ')
+    .map((word) => {
+      const bare = word.toLowerCase()
+      const lead = bare.match(/^[(]*/)?.[0] || ''
+      const core = bare.slice(lead.length)
+      if (ABBR[core]) return lead + ABBR[core]
+      if (/\d/.test(core)) return word.toUpperCase()
+      return lead + core.replace(/(^|[-/'])([a-z])/g, (_, sep, ch) => sep + ch.toUpperCase())
+    })
+    .join(' ')
+}
+
+const placeKey = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/\b(kab(upaten)?|kota|kec(amatan)?|kel(urahan)?|prov(insi)?)\.?\s*/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+/**
+ * Alamat tempelan dirapikan: nama & HP dipisah, bagian yang berulang (kota/kecamatan
+ * dua kali, "ID", provinsi, kode pos) dibuang dari jalan lalu ditulis sekali dengan
+ * nama resmi dari data ekspedisi (hasil cek ongkir) bila ada.
+ */
+export function tidyLooseAddress(
+  text: string,
+  destination?: { district?: string; city?: string; province?: string; zip_code?: string } | null
+): TidyAddress | null {
+  const parsed = parseLooseAddress(text)
+  if (!parsed) return null
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const phoneMatch = text.replace(/[\s-]/g, '').match(/(?:\+?62|0)8\d{7,12}/)
+  const phone = phoneMatch ? phoneMatch[0].replace(/^\+?62/, '0') : ''
+  const isName = (line: string) =>
+    line.length <= 40 && !/\d/.test(line) && !/[,]/.test(line) &&
+    !/\b(?:jl|jln|jalan|gg|gang|rt|rw|desa|dusun|kel|kec|kab|kota|perum|blok)\b/i.test(line)
+  const name = lines.length > 1 && isName(lines[0]) ? tidyWords(lines[0]) : ''
+  const district = tidyWords(destination?.district || parsed.district || '')
+  const cityRaw = destination?.city || ''
+  const regency = parsed.regency
+    ? tidyWords(parsed.regency.replace(/^kabupaten\b/i, 'Kab.').replace(/^kab\b\.?/i, 'Kab.'))
+    : tidyWords(cityRaw)
+  const provinceText = lines.join(', ').split(',').map((part) => part.trim()).find((part) => PROVINCE.test(part)) || ''
+  const province = tidyWords(destination?.province || provinceText)
+  const postalCode = parsed.postalCode || String(destination?.zip_code || '')
+  const drop = new Set([placeKey(district), placeKey(regency), placeKey(cityRaw), placeKey(province)].filter(Boolean))
+  const seen = new Set<string>()
+  const street: string[] = []
+  const body = lines.filter((line, index) => !(index === 0 && name) && line.replace(/[\s-]/g, '') !== phoneMatch?.[0])
+  // "… No 10 Kec. Serpong" → kecamatan/kota yang sudah ditulis di ekor dibuang dari jalan.
+  const places = [placeKey(district), placeKey(regency), placeKey(cityRaw)]
+    .filter(Boolean)
+    .map((key) => key.replace(/\s+/g, '\\s+'))
+  const inlinePlace = places.length
+    ? new RegExp(`\\b(?:kec(?:amatan)?|kab(?:upaten)?|kota)\\.?\\s+(?:${places.join('|')})\\b`, 'gi')
+    : null
+  for (const raw of body.join(', ').split(',')) {
+    const part = (inlinePlace ? raw.replace(inlinePlace, '') : raw)
+      .replace(/(?:\+?62|0)8[\d\s-]{7,16}/g, '')
+      .replace(/(?<!\d)\d{5}(?!\d)/g, '')
+      .replace(/\b(?:hp|telp|wa)\b\.?:?/gi, '')
+      .trim()
+    if (!part || /^(?:id|indonesia)$/i.test(part) || PROVINCE.test(part)) continue
+    const key = placeKey(part)
+    if (!key || drop.has(key) || seen.has(key)) continue
+    seen.add(key)
+    street.push(tidyWords(part))
+  }
+  const tail = [district ? `Kec. ${district}` : '', regency, [province, postalCode].filter(Boolean).join(' ')]
+  const full = [...street, ...tail].filter(Boolean).join(', ')
+  return { name, phone, street: street.join(', '), district, regency, province, postalCode, full }
+}
+
+/**
+ * Alamat tempelan (tanpa format form) diperlakukan sebagai form order: nama dari
+ * baris pertama atau nama kontak, HP dari teks atau nomor WhatsApp. Dengan begitu
+ * alurnya sama dengan form — order tercatat, ongkir dicek, total dikirim otomatis.
+ */
+export function looseAddressForm(
+  text: string,
+  fallbackName = '',
+  fallbackPhone = ''
+): ParsedOrderForm | null {
+  const tidy = tidyLooseAddress(text)
+  if (!tidy) return null
+  const customerName = tidy.name || fallbackName.trim()
+  const phone = tidy.phone || fallbackPhone
+  if (!customerName && !phone) return null
+  return {
+    customerName,
+    address: tidy.full,
+    district: tidy.district,
+    regency: tidy.regency,
+    postalCode: tidy.postalCode,
+    phone,
+    note: '',
+  }
 }
 
 export async function saveLeanOrder(input: {
@@ -344,7 +468,61 @@ export async function markLeanOrderPaid(id: number, csNote?: string) {
       updated_at: new Date(),
     })
   await writeOrderSpec(String(order.jid), '')
+  await attachRefsToOrder(String(order.jid), id)
   return { ...order, group_jid: groupJid }
+}
+
+/**
+ * Pelanggan sudah bayar tapi tidak mengisi form (mis. alamat ditempel bebas):
+ * CS mengonfirmasi dari panel, order dibuat lalu langsung Lunas → antre ke grup.
+ */
+export async function createPaidLeanOrder(input: {
+  jid: string
+  customerName: string
+  address: string
+  spec: string
+  total: number
+  csNote?: string
+  phone?: string
+  district?: string
+  regency?: string
+  postalCode?: string
+  shippingService?: string
+  shippingCost?: number
+}) {
+  await ensureLeanTables()
+  const spec = input.spec.trim()
+  if (!spec) throw new Error('Rincian pesanan masih kosong.')
+  if (!(input.total > 0)) throw new Error('Isi total yang dibayar.')
+  const parsed = parseLooseAddress(input.address) || { district: '', regency: '', postalCode: '' }
+  const place = {
+    district: input.district || parsed.district,
+    regency: input.regency || parsed.regency,
+    postalCode: input.postalCode || parsed.postalCode,
+  }
+  const now = new Date()
+  const [id] = await db.table('whatsapp_beta3_orders').insert({
+    jid: input.jid,
+    customer_name: input.customerName.trim().slice(0, 190),
+    address: input.address.trim() || null,
+    district: place.district.slice(0, 120),
+    regency: place.regency.slice(0, 120),
+    postal_code: place.postalCode.slice(0, 20),
+    phone: (input.phone || input.jid.split('@')[0]).replace(/\D/g, '').slice(0, 40),
+    shipping_service: (input.shippingService || '').slice(0, 40),
+    shipping_cost: input.shippingCost && input.shippingCost > 0 ? Math.round(input.shippingCost) : null,
+    subtotal:
+      input.shippingCost && input.shippingCost > 0 && input.total > input.shippingCost
+        ? Math.round(input.total - input.shippingCost)
+        : null,
+    items: spec.slice(0, 4000),
+    spec: spec.slice(0, 4000),
+    total: Math.round(input.total),
+    status: 'awaiting_payment',
+    created_at: now,
+    updated_at: now,
+  })
+  return markLeanOrderPaid(Number(id), input.csNote)
 }
 
 export async function requeueLeanOrderGroup(id: number) {

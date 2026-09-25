@@ -11,25 +11,36 @@
 @if(beta3Mode)
   <div class="wa-cart-body" id="beta3RoomPanel">
     <div id="beta3RoomNotice" role="status" hidden></div>
-    <section class="wa-cart-section wa-cart-current">
-      <div class="wa-cart-heading"><h3 data-i18n="Status chat">Status chat</h3><small id="beta3RoomHandling" class="wa-muted"></small></div>
-      <p id="beta3RoomStage" class="wa-lean-stage"></p>
-      <pre id="beta3RoomChatNote" class="wa-lean-chatnote"></pre>
+    <section class="wa-cart-section wa-b3-summary">
+      <div class="wa-b3-chips"><span id="beta3RoomHandling" class="wa-b3-chip"></span><span id="beta3RoomStage" class="wa-b3-chip wa-b3-chip--stage"></span></div>
+      <p id="beta3RoomWaiting" class="wa-b3-waiting" hidden></p>
+      <div id="beta3RoomPhotos" class="wa-b3-photos" hidden></div>
+      <dl id="beta3RoomPoints" class="wa-b3-points"></dl>
+      <pre id="beta3RoomSpecView" class="wa-b3-spec" hidden></pre>
     </section>
-    <section class="wa-cart-section wa-cart-current">
-      <div class="wa-cart-heading"><h3 data-i18n="Detail pesanan">Detail pesanan</h3><small class="wa-muted" data-i18n="Ditulis AI, boleh diedit">Ditulis AI, boleh diedit</small></div>
-      <textarea id="beta3RoomSpec" rows="8" placeholder="1. Produk - Warna, size, jas saja&#10;   kerah: ...&#10;   saku: ..."></textarea>
-      <div class="actions"><button id="beta3RoomSpecSave" type="button" class="button" data-i18n="Simpan detail">Simpan detail</button></div>
-    </section>
-    <section class="wa-cart-section wa-cart-current">
+    <details class="wa-cart-section wa-b3-edit" id="beta3RoomRefsBox">
+      <summary><span data-i18n="Referensi gambar">Referensi gambar</span> <small id="beta3RoomRefsCount" class="wa-muted"></small></summary>
+      <p class="wa-muted" data-i18n="Diisi AI otomatis dan ikut terkirim ke grup produksi. Ubah hanya bila perlu.">Diisi AI otomatis dan ikut terkirim ke grup produksi. Ubah hanya bila perlu.</p>
+      <div id="beta3RoomRefs" class="wa-b3-refs"></div>
+      <details class="wa-b3-pick">
+        <summary data-i18n="Tambah dari gambar chat">Tambah dari gambar chat</summary>
+        <div id="beta3RoomChatImages" class="wa-b3-pick-grid"></div>
+      </details>
+    </details>
+    <section class="wa-cart-section">
       <div class="wa-cart-heading"><h3 data-i18n="Order">Order</h3><small id="beta3RoomOrderStatus" class="wa-muted"></small></div>
       <div id="beta3RoomOrder"></div>
     </section>
-    <section class="wa-cart-section wa-cart-current">
-      <div class="wa-cart-heading"><h3 data-i18n="Catatan pelanggan">Catatan pelanggan</h3><small class="wa-muted" data-i18n="Dipakai AI untuk order berikutnya">Dipakai AI untuk order berikutnya</small></div>
+    <details class="wa-cart-section wa-b3-edit">
+      <summary data-i18n="Edit detail pesanan">Edit detail pesanan</summary>
+      <textarea id="beta3RoomSpec" rows="6" placeholder="1. Produk - Warna, size, jas saja&#10;   kerah: ...&#10;   saku: ..."></textarea>
+      <div class="actions"><button id="beta3RoomSpecSave" type="button" class="button" data-i18n="Simpan detail">Simpan detail</button></div>
+    </details>
+    <details class="wa-cart-section wa-b3-edit">
+      <summary data-i18n="Catatan pelanggan">Catatan pelanggan</summary>
       <textarea id="beta3RoomNote" rows="4" placeholder="Nama: ...&#10;Size: ...&#10;Alamat: ..."></textarea>
       <div class="actions"><button id="beta3RoomNoteSave" type="button" class="button" data-i18n="Simpan catatan">Simpan catatan</button></div>
-    </section>
+    </details>
   </div>
 @elseif(leanMode)
   <div class="wa-cart-body" id="leanRoomPanel">

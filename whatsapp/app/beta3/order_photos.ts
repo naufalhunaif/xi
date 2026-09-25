@@ -32,12 +32,17 @@ export async function attachOrderPhotos<
     const text = ` ${norm(`${order.spec || ''} ${order.items || ''} ${order.chat_note || ''}`)} `
     const photos: OrderPhoto[] = []
     const seenProducts = new Set<string>()
-    for (const entry of rows) {
+    const hits = rows.filter((entry) => text.includes(` ${entry.product} `))
+    // Varian yang warnanya disebut dulu; produk tanpa warna cocok cukup satu foto.
+    const ordered = [
+      ...hits.filter((entry) => entry.color && text.includes(` ${entry.color} `)),
+      ...hits.filter((entry) => !(entry.color && text.includes(` ${entry.color} `))),
+    ]
+    for (const entry of ordered) {
       if (photos.length >= 4) break
-      if (!text.includes(` ${entry.product} `)) continue
-      const colorHit = entry.color && text.includes(` ${entry.color} `)
-      if (entry.color && !colorHit && seenProducts.has(entry.product)) continue
+      const colorHit = Boolean(entry.color && text.includes(` ${entry.color} `))
       if (!colorHit && seenProducts.has(entry.product)) continue
+      if (photos.some((photo) => photo.url === String(entry.row.photoUrl))) continue
       photos.push({
         product: entry.row.product,
         color: entry.row.color,

@@ -56,6 +56,31 @@ export const LEAN_OUTPUT_SCHEMA = {
       description:
         'Lembar spesifikasi pesanan, ditulis ulang LENGKAP tiap giliran (bukan hanya perubahan): satu blok per item — produk, warna, size atau ukuran badan, jas saja/setelan, lalu setiap detail custom yang pelanggan sebut (kerah, saku, list/kombinasi, kancing, bahan, warna bagian) apa adanya. Kosong bila pelanggan belum memilih apa pun.',
     },
+    referensi: {
+      type: 'array',
+      description:
+        'Opsional. Isi bila pelanggan mengirim gambar di giliran ini untuk menunjukkan bagian yang diinginkan (kerah, saku, kancing, lengan, celana, warna, dll). Satu entri per bagian. Kosongkan bila gambar tidak dipakai sebagai contoh bagian.',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          gambar: { type: 'integer', description: 'Nomor lampiran gambar giliran ini (1 = gambar pertama).' },
+          bagian: { type: 'string', description: 'Nama bagian dengan kata sehari-hari: kerah, saku, kancing, lengan, celana, warna, dll.' },
+          catatan: {
+            type: 'string',
+            description:
+              'Ciri yang terlihat dengan bahasa sehari-hari untuk penjahit (bentuk, warna, mengkilap/tidak, jumlah), TANPA istilah model. Mis. "melengkung tanpa lekukan, warna hitam mengkilap".',
+          },
+          kotak: {
+            type: 'array',
+            items: { type: 'integer' },
+            description:
+              'Letak bagian itu di gambar: [x, y, lebar, tinggi] skala 0–1000 dari kiri-atas, cukup mencakup bagian itu. Kosongkan ([]) bila tidak yakin — gambar dikirim utuh.',
+          },
+        },
+        required: ['gambar', 'bagian', 'catatan', 'kotak'],
+      },
+    },
     susulan: {
       type: 'string',
       description:
@@ -87,8 +112,11 @@ export const LEAN_OUTPUT_SCHEMA = {
 
 export type LeanOrderDraft = { rincian: string; subtotal: number; layanan: string }
 
+export type LeanRefDraft = { gambar: number; bagian: string; catatan: string; kotak: number[] }
+
 export type LeanDecision = {
   order?: LeanOrderDraft
+  referensi?: LeanRefDraft[]
   pesan: string[]
   foto: string[]
   catatan: string
@@ -185,7 +213,7 @@ export function buildLeanPrompt(input: {
     ['produksi', input.production || ''],
     [
       'sekarang',
-      `SEKARANG: ${stamp(input.now || new Date())} WIB${input.imageCount ? `\nPelanggan melampirkan ${input.imageCount} gambar (lihat lampiran).` : ''}\nPESAN PELANGGAN SEKARANG:\n${input.message || '(hanya media, tanpa teks)'}`,
+      `SEKARANG: ${stamp(input.now || new Date())} WIB${input.imageCount ? `\nPelanggan melampirkan ${input.imageCount} gambar (lihat lampiran; nomor 1–${input.imageCount} sesuai urutan, untuk field referensi).` : ''}\nPESAN PELANGGAN SEKARANG:\n${input.message || '(hanya media, tanpa teks)'}`,
     ],
     [
       'keluaran',
@@ -233,6 +261,16 @@ export function parseLeanDecision(text: string): LeanDecision {
     spesifikasi: String(raw.spesifikasi || '')
       .trim()
       .slice(0, 3000),
+    referensi: (Array.isArray(raw.referensi) ? raw.referensi : [])
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      .map((item) => ({
+        gambar: Math.round(Number(item.gambar) || 0),
+        bagian: String(item.bagian || '').trim().slice(0, 80),
+        catatan: String(item.catatan || '').trim().slice(0, 300),
+        kotak: Array.isArray(item.kotak) ? item.kotak.map((n) => Number(n)) : [],
+      }))
+      .filter((item) => item.gambar > 0 && item.bagian)
+      .slice(0, 6),
     ...(raw.order && typeof raw.order === 'object'
       ? {
           order: {
