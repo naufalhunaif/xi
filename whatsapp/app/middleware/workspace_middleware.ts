@@ -19,6 +19,9 @@ export default class WorkspaceMiddleware {
       appVersion: appVersionLabel(),
       appUrl: publicAppUrl(ctx.request),
       pendingOrders: 0,
+      // Semua halaman (Kontak, Pengaturan, dll.) memakai panel pesanan Beta 3.
+      beta3Mode: true,
+      leanMode: false,
     })
     const expected = ctx.request.header('X-WhatsApp-Workspace')
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(ctx.request.method())

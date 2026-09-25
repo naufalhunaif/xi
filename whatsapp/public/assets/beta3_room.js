@@ -78,7 +78,7 @@
     byId('beta3RoomChatNote').hidden = !rest
   }
 
-  function renderOrder(order) {
+  function renderOrder(order, proofs = [], groupPreview = '') {
     const box = byId('beta3RoomOrder')
     box.replaceChildren()
     byId('beta3RoomOrderStatus').textContent = ''
@@ -145,7 +145,16 @@
       })
       box.append(form)
     } else if (order.status === 'awaiting_payment') {
-      const paid = el('button', t('Dana masuk · Lunas'), 'button primary'); paid.type = 'button'
+      const proofBox = el('div', undefined, 'wa-beta3-proofs')
+      proofBox.append(el('small', proofs.length ? t('Bukti transfer dari pelanggan') : t('Belum ada bukti transfer'), 'wa-muted'))
+      for (const proof of proofs) {
+        const link = el('a'); link.href = proof.media_url; link.target = '_blank'; link.rel = 'noopener'
+        const img = el('img'); img.src = proof.thumbnail_url || proof.media_url; img.alt = t('Bukti transfer'); img.loading = 'lazy'
+        link.append(img)
+        proofBox.append(link)
+      }
+      box.append(proofBox)
+      const paid = el('button', t('Konfirmasi dana masuk · Lunas'), 'button primary'); paid.type = 'button'
       paid.addEventListener('click', async () => {
         try {
           const result = await api(`/api/beta3/orders/${order.id}/paid`, {})
@@ -171,6 +180,14 @@
       if (order.group_error) box.append(el('p', `Grup gagal: ${order.group_error}`, 'error'))
     }
     if (actions.childElementCount) box.append(actions)
+    if (groupPreview) {
+      const details = el('details', undefined, 'wa-beta3-group')
+      details.append(
+        el('summary', order.status === 'paid' ? t('Pesan ke grup produksi') : t('Pratinjau pesan ke grup (dikirim setelah lunas)')),
+        el('pre', groupPreview, 'wa-lean-chatnote')
+      )
+      box.append(details)
+    }
   }
   async function load() {
     jid = byId('messages')?.dataset.jid || ''
@@ -182,7 +199,7 @@
       renderStatus(result)
       byId('beta3RoomSpec').value = result.spec || ''
       byId('beta3RoomNote').value = result.note || ''
-      renderOrder(result.order)
+      renderOrder(result.order, result.proofs || [], result.groupPreview || '')
     } catch (error) {
       notice(error.message, true)
     }

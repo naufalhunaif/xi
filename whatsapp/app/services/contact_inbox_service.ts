@@ -1,6 +1,7 @@
 import { isBeta3Mode } from '#services/settings_service'
 import db from '#services/workspace_database'
 import { initializeDatabase } from '#services/init_model'
+import { ensureLeanTables } from '#beta3/tables'
 
 type InboxMessage = {
   id: number
@@ -53,11 +54,23 @@ export async function latestInboxMessages() {
   await initializeDatabase()
   // Beta 3: filter Pembayaran/Order memakai order Beta 3 (bukan keranjang Beta 1).
   const beta3 = await isBeta3Mode().catch(() => false)
+  if (beta3) await ensureLeanTables()
+  // Pembayaran = pelanggan sudah bayar dan menunggu konfirmasi CS: kirim gambar setelah
+  // total dikirim, atau AI mencatat tahap bukti_dikirim (belum ada order lunas sesudahnya).
   const paymentSql = beta3
-    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'awaiting_payment')`
+    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'awaiting_payment'
+          AND EXISTS (SELECT 1 FROM whatsapp_messages p WHERE p.jid = m.jid AND p.direction = 'in'
+            AND p.media_type = 'image' AND p.created_at > b.updated_at))
+        OR EXISTS (SELECT 1 FROM whatsapp_beta3_chats n WHERE n.jid = m.jid
+          AND n.note REGEXP 'tahap[[:space:]]*[:=][[:space:]]*bukti_dikirim'
+          AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
+            AND d.status IN ('paid', 'cancelled') AND d.updated_at >= n.updated_at))`
     : PAYMENT_SQL
+  // Order = pesanan berjalan: form masuk, menunggu bayar, atau lunas tapi belum sampai grup.
   const orderSql = beta3
-    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status IN ('pending', 'awaiting_payment'))`
+    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
+          AND (b.status IN ('pending', 'awaiting_payment')
+            OR (b.status = 'paid' AND b.group_status IN ('pending', 'failed'))))`
     : ORDER_SQL
   const result = await db.rawQuery(`WITH successful_replies AS (
       SELECT jid, id, created_at,

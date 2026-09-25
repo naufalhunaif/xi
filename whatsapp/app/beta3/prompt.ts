@@ -249,6 +249,47 @@ export function parseLeanDecision(text: string): LeanDecision {
   }
 }
 
+const DAY_INDEX: Record<string, number> = { min: 0, sen: 1, sel: 2, rab: 3, kam: 4, jum: 5, sab: 6 }
+
+/**
+ * Hari tutup dari teks TOKO (MCP): "Sen-Sab 09:00-17:00, Min tutup" → [0].
+ * Tanpa data jam buka → Sabtu & Minggu dianggap libur.
+ */
+export function closedDaysFromStore(text: string) {
+  const hours = text.match(/buka (.+?) WIB/i)?.[1] || ''
+  if (!hours) return [0, 6]
+  const closed: number[] = []
+  for (const part of hours.split(/,\s*/)) {
+    const m = part.trim().match(/^(Sen|Sel|Rab|Kam|Jum|Sab|Min)(?:-(Sen|Sel|Rab|Kam|Jum|Sab|Min))?\s+tutup$/i)
+    if (!m) continue
+    const from = DAY_INDEX[m[1].toLowerCase()]
+    const to = DAY_INDEX[(m[2] || m[1]).toLowerCase()]
+    // Urutan Sen..Min (Min = 7) supaya rentang "Sab-Min" terbaca.
+    for (let d = from || 7; d <= (to || 7); d++) closed.push(d % 7)
+  }
+  return closed
+}
+
+/** Tanggal (WIB) setelah `days` hari; hari kerja melewati `closedDays` (0 = Minggu). */
+export function addProductionDays(now: Date, days: number, working: boolean, closedDays: number[] = [0, 6]) {
+  const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' })
+    .format(now)
+    .split('-')
+    .map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  let left = days
+  while (left > 0) {
+    date.setUTCDate(date.getUTCDate() + 1)
+    const day = date.getUTCDay()
+    if (working && closedDays.includes(day) && closedDays.length < 7) continue
+    left--
+  }
+  return date
+}
+
+const shortDate = (date: Date) =>
+  new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date)
+
 /** Estimasi produksi dari Pengaturan → Produksi, ditulis satu kalimat untuk AI. */
 export function renderProductionEstimate(policy: {
   rules: Record<
@@ -262,7 +303,9 @@ export function renderProductionEstimate(policy: {
       startsAfter: string
     }
   >
-}) {
+}, now: Date = new Date(), store = '') {
+  const closedDays = closedDaysFromStore(store)
+  const holiday = /^LIBUR:/m.test(store)
   const label: Record<string, string> = {
     preorder: 'pre-order (stok kosong, dibuatkan)',
     custom: 'custom (ukuran/model/detail khusus)',
@@ -282,9 +325,19 @@ export function renderProductionEstimate(policy: {
         : rule.startsAfter === 'approval'
           ? 'setelah persetujuan produksi'
           : 'setelah pembayaran/DP & detail lengkap'
-    lines.push(`${label[kind] || kind}: ${range} ${unit} sampai siap kirim, dihitung ${start}`)
+    const working = rule.dayType === 'working'
+    const lo = rule.minDays ?? rule.estimateDays ?? rule.maxDays
+    const hi = rule.maxDays ?? rule.estimateDays ?? rule.minDays
+    const from = lo ? shortDate(addProductionDays(now, lo, working, closedDays)) : ''
+    const to = hi ? shortDate(addProductionDays(now, hi, working, closedDays)) : ''
+    const when = from && to && from !== to ? `${from}–${to}` : to || from
+    lines.push(
+      `${label[kind] || kind}: ${range} ${unit} sampai siap kirim, dihitung ${start}` +
+        (when ? ` → kalau dibayar hari ini, siap kirim sekitar ${when}` : '')
+    )
   }
   if (!lines.length)
     return 'ESTIMASI PRODUKSI: belum diatur pemilik. Kalau ditanya lama pengerjaan: "nanti saya konfirmasi ke bagian produksi ya bos", jangan menyebut angka.'
+  if (holiday) lines.push('Toko sedang LIBUR (lihat TOKO): tanggal siap kirim bisa mundur — permintaan tanggal kirim ditanyakan ke tim.')
   return `ESTIMASI PRODUKSI (dari pengaturan pemilik; sebut sebagai perkiraan, bukan janji tanggal):\n${lines.join('\n')}`
 }

@@ -66,8 +66,8 @@ export function ensureDefaults() {
   defaults = (async () => {
     await initializeDatabase()
     const now = new Date()
-    // Standalone: mulai langsung di Beta 3 (Beta 1/2 tidak dipakai di pemasangan ini).
-    const beta3Default = isLocalAuth() ? 1 : 0
+    // Beta 1/2 sudah dihentikan: semua pemasangan memakai Beta 3 (pemasangan lama ikut dipindah).
+    const beta3Default = 1
     await db.rawQuery(
       `INSERT IGNORE INTO whatsapp_settings
        (id, ai_enabled, mcp_seeded, skill_name, skill_content, chatgpt_reasoning, claude_reasoning, chatgpt_speed, claude_speed, lean_mode, beta3_mode, updated_at)
@@ -125,10 +125,9 @@ export async function readSettings(includeSkill = false) {
     aiProvider: row.ai_provider === 'claude' ? 'claude' : 'chatgpt',
     aiFailover: Boolean(row.ai_failover),
     // Mode saling eksklusif: beta3 menang atas beta2 (lean).
-    beta3Mode: Boolean(row.beta3_mode ?? 0),
-    leanMode: Boolean(row.lean_mode ?? 1) && !(row.beta3_mode ?? 0),
-    aiMode: (row.beta3_mode ? 'beta3' : (row.lean_mode ?? 1) ? 'beta2' : 'beta1') as
-      'beta1' | 'beta2' | 'beta3',
+    beta3Mode: true,
+    leanMode: false,
+    aiMode: 'beta3' as 'beta1' | 'beta2' | 'beta3',
     chatgptModel: String(row.chatgpt_model || ''),
     chatgptSpeed: runtimeOptions(row, 'chatgpt').speed,
     chatgptReasoning: runtimeOptions(row, 'chatgpt').reasoning,
@@ -250,14 +249,11 @@ export async function saveSettings(input: Record<string, unknown>) {
     values.ai_provider = String(input.aiProvider)
   }
   if (input.aiMode !== undefined) {
-    const mode = String(input.aiMode)
-    if (!['beta1', 'beta2', 'beta3'].includes(mode)) throw new Error('Mode AI tidak dikenal.')
-    values.lean_mode = mode === 'beta2' ? 1 : 0
-    values.beta3_mode = mode === 'beta3' ? 1 : 0
+    // Hanya Beta 3; Beta 1/2 dihentikan.
+    values.lean_mode = 0
+    values.beta3_mode = 1
   }
-  if (input.leanMode !== undefined) {
-    values.lean_mode = input.leanMode === true || input.leanMode === 'on' ? 1 : 0
-  }
+  if (input.leanMode !== undefined) values.lean_mode = 0
   if (input.aiFailover !== undefined) {
     values.ai_failover = input.aiFailover === true || input.aiFailover === 'on'
   }
@@ -421,16 +417,11 @@ export async function deleteSkill(id: number) {
  * dibaca langsung dari whatsapp_settings supaya tampilan chat/Order selalu sama
  * dengan yang dipakai worker.
  */
+// Beta 1/2 dihentikan: semua pemasangan Beta 3, tanpa bergantung isi tabel.
 export async function isLeanMode() {
-  const row = await db
-    .from('whatsapp_settings')
-    .where('id', 1)
-    .select('lean_mode', 'beta3_mode')
-    .first()
-  return Boolean(row?.lean_mode ?? 1) && !(row?.beta3_mode ?? 0)
+  return false
 }
 
 export async function isBeta3Mode() {
-  const row = await db.from('whatsapp_settings').where('id', 1).select('beta3_mode').first()
-  return Boolean(row?.beta3_mode ?? 0)
+  return true
 }

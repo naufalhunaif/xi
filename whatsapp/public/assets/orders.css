@@ -476,3 +476,8 @@ body:has(#orderDrawer[open]) {
 .wa-order-tabs button[aria-pressed='true'] .wa-tab-count { background: #29946a; color: #fff; }
 #leanOrdersList tr[data-order-id] { cursor: pointer; }
 #leanOrdersList tr[data-order-id]:is(:hover, :focus-within), #leanOrdersList tr[data-selected='true'] { background: var(--wa-green-bg, #f1f8f4); }
+.wa-beta3-proofs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.wa-beta3-proofs small { flex-basis: 100%; }
+.wa-beta3-proofs img { width: 88px; height: 88px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line, #e2e6e3); display: block; }
+.wa-beta3-group { margin-top: 10px; }
+.wa-beta3-group summary { cursor: pointer; font-size: 12px; color: var(--muted, #69736c); margin-bottom: 6px; }

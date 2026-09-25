@@ -7,6 +7,7 @@ import { listLeanExamples, pickExamples, seedLeanExamples } from '#beta3/example
 import { readCustomerNote, readOrderSpec, writeOrderSpec } from '#beta3/customer_service'
 import {
   parseOrderForm,
+  parseLooseAddress,
   saveLeanOrder,
   updatePendingOrderSpec,
   latestLeanOrder,
@@ -107,6 +108,30 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
   }))
 }
 
+/**
+ * Buang bubble pertanyaan yang sudah ditanyakan di balasan keluar terakhir
+ * ("biasanya pakai size apa bos?" dua kali berturut-turut). Bubble lain tetap;
+ * kalau semua bubble adalah ulangan, balasan dibiarkan apa adanya.
+ */
+export function dropRepeatedQuestions(pesan: string[], rows: LeanHistoryRow[]) {
+  const norm = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/\b(bos|ka|kak|ya)\b/g, ' ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+  const recent = rows
+    .filter((row) => row.direction === 'out' && !row.current && row.body)
+    .slice(-3)
+    .map((row) => norm(String(row.body)))
+  const kept = pesan.filter((body) => {
+    if (!body.includes('?')) return true
+    const key = norm(body)
+    return key.length < 8 || !recent.some((prev) => prev.includes(key))
+  })
+  return kept.length ? kept : pesan
+}
+
 export function resolvePhotos(rows: LeanCatalogRow[], labels: string[]) {
   const photos: Array<{ caption: string; url: string }> = []
   for (const label of labels) {
@@ -204,7 +229,35 @@ export async function createLeanReply(input: {
   const last = form ? null : parseJson<LastShipping>(await readLeanState(lastKey))
   // Juga saat AI baru bertanya "pengiriman kemana": jawaban "ke pulogadung" langsung dicek.
   const followUp = Boolean(last && Date.now() - last.at < 30 * 60_000) || stage === 'minta_alamat'
-  const place = form ? null : extractShippingQuery(input.text, followUp)
+
+  // Alamat lengkap yang ditempel tanpa format form: ongkirnya langsung dicek,
+  // supaya balasan menyebut tarif, bukan hanya "alamatnya sudah dicatat".
+  const loose = form ? null : parseLooseAddress(input.text)
+  if (loose && mcp.url) {
+    try {
+      const rates = await ratesForAddress(loose, last?.resolved || null, mcp)
+      const rateText = rates ? renderShippingRates(rates) : ''
+      if (rateText) {
+        toolNotes.push(rateText)
+        systemNote +=
+          '\n\nCATATAN SISTEM: pelanggan mengirim alamat pengiriman; sebut ongkirnya dari bagian ONGKIR di balasan ini (satu kalimat), jangan hanya "alamatnya sudah dicatat".'
+      }
+      onTrace?.({
+        key: 'beta3-rates',
+        label: rateText ? `Ongkir dicek · ${rates?.destination?.district || loose.district || loose.regency}` : 'Ongkir alamat tidak ditemukan',
+        status: rateText ? 'completed' : 'failed',
+        detail: { loose, rates },
+      })
+    } catch (error) {
+      onTrace?.({
+        key: 'beta3-rates',
+        label: 'Ongkir tidak tersedia',
+        status: 'failed',
+        detail: { error: error instanceof Error ? error.message : String(error) },
+      })
+    }
+  }
+  const place = form || loose ? null : extractShippingQuery(input.text, followUp)
   if (place && mcp.url) {
     try {
       let note = ''
@@ -372,9 +425,10 @@ export async function createLeanReply(input: {
     }
   }
 
+  const store = await readLeanState('store_profile')
   const prompt = buildLeanPrompt({
     skill: skill.content,
-    store: await readLeanState('store_profile'),
+    store,
     fabrics: await readLeanState('fabrics'),
     sizeCharts: await readLeanState('size_charts'),
     catalog: digest.text,
@@ -385,7 +439,7 @@ export async function createLeanReply(input: {
     history: rows,
     message: `${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
-    production: settings.production ? renderProductionEstimate(settings.production) : '',
+    production: settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : '',
     imageCount: input.imagePaths?.length || 0,
   })
   onTrace?.({
@@ -398,6 +452,7 @@ export async function createLeanReply(input: {
   onTrace?.({ key: 'beta3-ai', label: 'Menyusun balasan · tanpa tool', status: 'running' })
   const result = await runLeanProvider(settings, prompt, input.imagePaths || [])
   const decision = parseLeanDecision(result.text)
+  decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
   if (decision.spesifikasi !== spec) {
     // Lembar spesifikasi menggantikan cart: ditulis ulang AI, disimpan kode.
     await writeOrderSpec(jid, decision.spesifikasi)

@@ -62,6 +62,60 @@ export function parseOrderForm(text: string): ParsedOrderForm | null {
   }
 }
 
+const PROVINCE =
+  /^(?:prov(?:insi)?\.?\s+)?(?:aceh|sumatera\s+(?:utara|barat|selatan)|riau|kepulauan\s+riau|jambi|bengkulu|lampung|(?:kep(?:ulauan)?\.?\s+)?bangka\s+belitung|banten|(?:dki\s+)?jakarta|jawa\s+(?:barat|tengah|timur)|(?:d\.?\s*i\.?\s+)?yogyakarta|bali|nusa\s+tenggara\s+(?:barat|timur)|ntb|ntt|kalimantan\s+(?:barat|tengah|selatan|timur|utara)|sulawesi\s+(?:utara|tengah|selatan|tenggara|barat)|gorontalo|maluku(?:\s+utara)?|papua(?:\s+(?:barat(?:\s+daya)?|tengah|selatan|pegunungan))?)$/i
+
+/**
+ * Alamat yang ditempel tanpa label form, mis. dari marketplace:
+ * "Deva, 0851…, Jalan Kapt Tendean, Balong Barat, KAB. NGAWI, NGAWI, JAWA TIMUR, ID, 63216".
+ * Cukup untuk cek ongkir (kecamatan, kabupaten/kota, kode pos); bukan pengganti form.
+ */
+export function parseLooseAddress(
+  text: string
+): { district: string; regency: string; postalCode: string } | null {
+  if (!text || text.length < 25 || parseOrderForm(text)) return null
+  const clean = text.replace(/\s+/g, ' ').trim()
+  const phone = /(?:\+?62|0)8\d{7,12}/.test(clean.replace(/[\s-]/g, ''))
+  const postal = [...clean.matchAll(/(?<!\d)(\d{5})(?!\d)/g)].map((m) => m[1]).pop() || ''
+  const addressy =
+    /\b(?:jl|jln|jalan|gg|gang|rt|rw|perum|perumahan|komp|komplek|kompleks|desa|dusun|dsn|kel|kelurahan|kec|kecamatan|kab|kabupaten|kota)\b/i.test(
+      clean
+    )
+  // Alamat, bukan obrolan: kata alamat + (kode pos atau nomor HP).
+  if (!addressy || (!postal && !phone)) return null
+
+  // Tiap segmen tanpa ekor kode pos / nomor HP: "Jawa Barat 16911" → "Jawa Barat".
+  const segments = clean
+    .split(',')
+    .map((s) => s.replace(/\s+(?:\d{5}|(?:\+?62|0)8\d{6,}|hp|telp|wa|no\.?\s*hp)\b.*$/i, '').trim())
+    .filter(Boolean)
+  let district = ''
+  let regency = ''
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    const kec = seg.match(/^kec(?:amatan)?\.?\s+(.+)$/i)
+    if (kec && !district) district = kec[1].trim()
+    const kab = seg.match(/^(?:kab(?:upaten)?\.?|kota)\s+(.+)$/i)
+    if (kab && !regency) {
+      regency = seg
+      // Format marketplace: kabupaten/kota lalu kecamatan di segmen berikutnya.
+      const next = (segments[i + 1] || '').trim()
+      if (!district && next && !PROVINCE.test(next) && !/^(?:id|indonesia|\d{5})$/i.test(next))
+        district = next.replace(/^kec(?:amatan)?\.?\s+/i, '')
+    }
+  }
+  if (!regency) {
+    const inline = clean.match(/\b((?:kab(?:upaten)?\.?|kota)\s+[a-z][a-z .'-]{2,30}?)(?=\s*(?:,|\d{5}|$|jawa|prov))/i)
+    if (inline) regency = inline[1].trim()
+  }
+  if (!district) {
+    const inline = clean.match(/\bkec(?:amatan)?\.?\s+([a-z][a-z .'-]{2,30}?)(?=\s*(?:,|\d{5}|$|kab|kota))/i)
+    if (inline) district = inline[1].trim()
+  }
+  if (!district && !regency && !postal) return null
+  return { district, regency, postalCode: postal }
+}
+
 export async function saveLeanOrder(input: {
   jid: string
   sourceMessageId?: string

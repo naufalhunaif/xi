@@ -17,6 +17,7 @@ import {
   markLeanOrderPaid,
   requeueLeanOrderGroup,
   updatePendingOrderSpec,
+  renderGroupOrderMessage,
 } from '#beta3/order_service'
 import {
   readCustomerNote,
@@ -27,7 +28,7 @@ import {
 import db from '#services/workspace_database'
 import { queueOutgoingMessage } from '#services/message_service'
 import { estimateTokens } from '#services/prompt_size_service'
-import { readLeanState } from '#beta3/tables'
+import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { ensureDefaults } from '#services/settings_service'
 import {
   readLeanMcpConfig,
@@ -208,19 +209,36 @@ export default class Beta3Controller {
   async room({ request, response }: HttpContext) {
     const jid = String(request.qs().jid || '')
     if (!jid) return response.badRequest({ error: 'jid wajib.' })
-    const [spec, note, order, contact] = await Promise.all([
+    const [spec, note, order, contact, chatNote] = await Promise.all([
       readOrderSpec(jid),
       readCustomerNote(jid),
       latestLeanOrder(jid),
       db.from('whatsapp_contacts').where('jid', jid).first(),
+      readBeta3ChatNote(jid),
     ])
+    // Bukti transfer: gambar pelanggan setelah total dikirim (untuk dicek sebelum Lunas).
+    const proofs =
+      order && order.status === 'awaiting_payment'
+        ? await db
+            .from('whatsapp_messages')
+            .where('jid', jid)
+            .where('direction', 'in')
+            .where('media_type', 'image')
+            .where('created_at', '>', order.updated_at)
+            .whereNotNull('media_url')
+            .orderBy('id', 'desc')
+            .limit(3)
+            .select('message_id', 'media_url', 'thumbnail_url', 'created_at')
+        : []
     response.header('cache-control', 'no-store')
     return response.json({
       jid,
       spec,
       note,
       order,
-      chatNote: contact?.chat_note ? String(contact.chat_note) : '',
+      proofs,
+      groupPreview: order && order.status !== 'cancelled' ? renderGroupOrderMessage(order) : '',
+      chatNote: chatNote || (contact?.chat_note ? String(contact.chat_note) : ''),
       handling: {
         mode: contact?.handling_mode === 'cs' ? 'cs' : 'ai',
         reason: contact?.handoff_reason ? String(contact.handoff_reason) : '',

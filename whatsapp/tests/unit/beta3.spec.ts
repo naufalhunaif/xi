@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import { readFile } from 'node:fs/promises'
-import { parseOrderForm, renderGroupOrderMessage, renderTotalMessage } from '#beta3/order_service'
+import { parseOrderForm, parseLooseAddress, renderGroupOrderMessage, renderTotalMessage } from '#beta3/order_service'
 import {
   findCatalogVariant,
   renderCatalogDigest,
@@ -8,9 +8,9 @@ import {
   type LeanCatalogRow,
 } from '#beta3/catalog_service'
 import { keywords, pickExamples, type LeanExample } from '#beta3/examples_service'
-import { buildLeanPrompt, parseLeanDecision } from '#beta3/prompt'
+import { addProductionDays, buildLeanPrompt, closedDaysFromStore, parseLeanDecision, renderProductionEstimate } from '#beta3/prompt'
 import { mergeCustomerNote } from '#beta3/customer_service'
-import { resolvePhotos, selectLeanSkill } from '#beta3/reply_service'
+import { dropRepeatedQuestions, resolvePhotos, selectLeanSkill } from '#beta3/reply_service'
 import { matchAutoTotal } from '#beta3/order_service'
 import {
   extractBodyMeasure,
@@ -54,6 +54,47 @@ test.group('beta3 · form order', () => {
     assert.equal(form!.postalCode, '169169')
     assert.equal(form!.phone, '087825583828')
     assert.match(form!.note, /Tuxedo brown/)
+  })
+
+  test('alamat tempelan tanpa label tetap terbaca untuk ongkir', ({ assert }) => {
+    const shopee = parseLooseAddress(
+      'Deva Wahyu Hidayat\n085157754566\nJalan Kapt Tendean, Balong Barat (Dekost 2 ), KAB. NGAWI, NGAWI, JAWA TIMUR, ID, 63216'
+    )
+    assert.deepEqual(shopee, { district: 'NGAWI', regency: 'KAB. NGAWI', postalCode: '63216' })
+    const inline = parseLooseAddress('Jl. Merdeka No 10 Kec. Serpong, Kota Tangerang Selatan 15310 hp 08123456789')
+    assert.equal(inline!.district, 'Serpong')
+    assert.equal(inline!.regency, 'Kota Tangerang Selatan')
+    assert.equal(inline!.postalCode, '15310')
+    assert.isNull(parseLooseAddress('size M ada bos? kalau ke kota bandung ongkirnya berapa'))
+    assert.isNull(parseLooseAddress('Nama : A\nAlamat : Jl X\nKode pos : 12345'))
+  })
+
+  test('estimasi produksi menyebut tanggal siap kirim', ({ assert }) => {
+    const now = new Date('2026-09-25T03:00:00Z') // Jumat
+    assert.equal(addProductionDays(now, 3, true).toISOString().slice(0, 10), '2026-09-30')
+    assert.equal(addProductionDays(now, 3, false).toISOString().slice(0, 10), '2026-09-28')
+    const text = renderProductionEstimate(
+      { rules: { preorder: { enabled: true, minDays: 3, maxDays: 7, estimateDays: null, dayType: 'working', startsAfter: 'payment' } } },
+      now
+    )
+    assert.include(text, 'siap kirim sekitar 30 Sep–6 Okt')
+    const store = 'TOKO: X.\nOrder lewat chat/website bisa 24 jam. Toko fisik buka Sen-Sab 09:00-17:00, Min tutup WIB (untuk yang mau datang/ukur langsung).'
+    assert.deepEqual(closedDaysFromStore(store), [0])
+    assert.equal(addProductionDays(now, 3, true, [0]).toISOString().slice(0, 10), '2026-09-29')
+    assert.include(renderProductionEstimate({ rules: {} }, now, store + '\nLIBUR: x'), 'belum diatur')
+  })
+
+  test('pertanyaan yang baru saja ditanyakan tidak diulang', ({ assert }) => {
+    const rows = [
+      { direction: 'out' as const, body: 'ini foto tuxedo putihnya bos, biasanya pakai size apa?', createdAt: '' },
+      { direction: 'in' as const, body: 'Ini ready to wear yah?', createdAt: '', current: true },
+    ]
+    assert.deepEqual(
+      dropRepeatedQuestions(['Iya ready bos, size S M L XL ada', 'biasanya pakai size apa bos?'], rows),
+      ['Iya ready bos, size S M L XL ada']
+    )
+    assert.deepEqual(dropRepeatedQuestions(['biasanya pakai size apa bos?'], rows), ['biasanya pakai size apa bos?'])
+    assert.deepEqual(dropRepeatedQuestions(['alamatnya di mana bos?'], rows), ['alamatnya di mana bos?'])
   })
 
   test('pesan biasa bukan form', ({ assert }) => {
