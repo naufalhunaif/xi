@@ -526,4 +526,23 @@ test.group('beta3 · total otomatis', () => {
     )
     assert.isTrue(big.ok)
   })
+  test('harga yang disebut toko & baris detail tidak menahan total', ({ assert }) => {
+    const detail = matchAutoTotal(
+      { rincian: 'Peak Suit - Black size L 485.000\nfull polos, bahan doff\npre order', subtotal: 485000, layanan: 'CTC' },
+      catalog,
+      prices
+    )
+    assert.isTrue(detail.ok)
+    const stated = matchAutoTotal(
+      { rincian: 'Jas custom broken white size L 500.000', subtotal: 500000, layanan: 'CTC' },
+      catalog,
+      prices,
+      [],
+      [500000]
+    )
+    assert.isTrue(stated.ok)
+    assert.isFalse(
+      matchAutoTotal({ rincian: 'Peak Suit - Black 485.000\nRompi Maroon', subtotal: 485000, layanan: 'CTC' }, catalog, prices).ok
+    )
+  })
 })

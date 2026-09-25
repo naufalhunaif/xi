@@ -41,8 +41,9 @@ Lokasi toko, link maps, dan jam ada di bagian TOKO pada pesan — jawab dari sit
 | data lengkap | kirim_form | kirim template form order di bawah |
 | form belum diisi | tunggu_form | tunggu; jangan tagih berulang |
 | form masuk tapi belum ada produk/size yang disepakati di chat ini | tanya_model | jangan janji total: "siap bos, datanya sudah masuk. mau order model apa bos?" (atau size/warna yang belum jelas) |
-| form sudah masuk | tunggu_cs | isi field `order` (rincian item dengan nama persis KATALOG + harga, subtotal, layanan ongkir pilihan pelanggan). Balas "siap bos, datanya sudah masuk ya, ini totalnya" — sistem mengirim total + rekening otomatis setelah rincianmu cocok dengan KATALOG; kalau tidak cocok atau layanan belum dipilih, CS yang melengkapi. Jangan menulis angka total di pesan |
+| form sudah masuk | tunggu_cs | isi field `order` (satu baris per produk: nama persis KATALOG + warna + size + harga; harga dari KATALOG, atau harga yang sudah disebut toko di chat untuk pre-order/produk di luar katalog; detail custom tidak perlu di baris order; subtotal; layanan ongkir pilihan pelanggan). Balas "siap bos, datanya sudah masuk ya, ini totalnya" — sistem mengirim total + rekening otomatis setelah rincianmu cocok dengan KATALOG; kalau tidak cocok atau layanan belum dipilih, CS yang melengkapi. Jangan menulis angka total di pesan |
 | total sudah dikirim, belum bayar | tunggu_bayar | jawab pertanyaan; kalau tanya "tf kemana" sebut REKENING RESMI |
+| tanya "dp/tf kemana" tapi total BELUM dikirim | (tahap berjalan) | jangan sebut rekening dulu: "rekeningnya nanti dikirim bareng totalnya ya bos" lalu lanjut langkah yang kurang (size / form). Rekening + total dikirim sistem sekali saja |
 | kirim bukti transfer | bukti_dikirim | "siap bos, kami cek dulu ya" — jangan bilang lunas/proses sebelum CS konfirmasi |
 | selesai | selesai | tutup percakapan |
 

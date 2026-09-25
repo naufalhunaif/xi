@@ -11,6 +11,7 @@ import {
   parseLooseAddress,
   tidyLooseAddress,
   looseAddressForm,
+  parsePrices,
   saveLeanOrder,
   updatePendingOrderSpec,
   latestLeanOrder,
@@ -508,10 +509,7 @@ export async function createLeanReply(input: {
   // Order pending yang tertinggal (mis. sebelum fitur ini) dicoba lagi saat pelanggan
   // menanyakan totalnya atau memilih layanan.
   let totalOrderId = orderId
-  if (
-    !totalOrderId &&
-    /\b(total|berapa|jadi|bayar|transfer|tf|ongkir|pakai|yang)\b/i.test(input.text)
-  ) {
+  if (!totalOrderId) {
     const pending = await latestLeanOrder(jid)
     if (pending && pending.status === 'pending') totalOrderId = Number(pending.id)
   }
@@ -524,14 +522,28 @@ export async function createLeanReply(input: {
       decision.order && decision.order.rincian
         ? decision.order
         : { rincian: specNow, subtotal: 0, layanan: '' }
-    const verdict = await verifyAutoTotal(totalOrderId, draft, digest.rows, [
-      decision.catatan,
-      specNow,
-      chatNote,
-      input.text,
-    ])
+    // Harga yang sudah disebut toko di chat (CS/AI), untuk pre-order atau produk di luar katalog.
+    const statedPrices = rows
+      .filter((row) => row.direction === 'out' && row.body)
+      .flatMap((row) => parsePrices(String(row.body)))
+    const verdict = await verifyAutoTotal(
+      totalOrderId,
+      draft,
+      digest.rows,
+      [decision.catatan, specNow, chatNote, input.text],
+      statedPrices
+    )
     if (verdict.ok) autoTotal = verdict.total
     await noteAutoTotalReason(totalOrderId, verdict.ok ? '' : verdict.reason)
+    // Total belum bisa dikirim: jangan menjanjikan "ini totalnya" yang tidak pernah datang.
+    if (!verdict.ok && !decision.serah_cs) {
+      const promise = /\b(ini|berikut|kami kirim|menyusul)\b[^.?!]*\btotal/i
+      decision.pesan = decision.pesan.map((bubble) =>
+        promise.test(bubble)
+          ? `${bubble.replace(/,?\s*(ini|berikut)\s+totalnya.*$/i, '').replace(/\s*bos$/i, '').trim()}, totalnya saya hitung dulu ya bos`
+          : bubble
+      )
+    }
     onTrace?.({
       key: 'beta3-total',
       label: verdict.ok

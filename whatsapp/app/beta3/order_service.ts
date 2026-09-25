@@ -606,6 +606,15 @@ export type VerifiedAutoTotal = {
   shippingCost: number
 }
 
+/** Angka harga di teks: "500.000", "500rb", "500k", "Rp 500000" → 500000. */
+export function parsePrices(text: string) {
+  const out: number[] = []
+  for (const match of text.matchAll(/(?:rp\.?\s*)?(\d{1,3}(?:[.,]\d{3})+|\d{4,7})(?!\d)/gi))
+    out.push(Number(match[1].replace(/[.,]/g, '')))
+  for (const match of text.matchAll(/(\d{2,4})\s*(?:rb|ribu|k)\b/gi)) out.push(Number(match[1]) * 1000)
+  return out.filter((value) => value >= 10000)
+}
+
 export function matchAutoTotal(
   draft: { rincian: string; subtotal: number; layanan: string },
   catalog: Array<{
@@ -617,7 +626,9 @@ export function matchAutoTotal(
   }>,
   prices: Array<{ service: string; price: number }>,
   /** Teks lain tempat mencari nama layanan bila draft.layanan kosong (catatan, spesifikasi, pesan). */
-  hints: string[] = []
+  hints: string[] = [],
+  /** Harga yang sudah disebut pihak toko (CS/AI) di chat, mis. "jas saja 500.000". */
+  statedPrices: number[] = []
 ):
   | { ok: true; items: string; subtotal: number; shippingService: string; shippingCost: number }
   | { ok: false; reason: string } {
@@ -633,20 +644,52 @@ export function matchAutoTotal(
     .filter((row) => row.active && row.price !== null)
     .sort((a, b) => `${b.product} ${b.color}`.length - `${a.product} ${a.color}`.length)
   const norm = (text: string) => text.toLowerCase().replace(/\s+/g, ' ').trim()
+  const words = (text: string) =>
+    text
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word.length >= 2)
   let sum = 0
+  const items: string[] = []
   for (const line of lines) {
     const text = norm(line)
-    const row = rows.find(
-      (candidate) =>
-        text.includes(norm(candidate.product)) &&
-        (!candidate.color || text.includes(norm(candidate.color)))
-    )
-    if (!row) return { ok: false, reason: `baris tidak cocok katalog: ${line}` }
+    const lineWords = new Set(words(line))
+    // Persis dulu, lalu longgar: semua kata nama produk (+ warna) ada di baris, urutan bebas.
+    const row =
+      rows.find(
+        (candidate) =>
+          text.includes(norm(candidate.product)) &&
+          (!candidate.color || text.includes(norm(candidate.color)))
+      ) ||
+      rows.find(
+        (candidate) =>
+          words(candidate.product).every((word) => lineWords.has(word)) &&
+          words(candidate.color).every((word) => lineWords.has(word))
+      )
+    const qty = Math.max(1, Number(line.match(/(\d+)\s*(?:x|pcs|pc|buah)\b/i)?.[1] || 1))
+    const linePrices = parsePrices(line)
+    if (!row) {
+      // Harga yang sudah disebut toko di chat (mis. pre-order / produk di luar katalog).
+      const stated = linePrices.find((price) => statedPrices.includes(price))
+      if (stated) {
+        sum += stated * qty
+        items.push(line)
+        continue
+      }
+      // Baris detail tanpa harga (size, warna, bahan, pre order, …) dilewati; baris yang
+      // terlihat seperti produk lain tetap menahan total supaya tidak ada item terlewat.
+      const detail =
+        /^[-•*]?\s*(size|ukuran|celana\s*(?:no|nomor)|warna|bahan|model|kirim|pre\s?-?order|po\b|dp|tb|bb|lingkar|panjang|lebar|kerah|saku|list|kancing|catatan|note|custom|detail)/i.test(line) ||
+        !/\b(jas|celana|setelan|tuxedo|tux|rompi|vest|beskap|suit|blazer|kemeja)\b/i.test(line)
+      if (!linePrices.length && detail) continue
+      return { ok: false, reason: `baris tidak cocok katalog: ${line}` }
+    }
     const big = /\b(xxl|3xl|xxxl)\b/i.test(line) ? row.note.match(/XXL-3XL ([\d.]+)/)?.[1] : null
     const unit = big ? Number(big.replace(/\./g, '')) : Number(row.price)
-    const qty = Math.max(1, Number(line.match(/(\d+)\s*(?:x|pcs|pc|buah)\b/i)?.[1] || 1))
     sum += unit * qty
+    items.push(line)
   }
+  if (!items.length) return { ok: false, reason: 'tidak ada produk katalog di rincian' }
   // subtotal 0 = draft dari kode (spesifikasi), pakai jumlah katalog apa adanya.
   if (draft.subtotal > 0 && sum !== draft.subtotal)
     return { ok: false, reason: `subtotal AI ${draft.subtotal} ≠ katalog ${sum}` }
@@ -674,7 +717,7 @@ export function matchAutoTotal(
     }
   return {
     ok: true,
-    items: lines.join('\n'),
+    items: items.join('\n'),
     subtotal: sum,
     shippingService: chosen.service.replace(/\d+$/, ''),
     shippingCost: Math.round(chosen.price),
@@ -691,13 +734,14 @@ export async function verifyAutoTotal(
     note: string
     active: boolean
   }>,
-  hints: string[] = []
+  hints: string[] = [],
+  statedPrices: number[] = []
 ): Promise<{ ok: true; total: VerifiedAutoTotal } | { ok: false; reason: string }> {
   const order = await readLeanOrder(orderId)
   if (!order || order.status !== 'pending') return { ok: false, reason: 'order bukan pending' }
   const options = order.shipping_options ? JSON.parse(String(order.shipping_options)) : null
   if (!options?.prices?.length) return { ok: false, reason: 'tarif ongkir belum ada di order' }
-  const result = matchAutoTotal(draft, catalog, options.prices, hints)
+  const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices)
   if (!result.ok) return result
   return {
     ok: true,
