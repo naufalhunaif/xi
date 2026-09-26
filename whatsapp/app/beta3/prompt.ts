@@ -284,7 +284,8 @@ export function buildLeanPrompt(input: {
     ],
     [
       'keluaran',
-      'Pahami maksud pelanggan dari seluruh RIWAYAT, bukan hanya pesan terakhir; jangan menanyakan ulang hal yang sudah jelas. Ditanya harga dan produknya sudah jelas (dikutip, baru dikirim fotonya, atau sudah disebut) → langsung sebut harganya dari KATALOG. Produk belum jelas → sebut kisaran harga dari KATALOG sambil menanyakan modelnya.\n' +
+      'Pengiriman hanya via JNE (REG/YES); ekspedisi lain (J&T, SiCepat, dll) tidak tersedia. Kargo JNE (JTR) minimal 8 kg, hanya untuk pesanan besar.\n' +
+        'Pahami maksud pelanggan dari seluruh RIWAYAT, bukan hanya pesan terakhir; jangan menanyakan ulang hal yang sudah jelas. Ditanya harga dan produknya sudah jelas (dikutip, baru dikirim fotonya, atau sudah disebut) → langsung sebut harganya dari KATALOG. Produk belum jelas → sebut kisaran harga dari KATALOG sambil menanyakan modelnya.\n' +
         'Balas sebagai JSON sesuai schema: pesan (array bubble), foto (nama varian katalog), catatan, tahap, serah_cs, alasan, susulan, spesifikasi. Jangan menulis apa pun di luar JSON.',
     ],
   ]

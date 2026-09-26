@@ -380,7 +380,7 @@ export async function createLeanReply(input: {
         }
       }
       if (resolved) {
-        const cacheKey = `ongkir:${resolved.code}:${new Date().toISOString().slice(0, 10)}`
+        const cacheKey = `ongkir2:${resolved.code}:${new Date().toISOString().slice(0, 10)}`
         note = await readLeanState(cacheKey)
         if (!note) {
           const rates = await callLeanTool<ShippingRates>(

@@ -377,9 +377,15 @@ const SERVICE_LABEL: Array<[RegExp, string]> = [
 const serviceLabel = (code: string) =>
   SERVICE_LABEL.find(([pattern]) => pattern.test(code))?.[1] || code
 
+/** JTR = kargo JNE, minimal 8 kg: tidak ditawarkan untuk pesanan biasa (1–2 potong). */
+const isCargo = (service: string) => /JTR/i.test(service)
+export const CARGO_MIN_KG = 8
+
 /** Blok ongkir rapi, satu layanan per baris; dipakai AI dan dipasang ulang oleh kode. */
-export function shippingBlock(rates: ShippingRates) {
-  const prices = (rates.prices || []).filter((row) => row.price > 0)
+export function shippingBlock(rates: ShippingRates, weightKg = 1) {
+  const prices = (rates.prices || []).filter(
+    (row) => row.price > 0 && (weightKg >= CARGO_MIN_KG || !isCargo(row.service))
+  )
   if (!prices.length) return ''
   const where = [rates.destination?.district, rates.destination?.city]
     .filter(Boolean)
@@ -399,5 +405,7 @@ export function renderShippingRates(rates: ShippingRates) {
   const codes = prices
     .map((row) => `${serviceLabel(row.service.replace(/\d+$/, ''))} = ${row.service.replace(/\d+$/, '')}`)
     .join(', ')
-  return `ONGKIR ke ${where || 'tujuan'} (1 kg): ${prices.map((row) => `${row.service.replace(/\d+$/, '')} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${row.etd.replace('day', 'hari')})` : ''}`).join(', ')}. Kode layanan untuk field order: ${codes}. Tanyakan mau pakai yang mana; total = harga barang + ongkir yang dipilih.\nTulis ongkir ke pelanggan PERSIS dengan blok ini (satu layanan per baris, nama REG/YES/JTR, bukan kode CTC), lalu tanya mau pakai yang mana:\n<<<ONGKIR\n${shippingBlock(rates)}\nONGKIR>>>`
+  const cargo = prices.find((row) => isCargo(row.service))
+  const rule = `Pengiriman hanya via JNE (REG/YES; ekspedisi lain tidak tersedia). JTR adalah kargo JNE minimal ${CARGO_MIN_KG} kg${cargo ? ' — jangan ditawarkan untuk pesanan biasa; sebut hanya bila pesanan besar (≥8 kg, mis. seragam/borongan) atau pelanggan menanyakan kargo' : ''}.`
+  return `${rule}\nONGKIR ke ${where || 'tujuan'} (1 kg): ${prices.map((row) => `${row.service.replace(/\d+$/, '')} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${row.etd.replace('day', 'hari')})` : ''}`).join(', ')}. Kode layanan untuk field order: ${codes}. Tanyakan mau pakai yang mana; total = harga barang + ongkir yang dipilih.\nTulis ongkir ke pelanggan PERSIS dengan blok ini (satu layanan per baris, nama REG/YES/JTR, bukan kode CTC), lalu tanya mau pakai yang mana:\n<<<ONGKIR\n${shippingBlock(rates)}\nONGKIR>>>`
 }
