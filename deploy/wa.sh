@@ -393,7 +393,7 @@ case "${1:-menu}" in
   start) supctl start wa-web wa-worker ;;
   stop) supctl stop wa-web wa-worker ;;
   restart) supctl restart wa-web wa-worker ;;
-  logs|log) tail -n 100 -f "/var/log/wa/${2:-worker}.log" ;;
+  logs|log) tail -n 100 -f "/var/log/wa/${2:-worker}.log" "/var/log/wa/${2:-worker}.err.log" ;;
   update) update "${2:-}" ;;
   rollback) rollback ;;
   version) echo "$(current_version) ($(git_ref))" ;;

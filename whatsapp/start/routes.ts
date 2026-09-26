@@ -25,8 +25,8 @@ router.get('/auth/callback', [AccountController, 'callback']).as('account.callba
 router.get('/instagram/webhook', [InstagramController, 'verify'])
 router.post('/instagram/webhook', [InstagramController, 'receive'])
 router.get('/ig-media/:name', [InstagramController, 'media'])
-router.get('/privacy', [InstagramController, 'policy'])
-router.get('/data-deletion', [InstagramController, 'policy'])
+router.get('/privacy', [InstagramController, 'policy']).as('instagram.privacy')
+router.get('/data-deletion', [InstagramController, 'policy']).as('instagram.deletion')
 
 router
   .group(() => {
