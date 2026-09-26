@@ -389,3 +389,4 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .brand { color: var(--text); }
 .workspace-ui .brand .brand-icon { display: block; flex: none; }
 .workspace-ui .app-launcher-icon svg { display: block; }
+.workspace-ui .wa-ai-advanced[hidden] { display: none; }

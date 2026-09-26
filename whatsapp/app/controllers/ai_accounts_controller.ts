@@ -204,10 +204,9 @@ export default class AiAccountsController {
 
   async destroy({ params, response }: HttpContext) {
     const account = await found(params)
-    if (account.legacy)
-      return response.unprocessableEntity({ error: 'Akun utama tidak bisa dihapus, cukup nonaktifkan.' })
     await deleteAiAccount(account.id)
-    await rm(
+    // Akun utama memakai folder login workspace bersama; hanya akun tambahan yang punya folder sendiri.
+    if (!account.legacy) await rm(
       app.makePath('storage', 'ai-accounts', String(account.id)),
       { recursive: true, force: true }
     ).catch(() => {})

@@ -4,6 +4,26 @@ import db from '#services/workspace_database'
 import { workspaceScope } from '#services/workspace_context'
 import { readSettings } from '#services/settings_service'
 import type { AiAccountRef } from '#services/ai_account_context'
+import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { workspaceOAuthDirectory } from '#services/workspace_oauth'
+
+/** Login lama (panel ChatGPT/Claude sebelum daftar akun) masih tersimpan di server? */
+function legacyLoginExists(provider: 'chatgpt' | 'claude') {
+  try {
+    const dir =
+      workspaceOAuthDirectory(provider === 'claude' ? 'claude' : 'codex') ||
+      (provider === 'claude'
+        ? process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+        : process.env.CODEX_HOME || join(homedir(), '.codex'))
+    return provider === 'claude'
+      ? existsSync(join(dir, '.credentials.json'))
+      : existsSync(join(dir, 'auth.json'))
+  } catch {
+    return false
+  }
+}
 
 export type AiProviderName = 'chatgpt' | 'claude' | 'gemini'
 export const AI_ACCOUNT_PROVIDERS: AiProviderName[] = ['chatgpt', 'claude', 'gemini']
@@ -57,24 +77,31 @@ async function ensureTable() {
       count = await db.from('whatsapp_ai_accounts').count('* as total').first()
     }
   }
-  // Pertama kali: akun lama (satu ChatGPT + satu Claude) menjadi dua baris pertama.
-  if (!Number(count?.total || 0)) {
-    const settings = await readSettings().catch(() => null)
-    const primary: AiProviderName = settings?.aiProvider === 'claude' ? 'claude' : 'chatgpt'
-    const secondary: AiProviderName = primary === 'claude' ? 'chatgpt' : 'claude'
-    const now = new Date()
-    await db.table('whatsapp_ai_accounts').multiInsert([
-      { provider: primary, label: '', position: 1, enabled: 1, legacy: 1, created_at: now, updated_at: now },
-      {
-        provider: secondary,
-        label: '',
-        position: 2,
-        enabled: 1,
-        legacy: 1,
-        created_at: now,
-        updated_at: now,
-      },
-    ])
+  // Sekali saja: instalasi lama yang SUDAH login ChatGPT/Claude di panel lama dimasukkan
+  // ke daftar. Instalasi baru mulai kosong; akun yang dihapus tidak muncul lagi.
+  await ensurePrefs()
+  const prefs = await db.from('whatsapp_ai_prefs').where('id', 1).first()
+  if (!Number(prefs?.seeded || 0)) {
+    if (!Number(count?.total || 0)) {
+      const settings = await readSettings().catch(() => null)
+      const first: AiProviderName = settings?.aiProvider === 'claude' ? 'claude' : 'chatgpt'
+      const logged = (['chatgpt', 'claude'] as const).filter((provider) => legacyLoginExists(provider))
+      logged.sort((a) => (a === first ? -1 : 1))
+      const now = new Date()
+      if (logged.length)
+        await db.table('whatsapp_ai_accounts').multiInsert(
+          logged.map((provider, index) => ({
+            provider,
+            label: '',
+            position: index + 1,
+            enabled: 1,
+            legacy: 1,
+            created_at: now,
+            updated_at: now,
+          }))
+        )
+    }
+    await db.from('whatsapp_ai_prefs').where('id', 1).update({ seeded: 1 })
   }
   // Dulu akun utama kedua hanya aktif bila "alih otomatis" dinyalakan. Kini semua akun
   // di daftar dipakai: aktifkan sekali, kecuali yang sengaja dinonaktifkan pengguna.
@@ -159,6 +186,7 @@ async function ensurePrefs() {
     spread VARCHAR(10) NOT NULL DEFAULT 'order'
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
   await db.rawQuery("INSERT IGNORE INTO whatsapp_ai_prefs (id, spread) VALUES (1, 'order')")
+  await db.rawQuery('ALTER TABLE whatsapp_ai_prefs ADD COLUMN IF NOT EXISTS seeded TINYINT(1) NOT NULL DEFAULT 0')
   prefsReady = true
 }
 export async function aiSpreadMode(): Promise<AiSpreadMode> {

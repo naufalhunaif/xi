@@ -184,8 +184,7 @@
         await call(`/api/ai/accounts/${account.id}/update`, 'POST', { enabled: !account.enabled })
         refresh()
       }))
-      if (!account.legacy)
-        side.append(button(t('Hapus'), async () => {
+      side.append(button(t('Hapus'), async () => {
           if (!window.confirm(t('Hapus akun {0}?', account.name))) return
           await call(`/api/ai/accounts/${account.id}`, 'DELETE')
           refresh()
@@ -312,6 +311,10 @@
       const data = await call('/api/ai/accounts')
       render(data.accounts || [])
       showSpread(data.spread || 'order')
+      // Panel lama (model/kecepatan akun utama) hanya relevan bila akun utama masih ada.
+      const advanced = document.querySelector('.wa-ai-advanced')
+      if (advanced) advanced.hidden = !(data.accounts || []).some((a) => a.legacy)
+      if (!(data.accounts || []).length) list.replaceChildren(el('p', 'wa-note', t('Belum ada akun AI. Tambahkan akun di bawah.')))
     } catch (error) {
       status(error.message)
     }

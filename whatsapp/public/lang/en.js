@@ -1268,4 +1268,10 @@ window.waLocales.en = {
   "Terkirim": "Sent",
   "Putuskan nomor": "Disconnect number",
   "Kontak dasar, skill, pengaturan, akun AI, dan koneksi nomor tetap ada. Tidak menghapus data di Orion/MCP.": "Basic contacts, skills, settings, AI accounts and the number connection stay. Data in Orion/MCP is not deleted.",
+  "Belum ada akun AI. Tambahkan akun di bawah.": "No AI accounts yet. Add one below.",
+  "Nomor terhubung": "Connected numbers",
+  "Nomor {0}": "Number {0}",
+  "Hapus nomor {0}? Chat yang sudah ada tetap tersimpan.": "Remove number {0}? Existing chats are kept.",
+  "Belum ada nomor. Klik Tambah nomor lalu scan QR dari HP.": "No numbers yet. Click Add number, then scan the QR from your phone.",
+  "Menyiapkan QR… scan dari HP (Perangkat tertaut).": "Preparing QR… scan it from your phone (Linked devices).",
 }

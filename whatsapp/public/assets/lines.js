@@ -59,38 +59,71 @@
     return item
   }
 
+  // Satu daftar nomor. Slot pertama memakai koneksi bawaan, sisanya nomor tambahan;
+  // bagi pengguna semuanya sama: bisa ditambah, di-scan, dan dihapus.
+  function removeButton(label, path) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'button small'
+    button.textContent = t('Hapus')
+    button.addEventListener('click', async () => {
+      if (!window.confirm(t('Hapus nomor {0}? Chat yang sudah ada tetap tersimpan.', label))) return
+      button.disabled = true
+      try {
+        await call(path, 'POST')
+        refresh()
+      } catch (error) {
+        status(error.message)
+        button.disabled = false
+      }
+    })
+    return button
+  }
+  function appendQr(src, error) {
+    if (src) {
+      const box = document.createElement('div')
+      box.className = 'wa-connect-qr'
+      const qr = document.createElement('img')
+      qr.className = 'wa-line-qr'
+      qr.alt = t('Kode QR')
+      qr.src = src
+      const note = document.createElement('small')
+      note.className = 'wa-note'
+      note.textContent = t('Di HP buka Perangkat tertaut → Tautkan perangkat, lalu scan QR ini.')
+      box.append(qr, note)
+      list.append(box)
+    }
+    if (error) {
+      const alert = document.createElement('p')
+      alert.className = 'wa-alert'
+      alert.textContent = error
+      list.append(alert)
+    }
+  }
+  let primaryActive = false
   function render(data) {
     list.replaceChildren()
-    // Nomor utama dikelola di kartu atasnya (Hubungkan/Putuskan + QR).
+    primaryActive = Boolean(data.primary?.active)
+    let index = 0
+    if (primaryActive) {
+      index++
+      const label = phoneLabel(data.primary.phone)
+      list.append(row(t('Nomor {0}', index), label, data.primary.status, removeButton(label, '/api/disconnect')))
+      appendQr(data.primary.qr)
+    }
     for (const line of data.lines || []) {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.className = 'button small'
-      button.textContent = t('Putuskan')
+      index++
+      const label = phoneLabel(line.phone)
+      const button = removeButton(label, `/api/lines/${line.id}/disconnect`)
       button.disabled = line.status === 'disconnecting'
-      button.addEventListener('click', async () => {
-        if (!window.confirm(t('Putuskan nomor {0}? Chat yang sudah ada tetap tersimpan.', phoneLabel(line.phone)))) return
-        try {
-          await call(`/api/lines/${line.id}/disconnect`, 'POST')
-          refresh()
-        } catch (error) {
-          status(error.message)
-        }
-      })
-      list.append(row(t('Nomor tambahan'), phoneLabel(line.phone), line.status, button))
-      if (line.qr) {
-        const qr = document.createElement('img')
-        qr.className = 'wa-line-qr'
-        qr.alt = t('Kode QR')
-        qr.src = line.qr
-        list.append(qr)
-      }
-      if (line.error) {
-        const error = document.createElement('p')
-        error.className = 'wa-alert'
-        error.textContent = line.error
-        list.append(error)
-      }
+      list.append(row(t('Nomor {0}', index), label, line.status, button))
+      appendQr(line.qr, line.error)
+    }
+    if (!index) {
+      const empty = document.createElement('p')
+      empty.className = 'wa-note'
+      empty.textContent = t('Belum ada nomor. Klik Tambah nomor lalu scan QR dari HP.')
+      list.append(empty)
     }
   }
 
@@ -100,7 +133,9 @@
     try {
       const data = await call('/api/lines')
       render(data)
-      const busy = (data.lines || []).some((line) => ['qr', 'connecting', 'disconnecting'].includes(line.status))
+      const busy =
+        ['qr', 'connecting'].includes(data.primary?.status) ||
+        (data.lines || []).some((line) => ['qr', 'connecting', 'disconnecting'].includes(line.status))
       timer = setTimeout(refresh, busy ? 3000 : 15000)
     } catch (error) {
       status(error.message)
@@ -111,8 +146,9 @@
     const button = byId('lineAdd')
     button.disabled = true
     try {
-      await call('/api/lines', 'POST')
-      status(t('Menyiapkan QR… scan dari HP nomor tambahan (Perangkat tertaut).'))
+      // Slot pertama kosong → pakai koneksi bawaan; selebihnya nomor tambahan.
+      await call(primaryActive ? '/api/lines' : '/api/connect', 'POST')
+      status(t('Menyiapkan QR… scan dari HP (Perangkat tertaut).'))
       refresh()
     } catch (error) {
       status(error.message)

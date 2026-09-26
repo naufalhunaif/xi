@@ -11,11 +11,16 @@ export default class LinesController {
     response.header('Cache-Control', 'no-store')
     const [scope, connection, lines] = await Promise.all([
       activeWorkspace(),
-      readConnectionStatus(),
+      readConnectionStatus() as Promise<Record<string, any>>,
       listLines(),
     ])
     return response.json({
-      primary: { phone: scope.phone || null, status: connection.status },
+      primary: {
+        phone: connection.phone || scope.phone || null,
+        status: connection.status,
+        active: Boolean(connection.desired_connected) || ['connected', 'qr', 'connecting'].includes(connection.status),
+        qr: connection.status === 'qr' ? connection.qr_data_url : null,
+      },
       lines: lines.map((line) => ({
         id: line.id,
         phone: line.phone,
