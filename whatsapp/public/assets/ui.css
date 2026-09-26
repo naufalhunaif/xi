@@ -426,3 +426,6 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .wa-correct-status { font-size: 11px; color: var(--muted); }
 .wa-correct-status:empty { display: none; }
 .wa-correct-box .actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* Backup: elemen yang disembunyikan JS tetap tersembunyi walau punya display grid/flex. */
+.workspace-ui #settings-backup [hidden] { display: none !important; }
+.workspace-ui #settings-backup ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }

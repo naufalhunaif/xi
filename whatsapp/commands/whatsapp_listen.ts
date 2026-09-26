@@ -22,6 +22,7 @@ import {
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import db from '#services/workspace_database'
 import { attachOrderPhotos } from '#beta3/order_photos'
+import { autoBackupTick, restartRequestedSince } from '#services/backup_service'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import makeWASocket, {
@@ -334,7 +335,22 @@ export default class WhatsappListen extends BaseCommand {
       this.socket?.end(undefined)
     })
     this.logger.info(`Listener WhatsApp aktif (pid=${process.pid}, build=${process.cwd()})`)
+    const startedAt = Date.now()
+    let lastBackupCheck = 0
     while (!this.stopping) {
+      // Setelah pemulihan backup: mulai ulang (Supervisor menjalankan lagi dengan data baru).
+      if (await restartRequestedSince(startedAt)) {
+        this.logger.info('Data dipulihkan dari backup; worker dimulai ulang.')
+        for (const child of this.lineChildren.values()) child.kill('SIGTERM')
+        this.socket?.end(undefined)
+        setTimeout(() => process.exit(0), 1500)
+        return
+      }
+      // Backup harian ke Google Drive (sekitar 03.00 WIB) bila diaktifkan.
+      if (Date.now() - lastBackupCheck > 30 * 60_000) {
+        lastBackupCheck = Date.now()
+        void autoBackupTick().catch(() => {})
+      }
       try {
         const cleanupState = await workspaceState()
         if (cleanupState.cleanup_workspace_id) {
@@ -587,7 +603,9 @@ export default class WhatsappListen extends BaseCommand {
       this.socket?.end(undefined)
       setTimeout(() => process.exit(0), 3000).unref()
     })
+    const lineStartedAt = Date.now()
     while (!this.stopping) {
+      if (await restartRequestedSince(lineStartedAt)) break
       try {
         const row = await readLine(line)
         if (!row) break
