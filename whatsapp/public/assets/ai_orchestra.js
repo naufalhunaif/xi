@@ -145,6 +145,7 @@
       bindHover(node)
       node.el.addEventListener('pointerdown', (event) => startDrag(event, node))
       nodes.set(account.id, node)
+      reheat(0.8)
     }
     return node
   }
@@ -176,6 +177,7 @@
       })
       node.el.addEventListener('pointerdown', (event) => startDrag(event, node))
       people.set(customer.jid, node)
+      reheat(0.6)
     }
     return node
   }
@@ -211,6 +213,7 @@
       const now = Date.now()
       for (const customer of customers) {
         const node = personFor(customer)
+        if (node.customer && node.customer.accountId !== customer.accountId) reheat(0.3)
         node.customer = customer
         keep.add(customer.jid)
         const fresh = now - customer.at < 10 * 60_000
@@ -253,6 +256,38 @@
     node.el.addEventListener('focus', () => showTip(node))
     node.el.addEventListener('blur', hideTip)
   }
+  // Sorot simpul & tetangganya, redupkan sisanya (seperti hover di Obsidian).
+  function highlight(node) {
+    svg.classList.add('orc-focus')
+    const lit = new Set([node])
+    const litLines = new Set()
+    if (node.kind === 'account') {
+      lit.add(hub)
+      litLines.add(node.edge)
+      for (const person of people.values())
+        if (person.customer.accountId === node.id) {
+          lit.add(person)
+          litLines.add(person.link)
+        }
+    } else if (node.kind === 'person') {
+      const anchor = nodes.get(node.customer.accountId) || hub
+      lit.add(anchor)
+      litLines.add(node.link)
+    } else {
+      for (const account of nodes.values()) {
+        lit.add(account)
+        litLines.add(account.edge)
+      }
+    }
+    for (const item of [hub, ...nodes.values(), ...people.values()]) item.el.classList.toggle('hl', lit.has(item))
+    for (const item of [...nodes.values()]) item.edge.classList.toggle('hl', litLines.has(item.edge))
+    for (const item of [...people.values()]) item.link.classList.toggle('hl', litLines.has(item.link))
+  }
+  function unhighlight() {
+    svg.classList.remove('orc-focus')
+  }
+  hub.el.addEventListener('pointerenter', () => highlight(hub))
+  hub.el.addEventListener('pointerleave', unhighlight)
   function showTip(node) {
     const lines = []
     if (node.kind === 'account' && node.account) {
@@ -292,6 +327,7 @@
       })
     )
     tip.hidden = false
+    highlight(node)
     const box = svg.getBoundingClientRect()
     const stage = svg.parentElement.getBoundingClientRect()
     const point = svg.createSVGPoint()
@@ -304,6 +340,7 @@
   }
   function hideTip() {
     tip.hidden = true
+    unhighlight()
   }
 
   function startDrag(event, node) {
@@ -318,7 +355,7 @@
       node.x = p.x
       node.y = p.y
       node.vx = node.vy = 0
-      kick()
+      reheat(0.3)
     }
     const end = () => {
       node.fixed = false
@@ -386,6 +423,7 @@
         const provider = node.account?.provider
         if (person) {
           // Pelanggan pindah menempel ke akun yang sedang melayani.
+          if (person.customer.accountId !== event.accountId) reheat(0.3)
           person.customer.accountId = event.accountId
           pulse(person, node, 'start', provider)
         } else pulse(hub, node, 'start', provider)
@@ -415,6 +453,14 @@
   let running = false
   let lastFrame = 0
   let busyTimer = 0
+  const ALPHA_MIN = 0.004
+  const ALPHA_DECAY = 0.0228
+  let alpha = 1
+  /** Panaskan tata letak (data berubah / simpul diseret) agar bergerak lalu tenang lagi. */
+  function reheat(value = 0.3) {
+    alpha = Math.max(alpha, value)
+    kick()
+  }
   function kick() {
     if (running || document.hidden || root.offsetParent === null) return
     running = true
@@ -427,54 +473,92 @@
     const accountList = [...nodes.values()]
     const peopleList = [...people.values()]
     const all = [...accountList, ...peopleList]
-    const ring = accountList.length > 5 ? 130 : 112
-    let energy = 0
-    for (const node of all) {
-      if (node.fixed) continue
-      let fx = 0
-      let fy = 0
-      if (node.kind === 'account') {
-        const dist = Math.hypot(node.x, node.y) || 1
-        fx += (-(dist - ring) * 0.012 * node.x) / dist
-        fy += (-(dist - ring) * 0.012 * node.y) / dist
-      } else {
-        // Pelanggan menempel ke akun yang melayani; yang belum, mengelilingi luar.
+    // Tata letak gaya d3-force (seperti graph view Obsidian): pegas di garis, tolak-menolak,
+    // tarikan ke tengah, anti-tumpuk, lalu "mendingin" sampai diam. Dipanaskan lagi bila berubah.
+    if (alpha > ALPHA_MIN) {
+      alpha += (0 - alpha) * ALPHA_DECAY
+      const bodies = [hub, ...all]
+      const links = []
+      // [asal, tujuan, panjang, kekuatan]
+      for (const node of accountList) links.push([hub, node, 70, 0.8])
+      for (const node of peopleList) {
         const anchor = nodes.get(node.customer.accountId)
-        const target = anchor || hub
-        const want = anchor ? 42 : 185
-        const dx = node.x - target.x
-        const dy = node.y - target.y
-        const dist = Math.hypot(dx, dy) || 1
-        fx += (-(dist - want) * 0.01 * dx) / dist
-        fy += (-(dist - want) * 0.01 * dy) / dist
+        links.push(anchor ? [anchor, node, 30, 0.6] : [hub, node, 125, 0.15])
       }
-      for (const other of all) {
-        if (other === node) continue
-        const dx = node.x - other.x
-        const dy = node.y - other.y
-        const d2 = Math.max(40, dx * dx + dy * dy)
-        if (d2 > 14000) continue
-        const strength =
-          node.kind === 'account' && other.kind === 'account'
-            ? 60
-            : node.kind === 'person' && other.kind === 'person'
-              ? 9
-              : node.kind === 'account'
-                ? 3
-                : 14
-        fx += (dx / d2) * strength
-        fy += (dy / d2) * strength
+      const degree = new Map()
+      for (const [s, t] of links) {
+        degree.set(s, (degree.get(s) || 0) + 1)
+        degree.set(t, (degree.get(t) || 0) + 1)
       }
-      if (!reduce.matches) {
-        fx += Math.sin(now / 1900 + (node.seed || node.id)) * 0.01
-        fy += Math.cos(now / 2300 + (node.seed || node.id) * 1.7) * 0.01
+      // Pegas garis.
+      for (const [source, target, distance, strength] of links) {
+        let dx = target.x + target.vx - source.x - source.vx || 0.01
+        let dy = target.y + target.vy - source.y - source.vy || 0.01
+        const l = Math.hypot(dx, dy)
+        const k = ((l - distance) / l) * alpha * strength
+        dx *= k
+        dy *= k
+        const bias = degree.get(source) / (degree.get(source) + degree.get(target))
+        if (!target.fixed) {
+          target.vx -= dx * bias
+          target.vy -= dy * bias
+        }
+        if (!source.fixed) {
+          source.vx += dx * (1 - bias)
+          source.vy += dy * (1 - bias)
+        }
       }
-      node.vx = (node.vx + fx) * 0.85
-      node.vy = (node.vy + fy) * 0.85
-      node.x = Math.max(-600, Math.min(600, node.x + node.vx))
-      node.y = Math.max(-600, Math.min(600, node.y + node.vy))
-      energy += Math.abs(node.vx) + Math.abs(node.vy)
+      // Tolak-menolak (muatan) + anti-tumpuk.
+      const radius = (node) => (node === hub ? 12 : node.kind === 'account' ? 10 : 4)
+      for (let i = 0; i < bodies.length; i++) {
+        const a = bodies[i]
+        for (let j = i + 1; j < bodies.length; j++) {
+          const b = bodies[j]
+          let dx = b.x - a.x || (Math.random() - 0.5) * 0.1
+          let dy = b.y - a.y || (Math.random() - 0.5) * 0.1
+          let d2 = dx * dx + dy * dy
+          if (d2 > 90000) continue
+          // Muatan per simpul (seperti d3 manyBody): akun & pusat lebih kuat dari pelanggan.
+          const charge = (node) => (node === hub ? -140 : node.kind === 'account' ? -90 : -14)
+          const inv = alpha / Math.max(d2, 25)
+          if (!a.fixed) {
+            a.vx += dx * charge(b) * inv
+            a.vy += dy * charge(b) * inv
+          }
+          if (!b.fixed) {
+            b.vx -= dx * charge(a) * inv
+            b.vy -= dy * charge(a) * inv
+          }
+          const min = radius(a) + radius(b) + 2
+          const d = Math.sqrt(d2) || 0.01
+          if (d < min) {
+            const push = ((min - d) / d) * 0.5
+            if (!a.fixed) {
+              a.x -= dx * push
+              a.y -= dy * push
+            }
+            if (!b.fixed) {
+              b.x += dx * push
+              b.y += dy * push
+            }
+          }
+        }
+      }
+      // Tarikan lembut ke tengah & redaman kecepatan.
+      for (const node of all) {
+        if (node.fixed) {
+          node.vx = node.vy = 0
+          continue
+        }
+        node.vx -= node.x * 0.004 * alpha
+        node.vy -= node.y * 0.004 * alpha
+        node.vx *= 0.6
+        node.vy *= 0.6
+        node.x += node.vx
+        node.y += node.vy
+      }
     }
+    const energy = alpha
     if (!userView && all.length) {
       // Kamera mengikuti batas graf dengan halus.
       let minX = -60, maxX = 60, minY = -60, maxY = 60
@@ -544,8 +628,9 @@
       arc.path.style.opacity = String(Math.min(1, (4000 - age) / 1200))
       return true
     })
-    const calm = energy < 0.05 && !pulses.length && !arcs.length && !busy.size
-    if (!document.hidden && root.offsetParent !== null && !(calm && reduce.matches)) requestAnimationFrame(frame)
+    // Diam bila tata letak sudah dingin dan tidak ada animasi: hemat CPU.
+    const calm = energy <= ALPHA_MIN && !pulses.length && !arcs.length && !busy.size
+    if (!document.hidden && root.offsetParent !== null && !calm) requestAnimationFrame(frame)
     else running = false
   }
 

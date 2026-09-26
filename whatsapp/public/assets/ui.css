@@ -366,3 +366,10 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
   .workspace-ui .wa-orchestra.expanded .wa-orchestra-stage { aspect-ratio: auto; min-height: 0; }
   .workspace-ui .wa-orchestra.expanded .wa-orchestra-log { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Hover ala Obsidian: simpul & tetangga menyala, sisanya redup. Teks label mengikuti. */
+.workspace-ui .orc-focus .orc-node:not(.hl), .workspace-ui .orc-focus .orc-person:not(.hl) { opacity: .18; }
+.workspace-ui .orc-focus .orc-edge:not(.hl), .workspace-ui .orc-focus .orc-link:not(.hl) { opacity: .08; }
+.workspace-ui .orc-focus .orc-edge.hl, .workspace-ui .orc-focus .orc-link.hl { stroke: var(--wa-ok); stroke-width: 1.1; opacity: 1; }
+.workspace-ui .orc-focus .orc-person.hl .plabel { opacity: 1; }
+.workspace-ui .orc-node, .workspace-ui .orc-person, .workspace-ui .orc-edge, .workspace-ui .orc-link { transition: opacity .18s; }
