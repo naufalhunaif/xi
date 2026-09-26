@@ -258,6 +258,18 @@
               <img id="qrImage" alt="QR WhatsApp" />
             </section>
 
+            @if(instagramOn)
+              <div id="channelTabs" class="wa-segmented" role="group" aria-label="Kanal" data-i18n-aria-label="Kanal">
+                @each(tab in [
+                  { key: 'all', label: 'Semua' },
+                  { key: 'wa', label: 'WhatsApp' },
+                  { key: 'ig', label: 'Instagram' },
+                  { key: 'comments', label: 'Komentar' },
+                ])
+                  <button type="button" data-channel="{{ tab.key }}" aria-pressed="{{ tab.key === 'all' ? 'true' : 'false' }}"><span data-i18n-auto>{{ tab.label }}</span> <span data-channel-count></span></button>
+                @end
+              </div>
+            @end
             <div id="inboxFilters" class="wa-inbox-filters" role="group" aria-label="Filter percakapan" data-i18n-aria-label="Filter percakapan">
               <div class="wa-inbox-tabs">
                 @each(tab in
@@ -304,6 +316,7 @@
                   data-payment="{{ contact.needs_payment ? 'true' : 'false' }}"
                   data-order="{{ contact.has_order ? 'true' : 'false' }}"
                   data-unanswered="{{ contact.unanswered_count }}"
+                  data-channel="{{ contact.channel }}"
                 >
                   @if(contact.profile_picture_url)
                     <img
@@ -316,6 +329,7 @@
                     <span class="wa-contact-avatar">
                       {{
                         (contact.contact_name || contact.jid)
+                          .replace('@', '')
                           .slice(0, 1)
                           .toUpperCase()
                       }}
@@ -323,7 +337,12 @@
                   @end
 
                   <span class="wa-contact-content">
-                    <strong>{{ contact.contact_name || contact.jid.split('@')[0] }}</strong>
+                    <strong>
+                      @if(contact.channel === 'ig')
+                        <span class="wa-channel ig" aria-label="Instagram">IG</span>
+                      @end
+                      {{ contact.contact_name || contact.jid.split('@')[0] }}
+                    </strong>
                     <small class="{{ contact.activity ? 'active' : '' }}">
                       {{ contact.activity || contact.body || '' }}
                     </small>
@@ -357,6 +376,7 @@
                 <div class="wa-empty" data-i18n="Belum ada kontak">Belum ada kontak</div>
               @end
             </div>
+            <div id="igComments" class="wa-comments" hidden aria-live="polite"></div>
           </aside>
 
           <section id="chat" class="wa-panel wa-chat-panel">
@@ -781,73 +801,107 @@
                 </section>
                 <section id="settings-skill" data-settings-panel="skill" aria-labelledby="settings-title-skill" hidden>
                   <h2 id="settings-title-skill" data-i18n="Skill">Skill</h2>
-                  <div class="wa-skill-card" id="skillCard">
-                    <p><strong id="skillName">—</strong> <span id="skillSource" class="wa-muted"></span></p>
-                    <p class="wa-muted"><span data-i18n="Terakhir diperbarui">Terakhir diperbarui</span>: <span id="skillUpdated">—</span> · <span data-i18n="Dicek">Dicek</span>: <span id="skillChecked">—</span></p>
-                    <p class="wa-muted" data-i18n="Skill dicek otomatis tiap 30 menit dari rilis online. Tekan tombol untuk mengambil sekarang.">Skill dicek otomatis tiap 30 menit dari rilis online. Tekan tombol untuk mengambil sekarang.</p>
-                    <div class="actions"><button type="button" class="button primary" id="skillUpdate" data-i18n="Update skill">Update skill</button></div>
-                    <small id="skillStatus" role="status" aria-live="polite"></small>
+                  <div class="wa-card" id="skillCard">
+                    <div class="wa-card-head">
+                      <div class="wa-card-title">
+                        <strong><span id="skillName">—</span> <span id="skillSource" class="wa-note"></span></strong>
+                        <small><span data-i18n="Terakhir diperbarui">Terakhir diperbarui</span>: <span id="skillUpdated">—</span> · <span data-i18n="Dicek">Dicek</span>: <span id="skillChecked">—</span></small>
+                      </div>
+                      <div class="actions"><button type="button" class="button primary" id="skillUpdate" data-i18n="Update skill">Update skill</button></div>
+                    </div>
+                    <p class="wa-note"><span data-i18n="Skill dicek otomatis tiap 30 menit dari rilis online. Tekan tombol untuk mengambil sekarang.">Skill dicek otomatis tiap 30 menit dari rilis online. Tekan tombol untuk mengambil sekarang.</span> <small id="skillStatus" role="status" aria-live="polite"></small></p>
                     <details><summary data-i18n="Lihat isi skill">Lihat isi skill</summary><pre id="skillContent" class="wa-b3-spec"></pre></details>
                   </div>
                 </section>
                 <section id="settings-instagram" data-settings-panel="instagram" aria-labelledby="settings-title-instagram" hidden>
                   <h2 id="settings-title-instagram">Instagram</h2>
-                  <div class="wa-skill-card wa-ig-card" id="igCard">
-                    <p><strong id="igStatus" data-i18n="Belum terhubung">Belum terhubung</strong></p>
-                    <p class="wa-muted" data-i18n="DM Instagram masuk ke inbox yang sama dan dijawab AI. Komentar dibalas singkat lalu diarahkan ke DM atau WhatsApp.">DM Instagram masuk ke inbox yang sama dan dijawab AI. Komentar dibalas singkat lalu diarahkan ke DM atau WhatsApp.</p>
-                    <small id="igError" class="wa-ig-error"></small>
-                    <label>
-                      <span>App ID Instagram</span>
-                      <input id="igAppId" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" data-settings-ignore />
-                    </label>
-                    <label>
-                      <span>App Secret Instagram</span>
-                      <input id="igAppSecret" type="password" autocomplete="new-password" spellcheck="false" data-settings-ignore />
-                    </label>
-                    <div class="actions">
-                      <button type="button" class="button" id="igSave" data-i18n="Simpan">Simpan</button>
-                      <button type="button" class="button primary" id="igConnect" data-i18n="Hubungkan Instagram">Hubungkan Instagram</button>
-                      <button type="button" class="button" id="igDisconnect" hidden data-i18n="Putuskan">Putuskan</button>
+                  <div id="igCard">
+                    <div class="wa-card">
+                      <div class="wa-card-head">
+                        <div class="wa-card-title">
+                          <strong id="igStatus" data-i18n="Belum terhubung">Belum terhubung</strong>
+                          <small id="igWebhook" data-i18n="DM masuk ke inbox dan dijawab AI. Komentar dibalas singkat lalu diarahkan ke DM atau WhatsApp.">DM masuk ke inbox dan dijawab AI. Komentar dibalas singkat lalu diarahkan ke DM atau WhatsApp.</small>
+                        </div>
+                        <div class="actions">
+                          <span id="igPill" class="wa-pill" data-i18n="Belum terhubung">Belum terhubung</span>
+                          <button type="button" class="button" id="igDisconnect" hidden data-i18n="Putuskan">Putuskan</button>
+                        </div>
+                      </div>
+                      <p id="igError" class="wa-alert" role="alert"></p>
+                      <p class="wa-note" id="igStats"></p>
                     </div>
-                    <details class="wa-ig-token">
-                      <summary data-i18n="Atau tempel access token dari Meta">Atau tempel access token dari Meta</summary>
-                      <p class="wa-muted" data-i18n="Meta Developer → Instagram → API setup with Instagram login → Generate access tokens → salin token akun Anda.">Meta Developer → Instagram → API setup with Instagram login → Generate access tokens → salin token akun Anda.</p>
+
+                    <div class="wa-card">
+                      <div class="wa-card-head">
+                        <div class="wa-card-title">
+                          <strong data-i18n="Hubungkan akun">Hubungkan akun</strong>
+                          <small data-i18n="Dari Meta Developer → Instagram → API setup with Instagram login.">Dari Meta Developer → Instagram → API setup with Instagram login.</small>
+                        </div>
+                      </div>
+                      <div class="wa-form-grid">
+                        <label>
+                          <span>Instagram App ID</span>
+                          <input id="igAppId" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" data-settings-ignore />
+                        </label>
+                        <label>
+                          <span>Instagram App Secret</span>
+                          <input id="igAppSecret" type="password" autocomplete="new-password" spellcheck="false" data-settings-ignore />
+                        </label>
+                        <label class="wa-span-full">
+                          <span data-i18n="Access token (Generate access tokens)">Access token (Generate access tokens)</span>
+                          <input id="igAccessToken" type="password" autocomplete="off" spellcheck="false" data-settings-ignore />
+                        </label>
+                      </div>
+                      <div class="actions wa-actions-start">
+                        <button type="button" class="button primary" id="igSaveToken" data-i18n="Simpan & hubungkan">Simpan & hubungkan</button>
+                        <button type="button" class="button" id="igConnect" data-i18n="Login dengan Instagram">Login dengan Instagram</button>
+                        <small id="igMessage" role="status" aria-live="polite"></small>
+                      </div>
+                    </div>
+
+                    <div class="wa-card">
+                      <div class="wa-card-head">
+                        <div class="wa-card-title">
+                          <strong data-i18n="Webhook di Meta">Webhook di Meta</strong>
+                          <small data-i18n="Salin ke langkah Configure webhooks, lalu aktifkan field messages dan comments.">Salin ke langkah Configure webhooks, lalu aktifkan field messages dan comments.</small>
+                        </div>
+                      </div>
+                      <div class="wa-kv">
+                        <div class="wa-kv-row"><span>Callback URL</span><code id="igWebhookUrl"></code><button type="button" class="button small" data-copy="igWebhookUrl" data-i18n="Salin">Salin</button></div>
+                        <div class="wa-kv-row"><span>Verify token</span><code id="igVerifyToken"></code><button type="button" class="button small" data-copy="igVerifyToken" data-i18n="Salin">Salin</button></div>
+                        <div class="wa-kv-row"><span>OAuth redirect URI</span><code id="igCallbackUrl"></code><button type="button" class="button small" data-copy="igCallbackUrl" data-i18n="Salin">Salin</button></div>
+                      </div>
+                    </div>
+
+                    <div class="wa-card">
+                      <div class="wa-card-head">
+                        <div class="wa-card-title">
+                          <strong data-i18n="Perilaku">Perilaku</strong>
+                        </div>
+                      </div>
+                      <div>
+                        <label class="wa-toggle-row">
+                          <span data-i18n="Balas DM Instagram dengan AI">Balas DM Instagram dengan AI</span>
+                          <button class="wa-switch" type="button" role="switch" data-ig="dmEnabled" aria-checked="true" value="true" aria-label="DM"></button>
+                        </label>
+                        <label class="wa-toggle-row">
+                          <span data-i18n="Tangani komentar">Tangani komentar</span>
+                          <button class="wa-switch" type="button" role="switch" data-ig="commentsEnabled" aria-checked="true" value="true" aria-label="Komentar"></button>
+                        </label>
+                        <label class="wa-toggle-row">
+                          <span data-i18n="Sembunyikan komentar spam">Sembunyikan komentar spam</span>
+                          <button class="wa-switch" type="button" role="switch" data-ig="hideSpam" aria-checked="false" value="false" aria-label="Spam"></button>
+                        </label>
+                      </div>
                       <label>
-                        <span>Access token</span>
-                        <input id="igAccessToken" type="password" autocomplete="off" spellcheck="false" data-settings-ignore />
+                        <span data-i18n="Arahkan komentar calon pembeli ke">Arahkan komentar calon pembeli ke</span>
+                        <select id="igCommentTarget" data-settings-ignore>
+                          <option value="both" data-i18n="DM + link WhatsApp">DM + link WhatsApp</option>
+                          <option value="dm" data-i18n="DM saja">DM saja</option>
+                          <option value="wa" data-i18n="WhatsApp saja">WhatsApp saja</option>
+                        </select>
                       </label>
-                      <div class="actions"><button type="button" class="button primary" id="igSaveToken" data-i18n="Simpan token">Simpan token</button></div>
-                    </details>
-                    <details>
-                      <summary data-i18n="Data untuk Meta Developer">Data untuk Meta Developer</summary>
-                      <p>OAuth redirect URI: <code id="igCallbackUrl"></code></p>
-                      <p>Webhook callback URL: <code id="igWebhookUrl"></code></p>
-                      <p>Verify token: <code id="igVerifyToken"></code></p>
-                      <p class="wa-muted" data-i18n="Langganan webhook: messages dan comments.">Langganan webhook: messages dan comments.</p>
-                    </details>
-                    <label class="wa-toggle-row">
-                      <span data-i18n="Balas DM Instagram dengan AI">Balas DM Instagram dengan AI</span>
-                      <button class="wa-switch" type="button" role="switch" data-ig="dmEnabled" aria-checked="true" value="true" aria-label="DM"></button>
-                    </label>
-                    <label class="wa-toggle-row">
-                      <span data-i18n="Tangani komentar">Tangani komentar</span>
-                      <button class="wa-switch" type="button" role="switch" data-ig="commentsEnabled" aria-checked="true" value="true" aria-label="Komentar"></button>
-                    </label>
-                    <label>
-                      <span data-i18n="Arahkan komentar calon pembeli ke">Arahkan komentar calon pembeli ke</span>
-                      <select id="igCommentTarget" data-settings-ignore>
-                        <option value="both" data-i18n="DM + link WhatsApp">DM + link WhatsApp</option>
-                        <option value="dm" data-i18n="DM saja">DM saja</option>
-                        <option value="wa" data-i18n="WhatsApp saja">WhatsApp saja</option>
-                      </select>
-                    </label>
-                    <label class="wa-toggle-row">
-                      <span data-i18n="Sembunyikan komentar spam">Sembunyikan komentar spam</span>
-                      <button class="wa-switch" type="button" role="switch" data-ig="hideSpam" aria-checked="false" value="false" aria-label="Spam"></button>
-                    </label>
-                    <p class="wa-muted" id="igWebhook"></p>
-                    <p class="wa-muted" id="igStats"></p>
-                    <small id="igMessage" role="status" aria-live="polite"></small>
+                    </div>
                   </div>
                 </section>
                 <section

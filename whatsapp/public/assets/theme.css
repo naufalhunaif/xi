@@ -363,7 +363,7 @@ html[data-theme="dark"] .workspace-ui .wa-trace-sizes {
 .workspace-ui .owner-info .wa-app-version { display: block; opacity: 0.6; font-size: 11px; }
 
 /* Kartu alamat akses (standalone) */
-.workspace-ui .wa-access-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; background: var(--wa-surface); }
+.workspace-ui .wa-access-card { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; background: var(--wa-surface); }
 .workspace-ui .wa-access-card p { margin: 6px 0; color: var(--muted); font-size: 13px; }
 .workspace-ui .wa-access-card pre { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: var(--wa-raised, #f3f4f2); overflow: auto; }
 .workspace-ui .wa-access-card code { font-size: 13px; }

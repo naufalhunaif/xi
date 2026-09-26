@@ -113,6 +113,30 @@ export default class InstagramController {
     })
   }
 
+  /** Komentar terbaru untuk tab Komentar di inbox. */
+  async comments({ response }: HttpContext) {
+    response.header('Cache-Control', 'no-store')
+    await readInstagram()
+    const rows = await db
+      .from('whatsapp_instagram_comments')
+      .select('id', 'comment_id', 'username', 'text', 'status', 'kind', 'public_reply', 'private_reply', 'error', 'created_at')
+      .orderBy('id', 'desc')
+      .limit(100)
+    // Room DM yang lahir dari komentar ditandai pesan igc_<comment_id>.
+    const links = rows.length
+      ? await db
+          .from('whatsapp_messages')
+          .select('message_id', 'jid')
+          .whereIn(
+            'message_id',
+            rows.map((row: any) => `igc_${row.comment_id}`)
+          )
+      : []
+    const dm = new Map(links.map((row: any) => [String(row.message_id).slice(4), String(row.jid)]))
+    for (const row of rows as any[]) row.dm_jid = dm.get(String(row.comment_id)) || null
+    return response.json({ comments: rows })
+  }
+
   async save({ request, response }: HttpContext) {
     const values: Record<string, unknown> = {}
     const appId = request.input('appId')

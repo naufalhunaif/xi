@@ -1,10 +1,148 @@
-# WhatsApp Workspace — UI guidelines
+# Design system — WhatsApp Workspace
+
+Wajib dibaca sebelum membuat atau mengubah halaman. Tujuannya: setiap layar rapi, mudah dibaca sekilas, dan mudah dipakai CS tanpa penjelasan.
+
+## 1. Prinsip
+
+1. **Tindakan dulu, teks belakangan.** Tampilkan status, data, dan tombol yang dibutuhkan. Tidak ada paragraf pengantar; bantuan pakai satu baris `wa-note` atau popover ⓘ.
+2. **Satu topik per kartu.** Kelompokkan isian yang saling terkait dalam satu `wa-card`. Urutan kartu: status → isian utama → data teknis → pengaturan tambahan.
+3. **Satu tombol utama per kartu.** Tombol utama `button primary`; sisanya `button` netral. Tindakan berisiko wajib konfirmasi.
+4. **Warna selalu bertemu label.** Hijau = baik, kuning = perlu dicek, merah = gagal, pink = Instagram. Jangan mengandalkan warna saja.
+5. **Pakai komponen yang ada.** Jangan membuat gaya baru atau `style="..."` inline. Kalau butuh komponen baru, tambahkan ke `public/assets/ui.css` dan dokumentasikan di sini.
+6. **Ringkas & enterprise.** Referensi: GitHub, Linear, Stripe, Notion. Bukan gaya Dribbble. Radius maksimal 6 px untuk kontrol dan kartu, tanpa bayangan berat.
+
+## 2. Checklist sebelum commit
+
+- [ ] Memakai komponen bagian 4. Tidak ada inline style, tidak ada warna hex baru di luar token.
+- [ ] Semua teks UI memakai `data-i18n` (HTML) atau `t()` (JS), dan terjemahan ditambahkan di `public/lang/en.js`.
+- [ ] Dicek di light dan dark, lebar 1440 px dan 390 px: tidak ada teks terpotong, tidak ada scroll horizontal halaman, tombol tidak bertumpuk berantakan.
+- [ ] Bisa dipakai dengan keyboard: fokus terlihat, Enter/Escape berfungsi, ikon tanpa teks punya `aria-label`.
+- [ ] Status proses hanya satu, di dekat tombolnya (`role="status"`). Error tampil sebagai `wa-alert`, tidak disembunyikan.
+- [ ] Versi aset (`?v=`) yang berubah dinaikkan di `resources/views/components/layout.edge`.
+
+## 3. Token
+
+Warna diambil dari variabel CSS. Dark mode cukup mengganti variabel, jadi jangan menulis warna langsung.
+
+| Token | Kegunaan |
+| --- | --- |
+| `--text`, `--muted` | Teks utama, teks sekunder/label |
+| `--line` | Garis dan border |
+| `--wa-surface`, `--wa-subtle` | Latar kartu/panel, latar hover/aktif lembut |
+| `--wa-ok` / `--wa-ok-bg` | Berhasil, aktif, terhubung, AI |
+| `--wa-warn` / `--wa-warn-bg` | Perlu dicek, antre, menunggu |
+| `--wa-err` / `--wa-err-bg` | Gagal, error, ditolak |
+| `--wa-ig` / `--wa-ig-bg` | Penanda Instagram |
+| `--wa-control-height` | Tinggi kontrol: 36 px desktop, 40 px sentuh |
+
+| Tipografi | Ukuran |
+| --- | --- |
+| Judul halaman | 22 px, tebal 600 |
+| Judul bagian (`h2`) / judul kartu | 14 px / 13 px, 600 |
+| Isi, isian, tombol | 12 px |
+| Label, catatan, status | 11 px (`--muted`) |
+| Badge, hitungan | 9–10 px, angka `tabular-nums` |
+
+Jarak memakai kelipatan 4: 4, 6, 8, 12, 16. Gap dalam kartu 12 px, padding kartu 14 × 16 px (12 px di mobile), label ke isian 6 px.
+
+## 4. Komponen
+
+### Kartu (`ui.css`)
+```html
+<div class="wa-card">
+  <div class="wa-card-head">
+    <div class="wa-card-title">
+      <strong>Judul singkat</strong>
+      <small>Satu baris keterangan (opsional)</small>
+    </div>
+    <div class="actions"><span class="wa-pill ok">Terhubung</span><button class="button">Aksi</button></div>
+  </div>
+  <!-- isi kartu -->
+</div>
+```
+- Kepala kartu = judul kiri, status/aksi kanan. Di mobile aksi turun otomatis.
+- `wa-note` untuk satu baris penjelasan di dalam kartu.
+
+### Isian
+```html
+<div class="wa-form-grid">
+  <label><span>Label</span><input /></label>
+  <label class="wa-span-full"><span>Label lebar penuh</span><input /></label>
+</div>
+<div class="actions wa-actions-start"><button class="button primary">Simpan</button><small role="status"></small></div>
+```
+- Label selalu di atas. Placeholder bukan pengganti label.
+- Dua kolom di desktop, satu kolom ≤ 640 px (otomatis).
+- Isian yang disimpan lewat JS sendiri diberi `data-settings-ignore` agar tidak ikut autosave Pengaturan.
+
+### Tombol
+- `button primary` hanya untuk satu aksi utama, `button` untuk yang lain, `button small` di baris tabel/daftar.
+- Tombol merah hanya di Danger zone (`button danger`).
+- Label berupa kata kerja singkat: "Simpan", "Hubungkan", "Salin", "Buka DM".
+
+### Switch & pilihan
+```html
+<label class="wa-toggle-row"><span>Nama pengaturan</span>
+  <button class="wa-switch" type="button" role="switch" aria-checked="true" value="true" aria-label="…"></button></label>
+```
+- Switch untuk on/off yang langsung berlaku. Pilihan 3 atau lebih memakai `select`.
+
+### Status
+- `wa-pill` (`ok` / `warn` / `err` / netral) untuk status singkat 1–2 kata.
+- `wa-alert` (merah) / `wa-alert warn` (kuning) untuk pesan error yang perlu tindakan. Elemen kosong otomatis tersembunyi.
+- Hitungan pada tab memakai `<span>` angka kecil, bukan badge berwarna.
+
+### Data yang disalin (`wa-kv`)
+```html
+<div class="wa-kv"><div class="wa-kv-row"><span>Label</span><code id="x">nilai</code><button class="button small" data-copy="x">Salin</button></div></div>
+```
+
+### Navigasi dalam daftar
+- **Segmen** (`wa-segmented`): pilihan setara dan saling eksklusif, maksimal 4 (mis. Semua / WhatsApp / Instagram / Komentar).
+- **Tab filter** (`wa-inbox-filters`): menyaring antrean di dalam segmen (AI, Perlu CS, Pembayaran, Order).
+- State tersimpan di URL (`?channel=`, `?inbox=`), bukan di memori saja.
+
+### Baris daftar
+- Kontak: `wa-contact` = avatar 32 px + nama (11 px, tebal) + pratinjau (10 px, muted) + meta kanan. Room Instagram diberi `<span class="wa-channel ig">IG</span>` sebelum nama dan avatar pink.
+- Komentar: `wa-comment` (`details`) dengan ringkasan satu baris + status di kanan; isi detail memakai `dl` (label kecil di atas nilai).
+- Kosong: `<div class="wa-empty">Belum ada …</div>`, satu kalimat pendek.
+
+### Lainnya
+- Info singkat: tombol ⓘ `.wa-info-button` + `.wa-info-popover` (`info.js`), bukan tooltip hover.
+- Detail/riwayat/pratinjau: `details/summary`, tertutup secara default.
+- Dialog: judul + tombol tutup tetap, isi scroll sendiri, Escape menutup, fokus kembali ke pemicu.
+
+## 5. Pola halaman
+
+- **Pengaturan:** `section[data-settings-panel]` → `h2` → kartu-kartu. Menu kiri satu kata/dua kata. Pengaturan sederhana autosave, pengaturan yang menghubungkan layanan memakai tombol eksplisit.
+- **Inbox:** kolom daftar (segmen → tab filter → daftar) + panel chat. Daftar dan chat scroll sendiri-sendiri.
+- **Tabel (Order, Kontak):** pencarian/filter di atas, tabel penuh, detail di dialog kanan (maks. 640 px, layar penuh di mobile).
+
+## 6. Teks & bahasa
+
+- Bahasa default UI English lewat `public/lang/en.js`. Teks sumber ditulis Indonesia singkat.
+- Maksimal satu kalimat per keterangan. Hindari "Silakan", "Anda dapat", dan kalimat ulang.
+- Jangan menerjemahkan nama pelanggan, isi chat, data produk, atau isi skill.
+
+## 7. File
+
+| File | Isi |
+| --- | --- |
+| `public/assets/ui.css` | Komponen bersama untuk halaman/fitur baru (kartu, pill, alert, kv, segmen, kanal, komentar) |
+| `public/assets/forms.css` | Ukuran dan fokus kontrol form |
+| `public/assets/theme.css` | Token warna light/dark |
+| `public/assets/app.css` | Layout lama (inbox, pengaturan, trace) — jangan tambah komponen baru di sini |
+| `public/assets/motion.css` | Animasi, menghormati Reduce Motion |
+
+Urutan muat CSS: bundle → halaman → `forms.css` → `theme.css` → `refine.css` → `ui.css`.
+
+## 8. Aturan per fitur
 
 ## Prinsip
 
 Antarmuka ringkas, tenang, dan berorientasi tindakan. Tampilkan data, label, status, dan tindakan yang diperlukan. Hindari paragraf pengantar, instruksi berulang, serta status yang muncul di beberapa tempat dalam panel yang sama. Jangan mengubah isi skill atau bahasa percakapan saat merapikan UI.
 
-## Sumber desain
+### Sumber desain
 
 - `public/assets/forms.css`: token dan kontrol form bersama. Muat setelah stylesheet halaman agar ukuran konsisten.
 - `public/assets/orders.css` dan `production.css`: layout halaman, bukan sistem kontrol baru.
@@ -12,7 +150,7 @@ Antarmuka ringkas, tenang, dan berorientasi tindakan. Tampilkan data, label, sta
 - `public/lang/en.js` dan `id.js`: seluruh label UI, English default.
 - `public/assets/theme.js` dan `theme.css`: preferensi tema dan token warna WhatsApp; jangan mengubah stylesheet workspace PHP bersama untuk kebutuhan tema WhatsApp.
 
-## Tema dan latar chat
+### Tema dan latar chat
 
 - Pengaturan → Umum → Tema tampilan: Auto (default, mengikuti sistem), Light, Dark. Preferensi disimpan per browser dan workspace, langsung berlaku tanpa tombol simpan. Auto merespons perubahan tema sistem; pilihan eksplisit tetap dipertahankan. Tab workspace yang sama ikut tersinkronisasi.
 - Muat `theme.js` di head sebelum stylesheet untuk menghindari kilatan tema terang. Muat `theme.css` terakhir agar kontrol, dialog, cart, order, dan badge memakai palet yang sama. Pertahankan perbedaan warna AI/CS dan status beserta labelnya.
@@ -21,7 +159,7 @@ Antarmuka ringkas, tenang, dan berorientasi tindakan. Tampilkan data, label, sta
 - Uji light/dark/auto pada Chromium dan WebKit, termasuk warna teks native dropdown, perubahan tema sistem, penyimpanan terblokir, desktop dan mobile. Motif tidak ditampilkan saat print atau forced colors.
 - Panel penerima/pengiriman pada detail order memakai permukaan biru lembut sesuai tema, dengan kontras judul, label, dan isi minimal 4.5:1. Uji order terisi, bukan hanya dialog kosong. Input upload dan `::file-selector-button` mengikuti palet dark; jangan meninggalkan kontrol native putih di Safari.
 
-## Kontrol dan ukuran
+### Kontrol dan ukuran
 
 - Input teks, angka, tanggal, dropdown, serta tombol form: tinggi 36 px desktop, 40 px layar sentuh/mobile. Gunakan `box-sizing: border-box`.
 - Font kontrol 12 px, line-height 18 px; mobile 16 px agar Safari tidak melakukan zoom saat fokus.
@@ -31,10 +169,10 @@ Antarmuka ringkas, tenang, dan berorientasi tindakan. Tampilkan data, label, sta
 - Grid form: 2 kolom, gap 12 px. Angka minimum/estimasi/maksimum: 3 kolom. Di layar sempit susun satu kolom tanpa overflow horizontal.
 - Switch memakai komponen `.wa-switch` yang sudah ada; jangan menerapkan tinggi input padanya. Switch sejajar kanan judul, bukan berada dalam grid isian.
 
-## Hirarki dan warna
+### Hirarki dan warna
 
 - Judul halaman 22 px; judul bagian 14 px; label/status 12 px.
-- Panel putih dengan border tipis; radius 10 px; padding 16 px (12 px mobile).
+- Panel putih dengan border tipis; radius 6 px; padding 16 px (12 px mobile).
 - Produksi memakai latar abu sangat muda; pengiriman grup memakai hijau sangat muda. Warna harus disertai label, bukan satu-satunya pembeda.
 - Satu tombol utama per form. Tindakan sekunder netral. Ikon tanpa teks harus mempunyai accessible name; tombol copy tetap di samping nomor order.
 - Badge cart menghitung total kuantitas draft (bukan jumlah order), disembunyikan saat kosong, dan ditampilkan maksimal `99+`; jumlah lengkap tersedia pada accessible name. Ikon uang kecil menandai transfer yang perlu diperiksa, bukan dana sudah diterima. Tombol konfirmasi memakai ikon cart + uang dan tetap berlabel.
@@ -42,7 +180,7 @@ Antarmuka ringkas, tenang, dan berorientasi tindakan. Tampilkan data, label, sta
 - Proses AWB memakai komponen bersama satu baris tahap, spinner kecil hanya saat lease dan heartbeat worker aktif, serta metadata pemeriksaan/retry. Order yang dibuka memperbarui panel produksi tiap 5 detik; jangan menutup disclosure, menghilangkan fokus tombol, atau menimpa isian yang belum disimpan.
 - Pilihan aktif diberi border dan latar lembut. Pertahankan focus ring keyboard yang jelas, termasuk dropdown dan disclosure.
 
-## Informasi dan interaksi
+### Informasi dan interaksi
 
 - Kontak & Alamat berada pada satu menu sidebar. Tabel menampilkan avatar/inisial, nama, nomor WhatsApp terverifikasi, dan alamat penerima (nomor penerima terpisah). Alamat dari cart, order, dan memori bersumber diberi label singkat; kosong tidak ditebak. Pencarian/pagination server-side, ekspor CSV mencakup seluruh hasil pencarian dengan satu baris per alamat, terproteksi login dan namespace nomor WhatsApp. Jangan mengekspor JID sebagai nomor telepon atau memasukkan foto/token ke CSV.
 - Grup produksi default dibuka melalui ikon pengaturan di kanan judul Order, memakai dialog floating ringkas; tidak memakai kartu/disclosure permanen. Status simpan/error berada di dialog; pilihan yang belum disimpan tidak boleh ditimpa sinkronisasi grup.
@@ -60,7 +198,7 @@ Antarmuka ringkas, tenang, dan berorientasi tindakan. Tampilkan data, label, sta
 - Interaksi terasa ringan: hover tombol naik 1 px hanya pada mouse, tekan mengecil 3%, avatar kontak membesar tipis, fokus form ber-ring lembut. Gunakan easing perlambatan `cubic-bezier(0.22, 1, 0.36, 1)` dan durasi 160–340 ms; respons tekan 90 ms. Navigasi/baris tidak bergeser dan isi chat tidak dianimasikan ulang saat polling. Panel/disclosure/dialog memakai `waMotion` yang ada, tidak menambah animasi paralel. Nonaktifkan efek gerak pada Reduce Motion dan tombol disabled.
 - Efek magnet hanya pada tombol aksi kecil saat mouse berada di atasnya, maksimal 2 px per sumbu. Gunakan satu frame terjadwal per gerakan, tanpa loop idle; posisi layout tetap. Reset saat keluar, klik, fokus keyboard, scroll, blur, atau tombol dinonaktifkan. Touch, Reduce Motion, baris kontak, input, dan media tidak memakai magnet.
 
-## Verifikasi perubahan
+### Verifikasi perubahan
 
 - Pengaturan → Danger zone dipisahkan dari General/autosave. Gunakan kartu merah redup yang terbaca pada light/dark, nomor aktif terlihat, cakupan hapus/simpan dan peringatan permanen ringkas. Tombol reset wajib konfirmasi serta ketikan persis `RESET ALL`; batal/salah ketik tidak mengirim POST. Selama pending/retry nonaktifkan kedua tombol penghapusan, tampilkan satu status, jangan auto-repeat POST saat koneksi tidak pasti.
 

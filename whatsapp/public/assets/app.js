@@ -480,9 +480,13 @@
   }
   const contacts = byId('contacts')
   const inboxKeys = ['all', 'ai', 'cs', 'payment', 'order']
+  const channelKeys = ['all', 'wa', 'ig', 'comments']
+  const channelTabs = byId('channelTabs')
+  const igComments = byId('igComments')
   function inboxState() {
     const params = new URLSearchParams(location.search)
     return {
+      channel: channelTabs && channelKeys.includes(params.get('channel')) ? params.get('channel') : 'all',
       filter: inboxKeys.includes(params.get('inbox')) ? params.get('inbox') : 'all',
       unanswered: params.get('unanswered') === '1',
     }
@@ -490,7 +494,28 @@
   function applyInboxFilters() {
     if (!contacts || !byId('inboxFilters')) return
     const state = inboxState()
-    const rows = [...contacts.querySelectorAll('.wa-contact')]
+    const allRows = [...contacts.querySelectorAll('.wa-contact')]
+    // Kanal (Semua/WhatsApp/Instagram) menyaring dulu; tab status menghitung di dalamnya.
+    const rows = allRows.filter(
+      (row) => !['wa', 'ig'].includes(state.channel) || (row.dataset.channel || 'wa') === state.channel
+    )
+    if (channelTabs) {
+      channelTabs.querySelectorAll('[data-channel]').forEach((button) => {
+        const key = button.dataset.channel
+        button.setAttribute('aria-pressed', String(key === state.channel))
+        const count =
+          key === 'comments'
+            ? igCommentsPending
+            : allRows.filter((row) => key === 'all' || (row.dataset.channel || 'wa') === key).length
+        button.querySelector('[data-channel-count]').textContent = count ? String(count) : ''
+      })
+      const commentsView = state.channel === 'comments'
+      byId('inboxFilters').hidden = commentsView
+      contacts.hidden = commentsView
+      if (igComments) igComments.hidden = !commentsView
+      if (commentsView) void loadComments()
+    }
+    for (const row of allRows) if (!rows.includes(row)) row.hidden = true
     const matches = (row, key) =>
       key === 'all' ||
       (key === 'ai' && row.dataset.mode !== 'cs') ||
@@ -515,8 +540,10 @@
       const url = new URL(row.href)
       url.searchParams.delete('inbox')
       url.searchParams.delete('unanswered')
+      url.searchParams.delete('channel')
       if (state.filter !== 'all') url.searchParams.set('inbox', state.filter)
       if (state.unanswered) url.searchParams.set('unanswered', '1')
+      if (['wa', 'ig'].includes(state.channel)) url.searchParams.set('channel', state.channel)
       row.href = url.href
     }
     // Going back from a room keeps the queue the chat was opened from.
@@ -526,6 +553,8 @@
       backUrl.searchParams.delete('jid')
       backUrl.searchParams.delete('inbox')
       backUrl.searchParams.delete('unanswered')
+      backUrl.searchParams.delete('channel')
+      if (state.channel !== 'all') backUrl.searchParams.set('channel', state.channel)
       if (state.filter !== 'all') backUrl.searchParams.set('inbox', state.filter)
       if (state.unanswered) backUrl.searchParams.set('unanswered', '1')
       back.href = backUrl.href
@@ -573,6 +602,111 @@
     history.replaceState(null, '', url)
     applyInboxFilters()
   })
+  channelTabs?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-channel]')
+    if (!button) return
+    const url = new URL(location.href)
+    if (button.dataset.channel === 'all') url.searchParams.delete('channel')
+    else url.searchParams.set('channel', button.dataset.channel)
+    history.replaceState(null, '', url)
+    applyInboxFilters()
+  })
+  // Tab Komentar: komentar Instagram terbaru beserta balasan AI dan tautan ke DM-nya.
+  let igCommentsPending = 0
+  let commentsLoadedAt = 0
+  let commentsLoading = false
+  const commentStatus = {
+    new: [t('Antre'), 'warn'],
+    processing: [t('Diproses'), 'warn'],
+    done: [t('Dibalas'), 'ok'],
+    hidden: [t('Disembunyikan'), ''],
+    spam: [t('Spam'), ''],
+    skipped: [t('Dilewati'), ''],
+    failed: [t('Gagal'), 'err'],
+  }
+  function renderComments(items) {
+    if (!igComments) return
+    const openIds = new Set([...igComments.querySelectorAll('details[open]')].map((item) => item.dataset.id))
+    igComments.replaceChildren()
+    if (!items.length) {
+      const empty = document.createElement('div')
+      empty.className = 'wa-empty'
+      empty.textContent = t('Belum ada komentar')
+      igComments.append(empty)
+      return
+    }
+    for (const item of items) {
+      const details = document.createElement('details')
+      details.className = 'wa-comment'
+      details.dataset.id = String(item.id)
+      details.open = openIds.has(String(item.id))
+      const summary = document.createElement('summary')
+      const avatar = document.createElement('span')
+      avatar.className = 'wa-contact-avatar'
+      avatar.textContent = String(item.username || '?').slice(0, 1).toUpperCase()
+      const content = document.createElement('span')
+      content.className = 'wa-contact-content'
+      const title = document.createElement('strong')
+      title.textContent = `@${item.username || t('pengguna')}`
+      const preview = document.createElement('small')
+      preview.textContent = item.text || ''
+      content.append(title, preview)
+      const [label, tone] = commentStatus[item.status] || [item.status, '']
+      const pill = document.createElement('span')
+      pill.className = `wa-pill ${tone}`
+      pill.textContent = label
+      summary.append(avatar, content, pill)
+      const body = document.createElement('div')
+      body.className = 'wa-comment-body'
+      const text = document.createElement('p')
+      text.textContent = item.text || ''
+      const list = document.createElement('dl')
+      const add = (term, value) => {
+        if (!value) return
+        const dt = document.createElement('dt')
+        dt.textContent = term
+        const dd = document.createElement('dd')
+        dd.textContent = value
+        list.append(dt, dd)
+      }
+      add(t('Waktu'), new Date(item.created_at).toLocaleString())
+      add(t('Balasan publik'), item.public_reply)
+      add(t('DM terkirim'), item.private_reply)
+      add(t('Kendala'), item.error)
+      body.append(text, list)
+      if (item.dm_jid) {
+        const open = document.createElement('a')
+        open.className = 'button small'
+        open.href = `${appUrl}/?jid=${encodeURIComponent(item.dm_jid)}&channel=ig`
+        open.textContent = t('Buka DM')
+        body.append(open)
+      }
+      details.append(summary, body)
+      igComments.append(details)
+    }
+  }
+  async function loadComments(force = false) {
+    if (!igComments || commentsLoading || (!force && Date.now() - commentsLoadedAt < 15_000)) return
+    commentsLoading = true
+    try {
+      const data = await api('/api/instagram/comments')
+      const items = data.comments || []
+      commentsLoadedAt = Date.now()
+      igCommentsPending = items.filter((item) => ['new', 'processing', 'failed'].includes(item.status)).length
+      renderComments(items)
+      const count = channelTabs?.querySelector('[data-channel="comments"] [data-channel-count]')
+      if (count) count.textContent = igCommentsPending ? String(igCommentsPending) : ''
+    } catch {
+      /* Coba lagi pada pembaruan berikutnya. */
+    } finally {
+      commentsLoading = false
+    }
+  }
+  if (channelTabs) {
+    // Jumlah komentar yang perlu perhatian tampil di tab walau tab belum dibuka.
+    void loadComments(true)
+    setInterval(() => void loadComments(inboxState().channel === 'comments'), 60_000)
+  }
   window.addEventListener('popstate', applyInboxFilters)
   applyInboxFilters()
   let contactsRequestVersion = 0
@@ -599,6 +733,7 @@
       link.dataset.payment = String(Boolean(contact.needs_payment))
       link.dataset.order = String(Boolean(contact.has_order))
       link.dataset.unanswered = String(Number(contact.unanswered_count) || 0)
+      link.dataset.channel = contact.channel || 'wa'
       const avatar = contact.profile_picture_url
         ? document.createElement('img')
         : document.createElement('span')
@@ -618,12 +753,19 @@
           { once: true }
         )
       } else {
-        avatar.textContent = String(name).slice(0, 1).toUpperCase()
+        avatar.textContent = String(name).replace('@', '').slice(0, 1).toUpperCase()
       }
       const content = document.createElement('span')
       content.className = 'wa-contact-content'
       const title = document.createElement('strong')
-      title.textContent = name
+      if (contact.channel === 'ig') {
+        const chip = document.createElement('span')
+        chip.className = 'wa-channel ig'
+        chip.textContent = 'IG'
+        chip.setAttribute('aria-label', 'Instagram')
+        title.append(chip)
+      }
+      title.append(name)
       const preview = document.createElement('small')
       preview.textContent = contact.activity || contact.body || ''
       preview.classList.toggle('active', Boolean(contact.activity))

@@ -1,5 +1,6 @@
 import { contactCleanupPreview } from '#services/contact_cleanup_service'
 import type { HttpContext } from '@adonisjs/core/http'
+import { readInstagram } from '#instagram/store'
 import { startSharedMcpLogin, completeSharedMcpLogin } from '#services/shared_mcp_oauth_service'
 import { archiveWorkspace, workspaceState, workspaceWorkerReady } from '#services/workspace_service'
 import { requestChatCleanup, chatCleanupStatus } from '#services/chat_cleanup_service'
@@ -145,7 +146,9 @@ export default class DashboardController {
       }
       return {
         ...message,
-        contact_name: profile?.name || message.contact_name,
+        // Nama IG disimpan "IG @user"; tampil "@user" + penanda kanal.
+        contact_name: String(profile?.name || message.contact_name || '').replace(/^IG\s+/, '') || null,
+        channel: String(message.jid).endsWith('@ig') ? 'ig' : 'wa',
         profile_picture_url: profile?.profile_picture_url || null,
         activity:
           activityIsFresh && !schedulePaused
@@ -203,8 +206,14 @@ export default class DashboardController {
       return false
     })
     const beta3Mode = await isBeta3Mode().catch(() => false)
+    const instagramOn =
+      contacts.some((contact) => String(contact.jid).endsWith('@ig')) ||
+      (await readInstagram()
+        .then((config) => config.connected)
+        .catch(() => false))
     return view.render('pages/dashboard', {
       page: 'chat',
+      instagramOn,
       leanMode,
       beta3Mode,
       connection,

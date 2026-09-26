@@ -73,6 +73,7 @@ router
     router.get('/api/beta3/customer', [Beta3Controller, 'customer'])
     router.post('/api/beta3/customer', [Beta3Controller, 'saveCustomer'])
     router.get('/api/instagram', [InstagramController, 'show'])
+    router.get('/api/instagram/comments', [InstagramController, 'comments'])
     router.post('/api/instagram', [InstagramController, 'save'])
     router.post('/api/instagram/disconnect', [InstagramController, 'disconnect'])
     router.post('/api/instagram/token', [InstagramController, 'saveToken'])
