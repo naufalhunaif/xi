@@ -6,6 +6,7 @@ const ICON = `<svg width="28" height="28" viewBox="0 0 512 512" aria-hidden="tru
 function shell(title: string, content: string) {
   return `<!doctype html><html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/assets/brand.svg" type="image/svg+xml">
 <title>${title === 'Chat' ? 'Chat' : `${title} · Chat`}</title>
 <meta name="description" content="Chat — layanan pelanggan dan pengelolaan pesanan toko.">
 <style>
