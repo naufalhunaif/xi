@@ -61,7 +61,8 @@ export function styleGuide(profile: StyleProfile) {
     profile.emoji ? '- Emoji boleh secukupnya, maksimal satu per bubble.' : '- Tanpa emoji.',
     // Sengaja tanpa batas jumlah huruf: batas panjang membuat jawaban terpotong dan
     // kurang informatif (harga/detail hilang). Panjang mengikuti skill & contoh CS.
-    '- Bahasa santai sehari-hari seperti contoh CS; tanpa format markdown (**tebal**, #judul, tabel). Rincian harga boleh per baris.',
+    '- Bahasa santai sehari-hari seperti contoh CS; tanpa format markdown (**tebal**, #judul, tabel).',
+    '- Rapi seperti CS: daftar 3 item atau lebih (harga, pilihan model/warna, ongkir, rincian total, data pesanan) ditulis satu item per baris setelah kalimat pembuka, lalu pertanyaan di baris terpisah. Jangan dideretkan dengan koma dalam satu kalimat.',
     '- Jangan membuka dengan salam panjang atau menutup dengan kalimat basa-basi yang sama tiap kali.',
   ]
   return lines.filter(Boolean).join('\n')

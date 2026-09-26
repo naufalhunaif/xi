@@ -49,6 +49,7 @@ import {
 } from '#beta3/mcp'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { saveAiRefs } from '#beta3/refs_service'
+import { tidyLists } from '#beta3/list_tidy'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 
 /**
@@ -562,6 +563,8 @@ export async function createLeanReply(input: {
   }
   // Ongkir selalu tampil rapi (satu layanan per baris), model apa pun yang menulis.
   decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
+  // Deretan pilihan/harga/produk dalam satu kalimat → satu per baris (semua model).
+  decision.pesan = decision.pesan.map(tidyLists)
   if (style) {
     if (decision.susulan) decision.susulan = normalizeStyle([decision.susulan], style)[0] || ''
   }
