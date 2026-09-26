@@ -10,6 +10,8 @@
   const nowText = document.getElementById('aiOrchestraNow')
   const expandButton = document.getElementById('aiOrchestraExpand')
   const NS = 'http://www.w3.org/2000/svg'
+  // offsetParent selalu null untuk elemen position:fixed (mode Perbesar), jadi cek ukuran.
+  const shown = () => root.getClientRects().length > 0
   const base = document.querySelector('meta[name="app-url"]').content.replace(/\/$/, '')
   const workspace = () => document.querySelector('meta[name="whatsapp-workspace"]')?.content || ''
   const t = (value, ...args) =>
@@ -52,9 +54,11 @@
 
   const hub = { id: 'hub', x: 0, y: 0, vx: 0, vy: 0, fixed: true }
   hub.el = make('g', { class: 'orc-node orc-hub' }, layerNodes)
-  make('circle', { class: 'halo', r: 16 }, hub.el)
-  make('circle', { class: 'core', r: 9 }, hub.el)
-  make('text', { class: 'label', y: 20, 'text-anchor': 'middle' }, hub.el).textContent = 'WhatsApp'
+  hub.halo = make('circle', { class: 'halo', r: 16 }, hub.el)
+  hub.core = make('circle', { class: 'core', r: 9 }, hub.el)
+  hub.label = make('text', { class: 'label', y: 20, 'text-anchor': 'middle' }, hub.el)
+  hub.label.textContent = 'WhatsApp'
+  hub.baseR = 9
 
   const nodes = new Map() // akun AI
   const people = new Map() // pelanggan
@@ -83,7 +87,8 @@
       const k = w / view.w
       view.x = p.x - (p.x - view.x) * k
       view.y = p.y - (p.y - view.y) * k
-      view.w = view.h = w
+      view.w = w
+      view.h = w * aspect()
       userView = true
       applyView()
       labelDensity()
@@ -111,11 +116,50 @@
   })
   svg.addEventListener('dblclick', () => {
     userView = false
+    fitBoost = 45
     kick()
   })
   // Label pelanggan muncul saat diperbesar (seperti Obsidian), selalu untuk yang aktif.
   function labelDensity() {
-    svg.classList.toggle('orc-zoomed', view.w < 300)
+    // Label pelanggan tampil bila cukup besar di layar (panel besar atau diperbesar).
+    const width = svg.clientWidth || 300
+    svg.classList.toggle('orc-zoomed', width / view.w > 1.45)
+  }
+  // Ukuran simpul & teks tetap mungil di layar walau panel diperbesar (mode Perbesar):
+  // skala dihitung dari kamera otomatis; zoom manual tetap memperbesar seperti biasa.
+  let nodeScale = 1
+  let textScale = 1
+  function applyScale(force = false) {
+    const s = nodeScale
+    const ts = textScale
+    svg.style.setProperty('--orc-t', ts.toFixed(3))
+    const size = (node, halo) => {
+      if (node.sized && !force) return
+      node.sized = true
+      const r = node.baseR * s
+      ;(node.core || node.dot).setAttribute('r', r.toFixed(2))
+      if (node.halo) node.halo.setAttribute('r', (r + (halo || 8) * s).toFixed(2))
+      if (node.label) node.label.setAttribute('y', (r + (node.kind === 'person' ? 5.5 : 8) * ts).toFixed(2))
+      if (node.sub) node.sub.setAttribute('y', (r + 15.5 * ts).toFixed(2))
+      if (node.badge) node.badge.setAttribute('y', (2.2 * ts).toFixed(2))
+    }
+    size(hub, 7)
+    for (const node of nodes.values()) size(node, 8)
+    for (const node of people.values()) size(node)
+  }
+  function setFitScale(pxPerUnit) {
+    const s = Math.min(1, 0.75 / pxPerUnit)
+    const ts = Math.min(1, Math.max(s, 8 / (6.5 * pxPerUnit)))
+    if (Math.abs(s - nodeScale) < 0.01 && Math.abs(ts - textScale) < 0.01) return
+    nodeScale = s
+    textScale = ts
+    applyScale(true)
+  }
+  /** Rasio tinggi/lebar panggung agar kamera memakai seluruh area (penting di mode Perbesar). */
+  const aspect = () => {
+    const w = svg.clientWidth || 1
+    const h = svg.clientHeight || w
+    return Math.max(0.3, Math.min(3, h / w))
   }
 
   expandButton?.addEventListener('click', () => {
@@ -123,7 +167,9 @@
     root.classList.toggle('expanded', open)
     expandButton.setAttribute('aria-pressed', String(open))
     expandButton.textContent = open ? t('Kecilkan') : t('Perbesar')
-    kick()
+    userView = false
+    fitBoost = 45
+    requestAnimationFrame(() => kick())
   })
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && root.classList.contains('expanded')) expandButton?.click()
@@ -137,8 +183,9 @@
       node = { id: account.id, kind: 'account', x: Math.cos(angle) * 115, y: Math.sin(angle) * 115, vx: 0, vy: 0 }
       node.edge = make('line', { class: 'orc-edge' }, layerEdges)
       node.el = make('g', { class: 'orc-node', tabindex: 0 }, layerNodes)
-      make('circle', { class: 'halo', r: 14 }, node.el)
+      node.halo = make('circle', { class: 'halo', r: 14 }, node.el)
       node.core = make('circle', { class: 'core', r: 6 }, node.el)
+      node.baseR = 6
       node.badge = make('text', { class: 'badge', y: 2.3, 'text-anchor': 'middle' }, node.el)
       node.label = make('text', { class: 'label', y: 17, 'text-anchor': 'middle' }, node.el)
       node.sub = make('text', { class: 'sub', y: 25, 'text-anchor': 'middle' }, node.el)
@@ -199,7 +246,8 @@
       node.sub.textContent =
         state === 'paused' ? t('jeda s/d {0}', clock(account.limitedUntil)) : state === 'busy' ? t('bekerja…') : ''
       // Ukuran = porsi token 5 jam terakhir.
-      node.core.setAttribute('r', String(5 + 4 * Math.sqrt((account.tokens5h || 0) / maxTokens)))
+      node.baseR = 5 + 4 * Math.sqrt((account.tokens5h || 0) / maxTokens)
+      node.sized = false
     })
     for (const [id, node] of nodes)
       if (!seen.has(id)) {
@@ -229,7 +277,8 @@
         const provider = nodes.get(customer.accountId)?.account?.provider || ''
         node.el.setAttribute('class', `orc-person c-${status} ${fresh ? 'fresh' : ''} ${customer.unread ? 'unread' : ''}`)
         node.link.setAttribute('class', `orc-link ${customer.accountId && nodes.has(customer.accountId) ? `p-${provider}` : 'loose'} ${fresh ? 'fresh' : ''}`)
-        node.dot.setAttribute('r', String(2.2 + Math.min(2.5, Math.log2(1 + customer.unread + customer.unanswered))))
+        node.baseR = 2.2 + Math.min(2.5, Math.log2(1 + customer.unread + customer.unanswered))
+        node.sized = false
         node.label.textContent = customer.name
       }
       for (const [jid, node] of people)
@@ -372,7 +421,7 @@
 
   function pulse(from, to, kind, provider) {
     if (reduce.matches || !from || !to) return
-    const dot = make('circle', { class: `orc-pulse k-${kind} p-${provider || ''}`, r: 2 }, layerPulses)
+    const dot = make('circle', { class: `orc-pulse k-${kind} p-${provider || ''}`, r: (2 * nodeScale).toFixed(2) }, layerPulses)
     pulses.push({ from, to, t: 0, dot })
     kick()
   }
@@ -456,13 +505,15 @@
   const ALPHA_MIN = 0.004
   const ALPHA_DECAY = 0.0228
   let alpha = 1
+  /** Paksa kamera menyesuaikan ulang beberapa frame (mis. setelah Perbesar/Kecilkan). */
+  let fitBoost = 0
   /** Panaskan tata letak (data berubah / simpul diseret) agar bergerak lalu tenang lagi. */
   function reheat(value = 0.3) {
     alpha = Math.max(alpha, value)
     kick()
   }
   function kick() {
-    if (running || document.hidden || root.offsetParent === null) return
+    if (running || document.hidden || !shown()) return
     running = true
     lastFrame = performance.now()
     requestAnimationFrame(frame)
@@ -568,18 +619,22 @@
         minY = Math.min(minY, node.y)
         maxY = Math.max(maxY, node.y)
       }
-      // Minimal 380 agar graf kecil tetap tampil mungil, tidak diperbesar memenuhi panel.
-      const size = Math.max(380, Math.max(maxX - minX, maxY - minY) + 70)
+      // Lebar kamera menampung seluruh graf sesuai bentuk panggung. Minimal 380 agar graf
+      // kecil tetap mungil, tidak diperbesar memenuhi panel.
+      const ratio = aspect()
+      const size = Math.max(380, maxX - minX + 70, (maxY - minY + 70) / ratio)
+      setFitScale((svg.clientWidth || 300) / size)
       const cx = (minX + maxX) / 2
       const cy = (minY + maxY) / 2
-      const ease = 0.12
+      const ease = fitBoost > 0 ? 0.25 : 0.12
       view.w += (size - view.w) * ease
-      view.h = view.w
+      view.h = view.w * ratio
       view.x += (cx - view.w / 2 - view.x) * ease
       view.y += (cy - view.h / 2 - view.y) * ease
       applyView()
       labelDensity()
     }
+    applyScale()
     for (const node of accountList) {
       node.el.setAttribute('transform', `translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})`)
       node.edge.setAttribute('x1', '0')
@@ -629,8 +684,9 @@
       return true
     })
     // Diam bila tata letak sudah dingin dan tidak ada animasi: hemat CPU.
-    const calm = energy <= ALPHA_MIN && !pulses.length && !arcs.length && !busy.size
-    if (!document.hidden && root.offsetParent !== null && !calm) requestAnimationFrame(frame)
+    if (fitBoost > 0) fitBoost--
+    const calm = energy <= ALPHA_MIN && !pulses.length && !arcs.length && !busy.size && fitBoost <= 0
+    if (!document.hidden && shown() && !calm) requestAnimationFrame(frame)
     else running = false
   }
 
@@ -638,7 +694,7 @@
   let pollTimer
   async function poll() {
     clearTimeout(pollTimer)
-    const visible = !document.hidden && root.offsetParent !== null
+    const visible = !document.hidden && shown()
     if (visible) {
       try {
         const response = await fetch(`${base}/api/ai/orchestra?after=${lastEventId}`, {
@@ -667,6 +723,9 @@
       kick()
     }
   })
-  window.addEventListener('resize', kick)
+  window.addEventListener('resize', () => {
+    fitBoost = 30
+    kick()
+  })
   poll()
 })()

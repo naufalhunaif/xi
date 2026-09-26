@@ -373,3 +373,10 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-focus .orc-edge.hl, .workspace-ui .orc-focus .orc-link.hl { stroke: var(--wa-ok); stroke-width: 1.1; opacity: 1; }
 .workspace-ui .orc-focus .orc-person.hl .plabel { opacity: 1; }
 .workspace-ui .orc-node, .workspace-ui .orc-person, .workspace-ui .orc-edge, .workspace-ui .orc-link { transition: opacity .18s; }
+
+/* Mode Perbesar: teks & garis tetap tipis/mungil (skala dari --orc-t, garis tidak ikut membesar). */
+.workspace-ui .orc-edge, .workspace-ui .orc-link, .workspace-ui .orc-arc { vector-effect: non-scaling-stroke; }
+.workspace-ui .orc-node .label { font-size: calc(6.5px * var(--orc-t, 1)); }
+.workspace-ui .orc-node .sub { font-size: calc(5.5px * var(--orc-t, 1)); }
+.workspace-ui .orc-node .badge { font-size: calc(6px * var(--orc-t, 1)); }
+.workspace-ui .orc-person .plabel { font-size: calc(5px * var(--orc-t, 1)); }
