@@ -119,21 +119,23 @@ export default class InstagramController {
     await readInstagram()
     const rows = await db
       .from('whatsapp_instagram_comments')
-      .select('id', 'comment_id', 'username', 'text', 'status', 'kind', 'public_reply', 'private_reply', 'error', 'created_at')
+      .select('id', 'comment_id', 'username', 'text', 'status', 'kind', 'public_reply', 'private_reply', 'error', 'created_at', 'dm_igsid')
       .orderBy('id', 'desc')
       .limit(100)
-    // Room DM yang lahir dari komentar ditandai pesan igc_<comment_id>.
-    const links = rows.length
-      ? await db
-          .from('whatsapp_messages')
-          .select('message_id', 'jid')
-          .whereIn(
-            'message_id',
-            rows.map((row: any) => `igc_${row.comment_id}`)
+    // Tautan "Buka DM" hanya bila pelanggan sudah membalas DM (room-nya ada).
+    const jids = [...new Set(rows.filter((row: any) => row.dm_igsid).map((row: any) => `${row.dm_igsid}@ig`))]
+    const rooms = jids.length
+      ? new Set(
+          (await db.from('whatsapp_messages').distinct('jid').whereIn('jid', jids)).map((row: any) =>
+            String(row.jid)
           )
-      : []
-    const dm = new Map(links.map((row: any) => [String(row.message_id).slice(4), String(row.jid)]))
-    for (const row of rows as any[]) row.dm_jid = dm.get(String(row.comment_id)) || null
+        )
+      : new Set<string>()
+    for (const row of rows as any[]) {
+      const jid = row.dm_igsid ? `${row.dm_igsid}@ig` : ''
+      row.dm_jid = rooms.has(jid) ? jid : null
+      delete row.dm_igsid
+    }
     return response.json({ comments: rows })
   }
 

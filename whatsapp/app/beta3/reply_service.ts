@@ -48,6 +48,7 @@ import {
 } from '#beta3/mcp'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { saveAiRefs } from '#beta3/refs_service'
+import { commentOrigin } from '#instagram/store'
 
 /**
  * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
@@ -453,6 +454,7 @@ export async function createLeanReply(input: {
   }
 
   const store = await readLeanState('store_profile')
+  const igOrigin = await commentOrigin(jid).catch(() => null)
   const prompt = buildLeanPrompt({
     skill: skill.content,
     store,
@@ -466,7 +468,11 @@ export async function createLeanReply(input: {
     history: rows,
     message: `${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}${
       jid.endsWith('@ig')
-        ? '\n\nCATATAN SISTEM: chat ini lewat DM Instagram (bukan WhatsApp). Nomor HP pelanggan belum diketahui — minta lewat form order bila sudah mau pesan. Baris "[Komentar di postingan]" adalah komentar pelanggan yang sudah kita balas lewat DM.'
+        ? `\n\nCATATAN SISTEM: chat ini lewat DM Instagram (bukan WhatsApp). Nomor HP pelanggan belum diketahui — minta lewat form order bila sudah mau pesan.${
+            igOrigin
+              ? ` Pelanggan datang dari komentar di postingan: "${igOrigin.text.slice(0, 300)}". Kita sudah mengirim DM: "${igOrigin.privateReply.slice(0, 400)}".`
+              : ''
+          }`
         : ''
     }`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),

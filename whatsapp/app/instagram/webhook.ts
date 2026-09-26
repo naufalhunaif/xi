@@ -128,6 +128,13 @@ async function ingestMessage(
   if (!body && !image) return
 
   if (echo) {
+    // Balasan pribadi komentar tetap di tab Komentar, tidak masuk chat DM.
+    const fromComment = await db
+      .from('whatsapp_instagram_comments')
+      .where('private_reply', body)
+      .where('updated_at', '>=', new Date(Date.now() - 30 * 60_000))
+      .first()
+    if (fromComment) return
     // Balasan yang dikirim aplikasi ini sendiri (AI/CS) juga kembali sebagai echo.
     // Pencocokan isi mencegah dobel bila echo datang sebelum id tersimpan.
     const recent = await db

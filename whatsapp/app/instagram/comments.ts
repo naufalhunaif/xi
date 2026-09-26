@@ -6,9 +6,8 @@ import { readSettings } from '#services/settings_service'
 import { isAiWorking } from '#services/ai_work_schedule'
 import { runLeanProvider } from '#beta3/provider'
 import { selectLeanSkill } from '#beta3/reply_service'
-import { readInstagram, instagramJid, type InstagramConfig } from '#instagram/store'
+import { readInstagram, type InstagramConfig } from '#instagram/store'
 import { hideComment, privateReply, replyComment } from '#instagram/api'
-import { igMessageId } from '#instagram/webhook'
 
 export const COMMENT_SCHEMA = {
   type: 'object',
@@ -122,35 +121,6 @@ async function recentlyMessaged(fromId: string) {
   )
 }
 
-async function saveToRoom(
-  row: Record<string, any>,
-  recipientId: string,
-  sentId: string,
-  dmText: string
-) {
-  const jid = instagramJid(recipientId)
-  const name = row.username ? `IG @${row.username}` : ''
-  await db.rawQuery(
-    `INSERT INTO whatsapp_contacts (jid, name, updated_at) VALUES (?, NULLIF(?, ''), ?)
-     ON DUPLICATE KEY UPDATE name = COALESCE(name, VALUES(name)), updated_at = VALUES(updated_at)`,
-    [jid, name, new Date()]
-  )
-  const now = Date.now()
-  // Komentar dicatat sebagai konteks (bukan DM), supaya AI di DM tahu asal percakapan.
-  await db.rawQuery(
-    `INSERT IGNORE INTO whatsapp_messages
-      (message_id, jid, contact_name, direction, sender_type, body, status, created_at)
-     VALUES (?, ?, ?, 'in', 'customer', ?, 'read', ?)`,
-    [`igc_${row.comment_id}`, jid, name || null, `[Komentar di postingan] ${row.text || ''}`, new Date(now - 1000)]
-  )
-  await db.rawQuery(
-    `INSERT IGNORE INTO whatsapp_messages
-      (message_id, jid, contact_name, direction, sender_type, body, status, created_at)
-     VALUES (?, ?, NULL, 'out', 'ai', ?, 'sent', ?)`,
-    [sentId || `igcr_${row.comment_id}`, jid, dmText, new Date(now)]
-  )
-}
-
 /** Proses beberapa komentar baru. Dipanggil listener tiap beberapa detik. */
 export async function processInstagramComments(limit = 3) {
   const config = await readInstagram()
@@ -203,8 +173,8 @@ export async function processInstagramComments(limit = 3) {
           : decision.pesan_dm
         const sent = await privateReply(config.accessToken, row.comment_id, dmText)
         update.private_reply = dmText
-        if (sent.recipient_id)
-          await saveToRoom(row, sent.recipient_id, igMessageId(sent.message_id || ''), dmText)
+        // Komentar tidak dicampur ke chat DM; cukup dicatat id penerimanya.
+        if (sent.recipient_id) update.dm_igsid = String(sent.recipient_id)
       }
       let publicText = decision.balasan_publik
       // Utas balasan (bukan komentar utama) hanya dibalas bila ada maksud bertanya/beli.

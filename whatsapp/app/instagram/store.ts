@@ -55,7 +55,28 @@ export async function ensureInstagramTables() {
     `INSERT IGNORE INTO whatsapp_instagram (id, verify_token, updated_at) VALUES (1, ?, ?)`,
     [randomBytes(16).toString('hex'), new Date()]
   )
+  // Kolom tambahan (instalasi lama): id DM penerima balasan pribadi komentar.
+  try {
+    await db.rawQuery(
+      'ALTER TABLE whatsapp_instagram_comments ADD COLUMN dm_igsid VARCHAR(64) NULL'
+    )
+  } catch (error) {
+    if ((error as any)?.errno !== 1060) throw error
+  }
   ready.add(key)
+}
+
+/** Komentar terakhir yang menjadi asal DM ini (konteks AI; tidak tampil di chat). */
+export async function commentOrigin(jid: string) {
+  if (!isInstagramJid(jid)) return null
+  await ensureInstagramTables()
+  const row = await db
+    .from('whatsapp_instagram_comments')
+    .where('dm_igsid', instagramUserId(jid))
+    .where('updated_at', '>=', new Date(Date.now() - 7 * 24 * 3_600_000))
+    .orderBy('id', 'desc')
+    .first()
+  return row ? { text: String(row.text || ''), privateReply: String(row.private_reply || '') } : null
 }
 
 export type InstagramConfig = {
