@@ -64,7 +64,7 @@ export default class Beta3Controller {
       digest: digest.text,
       tokens: estimateTokens(digest.text),
       updatedAt: new Date(digest.at).toISOString(),
-      version: await readLeanState('catalog_version_storefront'),
+      version: await readLeanState('catalog_version_sf2'),
     })
   }
 

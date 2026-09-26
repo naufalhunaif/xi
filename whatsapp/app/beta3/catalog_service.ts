@@ -65,7 +65,21 @@ export function normalizeCatalogInput(raw: unknown): LeanCatalogInput {
   const item = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const product = String(item.product ?? item.name ?? item.nama ?? '').trim()
   if (!product) throw new Error('Kolom product wajib diisi.')
-  const price = item.price ?? item.harga
+  const rawPrice = item.price ?? item.harga
+  // Harga beda per size datang sebagai {min, max} (S–XL vs XXL ke atas). Dulu objek ini
+  // terbaca 0 sehingga AI mengira harga tidak ada. Harga dasar = min; size besar = max.
+  const range =
+    rawPrice && typeof rawPrice === 'object'
+      ? (rawPrice as { min?: unknown; max?: unknown })
+      : null
+  const price = range ? (range.min ?? range.max) : rawPrice
+  const bigPrice = range ? Math.round(Number(range.max) || 0) : 0
+  const allSizes = sizeText((item.sizesAll ?? item.sizes_all ?? item.sizes ?? item.ukuran) as string)
+  const largest = allSizes.split(' ').filter((size) => /^\d?X{2,}L$|^\dXL$/.test(size)).pop() || '3XL'
+  const bigNote =
+    range && bigPrice > Math.round(Number(price) || 0)
+      ? `${largest === 'XXL' ? 'XXL' : `XXL-${largest}`} ${rupiah(bigPrice)}`
+      : ''
   return {
     product: product.slice(0, 120),
     color: String(item.color ?? item.warna ?? '')
@@ -98,8 +112,9 @@ export function normalizeCatalogInput(raw: unknown): LeanCatalogInput {
     sizeGroup: String(item.sizeGroup ?? item.size_group ?? '')
       .trim()
       .slice(0, 60),
-    note: String(item.note ?? item.catatan ?? '')
-      .trim()
+    note: [bigNote, String(item.note ?? item.catatan ?? '').trim()]
+      .filter(Boolean)
+      .join('; ')
       .slice(0, 255),
     // Cadangan bila server lama mengabaikan storefront_only: arsip/tersembunyi tidak aktif.
     active:
@@ -221,7 +236,7 @@ export function renderCatalogDigest(rows: LeanCatalogRow[], now = new Date()) {
   }).format(now)
   const lines: string[] = [
     `KATALOG (data per ${stamp} WIB; harga & stok dari sini, tidak perlu cek tool).`,
-    'Legenda: ready = stok jadi (size di kurung); foto = ada foto, stok kosong; tanpa foto = belum ada foto & tidak tampil di web. Semua warna bisa dibuatkan (pre-order) kecuali bertanda "bahan belum ada". Size jas S M L XL, ada XXL-3XL bila harganya disebut; celana 29-37. Ciri model (kerah, kancing) dan seri bahan ada di kurung siku; beda seri bahan beda harga. Sebut ke pelanggan sebagai "Produk - Warna".',
+    'Legenda: ready = stok jadi (size di kurung); foto = ada foto, stok kosong; tanpa foto = belum ada foto & tidak tampil di web. Semua warna bisa dibuatkan (pre-order) kecuali bertanda "bahan belum ada". Size jas S M L XL; size besar (XXL ke atas) ada bila harganya disebut di kurung; celana 29-37. Ciri model (kerah, kancing) dan seri bahan ada di kurung siku; beda seri bahan beda harga. Sebut ke pelanggan sebagai "Produk - Warna".',
   ]
   type Group = {
     category: string
@@ -233,7 +248,7 @@ export function renderCatalogDigest(rows: LeanCatalogRow[], now = new Date()) {
   const groups = new Map<string, Group>()
   const allSizeGroups = new Set(active.map((row) => row.sizeGroup).filter(Boolean))
   for (const row of active) {
-    const big = row.note.match(/XXL-3XL [\d.]+/)?.[0] || ''
+    const big = row.note.match(/XXL(?:-\d?X*L)? [\d.]+/)?.[0] || ''
     const key = [row.category, row.product, row.price ?? 'x'].join('|')
     let group = groups.get(key)
     if (!group) {
@@ -295,7 +310,7 @@ export function renderCatalogDigest(rows: LeanCatalogRow[], now = new Date()) {
         group.rows
           .map((row) =>
             row.note
-              .replace(/XXL-3XL [\d.]+;?\s*/, '')
+              .replace(/XXL(?:-\d?X*L)? [\d.]+;?\s*/, '')
               .replace(/tidak tampil di web/i, '')
               .replace(/^[;\s]+|[;\s]+$/g, '')
           )
