@@ -155,15 +155,16 @@ export async function deleteAiAccount(id: number) {
   await db.from('whatsapp_ai_accounts').where('id', id).delete()
 }
 
-/** Geser urutan satu langkah ke atas/bawah. */
-export async function moveAiAccount(id: number, direction: -1 | 1) {
+/** Urutan baru hasil seret-lepas; id yang tidak dikirim tetap di belakang. */
+export async function setAiAccountOrder(ids: number[]) {
   const accounts = await listAiAccounts()
-  const index = accounts.findIndex((a) => a.id === id)
-  const target = index + direction
-  if (index < 0 || target < 0 || target >= accounts.length) return
-  ;[accounts[index], accounts[target]] = [accounts[target], accounts[index]]
-  for (const [position, account] of accounts.entries())
-    await db.from('whatsapp_ai_accounts').where('id', account.id).update({ position: position + 1 })
+  const known = new Set(accounts.map((a) => a.id))
+  const ordered = [
+    ...ids.filter((id) => known.has(id)),
+    ...accounts.map((a) => a.id).filter((id) => !ids.includes(id)),
+  ]
+  for (const [position, id] of ordered.entries())
+    await db.from('whatsapp_ai_accounts').where('id', id).update({ position: position + 1 })
 }
 
 /** Akun utama (login di panel lama) milik provider ini dipindah ke urutan teratas. */

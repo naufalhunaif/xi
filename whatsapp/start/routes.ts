@@ -75,7 +75,7 @@ router
     router.get('/api/ai/accounts', [AiAccountsController, 'index'])
     router.post('/api/ai/accounts', [AiAccountsController, 'store'])
     router.post('/api/ai/accounts/:id/update', [AiAccountsController, 'update'])
-    router.post('/api/ai/accounts/:id/move', [AiAccountsController, 'move'])
+    router.post('/api/ai/accounts/order', [AiAccountsController, 'order'])
     router.delete('/api/ai/accounts/:id', [AiAccountsController, 'destroy'])
     router.get('/api/ai/accounts/:id/login', [AiAccountsController, 'loginStatus'])
     router.post('/api/ai/accounts/:id/login', [AiAccountsController, 'loginStart'])

@@ -132,24 +132,22 @@
 
   function render(accounts) {
     list.replaceChildren()
-    accounts.forEach((account, index) => {
+    accounts.forEach((account) => {
+      const wrap = el('div', 'wa-ai-item')
+      wrap.dataset.id = String(account.id)
       const item = el('div', 'wa-kv-row')
-      const name = el('span', '', `${index + 1}. ${account.name}`)
+      const name = el('span', 'wa-ai-name')
+      const handle = el('button', 'wa-drag-handle', '⠿')
+      handle.type = 'button'
+      handle.title = t('Seret untuk mengubah urutan')
+      handle.setAttribute('aria-label', handle.title)
+      handle.addEventListener('pointerdown', (event) => startDrag(event, wrap))
+      name.append(handle, el('span', '', account.name))
       const [label, tone] = state(account)
       const info = el('code', '', account.lastError && account.limitedUntil ? account.lastError : account.model || '')
       const side = el('div', 'actions')
       side.append(el('span', `wa-pill ${tone}`, label))
       const holder = el('div', 'wa-span-full')
-      if (index > 0)
-        side.append(button('↑', async () => {
-          await call(`/api/ai/accounts/${account.id}/move`, 'POST', { direction: -1 })
-          refresh()
-        }))
-      if (index < accounts.length - 1)
-        side.append(button('↓', async () => {
-          await call(`/api/ai/accounts/${account.id}/move`, 'POST', { direction: 1 })
-          refresh()
-        }))
       if (account.limitedUntil)
         side.append(button(t('Coba lagi'), async () => {
           await call(`/api/ai/accounts/${account.id}/update`, 'POST', { resume: true })
@@ -179,14 +177,48 @@
           refresh()
         }))
       item.append(name, info, side)
-      list.append(item, holder)
+      wrap.append(item, holder)
+      list.append(wrap)
     })
+  }
+
+  // Seret-lepas urutan (mouse & sentuh): baris dipindah langsung, urutan disimpan saat dilepas.
+  function startDrag(event, wrap) {
+    event.preventDefault()
+    const handle = event.currentTarget
+    handle.setPointerCapture(event.pointerId)
+    wrap.classList.add('dragging')
+    const before = [...list.children].map((node) => node.dataset.id).join(',')
+    const move = (next) => {
+      const target = document
+        .elementFromPoint(next.clientX, next.clientY)
+        ?.closest('.wa-ai-item')
+      if (!target || target === wrap || target.parentElement !== list) return
+      const box = target.getBoundingClientRect()
+      list.insertBefore(wrap, next.clientY < box.top + box.height / 2 ? target : target.nextSibling)
+    }
+    const end = async () => {
+      handle.removeEventListener('pointermove', move)
+      wrap.classList.remove('dragging')
+      const ids = [...list.children].map((node) => Number(node.dataset.id))
+      if (ids.join(',') === before) return
+      try {
+        await call('/api/ai/accounts/order', 'POST', { ids })
+        status(t('Urutan disimpan.'))
+      } catch (error) {
+        status(error.message)
+      }
+      refresh()
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', end, { once: true })
+    handle.addEventListener('pointercancel', end, { once: true })
   }
 
   let timer
   async function refresh() {
     clearTimeout(timer)
-    if (list.querySelector('.wa-ai-login')) return
+    if (list.querySelector('.wa-ai-login, .dragging')) return
     try {
       const data = await call('/api/ai/accounts')
       render(data.accounts || [])
@@ -214,8 +246,7 @@
       byId('aiAccountKey').value = ''
       await refresh()
       if (provider.value !== 'gemini') {
-        const index = [...list.querySelectorAll('.wa-kv-row')].length - 1
-        const holder = list.querySelectorAll('.wa-kv-row + .wa-span-full')[index]
+        const holder = list.querySelector(`.wa-ai-item[data-id="${result.id}"] .wa-span-full`)
         const data = await call('/api/ai/accounts')
         const account = (data.accounts || []).find((a) => a.id === result.id)
         if (account && holder) await login(account, holder)

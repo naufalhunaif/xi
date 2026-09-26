@@ -207,3 +207,9 @@ html[data-theme='dark'] .workspace-ui {
 /* Chat: tautan kecil ke pengaturan saat WhatsApp belum terhubung. */
 .workspace-ui .wa-connect-hint { font-size: 11px; font-weight: 500; color: var(--wa-err); text-decoration: none; padding: 2px 8px; border-radius: 4px; background: var(--wa-err-bg); }
 .workspace-ui .wa-connect-hint[hidden] { display: none; }
+
+/* Akun AI: seret-lepas urutan. */
+.workspace-ui .wa-ai-item.dragging { opacity: .6; background: var(--wa-subtle); border-radius: 6px; }
+.workspace-ui .wa-ai-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.workspace-ui .wa-drag-handle { flex: none; width: 22px; height: 28px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; cursor: grab; touch-action: none; }
+.workspace-ui .wa-ai-item.dragging .wa-drag-handle { cursor: grabbing; }

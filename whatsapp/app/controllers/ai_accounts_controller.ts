@@ -8,7 +8,7 @@ import {
   createAiAccount,
   deleteAiAccount,
   listAiAccounts,
-  moveAiAccount,
+  setAiAccountOrder,
   readAiAccount,
   updateAiAccount,
   type AiAccount,
@@ -95,9 +95,11 @@ export default class AiAccountsController {
     return response.json({ ok: true })
   }
 
-  async move({ params, request, response }: HttpContext) {
-    const account = await found(params)
-    await moveAiAccount(account.id, Number(request.input('direction')) < 0 ? -1 : 1)
+  async order({ request, response }: HttpContext) {
+    const ids = (Array.isArray(request.input('ids')) ? request.input('ids') : [])
+      .map(Number)
+      .filter((id: number) => Number.isSafeInteger(id) && id > 0)
+    await setAiAccountOrder(ids)
     return response.json({ ok: true })
   }
 

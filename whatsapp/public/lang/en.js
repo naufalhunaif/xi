@@ -1158,7 +1158,7 @@ window.waLocales.en = {
   "QR WhatsApp": "WhatsApp QR",
   "Menyiapkan QR… scan dari WhatsApp nomor tambahan (Perangkat tertaut).": "Preparing QR… scan it from the extra number's WhatsApp (Linked devices).",
   "Akun AI & urutan cadangan": "AI accounts & fallback order",
-  "Dipakai dari atas. Jika satu akun habis kuota atau perlu login, AI otomatis pindah ke akun berikutnya dan kembali setelah pulih.": "Used from the top. When an account runs out of quota or needs a login, the AI switches to the next account and returns once it recovers.",
+  "Dipakai dari atas (seret ⠿ untuk mengubah urutan). Jika satu akun habis kuota atau perlu login, AI otomatis pindah ke akun berikutnya dan kembali setelah pulih.": "Used from the top (drag ⠿ to reorder). When an account runs out of quota or needs a login, the AI switches to the next account and returns once it recovers.",
   "Tambah akun": "Add account",
   "Nama (opsional)": "Name (optional)",
   "mis. Akun kantor": "e.g. Office account",
@@ -1185,4 +1185,6 @@ window.waLocales.en = {
   "Di HP buka WhatsApp → Perangkat tertaut → Tautkan perangkat, lalu scan QR ini.": "On your phone open WhatsApp → Linked devices → Link a device, then scan this QR.",
   "Putuskan WhatsApp nomor utama? Chat yang sudah ada tetap tersimpan.": "Disconnect the main WhatsApp number? Existing chats are kept.",
   "Opsional. Nomor tambahan di bawah bisa dipakai tanpa nomor utama.": "Optional. The extra numbers below work without a main number.",
+  "Seret untuk mengubah urutan": "Drag to reorder",
+  "Urutan disimpan.": "Order saved.",
 }
