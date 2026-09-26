@@ -54,6 +54,14 @@ import { storeCsMedia, removeCsMedia, csMediaPath, type CsMedia } from '#service
 
 const ROOM_PAGE_SIZE = 50
 
+function displayPhone(jid: string | null | undefined) {
+  const digits = /^(\d{6,15})(?::\d+)?@s\.whatsapp\.net$/.exec(String(jid || ''))?.[1]
+  if (!digits) return null
+  if (!digits.startsWith('62')) return `+${digits}`
+  const rest = digits.slice(2)
+  return `+62 ${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7)}`.replace(/-$/, '')
+}
+
 export default class DashboardController {
   async evaluations({ response }: HttpContext) {
     response.header('cache-control', 'no-store')
@@ -145,7 +153,8 @@ export default class DashboardController {
       }
       return {
         ...message,
-        contact_name: profile?.name || message.contact_name,
+        // Tanpa nama: tampilkan nomor HP (bila sudah terpetakan), bukan ID internal.
+        contact_name: profile?.name || message.contact_name || displayPhone(message.phone_jid),
         profile_picture_url: profile?.profile_picture_url || null,
         activity:
           activityIsFresh && !schedulePaused

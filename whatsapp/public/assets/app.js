@@ -479,6 +479,9 @@
     if (messageList) messageResizeObserver.observe(messageList)
   }
   const contacts = byId('contacts')
+  // ID internal WhatsApp (@lid) bukan nomor HP; jangan ditampilkan seolah nomor.
+  const fallbackName = (jid) =>
+    String(jid).endsWith('@lid') ? t('Tanpa nama') : `+${String(jid).split('@')[0]}`
   const inboxKeys = ['all', 'ai', 'cs', 'payment', 'order']
   function inboxState() {
     const params = new URLSearchParams(location.search)
@@ -589,7 +592,7 @@
       return
     }
     for (const contact of items) {
-      const name = contact.contact_name || String(contact.jid).split('@')[0]
+      const name = contact.contact_name || fallbackName(contact.jid)
       const link = document.createElement('a')
       link.className = `wa-contact ${contact.jid === selectedJid ? 'active' : ''}`
       link.classList.toggle('ai-running', contact.ai_running === true)
@@ -685,7 +688,7 @@
           : selected?.goal_waiting_for || ''
       }
       if (selected) {
-        const name = selected.contact_name || String(selected.jid).split('@')[0]
+        const name = selected.contact_name || fallbackName(selected.jid)
         if (byId('roomName')) {
           byId('roomName').textContent = name
           byId('roomName').title = name

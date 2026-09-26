@@ -323,7 +323,7 @@
                   @end
 
                   <span class="wa-contact-content">
-                    <strong>{{ contact.contact_name || contact.jid.split('@')[0] }}</strong>
+                    <strong>{{ contact.contact_name || (contact.jid.endsWith('@lid') ? 'Tanpa nama' : '+' + contact.jid.split('@')[0]) }}</strong>
                     <small class="{{ contact.activity ? 'active' : '' }}">
                       {{ contact.activity || contact.body || '' }}
                     </small>
@@ -397,7 +397,7 @@
                 <strong id="roomName">
                   {{
                     selectedContact
-                      ? selectedContact.contact_name || selectedJid.split('@')[0]
+                      ? selectedContact.contact_name || (selectedJid.endsWith('@lid') ? 'Tanpa nama' : '+' + selectedJid.split('@')[0])
                       : 'Chat'
                   }}
                 </strong>

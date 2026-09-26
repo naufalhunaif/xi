@@ -7,6 +7,7 @@ type InboxMessage = {
   id: number
   jid: string
   contact_name: string | null
+  phone_jid: string | null
   body: string
   media_type: string | null
   direction: 'in' | 'out'
@@ -72,17 +73,21 @@ export async function latestInboxMessages() {
           AND (b.status IN ('pending', 'awaiting_payment')
             OR (b.status = 'paid' AND b.group_status IN ('pending', 'failed'))))`
     : ORDER_SQL
+  // Nama: kontak ini, pasangan LID ↔ nomor HP (dua arah), lalu nama WA terakhir dari
+  // pesan masuk (pesan keluar tidak membawa nama pelanggan).
   const result = await db.rawQuery(`WITH successful_replies AS (
       SELECT jid, id, created_at,
         ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages WHERE direction = 'out' AND status IN ('sent', 'delivered', 'read')
     )
     SELECT m.id, m.jid,
-      -- Nama: kontak ini, kontak nomor HP pasangannya (LID ↔ nomor), atau nama WA
-      -- terakhir dari pesan masuk. Pesan keluar tidak membawa nama pelanggan.
-      COALESCE(NULLIF(c.name, ''), NULLIF(pc.name, ''), m.contact_name,
+      COALESCE(NULLIF(c.name, ''), NULLIF(pc.name, ''),
+        (SELECT NULLIF(x.name, '') FROM whatsapp_contacts x WHERE x.phone_jid = m.jid
+          AND x.jid <> m.jid AND x.name IS NOT NULL AND x.name <> '' LIMIT 1),
+        m.contact_name,
         (SELECT n.contact_name FROM whatsapp_messages n WHERE n.jid = m.jid AND n.direction = 'in'
           AND n.contact_name IS NOT NULL AND n.contact_name <> '' ORDER BY n.id DESC LIMIT 1)) AS contact_name,
+      COALESCE(NULLIF(c.phone_jid, ''), CASE WHEN m.jid LIKE '%@s.whatsapp.net' THEN m.jid END) AS phone_jid,
       m.body, m.media_type,
       m.direction, m.created_at,
       (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid

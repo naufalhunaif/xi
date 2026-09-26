@@ -799,9 +799,13 @@ export default class WhatsappListen extends BaseCommand {
         // A live notification stays live while another batch is being stored.
         await this.ingestMessages(messages, type !== 'notify' || !this.receivedPending)
       })
-      onScoped('messaging-history.set', async ({ messages, contacts }) => {
+      onScoped('messaging-history.set', async ({ messages, contacts, lidPnMappings }) => {
         if (this.socket !== socket) return
         const ingestion = this.ingestMessages(messages, true)
+        // Pasangan LID ↔ nomor dari riwayat: room LID jadi punya nomor (dan nama kontaknya).
+        for (const mapping of lidPnMappings || [])
+          if (mapping?.lid && mapping?.pn)
+            await this.refreshCustomerPhone(mapping.lid, mapping.pn).catch(() => {})
         for (const contact of contacts) {
           await this.rememberContactIdentity(contact)
           for (const jid of this.contactAliases(contact))
@@ -1198,10 +1202,26 @@ export default class WhatsappListen extends BaseCommand {
     )
   }
 
+  /** Room LID yang belum punya nomor: coba petakan dari data LID ↔ nomor yang sudah dikenal. */
+  private async backfillCustomerPhones() {
+    const result = await db.rawQuery(
+      `SELECT DISTINCT m.jid FROM whatsapp_messages m
+         LEFT JOIN whatsapp_contacts c ON c.jid = m.jid
+        WHERE m.jid LIKE '%@lid' AND COALESCE(c.phone_jid, '') = ''
+        LIMIT 1000`
+    )
+    const rows = (Array.isArray(result) ? result[0] : result) as Array<{ jid: string }>
+    for (const row of rows || []) {
+      if (!this.socket) return
+      await this.refreshCustomerPhone(String(row.jid)).catch(() => {})
+    }
+  }
+
   private refreshContactProfiles(refreshPicture = false) {
     return this.track(() => this.refreshContactProfilesScoped(refreshPicture))
   }
   private async refreshContactProfilesScoped(refreshPicture = false) {
+    await this.backfillCustomerPhones().catch(() => {})
     const contacts = await db
       .from('whatsapp_messages')
       .distinct('jid', 'contact_name')
