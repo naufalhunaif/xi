@@ -195,7 +195,8 @@ export async function clearWorkspaceSession() {
   await ensureWorkspaceRegistry()
   await db.transaction(async (trx) => {
     await trx.from('whatsapp_workspace_state').where('id', 1).forUpdate().firstOrFail()
-    await trx.from('baileys_auth').delete()
+    // Hanya sesi nomor utama; sesi nomor tambahan (ln<id>|…) tetap.
+    await trx.from('baileys_auth').whereNot('auth_key', 'like', 'ln%|%').delete()
     await trx
       .from('whatsapp_workspace_state')
       .where('id', 1)

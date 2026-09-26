@@ -1,5 +1,7 @@
 import { contactCleanupPreview } from '#services/contact_cleanup_service'
 import type { HttpContext } from '@adonisjs/core/http'
+import { listLines } from '#services/line_service'
+import { workspaceScope } from '#services/workspace_context'
 import { startSharedMcpLogin, completeSharedMcpLogin } from '#services/shared_mcp_oauth_service'
 import { archiveWorkspace, workspaceState, workspaceWorkerReady } from '#services/workspace_service'
 import { requestChatCleanup, chatCleanupStatus } from '#services/chat_cleanup_service'
@@ -118,6 +120,14 @@ export default class DashboardController {
         messages.map((message) => message.jid)
       )
     const goalsByJid = new Map(goals.map((goal) => [goal.jid, goal]))
+    // Multi nomor: label 4 digit terakhir nomor penerima, hanya bila ada nomor tambahan.
+    const lines = await listLines().catch(() => [])
+    const linePhones = new Map(lines.map((line) => [Number(line.id), String(line.phone || '')]))
+    const lineLabel = (lineId: unknown) => {
+      if (!lines.length) return null
+      const phone = Number(lineId) > 1 ? linePhones.get(Number(lineId)) : workspaceScope().phone
+      return phone ? `…${String(phone).slice(-4)}` : null
+    }
     const [recentTraces, connection, settings] = await Promise.all([
       db
         .from('whatsapp_ai_traces')
@@ -155,6 +165,7 @@ export default class DashboardController {
         ...message,
         // Tanpa nama: tampilkan nomor HP (bila sudah terpetakan), bukan ID internal.
         contact_name: profile?.name || message.contact_name || displayPhone(message.phone_jid),
+        line_label: lineLabel(profile?.line_id),
         profile_picture_url: profile?.profile_picture_url || null,
         activity:
           activityIsFresh && !schedulePaused

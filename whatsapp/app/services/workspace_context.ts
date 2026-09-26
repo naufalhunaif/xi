@@ -18,6 +18,7 @@ const globalTables = new Set([
   'whatsapp_connection',
   'whatsapp_workspaces',
   'whatsapp_workspace_state',
+  'whatsapp_lines',
 ])
 export function workspaceIdentifier(identifier: string) {
   if (/^whatsapp_[a-z0-9_]+$/.test(identifier) && !globalTables.has(identifier))

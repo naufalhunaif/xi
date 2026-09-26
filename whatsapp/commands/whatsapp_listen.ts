@@ -36,7 +36,10 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
 import pino from 'pino'
-import { databaseAuthState } from '#services/baileys_auth_service'
+import { databaseAuthState, clearAuthRows } from '#services/baileys_auth_service'
+import { currentLine, setCurrentLine, lineColumns, lineOf } from '#services/line_context'
+import { listLines, readLine, updateLine } from '#services/line_service'
+import { spawn, type ChildProcess } from 'node:child_process'
 import {
   createReply,
   repairCatalogNotesWithAi,
@@ -242,6 +245,15 @@ export default class WhatsappListen extends BaseCommand {
   @flags.boolean({ description: 'Tampilkan log Baileys' })
   declare verbose: boolean
 
+  @flags.number({ description: 'Nomor tambahan (line ≥ 2); kosong = nomor utama' })
+  declare line?: number
+
+  private lineChildren = new Map<number, ChildProcess>()
+  private lastLineSuperviseAt = 0
+  private get primary() {
+    return currentLine() === 1
+  }
+
   private socket?: WASocket
   private connecting = false
   private stopping = false
@@ -273,6 +285,8 @@ export default class WhatsappListen extends BaseCommand {
   }
 
   async run() {
+    setCurrentLine(Number(this.line) || 1)
+    if (!this.primary) return this.runLine()
     const stopDiagnostics = await startWorkerDiagnostics(
       this.app.makePath('storage', 'diagnostics')
     )
@@ -295,6 +309,7 @@ export default class WhatsappListen extends BaseCommand {
       if (this.recapTimer) clearInterval(this.recapTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
       this.pendingTurns.clear()
+      for (const child of this.lineChildren.values()) child.kill('SIGTERM')
       this.socket?.end(undefined)
     })
     this.logger.info(`Listener WhatsApp aktif (pid=${process.pid}, build=${process.cwd()})`)
@@ -342,6 +357,12 @@ export default class WhatsappListen extends BaseCommand {
           await this.disconnect()
         if (connection.desired_connected && !this.socket && !this.connecting && !this.tasks.size)
           await this.connect()
+        if (Date.now() - this.lastLineSuperviseAt >= 5000) {
+          this.lastLineSuperviseAt = Date.now()
+          await this.superviseLines().catch((error) =>
+            this.logger.error(`Nomor tambahan: ${String(error)}`)
+          )
+        }
         const scope = this.sessionScope
         if (scope && (await workspaceState()).active_id === scope.id)
           await inWorkspace(scope, async () => {
@@ -384,7 +405,7 @@ export default class WhatsappListen extends BaseCommand {
             if (this.socket && this.readyForAi()) {
               await this.flushOutbox()
               await this.flushReactions()
-              await flushWorkspaceReads(this.socket).catch(() => {
+              await flushWorkspaceReads(this.socket, currentLine()).catch(() => {
                 this.logger.error('Tanda baca WhatsApp akan dicoba kembali.')
               })
               if (Date.now() - this.lastPaymentWaitAt >= 10_000) {
@@ -415,6 +436,134 @@ export default class WhatsappListen extends BaseCommand {
       }
       await wait(1500)
     }
+  }
+
+  /** Room dimiliki nomor yang terakhir menerima pesan pelanggan (NULL = nomor utama). */
+  private async ownsRoom(jid: string) {
+    if (!jid) return false
+    const contact = await db.from('whatsapp_contacts').where('jid', jid).select('line_id').first()
+    return lineOf(contact?.line_id) === currentLine()
+  }
+
+  /** Pesan pelanggan masuk lewat nomor ini → balasan (AI/CS) keluar dari nomor ini. */
+  private async claimRoom(jid: string) {
+    await db.rawQuery(
+      `INSERT INTO whatsapp_contacts (jid, line_id, updated_at) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE line_id = VALUES(line_id)`,
+      [jid, this.primary ? null : currentLine(), new Date()]
+    )
+  }
+
+  /** Nomor tambahan memakai workspace (inbox, AI, pengaturan) nomor utama. */
+  private async lineWorkspace(phone: string | null) {
+    const scope = await activeWorkspace()
+    if (!scope.id) throw new Error('Hubungkan nomor utama terlebih dahulu.')
+    if (phone && scope.phone === phone) throw new Error('Nomor ini sudah menjadi nomor utama.')
+    const other = (await listLines()).find(
+      (line) => line.id !== currentLine() && line.phone === phone && line.desired_connected
+    )
+    if (other) throw new Error('Nomor ini sudah terhubung sebagai nomor tambahan lain.')
+    return scope
+  }
+
+  /** Nomor tambahan diputus: logout, hapus sesi & baris line, lalu proses selesai. */
+  private async removeLine() {
+    const line = currentLine()
+    const socket = this.socket
+    this.socket = undefined
+    this.socketOpen = false
+    try {
+      await socket?.logout()
+    } catch {
+      socket?.end(undefined)
+    }
+    await db.transaction(async (trx) => {
+      await clearAuthRows(trx, line)
+      await trx.from('whatsapp_lines').where('id', line).delete()
+    })
+    this.stopping = true
+  }
+
+  /** Worker utama menyalakan satu proses per nomor tambahan dan menghidupkannya lagi bila mati. */
+  private async superviseLines() {
+    const lines = await listLines()
+    const wanted = new Set(lines.filter((line) => line.desired_connected || line.status === 'disconnecting').map((line) => line.id))
+    for (const [id, child] of this.lineChildren) {
+      if (!wanted.has(id) && child.exitCode === null) child.kill('SIGTERM')
+    }
+    for (const id of wanted) {
+      const running = this.lineChildren.get(id)
+      if (running && running.exitCode === null && running.signalCode === null) continue
+      const child = spawn(process.execPath, [process.argv[1], 'whatsapp:listen', `--line=${id}`], {
+        cwd: process.cwd(),
+        env: process.env,
+        stdio: ['ignore', 'inherit', 'inherit'],
+      })
+      child.on('exit', () => {
+        if (this.lineChildren.get(id) === child) this.lineChildren.delete(id)
+      })
+      this.lineChildren.set(id, child)
+      this.logger.info(`Nomor tambahan #${id}: proses dimulai (pid ${child.pid}).`)
+    }
+  }
+
+  /**
+   * Proses nomor tambahan: satu soket WhatsApp di workspace yang sama dengan nomor
+   * utama. Hanya menerima/mengirim & menjawab room miliknya; tugas lain (grup order,
+   * pengiriman, rekap, katalog) tetap di nomor utama.
+   */
+  private async runLine() {
+    const line = currentLine()
+    this.logger.info(`Nomor tambahan #${line} aktif (pid=${process.pid}).`)
+    this.app.terminating(async () => {
+      this.stopping = true
+      if (this.sweepTimer) clearInterval(this.sweepTimer)
+      for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
+      this.socket?.end(undefined)
+    })
+    process.on('SIGTERM', () => {
+      this.stopping = true
+      this.socket?.end(undefined)
+      setTimeout(() => process.exit(0), 3000).unref()
+    })
+    while (!this.stopping) {
+      try {
+        const row = await readLine(line)
+        if (!row) break
+        await updateLine(line, { heartbeat_at: new Date() })
+        if (!row.desired_connected) {
+          await this.removeLine()
+          break
+        }
+        // Setelah gagal (mis. nomor sama dengan nomor utama) tunggu sampai diputus/ditambah ulang.
+        if (!this.socket && !this.connecting && !this.tasks.size && row.status !== 'error')
+          await this.connect()
+        const state = await workspaceState()
+        const scope = this.sessionScope
+        if (scope && state.active_id === scope.id && !state.cleanup_workspace_id)
+          await inWorkspace(scope, async () => {
+            if (!this.socket || !this.readyForAi()) return
+            await this.flushOutbox()
+            await this.flushReactions()
+            await flushWorkspaceReads(this.socket, line).catch(() => {})
+            if (Date.now() - this.lastPaymentWaitAt >= 10_000) {
+              this.lastPaymentWaitAt = Date.now()
+              await this.sendPaymentWaitNotice()
+            }
+            void this.track(() => this.consumeAiReviews()).catch((error) =>
+              this.logger.error(String(error))
+            )
+            if (Date.now() - this.lastGoalSweepAt >= 60_000 && !this.goalSweepRunning) {
+              this.lastGoalSweepAt = Date.now()
+              void this.track(() => this.sweepConversationGoals())
+            }
+          })
+      } catch (error) {
+        this.logger.error(`Nomor #${line}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      await wait(1500)
+    }
+    process.exit(0)
   }
 
   private async processShippingConversation() {
@@ -613,6 +762,11 @@ export default class WhatsappListen extends BaseCommand {
   }
 
   private async setState(values: Record<string, unknown>) {
+    if (!this.primary) {
+      const { worker_id: _w, ...rest } = values
+      await updateLine(currentLine(), rest)
+      return
+    }
     await db
       .from('whatsapp_connection')
       .where('id', 1)
@@ -626,7 +780,7 @@ export default class WhatsappListen extends BaseCommand {
     await this.setState({ status: 'connecting', qr_data_url: null, last_error: null })
     try {
       const authVersion = (await workspaceState()).auth_version
-      const auth = await databaseAuthState()
+      const auth = await databaseAuthState(currentLine())
       const logger = pino({ level: this.verbose ? 'info' : 'silent' })
       const socket = workspaceSocket(
         makeWASocket({
@@ -685,8 +839,15 @@ export default class WhatsappListen extends BaseCommand {
           if (connection === 'open') {
             const phone = socket.user?.id?.split(':')[0]?.split('@')[0] || null
             try {
-              connectedScope = await activateWorkspace(phone, authVersion)
-            } catch {
+              connectedScope = this.primary
+                ? await activateWorkspace(phone, authVersion)
+                : await this.lineWorkspace(phone)
+            } catch (error) {
+              if (!this.primary)
+                await this.setState({
+                  status: 'error',
+                  last_error: (error instanceof Error ? error.message : String(error)).slice(0, 290),
+                })
               resolveScope(null)
               socket.end(undefined)
               this.socket = undefined
@@ -707,9 +868,10 @@ export default class WhatsappListen extends BaseCommand {
                   await requestRecentAiReviews('reconnected', settings.sweepMaxAgeHours)
               })
             this.lastProfileRefreshAt = Date.now()
-            inWorkspace(connectedScope, () =>
-              this.track(() => this.refreshContactProfiles(true))
-            ).catch(() => {})
+            if (this.primary)
+              inWorkspace(connectedScope, () =>
+                this.track(() => this.refreshContactProfiles(true))
+              ).catch(() => {})
           }
           if (connection === 'close') {
             resolveScope(null)
@@ -719,7 +881,10 @@ export default class WhatsappListen extends BaseCommand {
             this.receivedPending = false
             const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
             this.socket = undefined
-            if (statusCode === DisconnectReason.loggedOut) {
+            if (statusCode === DisconnectReason.loggedOut && !this.primary) {
+              // Nomor tambahan dilepas dari HP: hapus sesinya, baris line ikut dihapus.
+              await this.removeLine()
+            } else if (statusCode === DisconnectReason.loggedOut) {
               await archiveWorkspace()
               await this.disconnect()
               await this.setState({
@@ -744,7 +909,7 @@ export default class WhatsappListen extends BaseCommand {
             void inWorkspace(this.sessionScope, () => this.track(() => this.sweepUnanswered()))
         }, SWEEP_INTERVAL_MS)
       }
-      if (!this.recapTimer) {
+      if (!this.recapTimer && this.primary) {
         // Beta 3: rekap order dari chat CS manusia (tombol di halaman Order), satu chat
         // per menit, tanpa pesan ke pelanggan. Hanya berjalan setelah tombol ditekan.
         this.recapTimer = setInterval(() => {
@@ -763,7 +928,7 @@ export default class WhatsappListen extends BaseCommand {
           })
         }, 60_000)
       }
-      if (!this.leanSyncTimer) {
+      if (!this.leanSyncTimer && this.primary) {
         // Beta 2: katalog/TOKO/bahan ditarik sendiri tiap 30 menit (murah: if_version), lalu ciri foto di latar.
         const syncLean = () => {
           if (!this.sessionScope) return
@@ -1038,6 +1203,7 @@ export default class WhatsappListen extends BaseCommand {
     // server WhatsApp dan mengunduhnya satu per satu membuat sinkron sangat lambat.
     const downloadable = Boolean(media?.visual) && Date.now() - createdAt.getTime() < 3 * 86_400_000
     await db.table('whatsapp_messages').insert({
+      ...lineColumns(),
       message_id: id,
       jid,
       contact_name: message.pushName || null,
@@ -1063,6 +1229,7 @@ export default class WhatsappListen extends BaseCommand {
       : null
     // Older backfill must not undo a later handoff or reopen a completed conversation.
     if (latest && createdAt.getTime() < new Date(latest.created_at).getTime()) return
+    if (!message.key.fromMe) await this.claimRoom(jid)
     const settings = await readSettings()
     if (Date.now() - createdAt.getTime() > settings.sweepMaxAgeHours * 3_600_000) return
     if (message.key.fromMe) await resumeAiAfterHumanReply(jid)
@@ -1427,6 +1594,7 @@ export default class WhatsappListen extends BaseCommand {
     ].sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime())
     for (const notice of notices) {
       if (this.pendingTurns.has(notice.jid) || this.chatLocks.has(notice.jid)) continue
+      if (!(await this.ownsRoom(notice.jid))) continue
       const deliver =
         notice.kind === 'shipping'
           ? deliverShippingNotice
@@ -1492,10 +1660,16 @@ export default class WhatsappListen extends BaseCommand {
 
   private async flushOutbox() {
     if (!this.socket) return
+    const line = currentLine()
     const queued = await db
       .from('whatsapp_messages')
       .where('direction', 'out')
       .where('status', 'queued')
+      // Tiap nomor hanya mengirim antrean miliknya (NULL = nomor utama).
+      .where((query) => {
+        if (line > 1) query.where('line_id', line)
+        else query.whereNull('line_id').orWhere('line_id', '<=', 1)
+      })
       .orderBy('id', 'asc')
       .limit(20)
     for (const message of queued) {
@@ -1571,6 +1745,7 @@ export default class WhatsappListen extends BaseCommand {
       .orderBy('id', 'asc')
       .limit(20)
     for (const reaction of queued) {
+      if (!(await this.ownsRoom(String(reaction.jid || '')))) continue
       const target = await db
         .from('whatsapp_messages')
         .where('message_id', reaction.target_message_id)
@@ -1609,7 +1784,9 @@ export default class WhatsappListen extends BaseCommand {
     const media = await this.prepareMedia(message)
     if (!text && !media) return
     this.rememberContact(jid, message.pushName || '').catch(() => {})
+    await this.claimRoom(jid)
     await db.table('whatsapp_messages').insert({
+      ...lineColumns(),
       message_id: id,
       jid,
       contact_name: message.pushName || null,
@@ -1654,6 +1831,7 @@ export default class WhatsappListen extends BaseCommand {
       this.pendingTurns.delete(jid)
     }
     await db.table('whatsapp_messages').insert({
+      ...lineColumns(),
       message_id: id,
       jid,
       contact_name: null,
@@ -2360,6 +2538,7 @@ export default class WhatsappListen extends BaseCommand {
            LEFT JOIN whatsapp_contacts c ON c.jid = t.jid
            LEFT JOIN whatsapp_chat_goals g ON g.jid = t.jid
           WHERE t.direction = 'in'
+            AND GREATEST(COALESCE(c.line_id, 1), 1) = ?
             AND COALESCE(c.handling_mode, 'ai') <> 'cs'
             AND COALESCE(c.ai_excluded, 0) = 0
             AND COALESCE(g.analyzed_anchor_id, 0) <> t.id
@@ -2368,7 +2547,7 @@ export default class WhatsappListen extends BaseCommand {
             AND NOT EXISTS (SELECT 1 FROM whatsapp_ai_reviews r WHERE r.jid=t.jid AND r.status IN ('pending','processing'))
           ORDER BY t.created_at ASC
           LIMIT ?`,
-        [since, batch * 5]
+        [since, currentLine(), batch * 5]
       )
       const candidates = (Array.isArray(result) ? result[0] : result) as Array<{
         jid: string
@@ -2681,11 +2860,12 @@ export default class WhatsappListen extends BaseCommand {
         .where('r.status', 'pending')
         .where((query) => query.whereNull('c.ai_excluded').orWhere('c.ai_excluded', false))
         .where((query) => query.whereNull('c.handling_mode').orWhereNot('c.handling_mode', 'cs'))
-        .select('r.*')
+        .select('r.*', 'c.line_id')
         .orderBy('r.requested_at', 'asc')
         .limit(50)
       for (const request of requests) {
         if (this.pendingTurns.has(request.jid) || this.chatLocks.has(request.jid)) continue
+        if (lineOf(request.line_id) !== currentLine()) continue
         if (
           await db
             .from('whatsapp_messages')
@@ -3659,6 +3839,7 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
       for (const goal of await dueConversationGoals()) {
         const contact = await db.from('whatsapp_contacts').where('jid', goal.jid).first()
         if (contact?.ai_excluded) continue
+        if (lineOf(contact?.line_id) !== currentLine()) continue
         if (
           await db
             .from('whatsapp_ai_reviews')

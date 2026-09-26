@@ -78,7 +78,10 @@ export async function queueOutgoingMessage(input: {
   if ((input.replyToId || input.replyToMessageId) && (!target || target.jid !== input.jid))
     throw new Error('Pesan reply tidak ditemukan di room ini.')
 
+  // Balasan keluar dari nomor yang dipakai pelanggan (NULL = nomor utama).
+  const owner = await db.from('whatsapp_contacts').where('jid', input.jid).select('line_id').first()
   await db.table('whatsapp_messages').insert({
+    line_id: Number(owner?.line_id) > 1 ? Number(owner.line_id) : null,
     message_id: `queued-${randomUUID()}`,
     jid: input.jid,
     contact_name: null,

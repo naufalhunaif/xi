@@ -1,6 +1,7 @@
 import { generateMessageIDV2 } from '@whiskeysockets/baileys'
 import db from '#services/workspace_database'
 import { workspaceScope } from '#services/workspace_context'
+import { lineColumns } from '#services/line_context'
 
 const pending = new Set<string>()
 const key = (jid: string, id: string) => `${workspaceScope().prefix}:${jid}:${id}`
@@ -33,7 +34,7 @@ type Repository = {
   promote: (row: Row) => Promise<unknown>
 }
 const repository: Repository = {
-  insert: async (row) => db.table('whatsapp_messages').insert(row),
+  insert: async (row) => db.table('whatsapp_messages').insert({ ...lineColumns(), ...row }),
   find: async (id) => db.from('whatsapp_messages').where('message_id', id).first(),
   promote: async (row) => {
     const content = Object.fromEntries(

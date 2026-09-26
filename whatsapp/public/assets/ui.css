@@ -191,3 +191,6 @@ html[data-theme='dark'] .workspace-ui {
 .workspace-ui .wa-segmented button:focus-visible { outline: 2px solid var(--wa-ok); outline-offset: -2px; }
 .workspace-ui .wa-segmented button span { font-size: 10px; font-variant-numeric: tabular-nums; opacity: 0.8; }
 .workspace-ui .wa-kv-row .button.small { height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px; }
+.workspace-ui .wa-kv-row .actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.workspace-ui .wa-line-qr { width: 220px; height: 220px; margin: 8px 0; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid var(--line); }
+.workspace-ui .wa-line-chip { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; background: var(--wa-subtle); color: var(--muted); font-size: 9px; font-weight: 600; vertical-align: 1px; }

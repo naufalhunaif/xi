@@ -51,12 +51,17 @@ export async function readIncomingThrough(
 }
 
 /** Manual room reads persist in workspace_read_id, so receipt delivery survives restart. */
-export async function flushWorkspaceReads(socket: ReadSocket) {
+export async function flushWorkspaceReads(socket: ReadSocket, line = 1) {
   const rows = await db
     .from('whatsapp_messages as m')
     .join('whatsapp_contacts as c', 'c.jid', 'm.jid')
     .select('m.id', 'm.jid', 'm.message_id')
     .where('m.direction', 'in')
+    // Tanda baca dikirim oleh nomor yang menerima pesan itu.
+    .where((query) => {
+      if (line > 1) query.where('m.line_id', line)
+      else query.whereNull('m.line_id').orWhere('m.line_id', '<=', 1)
+    })
     .whereNot('m.status', 'read')
     .whereColumn('m.id', '<=', 'c.workspace_read_id')
     .orderBy('m.id', 'asc')

@@ -627,6 +627,13 @@
       content.className = 'wa-contact-content'
       const title = document.createElement('strong')
       title.textContent = name
+      if (contact.line_label) {
+        const chip = document.createElement('span')
+        chip.className = 'wa-line-chip'
+        chip.title = t('Nomor penerima')
+        chip.textContent = contact.line_label
+        title.append(chip)
+      }
       const preview = document.createElement('small')
       preview.textContent = contact.activity || contact.body || ''
       preview.classList.toggle('active', Boolean(contact.activity))
