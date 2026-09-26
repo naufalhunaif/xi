@@ -81,6 +81,7 @@ export async function googleAuthUrl() {
     scope: `${SCOPE} openid email`,
     access_type: 'offline',
     prompt: 'consent',
+    include_granted_scopes: 'true',
     state: state.oauthState,
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
@@ -101,6 +102,9 @@ export async function finishGoogleAuth(code: string, returnedState: string) {
   })
   const token = (await response.json().catch(() => ({}))) as Record<string, any>
   if (!response.ok || !token.refresh_token) throw new Error(token.error_description || 'Google tidak memberi izin.')
+  // Layar izin Google punya kotak centang per izin; tanpa izin Drive backup tidak bisa jalan.
+  if (!String(token.scope || '').includes('drive.file'))
+    throw new Error('Izin Google Drive belum dicentang. Hubungkan lagi dan centang izin "file Google Drive yang Anda gunakan dengan aplikasi ini".')
   let email = ''
   try {
     const payload = JSON.parse(Buffer.from(String(token.id_token || '').split('.')[1] || '', 'base64url').toString())
@@ -133,7 +137,12 @@ async function drive(token: string, path: string, init: RequestInit = {}) {
     ...init,
     headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) },
   })
-  if (!response.ok) throw new Error(`Google Drive: ${response.status} ${(await response.text()).slice(0, 200)}`)
+  if (!response.ok) {
+    const text = await response.text()
+    if (response.status === 403 && /insufficient/i.test(text))
+      throw new Error('Izin Google Drive belum diberikan. Tekan Putuskan, lalu Hubungkan lagi dan centang izin Google Drive.')
+    throw new Error(`Google Drive: ${response.status} ${text.slice(0, 200)}`)
+  }
   return response
 }
 async function folderId(state: GoogleState, token: string) {
