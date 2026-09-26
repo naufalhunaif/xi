@@ -26,6 +26,7 @@ import makeWASocket, {
   Browsers,
   DisconnectReason,
   downloadMediaMessage,
+  fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
   normalizeMessageContent,
   jidNormalizedUser,
@@ -36,6 +37,20 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
 import pino from 'pino'
+
+/** Versi WhatsApp Web terbaru (versi bawaan Baileys bisa ditolak server bila usang). */
+let waVersion: { value?: [number, number, number]; at: number } = { at: 0 }
+async function latestWaVersion() {
+  if (waVersion.value && Date.now() - waVersion.at < 6 * 3_600_000) return waVersion.value
+  try {
+    const result = await fetchLatestWaWebVersion({ signal: AbortSignal.timeout(10_000) } as any)
+    if (result?.version?.length === 3)
+      waVersion = { value: result.version as [number, number, number], at: Date.now() }
+  } catch {
+    // Tetap pakai versi terakhir yang diketahui / bawaan.
+  }
+  return waVersion.value
+}
 import { databaseAuthState, clearAuthRows } from '#services/baileys_auth_service'
 import { currentLine, setCurrentLine, lineColumns, lineOf } from '#services/line_context'
 import { listLines, readLine, updateLine } from '#services/line_service'
@@ -782,8 +797,10 @@ export default class WhatsappListen extends BaseCommand {
       const authVersion = (await workspaceState()).auth_version
       const auth = await databaseAuthState(currentLine())
       const logger = pino({ level: this.verbose ? 'info' : 'silent' })
+      const version = await latestWaVersion()
       const socket = workspaceSocket(
         makeWASocket({
+          ...(version ? { version } : {}),
           auth: {
             creds: auth.state.creds,
             keys: makeCacheableSignalKeyStore(auth.state.keys, logger),
@@ -843,6 +860,9 @@ export default class WhatsappListen extends BaseCommand {
                 ? await activateWorkspace(phone, authVersion)
                 : await this.lineWorkspace(phone)
             } catch (error) {
+              this.logger.error(
+                `WhatsApp terhubung tapi gagal diaktifkan: ${error instanceof Error ? error.message : String(error)}`
+              )
               if (!this.primary)
                 await this.setState({
                   status: 'error',
@@ -880,6 +900,10 @@ export default class WhatsappListen extends BaseCommand {
             this.socketOpen = false
             this.receivedPending = false
             const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
+            const reason = String((lastDisconnect?.error as any)?.message || '').slice(0, 200)
+            this.logger.error(
+              `Koneksi WhatsApp${this.primary ? '' : ` #${currentLine()}`} tertutup (kode ${statusCode ?? '-'}${reason ? `: ${reason}` : ''}).`
+            )
             this.socket = undefined
             if (statusCode === DisconnectReason.loggedOut && !this.primary) {
               // Nomor tambahan dilepas dari HP: hapus sesinya, baris line ikut dihapus.
@@ -897,7 +921,7 @@ export default class WhatsappListen extends BaseCommand {
               await this.setState({
                 status: 'disconnected',
                 qr_data_url: null,
-                last_error: 'Koneksi terputus.',
+                last_error: `Koneksi terputus${statusCode ? ` (kode ${statusCode})` : ''}.`,
               })
             }
           }
@@ -1045,6 +1069,7 @@ export default class WhatsappListen extends BaseCommand {
       })
     } catch (error) {
       this.socket = undefined
+      this.logger.error(`Gagal memulai koneksi WhatsApp: ${error instanceof Error ? error.message : String(error)}`)
       await this.setState({
         status: 'error',
         last_error: error instanceof Error ? error.message : String(error),
