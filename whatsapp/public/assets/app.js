@@ -732,9 +732,15 @@
       preview.textContent = contact.activity || contact.body || ''
       preview.classList.toggle('active', Boolean(contact.activity))
       content.append(title, preview)
+      // AI adalah bawaan: badge hanya untuk CS. Koin kuning = pembayaran perlu dikonfirmasi.
       const mode = document.createElement('span')
-      mode.className = `wa-contact-mode ${contact.handling_mode === 'cs' ? 'cs' : 'ai'}`
-      mode.textContent = contact.handling_mode === 'cs' ? 'CS' : 'AI'
+      mode.className = 'wa-contact-mode cs'
+      mode.textContent = 'CS'
+      const coin = document.createElement('span')
+      coin.className = 'wa-contact-coin'
+      coin.title = t('Pembayaran perlu dikonfirmasi')
+      coin.setAttribute('aria-label', coin.title)
+      coin.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.8-2.5 1.9 0 2.6 5 1.4 5 4.1 0 1.1-1.1 2-2.5 2-1.1 0-2.1-.5-2.6-1.3M12 6.5V8m0 8v1.5"/></svg>'
       const meta = document.createElement('span')
       meta.className = 'wa-contact-meta'
       if (Number(contact.unanswered_count) > 0) {
@@ -753,7 +759,8 @@
         badge.setAttribute('aria-label', t("{0} pesan belum dibaca", unread))
         meta.append(badge)
       }
-      meta.append(mode)
+      if (contact.needs_payment) meta.append(coin)
+      if (contact.handling_mode === 'cs') meta.append(mode)
       link.append(avatar, content, meta)
       contacts.append(link)
     }

@@ -1343,4 +1343,5 @@ window.waLocales.en = {
   "Hapus nomor {0}? Chat yang sudah ada tetap tersimpan.": "Remove number {0}? Existing chats are kept.",
   "Belum ada nomor. Klik Tambah nomor lalu scan QR dari HP.": "No numbers yet. Click Add number, then scan the QR from your phone.",
   "Menyiapkan QR… scan dari HP (Perangkat tertaut).": "Preparing QR… scan it from your phone (Linked devices).",
+  "Pembayaran perlu dikonfirmasi": "Payment needs confirmation",
 }

@@ -1159,4 +1159,5 @@ window.waLocales.id = {
   "Skill sudah yang terbaru.": "Skill sudah yang terbaru.",
   "Dibayar (DP)": "Dibayar (DP)",
   "Sisa": "Sisa",
+  "Pembayaran perlu dikonfirmasi": "Pembayaran perlu dikonfirmasi",
 }
