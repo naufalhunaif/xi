@@ -16,6 +16,7 @@ type InboxMessage = {
   unanswered_count: number
   needs_payment: boolean
   has_order: boolean
+  done_order: boolean
 }
 
 /** Workspace read state is separate from WhatsApp delivery/read receipts. */
@@ -67,16 +68,21 @@ export async function latestInboxMessages() {
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
             AND d.status IN ('paid', 'cancelled') AND d.updated_at >= n.updated_at))`
     : PAYMENT_SQL
-  // Order = chat yang sedang/baru memesan: form masuk, menunggu bayar, lunas 14 hari
-  // terakhir (atau belum sampai grup), atau spesifikasi pesanan sedang disusun AI.
+  // Order = pesanan berjalan: AI sedang menyusun spesifikasi, form masuk, menunggu bayar,
+  // atau lunas tapi belum terkirim ke grup. Selesai = lunas dan sudah terkirim ke grup.
   const orderSql = beta3
     ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
           AND (b.status IN ('pending', 'awaiting_payment')
-            OR (b.status = 'paid' AND (b.group_status IN ('pending', 'failed')
-              OR b.updated_at >= NOW() - INTERVAL 14 DAY))))
+            OR (b.status = 'paid' AND b.group_status IN ('pending', 'failed'))))
         OR EXISTS (SELECT 1 FROM whatsapp_beta3_specs sp WHERE sp.jid = m.jid AND sp.spec <> ''
-          AND sp.updated_at >= NOW() - INTERVAL 14 DAY)`
+          AND sp.updated_at >= NOW() - INTERVAL 14 DAY
+          AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
+            AND d.updated_at >= sp.updated_at))`
     : ORDER_SQL
+  const doneSql = beta3
+    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
+          AND b.status = 'paid' AND b.group_status NOT IN ('pending', 'failed'))`
+    : `EXISTS (SELECT 1 FROM whatsapp_orders o WHERE o.jid = m.jid AND o.status = 'completed')`
   // Nama: kontak ini, pasangan LID ↔ nomor HP (dua arah), lalu nama WA terakhir dari
   // pesan masuk (pesan keluar tidak membawa nama pelanggan).
   const result = await db.rawQuery(`WITH successful_replies AS (
@@ -100,7 +106,8 @@ export async function latestInboxMessages() {
         AND (r.id IS NULL OR u.created_at > r.created_at
           OR (u.created_at = r.created_at AND u.id > r.id))) AS unanswered_count,
       (${paymentSql}) AS needs_payment,
-      (${orderSql}) AS has_order
+      (${orderSql}) AS has_order,
+      (${doneSql}) AS done_order
     FROM whatsapp_messages m
     JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages) ranked ON ranked.id = m.id AND ranked.position = 1
@@ -115,5 +122,6 @@ export async function latestInboxMessages() {
     unanswered_count: Number(message.unanswered_count),
     needs_payment: Boolean(Number(message.needs_payment)),
     has_order: Boolean(Number(message.has_order)),
+    done_order: Boolean(Number(message.done_order)),
   }))
 }

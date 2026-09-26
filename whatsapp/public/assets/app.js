@@ -511,7 +511,7 @@
   // ID internal WhatsApp (@lid) bukan nomor HP; jangan ditampilkan seolah nomor.
   const fallbackName = (jid) =>
     String(jid).endsWith('@lid') ? t('Tanpa nama') : `+${String(jid).split('@')[0]}`
-  const inboxKeys = ['all', 'ai', 'cs', 'payment', 'order']
+  const inboxKeys = ['all', 'unanswered', 'cs', 'payment', 'order', 'done']
   // Pencarian kotak masuk: nama, nomor, pratinjau (langsung) + isi chat (server).
   const normalizeSearch = (value) =>
     String(value || '')
@@ -527,10 +527,9 @@
   let inboxSearchHits = new Map()
   function inboxState() {
     const params = new URLSearchParams(location.search)
-    return {
-      filter: inboxKeys.includes(params.get('inbox')) ? params.get('inbox') : 'all',
-      unanswered: params.get('unanswered') === '1',
-    }
+    // Tautan lama ?unanswered=1 tetap membuka tab Belum dibalas.
+    const key = params.get('unanswered') === '1' ? 'unanswered' : params.get('inbox')
+    return { filter: inboxKeys.includes(key) ? key : 'all' }
   }
   function applyInboxFilters() {
     if (!contacts || !byId('inboxFilters')) return
@@ -538,10 +537,11 @@
     const rows = [...contacts.querySelectorAll('.wa-contact')]
     const matches = (row, key) =>
       key === 'all' ||
-      (key === 'ai' && row.dataset.mode !== 'cs') ||
+      (key === 'unanswered' && Number(row.dataset.unanswered) > 0) ||
       (key === 'cs' && row.dataset.mode === 'cs') ||
       (key === 'payment' && row.dataset.payment === 'true') ||
-      (key === 'order' && row.dataset.order === 'true')
+      (key === 'order' && row.dataset.order === 'true') ||
+      (key === 'done' && row.dataset.done === 'true')
     document.querySelectorAll('[data-inbox-filter]').forEach((button) => {
       const key = button.dataset.inboxFilter
       button.setAttribute('aria-pressed', String(key === state.filter))
@@ -549,9 +549,6 @@
       button.querySelector('[data-filter-count]').textContent = count ? String(count) : ''
       button.title = t("{0} percakapan{1}", count, key === 'payment' ? t(' menunggu konfirmasi pembayaran') : '')
     })
-    byId('unansweredFilter').setAttribute('aria-pressed', String(state.unanswered))
-    const unansweredCount = rows.filter((row) => matches(row, state.filter) && Number(row.dataset.unanswered) > 0).length
-    byId('unansweredCount').textContent = unansweredCount ? String(unansweredCount) : ''
     let visible = 0
     const queryDigits = searchDigits(inboxQuery)
     for (const row of rows) {
@@ -568,7 +565,7 @@
           preview.classList.add('search-snippet')
         }
       } else {
-        row.hidden = !matches(row, state.filter) || (state.unanswered && !Number(row.dataset.unanswered))
+        row.hidden = !matches(row, state.filter)
       }
       if (preview && (!hit || !inboxQuery) && preview.classList.contains('search-snippet')) {
         preview.textContent = row.dataset.preview || ''
@@ -580,7 +577,6 @@
       url.searchParams.delete('unanswered')
       url.searchParams.delete('q')
       if (state.filter !== 'all') url.searchParams.set('inbox', state.filter)
-      if (state.unanswered) url.searchParams.set('unanswered', '1')
       if (inboxQuery) url.searchParams.set('q', inboxQuery)
       row.href = url.href
     }
@@ -592,7 +588,6 @@
       backUrl.searchParams.delete('inbox')
       backUrl.searchParams.delete('unanswered')
       if (state.filter !== 'all') backUrl.searchParams.set('inbox', state.filter)
-      if (state.unanswered) backUrl.searchParams.set('unanswered', '1')
       back.href = backUrl.href
     }
     contacts.querySelectorAll('.wa-empty').forEach((element) => element.remove())
@@ -601,7 +596,7 @@
       empty.className = 'wa-empty'
       empty.textContent = inboxQuery
         ? t('Tidak ada hasil')
-        : state.unanswered
+        : state.filter === 'unanswered'
         ? t('Semua sudah dibalas')
         : state.filter === 'all' ? t('Belum ada kontak') : t('Tidak ada percakapan di tab ini')
       contacts.append(empty)
@@ -627,16 +622,11 @@
   byId('inboxFilters')?.addEventListener('click', (event) => {
     const button = event.target.closest('button')
     if (!button || button.id === 'inboxFiltersMore') return
-    const state = inboxState()
     const url = new URL(location.href)
-    if (button.dataset.inboxFilter) {
-      url.searchParams.set('inbox', button.dataset.inboxFilter)
-      // Switching queues shows all work, including payments already acknowledged in chat.
-      url.searchParams.delete('unanswered')
-    } else if (button.id === 'unansweredFilter') {
-      if (state.unanswered) url.searchParams.delete('unanswered')
-      else url.searchParams.set('unanswered', '1')
-    }
+    if (!button.dataset.inboxFilter) return
+    url.searchParams.delete('unanswered')
+    if (button.dataset.inboxFilter === 'all') url.searchParams.delete('inbox')
+    else url.searchParams.set('inbox', button.dataset.inboxFilter)
     history.replaceState(null, '', url)
     applyInboxFilters()
   })
@@ -701,6 +691,7 @@
       link.dataset.mode = contact.handling_mode || 'ai'
       link.dataset.payment = String(Boolean(contact.needs_payment))
       link.dataset.order = String(Boolean(contact.has_order))
+      link.dataset.done = String(Boolean(contact.done_order))
       link.dataset.unanswered = String(Number(contact.unanswered_count) || 0)
       link.dataset.preview = contact.activity || contact.body || ''
       link.dataset.search = normalizeSearch(`${name} ${contact.contact_name || ''} ${contact.body || ''}`)

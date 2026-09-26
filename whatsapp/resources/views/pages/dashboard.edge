@@ -189,10 +189,11 @@
                 @each(tab in
                 [
                   { key: 'all', label: 'Semua' },
-                  { key: 'ai', label: 'Ditangani AI' },
+                  { key: 'unanswered', label: 'Belum dibalas' },
                   { key: 'cs', label: 'Perlu CS' },
                   { key: 'payment', label: 'Pembayaran' },
                   { key: 'order', label: 'Order' },
+                  { key: 'done', label: 'Selesai' },
                 ])
                   <button
                     type="button"
@@ -203,16 +204,6 @@
                     <span data-filter-count></span>
                   </button>
                 @end
-                <button
-                  id="unansweredFilter"
-                  class="wa-inbox-unanswered"
-                  type="button"
-                  aria-pressed="false"
-                  title="Percakapan dengan pesan pelanggan yang belum mendapat balasan terkirim"
-                 data-i18n="Belum dibalas" data-i18n-title="Percakapan dengan pesan pelanggan yang belum mendapat balasan terkirim">
-                  Belum dibalas
-                  <span id="unansweredCount"></span>
-                </button>
                 <span class="wa-inbox-fade" aria-hidden="true"></span>
               </div>
               <button id="inboxFiltersMore" class="wa-inbox-more" type="button" aria-expanded="false" aria-label="Tampilkan semua filter" title="Tampilkan semua filter" data-i18n-aria-label="Tampilkan semua filter" data-i18n-title="Tampilkan semua filter" hidden>
@@ -229,6 +220,7 @@
                   data-mode="{{ contact.handling_mode }}"
                   data-payment="{{ contact.needs_payment ? 'true' : 'false' }}"
                   data-order="{{ contact.has_order ? 'true' : 'false' }}"
+                  data-done="{{ contact.done_order ? 'true' : 'false' }}"
                   data-unanswered="{{ contact.unanswered_count }}"
                 >
                   @if(contact.profile_picture_url)
