@@ -274,16 +274,21 @@
     if (order.source === 'rekap') head.append(el('small', t('Rekap dari chat'), 'wa-muted'))
     box.append(head)
 
-    if (Array.isArray(order.photos) && order.photos.length) {
-      const photos = el('div', undefined, 'wa-order-photos')
-      for (const photo of order.photos) {
+    // Foto katalog + gambar dari pelanggan (referensi model/bagian), sama seperti yang dikirim ke grup.
+    const pictures = [
+      ...(Array.isArray(order.photos) ? order.photos : []).map((photo) => ({ url: photo.url, caption: `${photo.product}${photo.color ? ` - ${photo.color}` : ''}` })),
+      ...(Array.isArray(order.refs) ? order.refs : []).map((ref) => ({ url: ref.url, caption: ref.caption, customer: true })),
+    ]
+    if (pictures.length) {
+      const photos = el('div', undefined, 'wa-order-photos wa-b3-pictures')
+      for (const picture of pictures) {
         const figure = el('figure')
         const img = el('img')
-        img.src = photo.url
-        img.alt = `${photo.product} ${photo.color}`.trim()
+        img.src = picture.url
+        img.alt = picture.caption
         img.loading = 'lazy'
         img.addEventListener('error', () => figure.remove())
-        figure.append(img)
+        figure.append(img, el('figcaption', picture.customer ? `${t('Dari pelanggan')} · ${picture.caption}` : picture.caption))
         photos.append(figure)
       }
       box.append(photos)

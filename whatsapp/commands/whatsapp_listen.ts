@@ -772,10 +772,22 @@ export default class WhatsappListen extends BaseCommand {
           })
         } catch {}
       }
+      // Produk di luar katalog (model dari gambar pelanggan): gambar pelanggan jadi foto utama.
+      // Juga bila spesifikasi menyebut "sesuai gambar": gambar pelanggan didahulukan dari foto katalog.
+      const refs = await beta3Refs.refsForOrder(Number(order.id)).catch(() => [])
+      const customerModel = /sesuai gambar|seperti gambar|kayak gambar|model dari gambar/i.test(String(order.spec || ''))
+      let mainRef: (typeof refs)[number] | null = null
+      if ((!images.length || customerModel) && refs.length) {
+        try {
+          images.unshift({ bytes: await beta3Refs.loadImage(refs[0].image_url), caption: '' })
+          mainRef = refs[0]
+        } catch {}
+      }
+      const caption = mainRef ? `${text}\n\n${beta3Refs.refCaption(mainRef)}` : text
       const sent = await socket.sendMessage(
         groupJid,
         images.length
-          ? { image: images[0].bytes, caption: text, mimetype: 'image/jpeg' }
+          ? { image: images[0].bytes, caption, mimetype: 'image/jpeg' }
           : { text }
       )
       if (!sent?.key.id) throw new Error('Pengiriman ke grup belum dikonfirmasi.')
@@ -786,7 +798,7 @@ export default class WhatsappListen extends BaseCommand {
           .catch(() => null)
       }
       // Gambar referensi per bagian, apa adanya: "Model kerah seperti ini".
-      for (const ref of await beta3Refs.refsForOrder(Number(order.id)).catch(() => [])) {
+      for (const ref of refs.filter((item) => item !== mainRef)) {
         if (this.stopping || this.socket !== socket) break
         try {
           await socket.sendMessage(groupJid, {

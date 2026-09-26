@@ -553,6 +553,8 @@ export async function requeueLeanOrderGroup(id: number, chosenGroup?: string | n
   if (!order) throw new Error('Order tidak ditemukan.')
   const groupJid = await chooseGroup(chosenGroup)
   if (!groupJid) throw new Error('Pilih grup tujuan, atau atur grup produksi default di halaman Order.')
+  // Gambar pelanggan yang masuk setelah lunas ikut terkirim saat kirim ulang.
+  await attachRefsToOrder(String(order.jid), id)
   await db.from('whatsapp_beta3_orders').where('id', id).update({
     group_jid: groupJid,
     group_status: 'pending',

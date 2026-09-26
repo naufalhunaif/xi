@@ -174,7 +174,20 @@ export default class Beta3Controller {
       chat_note: '',
       text: renderGroupOrderMessage({ ...order, contact_name: nameOf.get(String(order.jid || '')) || '' }),
     }))
-    return response.json({ orders: await attachOrderPhotos(withText), counts })
+    // Gambar dari pelanggan (referensi) ikut tampil di detail order.
+    const withRefs = await Promise.all(
+      withText.map(async (order: Record<string, any>): Promise<Record<string, any> & { spec?: unknown }> => {
+        const refs =
+          order.status === 'paid' || order.status === 'cancelled'
+            ? await refsForOrder(Number(order.id)).catch(() => [])
+            : await listActiveRefs(String(order.jid || '')).catch(() => [])
+        return {
+          ...order,
+          refs: refs.map((ref) => ({ url: ref.image_url, caption: refCaption(ref) })),
+        }
+      })
+    )
+    return response.json({ orders: await attachOrderPhotos(withRefs), counts })
   }
 
   /** CS mengisi ongkir + subtotal → sistem kirim total lalu rekening ke pelanggan. */

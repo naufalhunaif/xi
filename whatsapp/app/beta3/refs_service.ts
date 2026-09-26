@@ -139,7 +139,7 @@ export async function loadImage(url: string) {
 
 /** Caption singkat untuk penjahit: "Model kerah seperti ini". */
 export function refCaption(ref: LeanRef) {
-  const part = ref.part.trim().toLowerCase().replace(/^model\s+/, '')
+  const part = ref.part.trim().toLowerCase().replace(/^model\s*/, '')
   return part ? `Model ${part} seperti ini` : 'Model seperti ini'
 }
 

@@ -595,6 +595,15 @@ export async function createLeanReply(input: {
   if (style) {
     if (decision.susulan) decision.susulan = normalizeStyle([decision.susulan], style)[0] || ''
   }
+  // Cadangan bila model tidak menandai referensi: gambar giliran ini yang disebut di
+  // spesifikasi ("Model sesuai gambar") disimpan sebagai referensi model. Bukti transfer tidak.
+  if (
+    !decision.referensi?.length &&
+    input.imageIds?.length &&
+    /sesuai gambar|seperti gambar|kayak gambar|dari gambar/i.test(decision.spesifikasi) &&
+    !/transfer|bukti|struk|resi|bayar/i.test(`${input.text} ${decision.tahap}`)
+  )
+    decision.referensi = input.imageIds.map((_, index) => ({ gambar: index + 1, bagian: 'model' }))
   if (decision.referensi?.length && input.imageIds?.length) {
     const saved = await saveAiRefs(jid, decision.referensi, input.imageIds).catch(() => 0)
     if (saved)
