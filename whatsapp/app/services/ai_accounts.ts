@@ -122,12 +122,37 @@ async function ensureTable() {
     await db.rawQuery("ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS scope VARCHAR(12) NOT NULL DEFAULT 'all'")
     await db.from('whatsapp_ai_accounts').where('provider', 'gemini').update({ scope: 'background' })
   }
+  const [quotaCol] = await db.rawQuery(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'whatsapp_ai_accounts' AND column_name = 'quota_json'"
+  )
+  if (!Number(quotaCol?.[0]?.n || 0))
+    await db.rawQuery('ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS quota_json TEXT NULL')
   const [blockedCol] = await db.rawQuery(
     "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'whatsapp_ai_accounts' AND column_name = 'model_blocked'"
   )
   if (!Number(blockedCol?.[0]?.n || 0))
     await db.rawQuery("ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS model_blocked VARCHAR(80) NOT NULL DEFAULT ''")
   ready = true
+}
+
+/** Kuota terakhir yang dilaporkan layanan untuk akun ini (jendela 5 jam / 7 hari). */
+export async function saveAiAccountQuota(id: number, windows: unknown[]) {
+  await ensureTable()
+  if (!windows.length) return
+  await db
+    .from('whatsapp_ai_accounts')
+    .where('id', id)
+    .update({ quota_json: JSON.stringify({ at: Date.now(), windows }).slice(0, 20000) })
+}
+export async function readAiAccountQuota(id: number): Promise<{ at: number; windows: any[] }> {
+  await ensureTable()
+  const row = await db.from('whatsapp_ai_accounts').where('id', id).select('quota_json').first()
+  try {
+    const parsed = JSON.parse(String(row?.quota_json || ''))
+    return { at: Number(parsed.at || 0), windows: Array.isArray(parsed.windows) ? parsed.windows : [] }
+  } catch {
+    return { at: 0, windows: [] }
+  }
 }
 
 /** Ingat model yang ditolak untuk akun ini (tahan restart & berlaku di semua proses nomor). */

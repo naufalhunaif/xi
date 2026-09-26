@@ -23,3 +23,18 @@ html[data-theme="dark"] .workspace-ui .wa-quota-bar[data-level="stale"] { --quot
   color: var(--wa-red, #b3261e);
   font-weight: 600;
 }
+
+/* Semua akun AI: satu baris per akun, progres kecil per jendela kuota. */
+.workspace-ui .wa-usage-cards.wa-quota-accounts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--wa-surface, #fff); }
+.workspace-ui .wa-quota-account { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; min-width: 0; }
+.workspace-ui .wa-quota-account + .wa-quota-account { border-top: 1px solid var(--line); }
+.workspace-ui .wa-quota-who { display: grid; gap: 2px; min-width: 0; }
+.workspace-ui .wa-quota-who strong { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-ui .wa-quota-mini-list { display: flex; flex-wrap: wrap; gap: 6px 16px; min-width: 0; }
+.workspace-ui .wa-quota-mini { display: grid; grid-template-columns: auto 72px auto; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.workspace-ui .wa-quota-mini-value { min-width: 30px; color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+.workspace-ui .wa-quota-bar--mini { height: 4px; }
+@media (max-width: 640px) {
+  .workspace-ui .wa-quota-account { grid-template-columns: minmax(0, 1fr) auto; }
+  .workspace-ui .wa-quota-mini-list { grid-column: 1 / -1; grid-row: 2; }
+}

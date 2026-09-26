@@ -309,7 +309,13 @@ export default class DashboardController {
   async quotas({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
     const { readAccountQuotas } = await import('#services/ai_quota_service')
-    return response.json(await readAccountQuotas())
+    const { readAiAccountQuotas } = await import('#services/ai_account_quota')
+    const accounts = await readAiAccountQuotas().catch(() => [])
+    // Tampilan lama (per penyedia) hanya bila belum ada akun AI terdaftar.
+    const legacy = accounts.length
+      ? { providers: [] }
+      : await readAccountQuotas().catch(() => ({ providers: [] }))
+    return response.json({ ...legacy, accounts })
   }
   async trace({ request, response }: HttpContext) {
     const jid = String(request.input('jid', '')).trim().slice(0, 190)

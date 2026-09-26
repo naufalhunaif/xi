@@ -11,7 +11,9 @@ import { observeProviderProcess } from '#services/provider_process_diagnostics'
 import { recordUsage, usageFromEvent, type TokenUsage } from '#services/usage_service'
 import { LEAN_OUTPUT_SCHEMA } from '#beta3/prompt'
 import { withAiAccount } from '#services/ai_account_context'
+import { claudeQuotaWindows, type QuotaWindow } from '#services/ai_quota_contract'
 import {
+  saveAiAccountQuota,
   blockAiModel,
   aiAccountRef,
   markAiAccountLimited,
@@ -91,6 +93,10 @@ export async function runLeanProvider(
   let lastError: unknown
   for (const account of accounts) {
     await recordAiEvent(account.id, 'start', phase, '', null, jid).catch(() => {})
+    // Laporan limit Claude selama run → sisa kuota akun ini di Pengaturan → Usage.
+    const quota = new Map<string, QuotaWindow>()
+    const saveQuota = () =>
+      quota.size ? saveAiAccountQuota(account.id, [...quota.values()]).catch(() => {}) : undefined
     try {
       const attempt = (useDefault: boolean) =>
         withAiAccount(aiAccountRef(account), () =>
@@ -101,7 +107,8 @@ export async function runLeanProvider(
             prompt,
             imagePaths,
             phase,
-            schema
+            schema,
+            quota
           )
         )
       // Model yang tidak tersedia untuk langganan akun ini (mis. akun ChatGPT lain paketnya
@@ -120,6 +127,7 @@ export async function runLeanProvider(
           await blockAiModel(account.id, wanted).catch(() => {})
         }
       }
+      await saveQuota()
       await markAiAccountUsed(account.id).catch(() => {})
       const tokens = result.usage ? result.usage.input + result.usage.output : null
       await recordAiEvent(account.id, 'ok', phase, '', tokens, jid).catch(() => {})
@@ -130,6 +138,7 @@ export async function runLeanProvider(
         provider: account.provider === 'claude' ? 'claude' : 'chatgpt',
       })
       lastError = error
+      await saveQuota()
       const reason = (error instanceof Error ? error.message : String(error)).replace(/\s+/g, ' ')
       await recordAiEvent(
         account.id,
@@ -209,7 +218,8 @@ async function runLeanOnce(
   prompt: { system: string; user: string },
   imagePaths: string[],
   phase: string,
-  schema: Record<string, unknown>
+  schema: Record<string, unknown>,
+  quotaSink?: Map<string, QuotaWindow>
 ): Promise<LeanProviderResult> {
   const provider: AiProviderName =
     providerName === 'claude' ? 'claude' : providerName === 'gemini' ? 'gemini' : 'chatgpt'
@@ -234,6 +244,8 @@ async function runLeanOnce(
     const schemaPath = join(workingDirectory, 'lean.schema.json')
     await writeFile(schemaPath, JSON.stringify(schema), { mode: 0o600 })
     const observe = (event: Record<string, any>) => {
+      if (quotaSink && provider === 'claude')
+        for (const window of claudeQuotaWindows(event)) quotaSink.set(window.key, window)
       const next = usageFromEvent(provider, event)
       if (next)
         usage = {
