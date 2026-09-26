@@ -17,6 +17,9 @@ const AiAccountsController = () => import('#controllers/ai_accounts_controller')
 const BackupController = () => import('#controllers/backup_controller')
 
 router.get('/login', [AccountController, 'login']).as('account.login')
+// Halaman publik untuk Google (Branding): kebijakan privasi & syarat layanan.
+router.get('/privacy', [() => import('#controllers/legal_controller'), 'privacy'])
+router.get('/terms', [() => import('#controllers/legal_controller'), 'terms'])
 router.post('/login', [AccountController, 'loginPost'])
 router.get('/setup', [AccountController, 'setup']).as('account.setup')
 router.post('/setup', [AccountController, 'setupPost'])
