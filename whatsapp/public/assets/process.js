@@ -297,7 +297,7 @@
     if (trace.status === 'failed') {
       const failure = steps.filter((step) => step.status === 'failed').at(-1)
       if (failure?.detail?.code === 'USAGE_LIMIT') {
-        const name = failure.detail.source || (failure.detail.provider === 'claude' ? 'Claude' : failure.detail.provider === 'chatgpt' ? 'ChatGPT' : 'AI')
+        const name = failure.detail.source || (({ claude: 'Claude', chatgpt: 'ChatGPT', gemini: 'Gemini' })[failure.detail.provider] || 'AI')
         return { label: t('Limit penggunaan {0} tercapai.', name), active: false, state: 'failed' }
       }
       const label = failure?.detail?.message

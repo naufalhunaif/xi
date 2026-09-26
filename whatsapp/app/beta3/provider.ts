@@ -47,7 +47,8 @@ export type LeanProviderResult = {
 }
 
 const TIMEOUT_MS = 120_000
-export const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+// Alias selalu menunjuk Flash terbaru (model 2.5 kini tertutup untuk API key baru).
+export const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest'
 
 /** Kegagalan yang berarti akun ini tidak bisa melayani sekarang → coba akun berikutnya. */
 const SWITCHABLE = new Set(['USAGE_LIMIT', 'ACCESS_DENIED', 'AI_AUTH_REQUIRED'])

@@ -311,3 +311,6 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 @media (prefers-reduced-motion: reduce) {
   .workspace-ui .orc-node.s-busy .halo, .workspace-ui .orc-arc, .workspace-ui .orc-node[class*='flash-'] .halo { animation: none; }
 }
+
+/* Usage: tiga penyedia (ChatGPT, Claude, Gemini). */
+.workspace-ui .wa-usage-cards { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }

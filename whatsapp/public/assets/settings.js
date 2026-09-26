@@ -80,7 +80,7 @@
       cards.replaceChildren()
       for (const usage of data.providers) {
         const card = textElement('article', '', 'wa-usage-card')
-        card.append(textElement('h3', usage.provider === 'claude' ? 'Claude' : 'ChatGPT'))
+        card.append(textElement('h3', ({ claude: 'Claude', gemini: 'Gemini' })[usage.provider] || 'ChatGPT'))
         card.append(
           textElement(
             'strong',
@@ -153,7 +153,7 @@
         for (const value of [
           date,
           run.phase || '—',
-          `${run.provider === 'claude' ? 'Claude' : 'ChatGPT'} / ${run.model}`,
+          `${({ claude: 'Claude', gemini: 'Gemini' })[run.provider] || 'ChatGPT'} / ${run.model}`,
           run.tokens === null ? '—' : number(run.tokens),
           t("{0} dtk", number(Math.round(run.durationMs / 1000))),
           run.status === 'completed' ? t('Selesai') : t('Gagal'),

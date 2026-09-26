@@ -97,7 +97,7 @@ export async function readUsage() {
     .limit(12)
   return {
     days: 30,
-    providers: ['chatgpt', 'claude'].map((provider) => {
+    providers: ['chatgpt', 'claude', 'gemini'].map((provider) => {
       const row = rows.find((item) => item.provider === provider)
       return {
         provider,
