@@ -9,7 +9,7 @@ import {
   codexCommand,
 } from '#services/workspace_oauth'
 import { workspaceScope } from '#services/workspace_context'
-import { aiAccountKey } from '#services/ai_account_context'
+import { aiAccountKey, currentAiAccount } from '#services/ai_account_context'
 import { watchDeviceLogin } from '#services/codex_device_login'
 import { resetQuota } from '#services/ai_quota_store'
 
@@ -95,7 +95,7 @@ function details(connected: boolean): LoginState {
 }
 
 export async function isChatgptConnected() {
-  if (!workspaceScope().id) return false
+  if (!workspaceScope().id && !currentAiAccount()) return false
   try {
     const { stdout, stderr } = await execFileAsync(
       await codexBinary(),
@@ -132,7 +132,7 @@ export async function startOAuthLogin(restart = false) {
 
 async function beginOAuthLogin(restart: boolean) {
   const state = loginState()
-  if (!workspaceScope().id) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
   if (await isChatgptConnected()) return details(true)
   if (state.session?.snapshot().pending && !restart) {
     await state.session.ready

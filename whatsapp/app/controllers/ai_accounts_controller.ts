@@ -1,7 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import app from '@adonisjs/core/services/app'
 import { rm } from 'node:fs/promises'
-import { workspaceScope } from '#services/workspace_context'
 import { withAiAccount } from '#services/ai_account_context'
 import {
   AI_ACCOUNT_PROVIDERS,
@@ -107,9 +106,8 @@ export default class AiAccountsController {
     if (account.legacy)
       return response.unprocessableEntity({ error: 'Akun utama tidak bisa dihapus, cukup nonaktifkan.' })
     await deleteAiAccount(account.id)
-    const scope = workspaceScope()
     await rm(
-      app.makePath('storage', 'whatsapp-workspaces', String(scope.id || 1), 'ai-accounts', String(account.id)),
+      app.makePath('storage', 'ai-accounts', String(account.id)),
       { recursive: true, force: true }
     ).catch(() => {})
     return response.json({ ok: true })

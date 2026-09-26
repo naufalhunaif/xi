@@ -124,6 +124,45 @@ export async function cleanupWorkspace() {
     : null
   return scopeOf(row, state.version)
 }
+/** Nomor tambahan yang sedang terhubung (tabel belum ada = tidak ada). */
+async function liveLines(trx: any = db): Promise<Array<{ id: number; phone: string | null }>> {
+  try {
+    return await trx
+      .from('whatsapp_lines')
+      .where('desired_connected', 1)
+      .where('status', 'connected')
+      .select('id', 'phone')
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Nomor tambahan boleh terhubung tanpa nomor utama: bila belum ada workspace aktif,
+ * workspace nomor ini yang dipakai (dibuat bila belum ada). Bila sudah ada, ikut workspace aktif.
+ */
+export async function adoptWorkspace(value: unknown) {
+  const phone = normalizeWorkspacePhone(value)
+  await ensureWorkspaceRegistry()
+  await db.rawQuery(
+    'INSERT IGNORE INTO whatsapp_workspaces (phone,legacy,archived_at,created_at) VALUES (?,0,NULL,?)',
+    [phone, new Date()]
+  )
+  const row = await db.from('whatsapp_workspaces').where('phone', phone).firstOrFail()
+  const scope = scopeOf(row, '')
+  await inWorkspace(scope, () => ensureDefaults())
+  await db.transaction(async (trx) => {
+    const state = await trx.from('whatsapp_workspace_state').where('id', 1).forUpdate().firstOrFail()
+    if (state.active_id) return
+    await trx.from('whatsapp_workspaces').where('id', scope.id).update({ archived_at: null })
+    await trx
+      .from('whatsapp_workspace_state')
+      .where('id', 1)
+      .update({ active_id: scope.id, version: randomUUID(), updated_at: new Date() })
+  })
+  return activeWorkspace()
+}
+
 export async function activateWorkspace(value: unknown, authVersion: string) {
   const phone = normalizeWorkspacePhone(value)
   await ensureWorkspaceRegistry()
@@ -144,6 +183,18 @@ export async function activateWorkspace(value: unknown, authVersion: string) {
     const connection = await trx.from('whatsapp_connection').where('id', 1).firstOrFail()
     if (state.auth_version !== authVersion || !connection.desired_connected)
       throw new Error('Koneksi sudah dibatalkan.')
+    const lines = await liveLines(trx)
+    if (lines.some((line) => line.phone === phone))
+      throw new Error('Nomor ini sudah terhubung sebagai nomor tambahan.')
+    // Nomor tambahan sedang aktif di workspace lain → nomor utama bergabung, tidak memindah data.
+    if (state.active_id && Number(state.active_id) !== scope.id && lines.length) {
+      const active = await trx.from('whatsapp_workspaces').where('id', state.active_id).first()
+      await trx
+        .from('whatsapp_workspace_state')
+        .where('id', 1)
+        .update({ session_id: state.active_id, updated_at: new Date() })
+      return { ...scopeOf(active, state.version) }
+    }
     if (state.active_id && Number(state.active_id) !== scope.id)
       await trx
         .from('whatsapp_workspaces')
@@ -167,7 +218,9 @@ export async function archiveWorkspace() {
       .where('id', 1)
       .forUpdate()
       .firstOrFail()
-    if (state.active_id)
+    // Masih ada nomor tambahan terhubung → workspace (inbox, AI) tetap aktif untuk mereka.
+    const keep = Boolean(state.active_id) && (await liveLines(trx)).length > 0
+    if (state.active_id && !keep)
       await trx
         .from('whatsapp_workspaces')
         .where('id', state.active_id)
@@ -176,8 +229,8 @@ export async function archiveWorkspace() {
       .from('whatsapp_workspace_state')
       .where('id', 1)
       .update({
-        active_id: null,
-        version: state.active_id ? randomUUID() : state.version,
+        active_id: keep ? state.active_id : null,
+        version: state.active_id && !keep ? randomUUID() : state.version,
         auth_version: randomUUID(),
         updated_at: new Date(),
       })

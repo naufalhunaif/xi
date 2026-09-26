@@ -31,9 +31,6 @@ export default class LinesController {
   }
 
   async store({ response }: HttpContext) {
-    const scope = await activeWorkspace()
-    if (!scope.id)
-      return response.unprocessableEntity({ error: 'Hubungkan nomor utama terlebih dahulu.' })
     const id = await createLine()
     return response.json({ ok: true, id })
   }

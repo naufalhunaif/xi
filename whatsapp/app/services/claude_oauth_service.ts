@@ -6,7 +6,7 @@ import env from '#start/env'
 import { readSettings } from '#services/settings_service'
 import { workspaceOAuthDirectory } from '#services/workspace_oauth'
 import { workspaceScope } from '#services/workspace_context'
-import { aiAccountKey } from '#services/ai_account_context'
+import { aiAccountKey, currentAiAccount } from '#services/ai_account_context'
 import { randomUUID } from 'node:crypto'
 import { writeClaudeVerification } from '#services/oauth_verification'
 import { resetQuota } from '#services/ai_quota_store'
@@ -118,7 +118,7 @@ export async function claudeBinaryStatus(override?: string) {
 }
 
 export async function isClaudeConnected() {
-  if (!workspaceScope().id) return false
+  if (!workspaceScope().id && !currentAiAccount()) return false
   try {
     const { stdout } = await execFileAsync(await claudeBinary(), ['auth', 'status'], {
       timeout: 8000,
@@ -159,7 +159,7 @@ export async function claudeOAuthState() {
 
 export async function startClaudeOAuthLogin(restart = false) {
   const state = loginState()
-  if (!workspaceScope().id) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
   if (await isClaudeConnected()) return details(true)
   if (state.loginProcess && !restart) return details(false)
   if (state.loginProcess) {
@@ -204,7 +204,7 @@ export async function startClaudeOAuthLogin(restart = false) {
 }
 
 export async function verifyClaudeOAuthLogin(loginId: unknown, code: unknown) {
-  if (!workspaceScope().id) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
   await writeClaudeVerification(loginState(), loginId, code)
   return { submitted: true }
 }

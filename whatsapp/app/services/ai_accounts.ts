@@ -23,10 +23,9 @@ export type AiAccount = {
   lastUsedAt: Date | null
 }
 
-const ready = new Set<string>()
+let ready = false
 async function ensureTable() {
-  const key = workspaceScope().prefix
-  if (ready.has(key)) return
+  if (ready) return
   await db.rawQuery(`CREATE TABLE IF NOT EXISTS whatsapp_ai_accounts (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     provider VARCHAR(20) NOT NULL,
@@ -43,8 +42,20 @@ async function ensureTable() {
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  // Dulu tabel ini per nomor: salin akun dari workspace aktif sekali saja.
+  const prefix = workspaceScope().prefix
+  let count = await db.from('whatsapp_ai_accounts').count('* as total').first()
+  if (!Number(count?.total || 0) && prefix) {
+    const [found] = await db.rawQuery(
+      'SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?',
+      [`${prefix}whatsapp_ai_accounts`]
+    )
+    if (Number(found?.[0]?.n || 0)) {
+      await db.rawQuery(`INSERT IGNORE INTO whatsapp_ai_accounts SELECT * FROM \`${prefix}whatsapp_ai_accounts\``)
+      count = await db.from('whatsapp_ai_accounts').count('* as total').first()
+    }
+  }
   // Pertama kali: akun lama (satu ChatGPT + satu Claude) menjadi dua baris pertama.
-  const count = await db.from('whatsapp_ai_accounts').count('* as total').first()
   if (!Number(count?.total || 0)) {
     const settings = await readSettings().catch(() => null)
     const primary: AiProviderName = settings?.aiProvider === 'claude' ? 'claude' : 'chatgpt'
@@ -63,7 +74,7 @@ async function ensureTable() {
       },
     ])
   }
-  ready.add(key)
+  ready = true
 }
 
 const map = (row: any): AiAccount => ({

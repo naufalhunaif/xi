@@ -94,14 +94,14 @@
     updateClaudeStatus()
   })
   // Koneksi WhatsApp dikelola di Pengaturan → Nomor WhatsApp; chat hanya menampilkan tautan bila belum terhubung.
-  function renderConnectionStatus(status, phone = '') {
+  function renderConnectionStatus(status, phone = '', linesConnected = 0) {
     const label = statusLabels[status] || t('Belum terhubung')
     const digits = String(phone || '').replace(/\D/g, '')
     const number = digits.startsWith('62')
       ? digits.replace(/^62(\d{3})(\d{4})(\d{1,4})$/, '+62 $1 $2 $3')
       : digits
     const hint = byId('connectHint')
-    if (hint) hint.hidden = status === 'connected'
+    if (hint) hint.hidden = status === 'connected' || linesConnected > 0
     if (!byId('statusText')) return
     byId('statusText').textContent = label
     byId('phoneText').textContent = number || t('Belum ada nomor terhubung')
@@ -112,7 +112,7 @@
     try {
       const state = await api('/api/status')
       const status = String(state.status || 'disconnected')
-      renderConnectionStatus(status, state.phone)
+      renderConnectionStatus(status, state.phone, Number(state.linesConnected || 0))
       const badge = byId('ordersBadge')
       if (badge && state.pendingOrders !== undefined) {
         badge.textContent = String(state.pendingOrders)

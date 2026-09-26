@@ -296,8 +296,13 @@ export default class DashboardController {
   }
   async status({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
-    const [state, pendingOrders] = await Promise.all([readConnectionStatus(), pendingOrderCount()])
-    return response.json({ ...state, pendingOrders })
+    const [state, pendingOrders, lines] = await Promise.all([
+      readConnectionStatus(),
+      pendingOrderCount(),
+      listLines().catch(() => []),
+    ])
+    const linesConnected = lines.filter((line) => line.status === 'connected').length
+    return response.json({ ...state, pendingOrders, linesConnected })
   }
   async usage({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')

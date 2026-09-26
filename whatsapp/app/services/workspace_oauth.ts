@@ -1,5 +1,5 @@
 import app from '@adonisjs/core/services/app'
-import { mkdirSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, realpathSync, renameSync } from 'node:fs'
 import { dirname, delimiter } from 'node:path'
 import { workspaceScope } from '#services/workspace_context'
 import { currentAiAccount } from '#services/ai_account_context'
@@ -17,15 +17,23 @@ export function workspaceOAuthDirectory(provider: 'codex' | 'claude') {
   const scope = workspaceScope()
   const account = currentAiAccount()
   if (account) {
-    // Tiap akun AI tambahan punya folder login sendiri.
-    const directory = app.makePath(
-      'storage',
-      'whatsapp-workspaces',
-      String(scope.id || 1),
-      'ai-accounts',
-      String(account.id),
-      provider
-    )
+    // Tiap akun AI tambahan punya folder login sendiri, berlaku untuk semua nomor.
+    const directory = app.makePath('storage', 'ai-accounts', String(account.id), provider)
+    if (!existsSync(directory)) {
+      // Pindahkan login dari lokasi lama (dulu per nomor), bila ada.
+      const root = app.makePath('storage', 'whatsapp-workspaces')
+      const old = (existsSync(root) ? readdirSync(root) : [])
+        .map((id) => app.makePath('storage', 'whatsapp-workspaces', id, 'ai-accounts', String(account.id), provider))
+        .find((path) => existsSync(path))
+      mkdirSync(dirname(directory), { recursive: true, mode: 0o700 })
+      if (old) {
+        try {
+          renameSync(old, directory)
+        } catch {
+          // Tetap buat folder baru; akun cukup login ulang.
+        }
+      }
+    }
     mkdirSync(directory, { recursive: true, mode: 0o700 })
     return realpathSync(directory)
   }

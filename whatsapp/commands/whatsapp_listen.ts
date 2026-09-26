@@ -6,6 +6,7 @@ import { cleanupWorkspace } from '#services/workspace_service'
 import {
   activateWorkspace,
   activeWorkspace,
+  adoptWorkspace,
   archiveWorkspace,
   clearWorkspaceSession,
   ensureWorkspaceRegistry,
@@ -376,6 +377,13 @@ export default class WhatsappListen extends BaseCommand {
           await this.disconnect()
         if (connection.desired_connected && !this.socket && !this.connecting && !this.tasks.size)
           await this.connect()
+        if (!this.sessionScope && Date.now() - this.lastIdleScopeAt >= 30_000) {
+          // Nomor utama belum terhubung: tugas workspace tetap jalan untuk nomor tambahan.
+          this.lastIdleScopeAt = Date.now()
+          const active = await activeWorkspace()
+          this.idleScope = active.id ? active : undefined
+          if (this.idleScope) this.ensureWorkspaceTimers()
+        }
         if (Date.now() - this.lastLineSuperviseAt >= 5000) {
           this.lastLineSuperviseAt = Date.now()
           await this.superviseLines().catch((error) =>
@@ -473,16 +481,20 @@ export default class WhatsappListen extends BaseCommand {
     )
   }
 
-  /** Nomor tambahan memakai workspace (inbox, AI, pengaturan) nomor utama. */
+  /**
+   * Nomor tambahan memakai workspace aktif (inbox, AI, pengaturan). Tanpa nomor utama pun
+   * boleh: workspace nomor ini yang diaktifkan.
+   */
   private async lineWorkspace(phone: string | null) {
-    const scope = await activeWorkspace()
-    if (!scope.id) throw new Error('Hubungkan nomor utama terlebih dahulu.')
-    if (phone && scope.phone === phone) throw new Error('Nomor ini sudah menjadi nomor utama.')
+    const connection = await db.from('whatsapp_connection').where('id', 1).first()
+    if (phone && connection?.desired_connected && String(connection.phone || '') === phone)
+      throw new Error('Nomor ini sudah menjadi nomor utama.')
     const other = (await listLines()).find(
       (line) => line.id !== currentLine() && line.phone === phone && line.desired_connected
     )
     if (other) throw new Error('Nomor ini sudah terhubung sebagai nomor tambahan lain.')
-    return scope
+    const scope = await activeWorkspace()
+    return scope.id ? scope : adoptWorkspace(phone)
   }
 
   /** Nomor tambahan diputus: logout, hapus sesi & baris line, lalu proses selesai. */
@@ -976,59 +988,7 @@ export default class WhatsappListen extends BaseCommand {
             void inWorkspace(this.sessionScope, () => this.track(() => this.sweepUnanswered()))
         }, SWEEP_INTERVAL_MS)
       }
-      if (!this.recapTimer && this.primary) {
-        // Beta 3: rekap order dari chat CS manusia (tombol di halaman Order), satu chat
-        // per menit, tanpa pesan ke pelanggan. Hanya berjalan setelah tombol ditekan.
-        this.recapTimer = setInterval(() => {
-          if (!this.sessionScope || this.recapRunning) return
-          this.recapRunning = true
-          void inWorkspace(this.sessionScope, async () => {
-            try {
-              const settings = await readSettings(true)
-              if (!settings.beta3Mode || !settings.aiEnabled || !settings.hasSkill) return
-              await beta3Recap.runRecapStep()
-            } catch (error) {
-              this.logger.error(`Rekap order: ${error instanceof Error ? error.message : String(error)}`)
-            } finally {
-              this.recapRunning = false
-            }
-          })
-        }, 60_000)
-      }
-      if (!this.leanSyncTimer && this.primary) {
-        // Beta 2: katalog/TOKO/bahan ditarik sendiri tiap 30 menit (murah: if_version), lalu ciri foto di latar.
-        const syncLean = () => {
-          if (!this.sessionScope) return
-          void inWorkspace(this.sessionScope, () =>
-            this.track(async () => {
-              const settings = await readSettings(true)
-              if (!settings.leanMode && !settings.beta3Mode) return
-              try {
-                const result = settings.beta3Mode
-                  ? await beta3.syncLeanCatalog()
-                  : await syncLeanCatalog()
-                if (result.configured && !result.unchanged)
-                  this.logger.info(
-                    `${settings.beta3Mode ? 'Beta 3' : 'Beta 2'}: katalog disinkronkan (${result.count} varian).`
-                  )
-                if (result.configured) {
-                  if (settings.beta3Mode) await beta3.describeCatalogPhotos()
-                  else await describeCatalogPhotos()
-                }
-                // Update ringan: skill terbaru dari rilis online, tanpa `wa update`.
-                if (settings.beta3Mode)
-                  await beta3SkillSync.syncRemoteSkills((line) => this.logger.info(line)).catch(() => {})
-              } catch (error) {
-                this.logger.warning(
-                  `Beta 2: sync katalog gagal: ${error instanceof Error ? error.message : String(error)}`
-                )
-              }
-            })
-          )
-        }
-        setTimeout(syncLean, 20_000)
-        this.leanSyncTimer = setInterval(syncLean, LEAN_SYNC_INTERVAL_MS)
-      }
+      this.ensureWorkspaceTimers()
       onScoped('messages.upsert', async ({ messages, type }) => {
         if (this.socket !== socket) return
         // A live notification stays live while another batch is being stored.
@@ -3977,6 +3937,80 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
       this.logger.error(`Goal: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       await this.setActivity(jid, null).catch(() => {})
+    }
+  }
+
+  /** Nomor utama yang sedang tidak terhubung tetap menjalankan tugas workspace (katalog, rekap). */
+  private idleScope?: WorkspaceScope
+  private leanSyncRunning = false
+  private lastIdleScopeAt = 0
+  private timerScope() {
+    return this.sessionScope ?? this.idleScope
+  }
+
+  private ensureWorkspaceTimers() {
+    if (!this.recapTimer && this.primary) {
+      // Beta 3: rekap order dari chat CS manusia (tombol di halaman Order), satu chat
+      // per menit, tanpa pesan ke pelanggan. Hanya berjalan setelah tombol ditekan.
+      this.recapTimer = setInterval(() => {
+        const scope = this.timerScope()
+        if (!scope || this.recapRunning) return
+        this.recapRunning = true
+        void inWorkspace(scope, async () => {
+          try {
+            const settings = await readSettings(true)
+            if (!settings.beta3Mode || !settings.aiEnabled || !settings.hasSkill) return
+            await beta3Recap.runRecapStep()
+          } catch (error) {
+            this.logger.error(`Rekap order: ${error instanceof Error ? error.message : String(error)}`)
+          } finally {
+            this.recapRunning = false
+          }
+        })
+      }, 60_000)
+    }
+    if (!this.leanSyncTimer && this.primary) {
+      // Beta 2: katalog/TOKO/bahan ditarik sendiri tiap 30 menit (murah: if_version), lalu ciri foto di latar.
+      const syncLean = () => {
+        const scope = this.timerScope()
+        if (!scope || this.leanSyncRunning) return
+        this.leanSyncRunning = true
+        // Tanpa soket nomor utama, sinkron berjalan di latar tanpa menahan koneksi baru.
+        const run = (task: () => Promise<void>) => (this.socket ? this.track(task) : task())
+        void inWorkspace(scope, () =>
+          run(async () => {
+            const settings = await readSettings(true)
+            if (!settings.leanMode && !settings.beta3Mode) {
+              this.leanSyncRunning = false
+              return
+            }
+            try {
+              const result = settings.beta3Mode
+                ? await beta3.syncLeanCatalog()
+                : await syncLeanCatalog()
+              if (result.configured && !result.unchanged)
+                this.logger.info(
+                  `${settings.beta3Mode ? 'Beta 3' : 'Beta 2'}: katalog disinkronkan (${result.count} varian).`
+                )
+              if (result.configured) {
+                if (settings.beta3Mode) await beta3.describeCatalogPhotos()
+                else await describeCatalogPhotos()
+              }
+              // Update ringan: skill terbaru dari rilis online, tanpa `wa update`.
+              if (settings.beta3Mode)
+                await beta3SkillSync.syncRemoteSkills((line) => this.logger.info(line)).catch(() => {})
+            } catch (error) {
+              this.logger.warning(
+                `Beta 2: sync katalog gagal: ${error instanceof Error ? error.message : String(error)}`
+              )
+            } finally {
+              this.leanSyncRunning = false
+            }
+          })
+        ).catch(() => (this.leanSyncRunning = false))
+      }
+      setTimeout(syncLean, 20_000)
+      this.leanSyncTimer = setInterval(syncLean, LEAN_SYNC_INTERVAL_MS)
     }
   }
 
