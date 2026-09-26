@@ -204,7 +204,7 @@ export async function recapCandidates(days: number) {
   const result = await db.rawQuery(
     `SELECT m.jid, MAX(m.id) AS last_id
        FROM whatsapp_messages m
-      WHERE m.created_at >= ? AND (m.jid LIKE '%@s.whatsapp.net' OR m.jid LIKE '%@lid')
+      WHERE m.created_at >= ? AND (m.jid LIKE '%@s.whatsapp.net' OR m.jid LIKE '%@lid' OR m.jid LIKE '%@ig')
       GROUP BY m.jid
      HAVING SUM(m.direction = 'out' AND m.sender_type IN ('cs', 'owner')) > 0
         AND SUM(m.direction = 'in') > 0 AND COUNT(*) >= 4

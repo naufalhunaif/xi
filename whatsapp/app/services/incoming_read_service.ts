@@ -59,6 +59,8 @@ export async function flushWorkspaceReads(socket: ReadSocket) {
     .where('m.direction', 'in')
     .whereNot('m.status', 'read')
     .whereColumn('m.id', '<=', 'c.workspace_read_id')
+    // Tanda baca hanya untuk WhatsApp; room Instagram tidak lewat soket WA.
+    .whereNot('m.jid', 'like', '%@ig')
     .orderBy('m.id', 'asc')
     .limit(BATCH_SIZE)
   await acknowledge(socket, rows)

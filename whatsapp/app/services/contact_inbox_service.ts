@@ -21,7 +21,7 @@ type InboxMessage = {
 export async function markRoomRead(jid: string, throughId: number) {
   await initializeDatabase()
   if (
-    !/^[^@\s]+@(?:s\.whatsapp\.net|lid)$/.test(jid) ||
+    !/^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid) ||
     !Number.isSafeInteger(throughId) ||
     throughId < 1
   )

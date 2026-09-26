@@ -9,7 +9,7 @@ import { selectEvaluationSkills } from '#services/reply_skill_selection'
 import { recordProductionSignal } from '#services/production_service'
 
 type Settings = Awaited<ReturnType<typeof readSettings>>
-const privateRoom = /^[0-9]+@(lid|s\.whatsapp\.net)$/
+const privateRoom = /^[0-9]+@(lid|s\.whatsapp\.net|ig)$/
 const roomPattern = '^[0-9]+@(lid|s[.]whatsapp[.]net)$'
 export function evaluationSignature(settings: Settings) {
   return createHash('sha256')

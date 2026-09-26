@@ -183,7 +183,14 @@ export function tidyLooseAddress(
   const regency = parsed.regency
     ? tidyWords(parsed.regency.replace(/^kabupaten\b/i, 'Kab.').replace(/^kab\b\.?/i, 'Kab.'))
     : tidyWords(cityRaw)
-  const provinceText = lines.join(', ').split(',').map((part) => part.trim()).find((part) => PROVINCE.test(part)) || ''
+  const clean = (raw: string) =>
+    raw
+      .replace(/(?:\+?62|0)8[\d\s-]{7,16}/g, '')
+      .replace(/(?<!\d)\d{5}(?!\d)/g, '')
+      .replace(/\b(?:hp|telp|wa)\b\.?:?/gi, '')
+      .trim()
+  // "Banten 15310 hp 0812…" tetap dikenali sebagai provinsi.
+  const provinceText = lines.join(', ').split(',').map(clean).find((part) => PROVINCE.test(part)) || ''
   const province = tidyWords(destination?.province || provinceText)
   const postalCode = parsed.postalCode || String(destination?.zip_code || '')
   const drop = new Set([placeKey(district), placeKey(regency), placeKey(cityRaw), placeKey(province)].filter(Boolean))
@@ -198,11 +205,7 @@ export function tidyLooseAddress(
     ? new RegExp(`\\b(?:kec(?:amatan)?|kab(?:upaten)?|kota)\\.?\\s+(?:${places.join('|')})\\b`, 'gi')
     : null
   for (const raw of body.join(', ').split(',')) {
-    const part = (inlinePlace ? raw.replace(inlinePlace, '') : raw)
-      .replace(/(?:\+?62|0)8[\d\s-]{7,16}/g, '')
-      .replace(/(?<!\d)\d{5}(?!\d)/g, '')
-      .replace(/\b(?:hp|telp|wa)\b\.?:?/gi, '')
-      .trim()
+    const part = clean(inlinePlace ? raw.replace(inlinePlace, '') : raw)
     if (!part || /^(?:id|indonesia)$/i.test(part) || PROVINCE.test(part)) continue
     const key = placeKey(part)
     if (!key || drop.has(key) || seen.has(key)) continue

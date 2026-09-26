@@ -5,7 +5,7 @@ import { requestAiReview, type ReviewReason } from '#services/ai_review_service'
 import type { CsMedia } from '#services/cs_media_service'
 
 export function isDirectContactJid(jid: string) {
-  return /@(?:s\.whatsapp\.net|lid)$/.test(jid)
+  return /@(?:s\.whatsapp\.net|lid|ig)$/.test(jid)
 }
 
 export async function setHandlingMode(

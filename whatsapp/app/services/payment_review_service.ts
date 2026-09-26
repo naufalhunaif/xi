@@ -82,7 +82,7 @@ export async function preparePaymentReview(
   reader = readReceiptImage
 ) {
   if (
-    !/^[^@\s]+@(?:s\.whatsapp\.net|lid)$/.test(jid) ||
+    !/^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid) ||
     (orderId !== undefined && (!Number.isSafeInteger(orderId) || orderId <= 0))
   )
     throw new Error('Pesanan tidak valid.')

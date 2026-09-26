@@ -4,7 +4,7 @@ import { invalidateConversationGoal } from '#services/conversation_goal_service'
 
 export async function setAiExcluded(jid: string, excluded: boolean) {
   await initializeDatabase()
-  if (!/^[^@\s]+@(?:s\.whatsapp\.net|lid)$/.test(jid) || typeof excluded !== 'boolean')
+  if (!/^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid) || typeof excluded !== 'boolean')
     throw new Error('Kontak atau status tidak valid.')
   const message = await db.from('whatsapp_messages').where('jid', jid).first()
   const contact = await db.from('whatsapp_contacts').where('jid', jid).first()

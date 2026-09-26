@@ -236,7 +236,7 @@ export async function createLeanReply(input: {
     const waPhone = phoneFromJid(jid)
     pasted = looseAddressForm(
       input.text,
-      contact?.name ? String(contact.name) : '',
+      contact?.name && !String(contact.name).startsWith('IG ') ? String(contact.name) : '',
       waPhone ? `0${waPhone.replace(/^62/, '')}` : ''
     )
   }
@@ -464,7 +464,11 @@ export async function createLeanReply(input: {
     chatNote,
     spec,
     history: rows,
-    message: `${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
+    message: `${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}${
+      jid.endsWith('@ig')
+        ? '\n\nCATATAN SISTEM: chat ini lewat DM Instagram (bukan WhatsApp). Nomor HP pelanggan belum diketahui — minta lewat form order bila sudah mau pesan. Baris "[Komentar di postingan]" adalah komentar pelanggan yang sudah kita balas lewat DM.'
+        : ''
+    }`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
     production: settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : '',
     imageCount: input.imagePaths?.length || 0,

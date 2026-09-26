@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   access,
   cp,
@@ -59,6 +60,52 @@ export async function run(command, args, cwd, env = process.env) {
     );
   });
 }
+/** Salin folder dengan hardlink (cepat, tanpa menyalin isi file). */
+function linkCopy(from, to) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("cp", ["-al", from, to], { stdio: "ignore" });
+    child.on("error", reject);
+    child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`cp -al ${code}`))));
+  });
+}
+
+/**
+ * node_modules disimpan per isi package-lock + versi Node. Update tanpa perubahan
+ * dependensi memakai salinan hardlink (detik), bukan `npm ci` ulang (menit).
+ */
+async function cachedInstall({ kind, dir, lockFile, cacheRoot, install }) {
+  if (!(await exists(lockFile))) return install();
+  const key = `${kind}-${createHash("sha256")
+    .update(await readFile(lockFile))
+    .update(`${process.version}-${process.platform}-${process.arch}`)
+    .digest("hex")
+    .slice(0, 16)}`;
+  const cached = join(cacheRoot, key, "node_modules");
+  const target = join(dir, "node_modules");
+  if (await exists(cached)) {
+    try {
+      await linkCopy(cached, target);
+      console.log(`Dependensi ${kind} dipakai ulang (tidak berubah).`);
+      return;
+    } catch {
+      await rm(target, { recursive: true, force: true });
+    }
+  }
+  await install();
+  if (!(await exists(target))) return;
+  try {
+    await mkdir(cacheRoot, { recursive: true, mode: 0o700 });
+    for (const entry of await readdir(cacheRoot))
+      if (entry.startsWith(`${kind}-`) && entry !== key)
+        await rm(join(cacheRoot, entry), { recursive: true, force: true });
+    await mkdir(join(cacheRoot, key), { recursive: true });
+    await rm(cached, { recursive: true, force: true });
+    await linkCopy(target, cached);
+  } catch {
+    await rm(join(cacheRoot, key), { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 async function exists(path) {
   try {
     await lstat(path);
@@ -156,34 +203,49 @@ export async function deploy({
     }
     // Build dependencies must be installed even if aaPanel exports NODE_ENV=production.
     const buildEnv = { ...process.env, NODE_ENV: "development" };
-    await execute(
-      "npm",
-      [
-        "ci",
-        "--include=dev",
-        "--include=optional",
-        "--ignore-scripts=false",
-        "--no-audit",
-        "--no-fund",
-      ],
-      source,
-      buildEnv,
-    );
+    const cacheRoot = join(deployRoot, "deps");
+    await cachedInstall({
+      kind: "dev",
+      dir: source,
+      lockFile: join(source, "package-lock.json"),
+      cacheRoot,
+      install: () =>
+        execute(
+          "npm",
+          [
+            "ci",
+            "--include=dev",
+            "--include=optional",
+            "--ignore-scripts=false",
+            "--no-audit",
+            "--no-fund",
+          ],
+          source,
+          buildEnv,
+        ),
+    });
     await execute("npm", ["run", "build"], source, buildEnv);
     const productionEnv = { ...process.env, NODE_ENV: "production" };
-    await execute(
-      "npm",
-      [
-        "ci",
-        "--omit=dev",
-        "--include=optional",
-        "--ignore-scripts=false",
-        "--no-audit",
-        "--no-fund",
-      ],
-      output,
-      productionEnv,
-    );
+    await cachedInstall({
+      kind: "prod",
+      dir: output,
+      lockFile: join(output, "package-lock.json"),
+      cacheRoot,
+      install: () =>
+        execute(
+          "npm",
+          [
+            "ci",
+            "--omit=dev",
+            "--include=optional",
+            "--ignore-scripts=false",
+            "--no-audit",
+            "--no-fund",
+          ],
+          output,
+          productionEnv,
+        ),
+    });
     await execute(
       process.execPath,
       [join(repoRoot, "deploy", "whatsapp-runtime-check.mjs"), output],
