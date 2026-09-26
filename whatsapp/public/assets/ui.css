@@ -235,7 +235,7 @@ html[data-theme='dark'] .workspace-ui {
 .workspace-ui .wa-settings-wrap { display: grid; grid-template-columns: minmax(0, 1040px); gap: 28px; align-items: start; }
 .workspace-ui .wa-orchestra { display: none; }
 @media (min-width: 1200px) {
-  .workspace-ui .wa-settings-wrap { grid-template-columns: minmax(0, 1040px) minmax(280px, 400px); }
+  .workspace-ui .wa-settings-wrap { grid-template-columns: minmax(0, 1040px) minmax(260px, 320px); }
   .workspace-ui .wa-orchestra {
     display: grid; gap: 10px; position: sticky; top: 20px; margin-top: 52px; padding: 14px;
     border: 1px solid var(--line); border-radius: 10px; background: var(--wa-surface, #fff);
@@ -263,7 +263,7 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-edge.s-busy.p-gemini { stroke: var(--orc-gemini); }
 .workspace-ui .orc-edge.s-off, .workspace-ui .orc-edge.s-paused { stroke-dasharray: 3 4; }
 .workspace-ui .orc-node { cursor: grab; outline: none; }
-.workspace-ui .orc-node .core { stroke: var(--wa-surface, #fff); stroke-width: 2; transition: r .3s, opacity .3s; }
+.workspace-ui .orc-node .core { stroke: var(--wa-surface, #fff); stroke-width: 1.2; transition: r .3s, opacity .3s; }
 .workspace-ui .orc-node .halo { fill: currentColor; opacity: 0; transition: opacity .4s; }
 .workspace-ui .orc-node.p-chatgpt { color: var(--orc-chatgpt); }
 .workspace-ui .orc-node.p-claude { color: var(--orc-claude); }
@@ -271,9 +271,9 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-node .core { fill: currentColor; }
 .workspace-ui .orc-hub { color: var(--orc-hub); cursor: default; }
 .workspace-ui .orc-hub .halo { opacity: .12; }
-.workspace-ui .orc-node .label { fill: var(--text); font-size: 9.5px; font-weight: 500; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 3px; }
-.workspace-ui .orc-node .sub { fill: var(--muted); font-size: 8px; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 3px; }
-.workspace-ui .orc-node .badge { fill: #fff; font-size: 8.5px; font-weight: 700; pointer-events: none; }
+.workspace-ui .orc-node .label { fill: var(--text); font-size: 6.5px; font-weight: 500; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 3px; }
+.workspace-ui .orc-node .sub { fill: var(--muted); font-size: 5.5px; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 3px; }
+.workspace-ui .orc-node .badge { fill: #fff; font-size: 6px; font-weight: 700; pointer-events: none; }
 .workspace-ui .orc-node.s-busy .halo { opacity: .22; animation: orc-breathe 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 .workspace-ui .orc-node.s-paused .core { fill: var(--wa-surface, #fff); stroke: currentColor; stroke-dasharray: 3 2.5; }
 .workspace-ui .orc-node.s-paused .badge { fill: currentColor; }
@@ -286,7 +286,7 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-pulse.p-claude { color: var(--orc-claude); }
 .workspace-ui .orc-pulse.p-gemini { color: var(--orc-gemini); }
 .workspace-ui .orc-pulse.k-ok { color: var(--orc-hub); }
-.workspace-ui .orc-arc { fill: none; stroke: var(--wa-warn); stroke-width: 1.8; stroke-dasharray: 5 4; animation: orc-dash 1s linear infinite; }
+.workspace-ui .orc-arc { fill: none; stroke: var(--wa-warn); stroke-width: 1.2; stroke-dasharray: 5 4; animation: orc-dash 1s linear infinite; }
 .workspace-ui .orc-arrow { fill: var(--wa-warn); }
 .workspace-ui .wa-orchestra-tip {
   position: absolute; transform: translate(-50%, calc(-100% - 18px)); display: grid; gap: 2px; padding: 6px 8px;
@@ -343,14 +343,14 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-person.c-payment .dot { fill: var(--orc-pay); }
 .workspace-ui .orc-person.c-cs .dot { fill: var(--orc-cs); }
 .workspace-ui .orc-person.unread .dot { stroke: var(--text); stroke-width: 1.2; }
-.workspace-ui .orc-person .plabel { fill: var(--muted); font-size: 7px; opacity: 0; pointer-events: none; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 2.5px; transition: opacity .2s; }
+.workspace-ui .orc-person .plabel { fill: var(--muted); font-size: 5px; opacity: 0; pointer-events: none; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 2.5px; transition: opacity .2s; }
 .workspace-ui .orc-person.fresh .plabel,
 .workspace-ui .orc-zoomed .orc-person .plabel,
 .workspace-ui .orc-person:hover .plabel,
 .workspace-ui .orc-person:focus-visible .plabel { opacity: 1; }
 .workspace-ui .orc-person:hover .dot, .workspace-ui .orc-person:focus-visible .dot { stroke: var(--text); stroke-width: 1.5; }
 .workspace-ui .orc-person.flash-ok .dot { animation: orc-pop .9s ease-out; }
-@keyframes orc-pop { 30% { r: 8; } }
+@keyframes orc-pop { 30% { r: 5; } }
 .workspace-ui .wa-orchestra-hint { position: absolute; left: 8px; bottom: 6px; font-size: 9.5px; color: var(--muted); opacity: .75; pointer-events: none; }
 .workspace-ui .wa-orchestra-legend { flex-wrap: wrap; row-gap: 4px; }
 .workspace-ui .wa-orchestra-legend .dot.person { background: var(--orc-person); }

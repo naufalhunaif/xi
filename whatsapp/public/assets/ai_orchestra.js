@@ -52,9 +52,9 @@
 
   const hub = { id: 'hub', x: 0, y: 0, vx: 0, vy: 0, fixed: true }
   hub.el = make('g', { class: 'orc-node orc-hub' }, layerNodes)
-  make('circle', { class: 'halo', r: 26 }, hub.el)
-  make('circle', { class: 'core', r: 15 }, hub.el)
-  make('text', { class: 'label', y: 32, 'text-anchor': 'middle' }, hub.el).textContent = 'WhatsApp'
+  make('circle', { class: 'halo', r: 16 }, hub.el)
+  make('circle', { class: 'core', r: 9 }, hub.el)
+  make('text', { class: 'label', y: 20, 'text-anchor': 'middle' }, hub.el).textContent = 'WhatsApp'
 
   const nodes = new Map() // akun AI
   const people = new Map() // pelanggan
@@ -137,11 +137,11 @@
       node = { id: account.id, kind: 'account', x: Math.cos(angle) * 115, y: Math.sin(angle) * 115, vx: 0, vy: 0 }
       node.edge = make('line', { class: 'orc-edge' }, layerEdges)
       node.el = make('g', { class: 'orc-node', tabindex: 0 }, layerNodes)
-      make('circle', { class: 'halo', r: 22 }, node.el)
-      node.core = make('circle', { class: 'core', r: 10 }, node.el)
-      node.badge = make('text', { class: 'badge', y: 3.5, 'text-anchor': 'middle' }, node.el)
-      node.label = make('text', { class: 'label', y: 25, 'text-anchor': 'middle' }, node.el)
-      node.sub = make('text', { class: 'sub', y: 36, 'text-anchor': 'middle' }, node.el)
+      make('circle', { class: 'halo', r: 14 }, node.el)
+      node.core = make('circle', { class: 'core', r: 6 }, node.el)
+      node.badge = make('text', { class: 'badge', y: 2.3, 'text-anchor': 'middle' }, node.el)
+      node.label = make('text', { class: 'label', y: 17, 'text-anchor': 'middle' }, node.el)
+      node.sub = make('text', { class: 'sub', y: 25, 'text-anchor': 'middle' }, node.el)
       bindHover(node)
       node.el.addEventListener('pointerdown', (event) => startDrag(event, node))
       nodes.set(account.id, node)
@@ -167,8 +167,8 @@
       }
       node.link = make('line', { class: 'orc-link' }, layerLinks)
       node.el = make('g', { class: 'orc-person', tabindex: 0 }, layerCustomers)
-      node.dot = make('circle', { class: 'dot', r: 4 }, node.el)
-      node.label = make('text', { class: 'plabel', y: 11, 'text-anchor': 'middle' }, node.el)
+      node.dot = make('circle', { class: 'dot', r: 2.5 }, node.el)
+      node.label = make('text', { class: 'plabel', y: 8, 'text-anchor': 'middle' }, node.el)
       bindHover(node)
       node.el.addEventListener('click', () => {
         if (node.dragged) return
@@ -197,7 +197,7 @@
       node.sub.textContent =
         state === 'paused' ? t('jeda s/d {0}', clock(account.limitedUntil)) : state === 'busy' ? t('bekerja…') : ''
       // Ukuran = porsi token 5 jam terakhir.
-      node.core.setAttribute('r', String(8 + 7 * Math.sqrt((account.tokens5h || 0) / maxTokens)))
+      node.core.setAttribute('r', String(5 + 4 * Math.sqrt((account.tokens5h || 0) / maxTokens)))
     })
     for (const [id, node] of nodes)
       if (!seen.has(id)) {
@@ -226,7 +226,7 @@
         const provider = nodes.get(customer.accountId)?.account?.provider || ''
         node.el.setAttribute('class', `orc-person c-${status} ${fresh ? 'fresh' : ''} ${customer.unread ? 'unread' : ''}`)
         node.link.setAttribute('class', `orc-link ${customer.accountId && nodes.has(customer.accountId) ? `p-${provider}` : 'loose'} ${fresh ? 'fresh' : ''}`)
-        node.dot.setAttribute('r', String(3 + Math.min(4, Math.log2(1 + customer.unread + customer.unanswered))))
+        node.dot.setAttribute('r', String(2.2 + Math.min(2.5, Math.log2(1 + customer.unread + customer.unanswered))))
         node.label.textContent = customer.name
       }
       for (const [jid, node] of people)
@@ -335,7 +335,7 @@
 
   function pulse(from, to, kind, provider) {
     if (reduce.matches || !from || !to) return
-    const dot = make('circle', { class: `orc-pulse k-${kind} p-${provider || ''}`, r: 3 }, layerPulses)
+    const dot = make('circle', { class: `orc-pulse k-${kind} p-${provider || ''}`, r: 2 }, layerPulses)
     pulses.push({ from, to, t: 0, dot })
     kick()
   }
@@ -484,7 +484,8 @@
         minY = Math.min(minY, node.y)
         maxY = Math.max(maxY, node.y)
       }
-      const size = Math.max(maxX - minX, maxY - minY) + 90
+      // Minimal 380 agar graf kecil tetap tampil mungil, tidak diperbesar memenuhi panel.
+      const size = Math.max(380, Math.max(maxX - minX, maxY - minY) + 70)
       const cx = (minX + maxX) / 2
       const cy = (minY + maxY) / 2
       const ease = 0.12
