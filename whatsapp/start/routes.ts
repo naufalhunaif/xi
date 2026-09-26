@@ -81,6 +81,7 @@ router
     router.get('/api/ai/accounts/:id/login', [AiAccountsController, 'loginStatus'])
     router.post('/api/ai/accounts/:id/login', [AiAccountsController, 'loginStart'])
     router.post('/api/ai/accounts/:id/verify', [AiAccountsController, 'loginVerify'])
+    router.post('/api/ai/accounts/:id/test', [AiAccountsController, 'test'])
     router.get('/contacts', [ContactDirectoryController, 'page']).as('directory')
     router.get('/api/contact-directory', [ContactDirectoryController, 'index'])
     router.get('/api/contact-directory/export', [ContactDirectoryController, 'export'])

@@ -123,6 +123,47 @@ export async function runLeanProvider(
   throw lastError
 }
 
+/** Tes satu akun dengan permintaan kecil; hasil/alasan gagal ditampilkan di Pengaturan. */
+export async function testAiAccount(
+  settings: LeanProviderSettings,
+  account: { id: number; provider: AiProviderName; model?: string; apiKey?: string; legacy?: boolean }
+) {
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: { jawab: { type: 'string' } },
+    required: ['jawab'],
+  }
+  const started = Date.now()
+  try {
+    const result = await withAiAccount(
+      account.legacy ? null : { id: account.id, provider: account.provider },
+      () =>
+        runLeanOnce(
+          settings,
+          account.provider,
+          { model: account.model, apiKey: account.apiKey },
+          { system: 'Balas HANYA JSON sesuai skema.', user: 'Tes koneksi. Isi "jawab" dengan kata: siap' },
+          [],
+          'test',
+          schema
+        )
+    )
+    return { ok: true, ms: Date.now() - started, model: result.model, text: result.text.slice(0, 120) }
+  } catch (error) {
+    const detail = aiFailureDetail(error, {
+      stage: 'provider',
+      provider: account.provider === 'claude' ? 'claude' : 'chatgpt',
+    })
+    return {
+      ok: false,
+      ms: Date.now() - started,
+      code: detail.code,
+      error: (error instanceof Error ? error.message : String(error)).slice(0, 400),
+    }
+  }
+}
+
 async function runLeanOnce(
   settings: LeanProviderSettings,
   providerName: AiProviderName,

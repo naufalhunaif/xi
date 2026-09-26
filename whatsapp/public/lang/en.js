@@ -1216,4 +1216,8 @@ window.waLocales.en = {
   "{0} menyelesaikan {1}": "{0} finished {1}",
   "{0} habis kuota / perlu login": "{0} out of quota / needs login",
   "{0} gagal ({1})": "{0} failed ({1})",
+  "Tes": "Test",
+  "Menguji {0}…": "Testing {0}…",
+  "{0} berhasil ({1} detik, model {2}).": "{0} works ({1} s, model {2}).",
+  "{0} gagal: {1}": "{0} failed: {1}",
 }

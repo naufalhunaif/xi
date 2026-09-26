@@ -145,6 +145,17 @@ export default class AiAccountsController {
     return response.json({ ok: true })
   }
 
+  async test({ params, response }: HttpContext) {
+    const account = await found(params)
+    const { readSettings } = await import('#services/settings_service')
+    const { testAiAccount } = await import('#beta3/provider')
+    const result = await testAiAccount((await readSettings()) as any, account)
+    if (result.ok)
+      await updateAiAccount(account.id, { limited_until: 0, limited_code: null, last_error: null })
+    else await updateAiAccount(account.id, { last_error: String(result.error || '').slice(0, 290) })
+    return response.json(result)
+  }
+
   async loginStatus({ params, response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
     const account = await found(params)

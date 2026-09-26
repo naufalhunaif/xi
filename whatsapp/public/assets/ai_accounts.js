@@ -144,7 +144,7 @@
       handle.addEventListener('pointerdown', (event) => startDrag(event, wrap))
       name.append(handle, el('span', '', account.name))
       const [label, tone] = state(account)
-      const info = el('code', '', account.lastError && account.limitedUntil ? account.lastError : account.model || '')
+      const info = el('code', '', account.lastError || account.model || '')
       const side = el('div', 'actions')
       side.append(el('span', `wa-pill ${tone}`, label))
       const holder = el('div', 'wa-span-full')
@@ -162,6 +162,16 @@
           await call(`/api/ai/accounts/${account.id}/update`, 'POST', { apiKey: key, resume: true })
           refresh()
         }))
+      side.append(button(t('Tes'), async () => {
+        status(t('Menguji {0}…', account.name))
+        const result = await call(`/api/ai/accounts/${account.id}/test`, 'POST')
+        status(
+          result.ok
+            ? t('{0} berhasil ({1} detik, model {2}).', account.name, (result.ms / 1000).toFixed(1), result.model || '-')
+            : t('{0} gagal: {1}', account.name, result.error || result.code || '-')
+        )
+        refresh()
+      }))
       side.append(button(account.enabled ? t('Nonaktifkan') : t('Aktifkan'), async () => {
         await call(`/api/ai/accounts/${account.id}/update`, 'POST', { enabled: !account.enabled })
         refresh()
