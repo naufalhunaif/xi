@@ -54,7 +54,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     spesifikasi: {
       type: 'string',
       description:
-        'Catatan untuk penjahit, ditulis ulang LENGKAP tiap giliran, baris pendek tanpa harga/label/nomor: per item "Produk - Warna", "Jas, Celana" (yang dibuat), "Size M/31", "Tinggi 164/68" bila ada, lalu tiap detail custom satu baris dengan kata sehari-hari (mis. "Kerah shawl", "Kancing 1", "Tanpa saku dada"). Ukuran badan custom satu baris: "Ukuran badan: dada 96, pinggang 80, lengan 60". Model dari gambar pelanggan: tulis "Model sesuai gambar" lalu bagiannya. Item dipisah baris kosong. Kosong bila pelanggan belum memilih apa pun.',
+        'Catatan untuk penjahit, ditulis ulang LENGKAP tiap giliran, baris pendek tanpa harga/label/nomor: per item "Produk - Warna", "Jas, Celana" (yang dibuat), "Size M/31", "Tinggi 164/68" bila ada, lalu tiap detail custom satu baris dengan kata sehari-hari (mis. "Kerah shawl", "Kancing 1", "Tanpa saku dada"). Ukuran badan custom satu baris: "Ukuran badan: dada 96, pinggang 80, lengan 60". Model dari gambar pelanggan: tulis "Model sesuai gambar" lalu bagiannya. Warna ditulis PERSIS seperti permintaan/gambar pelanggan (mis. "Broken White"), jangan diganti ke warna katalog terdekat; bila tiap bagian beda warna/bahan, tulis per bagian (mis. "Rompi broken white", "Kerah senada"). Item dipisah baris kosong. Kosong bila pelanggan belum memilih apa pun.',
     },
     referensi: {
       type: 'array',
