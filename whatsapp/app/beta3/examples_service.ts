@@ -3,6 +3,7 @@ import db from '#services/workspace_database'
 import { readFile } from 'node:fs/promises'
 import app from '@adonisjs/core/services/app'
 import { ensureLeanTables } from '#beta3/tables'
+import { workspaceScope } from '#services/workspace_context'
 
 /**
  * Contoh jawaban CS asli. Ini cara AI "belajar": bukan aturan yang terus
@@ -82,6 +83,7 @@ export function renderExamples(examples: LeanExample[]) {
 
 export async function listLeanExamples(): Promise<LeanExample[]> {
   await ensureLeanTables()
+  await compactTakeoverExamples(workspaceScope().prefix).catch(() => {})
   const rows = await db.from('whatsapp_beta3_examples').where('active', 1).orderBy('id', 'asc')
   return rows.map((row) => ({
     id: Number(row.id),
@@ -167,17 +169,91 @@ export async function learnFromHumanReply(jid: string, csMessageId: string) {
     .orderBy('id', 'desc')
     .first()
   if (!question?.body || String(question.body).length < 3) return null
+  const customerText = String(question.body).trim().slice(0, 2000)
+  const csText = String(reply.body).trim().slice(0, 2000)
   const duplicate = await db
     .from('whatsapp_beta3_examples')
-    .where('customer_text', String(question.body).trim().slice(0, 2000))
-    .where('cs_text', String(reply.body).trim().slice(0, 2000))
+    .where('customer_text', customerText)
+    .where('cs_text', 'like', `%${csText.replace(/[%_\\]/g, '\\$&')}%`)
+    .where('active', 1)
     .first()
   if (duplicate) return null
-  return addLeanExample({
+  // Beberapa bubble CS untuk pesan pelanggan yang sama digabung jadi satu contoh
+  // ("Sore" + "Untuk stock habis bos, paling pre order ya").
+  const recent = await db
+    .from('whatsapp_beta3_examples')
+    .where('customer_text', customerText)
+    .where('source', 'takeover')
+    .where('active', 1)
+    .where('created_at', '>', new Date(Date.now() - 60 * 60_000))
+    .orderBy('id', 'desc')
+    .first()
+  if (recent) {
+    await db
+      .from('whatsapp_beta3_examples')
+      .where('id', recent.id)
+      .update({ cs_text: `${String(recent.cs_text)}\n${csText}`.slice(0, 2000) })
+    return Number(recent.id)
+  }
+  const id = await addLeanExample({
     situation: '',
-    customerText: String(question.body),
-    csText: String(reply.body),
+    customerText,
+    csText,
     tags: 'cs-takeover',
     source: 'takeover',
   })
+  await trimTakeoverExamples()
+  return id
+}
+
+/** Batas contoh otomatis: yang terlama dinonaktifkan agar daftar tetap ringkas. */
+export const TAKEOVER_EXAMPLE_LIMIT = 300
+async function trimTakeoverExamples() {
+  const old = await db
+    .from('whatsapp_beta3_examples')
+    .where('source', 'takeover')
+    .where('active', 1)
+    .orderBy('id', 'desc')
+    .offset(TAKEOVER_EXAMPLE_LIMIT)
+    .limit(1000)
+    .select('id')
+  if (old.length)
+    await db
+      .from('whatsapp_beta3_examples')
+      .whereIn('id', old.map((row: any) => row.id))
+      .update({ active: 0 })
+}
+
+/**
+ * Rapikan contoh takeover lama sekali per proses: bubble berurutan dengan pesan
+ * pelanggan yang sama (dibuat berdekatan) digabung jadi satu contoh.
+ */
+const compacted = new Set<string>()
+export async function compactTakeoverExamples(scopeKey: string) {
+  if (compacted.has(scopeKey)) return
+  compacted.add(scopeKey)
+  await ensureLeanTables()
+  const rows = await db
+    .from('whatsapp_beta3_examples')
+    .where('source', 'takeover')
+    .where('active', 1)
+    .orderBy('id', 'asc')
+  let keep: any = null
+  for (const row of rows) {
+    const near =
+      keep &&
+      keep.customer_text === row.customer_text &&
+      Math.abs(new Date(row.created_at).getTime() - new Date(keep.created_at).getTime()) < 60 * 60_000
+    if (!near) {
+      keep = row
+      continue
+    }
+    const joined = String(keep.cs_text).includes(String(row.cs_text))
+      ? String(keep.cs_text)
+      : `${keep.cs_text}\n${row.cs_text}`.slice(0, 2000)
+    await db.from('whatsapp_beta3_examples').where('id', keep.id).update({ cs_text: joined })
+    await db.from('whatsapp_beta3_examples').where('id', row.id).update({ active: 0 })
+    keep = { ...keep, cs_text: joined }
+  }
+  await trimTakeoverExamples()
 }
