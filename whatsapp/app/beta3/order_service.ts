@@ -458,13 +458,32 @@ export async function approveLeanOrder(input: {
   }
 }
 
-export async function markLeanOrderPaid(id: number, csNote?: string, paidAmount?: number) {
+/** Grup pilihan CS untuk order ini (harus grup yang tersedia), atau grup produksi default. */
+async function chooseGroup(chosen?: string | null) {
+  if (chosen) {
+    const ok = await db
+      .from('whatsapp_order_groups')
+      .where('jid', chosen)
+      .where('available', true)
+      .first()
+    if (!ok) throw new Error('Grup belum tersedia. Perbarui daftar grup.')
+    return chosen
+  }
+  const routing = await db.from('whatsapp_order_routing').where('id', 1).first()
+  return routing?.group_jid ? String(routing.group_jid) : null
+}
+
+export async function markLeanOrderPaid(
+  id: number,
+  csNote?: string,
+  paidAmount?: number,
+  chosenGroup?: string | null
+) {
   await ensureLeanTables()
   const order = await readLeanOrder(id)
   if (!order) throw new Error('Order tidak ditemukan.')
-  // Lunas → antre ke grup produksi default (Order → Grup produksi default), dikirim worker.
-  const routing = await db.from('whatsapp_order_routing').where('id', 1).first()
-  const groupJid = routing?.group_jid ? String(routing.group_jid) : null
+  // Lunas → antre ke grup pilihan (atau grup produksi default), dikirim worker.
+  const groupJid = await chooseGroup(chosenGroup || (order.group_jid ? String(order.group_jid) : null))
   await db
     .from('whatsapp_beta3_orders')
     .where('id', id)
@@ -528,13 +547,12 @@ export async function syncOrderFromChat(
   return status
 }
 
-export async function requeueLeanOrderGroup(id: number) {
+export async function requeueLeanOrderGroup(id: number, chosenGroup?: string | null) {
   await ensureLeanTables()
   const order = await readLeanOrder(id)
   if (!order) throw new Error('Order tidak ditemukan.')
-  const routing = await db.from('whatsapp_order_routing').where('id', 1).first()
-  const groupJid = routing?.group_jid ? String(routing.group_jid) : null
-  if (!groupJid) throw new Error('Grup produksi default belum diatur di halaman Order.')
+  const groupJid = await chooseGroup(chosenGroup)
+  if (!groupJid) throw new Error('Pilih grup tujuan, atau atur grup produksi default di halaman Order.')
   await db.from('whatsapp_beta3_orders').where('id', id).update({
     group_jid: groupJid,
     group_status: 'pending',

@@ -380,3 +380,7 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-node .sub { font-size: calc(5.5px * var(--orc-t, 1)); }
 .workspace-ui .orc-node .badge { font-size: calc(6px * var(--orc-t, 1)); }
 .workspace-ui .orc-person .plabel { font-size: calc(5px * var(--orc-t, 1)); }
+
+/* Order: pilih grup tujuan per pesanan. */
+.workspace-ui .wa-b3-group { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; margin: 8px 0; font-size: 12px; }
+.workspace-ui .wa-b3-group select { min-width: 0; height: 32px; }

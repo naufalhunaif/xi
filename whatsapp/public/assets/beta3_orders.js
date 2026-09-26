@@ -49,6 +49,41 @@
       ? new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
       : ''
 
+  // Grup WhatsApp tujuan: bisa dipilih per order (bawaan = grup produksi default).
+  let groups = []
+  let defaultGroup = ''
+  async function loadGroups() {
+    try {
+      const routing = await api('/api/orders/routing')
+      groups = routing.groups || []
+      defaultGroup = routing.groupJid || ''
+    } catch {}
+  }
+  const groupName = (jid) => groups.find((g) => g.jid === jid)?.name || ''
+  function groupPicker(order) {
+    const wrap = el('label', undefined, 'wa-b3-group')
+    wrap.append(el('span', t('Kirim ke grup')))
+    const select = el('select')
+    select.append(new Option(groups.length ? t('Pilih grup…') : t('Belum ada grup — perbarui daftar'), ''))
+    for (const group of groups) select.append(new Option(group.name, group.jid))
+    select.value = order.group_jid || defaultGroup || ''
+    const refresh = button('↻', async () => {
+      try {
+        await api('/api/orders/groups/refresh', 'POST', {})
+        notice(t('Daftar grup diperbarui dalam beberapa detik.'))
+        setTimeout(async () => {
+          await loadGroups()
+          renderDetail(order)
+        }, 4000)
+      } catch (error) {
+        notice(error.message, true)
+      }
+    })
+    refresh.title = t('Perbarui daftar grup')
+    wrap.append(select, refresh)
+    return { wrap, value: () => select.value }
+  }
+
   let status = 'all'
   let orders = []
   let selected = null
@@ -56,6 +91,7 @@
   const drawer = byId('beta3OrderDrawer')
 
   async function load() {
+    if (!groups.length) await loadGroups()
     const q = byId('beta3OrdersSearch').value.trim()
     try {
       const result = await api(`/api/beta3/orders?status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}`)
@@ -110,7 +146,11 @@
       badge.dataset.tone = statusTone[order.status] || ''
       state.append(badge)
       if (order.status === 'pending' && order.auto_total_reason) state.append(el('br'), el('small', order.auto_total_reason, 'wa-muted'))
-      if (groupLabel[order.group_status]) state.append(el('br'), el('small', groupLabel[order.group_status], 'wa-muted'))
+      if (groupLabel[order.group_status])
+        state.append(
+          el('br'),
+          el('small', [groupLabel[order.group_status], groupName(order.group_jid)].filter(Boolean).join(' · '), 'wa-muted')
+        )
       if (order.source === 'rekap') state.append(el('br'), el('small', t('Rekap dari chat'), 'wa-order-source'))
       row.append(head, who, items, total, state)
       const open = () => openOrder(order)
@@ -231,11 +271,13 @@
       box.append(summary)
     }
     const actions = el('div', undefined, 'actions')
+    const picker = ['awaiting_payment', 'paid'].includes(order.status) ? groupPicker(order) : null
+    if (picker) box.append(picker.wrap)
     const act = (label, path, done, primary = true) =>
       button(label, async () => {
         if (path.endsWith('/cancel') && !confirm(t('Batalkan order ini?'))) return
         try {
-          await api(path, 'POST', {})
+          await api(path, 'POST', picker && !path.endsWith('/cancel') ? { groupJid: picker.value() || null } : {})
           notice(done)
           await load()
         } catch (error) {

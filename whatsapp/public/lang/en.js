@@ -1248,4 +1248,8 @@ window.waLocales.en = {
   "Tugas: balas pelanggan + latar": "Tasks: customer replies + background",
   "Tugas: latar saja (katalog, rekap)": "Tasks: background only (catalog, recap)",
   "Tugas {0} diperbarui.": "Tasks for {0} updated.",
+  "Pilih grup…": "Choose group…",
+  "Belum ada grup — perbarui daftar": "No groups yet — refresh list",
+  "Daftar grup diperbarui dalam beberapa detik.": "Group list refreshes in a few seconds.",
+  "Perbarui daftar grup": "Refresh group list",
 }

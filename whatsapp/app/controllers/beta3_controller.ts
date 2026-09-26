@@ -190,7 +190,9 @@ export default class Beta3Controller {
     try {
       const order = await markLeanOrderPaid(
         Number(params.id),
-        body.csNote ? String(body.csNote) : undefined
+        body.csNote ? String(body.csNote) : undefined,
+        undefined,
+        body.groupJid ? String(body.groupJid) : null
       )
       if (body.notify !== false)
         await queueOutgoingMessage({ jid: String(order.jid), body: 'Terimakasih bos, prosess ya' })
@@ -200,9 +202,10 @@ export default class Beta3Controller {
     }
   }
 
-  async resendGroup({ params, response }: HttpContext) {
+  async resendGroup({ params, request, response }: HttpContext) {
     try {
-      await requeueLeanOrderGroup(Number(params.id))
+      const groupJid = request.input('groupJid')
+      await requeueLeanOrderGroup(Number(params.id), groupJid ? String(groupJid) : null)
       return response.json({ ok: true })
     } catch (error) {
       return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
