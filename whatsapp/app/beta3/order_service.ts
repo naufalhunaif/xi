@@ -586,7 +586,17 @@ export function renderGroupOrderMessage(order: Record<string, any>) {
   while (lines.length && lines[lines.length - 1] === '') lines.pop()
   const extra = [order.note, order.cs_note].map((value) => String(value || '').trim()).filter(Boolean)
   for (const value of extra) if (!lines.some((line) => line.includes(value))) lines.push(value)
-  if (order.customer_name) lines.push(String(order.customer_name).trim())
+  // Penutup: nama pelanggan (dari order, atau nama kontak WhatsApp) + nomor order untuk dilacak.
+  const name = String(order.customer_name || order.contact_name || '').trim()
+  const number = String(order.order_number || '').trim()
+  const paid = Number(order.paid_amount || 0)
+  const partial = order.status === 'paid' && paid > 0 && Number(order.total || 0) > paid
+  if (lines.length) lines.push('')
+  if (name) lines.push(name)
+  const tail = [number ? `#${number}` : `#${order.id}`, partial ? 'DP' : order.status === 'paid' ? 'Lunas' : '']
+    .filter(Boolean)
+    .join(' · ')
+  if (tail) lines.push(tail)
   return lines.join('\n')
 }
 

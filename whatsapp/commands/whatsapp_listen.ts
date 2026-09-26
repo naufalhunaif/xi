@@ -21,6 +21,7 @@ import {
 } from '#services/workspace_context'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import db from '#services/workspace_database'
+import { attachOrderPhotos } from '#beta3/order_photos'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import makeWASocket, {
@@ -753,27 +754,37 @@ export default class WhatsappListen extends BaseCommand {
     const groupJid = String(order.group_jid)
     try {
       if (this.stopping || !this.socketOpen || this.socket !== socket) return
-      const text = beta3.renderGroupOrderMessage(order)
-      let image: { bytes: Buffer; caption: string } | null = null
-      try {
-        const digest = await beta3.catalogDigest()
-        const firstLine = String(order.spec || order.items || '').split('\n')[0] || ''
-        const variant = beta3.findCatalogVariant(
-          digest.rows,
-          firstLine.replace(/^\d+[.)]\s*/, '').split(/[,|]/)[0]
-        )
-        if (variant?.photoUrl) {
-          const bytes = await downloadOutgoingImage(variant.photoUrl)
-          image = { bytes, caption: text }
-        }
-      } catch {
-        image = null
+      // Nama pelanggan dari kontak bila order belum punya nama.
+      const contact = order.customer_name
+        ? null
+        : await db.from('whatsapp_contacts').where('jid', String(order.jid || '')).select('name').first().catch(() => null)
+      const full = { ...order, contact_name: contact?.name ? String(contact.name) : '' }
+      const text = beta3.renderGroupOrderMessage(full)
+      // Semua produk di pesanan dapat foto contoh (maks 4): foto pertama membawa teks pesanan.
+      const photos =
+        (await attachOrderPhotos([{ ...order, chat_note: '' }]).catch(() => []))[0]?.photos || []
+      const images: Array<{ bytes: Buffer; caption: string }> = []
+      for (const photo of photos) {
+        try {
+          images.push({
+            bytes: await downloadOutgoingImage(photo.url),
+            caption: `${photo.product}${photo.color ? ` - ${photo.color}` : ''}`,
+          })
+        } catch {}
       }
       const sent = await socket.sendMessage(
         groupJid,
-        image ? { image: image.bytes, caption: image.caption, mimetype: 'image/jpeg' } : { text }
+        images.length
+          ? { image: images[0].bytes, caption: text, mimetype: 'image/jpeg' }
+          : { text }
       )
       if (!sent?.key.id) throw new Error('Pengiriman ke grup belum dikonfirmasi.')
+      for (const extra of images.slice(1)) {
+        if (this.stopping || this.socket !== socket) break
+        await socket
+          .sendMessage(groupJid, { image: extra.bytes, caption: extra.caption, mimetype: 'image/jpeg' })
+          .catch(() => null)
+      }
       // Gambar referensi per bagian, apa adanya: "Model kerah seperti ini".
       for (const ref of await beta3Refs.refsForOrder(Number(order.id)).catch(() => [])) {
         if (this.stopping || this.socket !== socket) break

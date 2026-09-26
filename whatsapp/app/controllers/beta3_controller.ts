@@ -172,7 +172,7 @@ export default class Beta3Controller {
       ...order,
       // Foto dicocokkan dari isi pesanan saja, bukan dari catatan chat.
       chat_note: '',
-      text: renderGroupOrderMessage(order),
+      text: renderGroupOrderMessage({ ...order, contact_name: nameOf.get(String(order.jid || '')) || '' }),
     }))
     return response.json({ orders: await attachOrderPhotos(withText), counts })
   }
