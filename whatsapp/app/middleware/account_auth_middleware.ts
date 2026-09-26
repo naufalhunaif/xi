@@ -3,6 +3,7 @@ import type { NextFn } from '@adonisjs/core/types/http'
 import env from '#start/env'
 import { isLocalAuth } from '#services/local_auth_service'
 import { publicAppUrl } from '#services/public_url'
+import { landingPage } from '#controllers/legal_controller'
 
 const accountUrl = () => String(env.get('ACCOUNT_URL') || '').replace(/\/$/, '')
 
@@ -20,6 +21,11 @@ export default class AccountAuthMiddleware {
           code: 'AUTH_REQUIRED',
           error: 'Sesi berakhir. Silakan masuk kembali.',
         })
+      }
+      // Beranda publik untuk pengunjung (dan verifikasi Google): tanpa login, bukan redirect.
+      if (request.method() === 'GET' && ['/', ''].includes(request.url().split('?')[0])) {
+        response.header('content-type', 'text/html; charset=utf-8')
+        return response.send(landingPage(request.host() || ''))
       }
       return response.redirect().withQs(false).toPath(login)
     }
