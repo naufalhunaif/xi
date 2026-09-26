@@ -177,6 +177,30 @@ export function measureFromHistory(rows: LeanHistoryRow[]) {
   return { height, weight }
 }
 
+/** Label size chart (Indonesia/Inggris) → nama bagian badan yang dipakai pelanggan. */
+const MEASURE_ALIAS: Record<string, string> = {
+  waist: 'pinggang',
+  'pinggang': 'pinggang',
+  chest: 'dada',
+  bust: 'dada',
+  hip: 'panggul',
+  hips: 'panggul',
+  pinggul: 'panggul',
+  shoulder: 'bahu',
+  'lebar bahu': 'bahu',
+  sleeve: 'lengan',
+  'panjang lengan': 'lengan',
+  thigh: 'paha',
+  stomach: 'perut',
+  belly: 'perut',
+  'chest width': 'half:dada',
+  'lebar dada': 'half:dada',
+  'body width': 'half:dada',
+  'lebar badan': 'half:dada',
+  'waist width': 'half:pinggang',
+  'lebar pinggang': 'half:pinggang',
+}
+
 type ChartRow = { size: string; values: Map<string, number> }
 type ChartGroup = { name: string; rows: ChartRow[] }
 
@@ -191,8 +215,14 @@ export function parseSizeCharts(text: string): ChartGroup[] {
       const tokens = part.trim().match(/^(\S+)\s+(.*)$/)
       if (!tokens) continue
       const values = new Map<string, number>()
-      for (const pair of tokens[2].matchAll(/([a-z][a-z ]*?)\s+(\d+(?:[.,]\d+)?)/gi))
-        values.set(pair[1].trim().toLowerCase().replace(/^lingkar\s+/, ''), Number(pair[2].replace(',', '.')))
+      for (const pair of tokens[2].matchAll(/([a-z][a-z ]*?)\s+(\d+(?:[.,]\d+)?)/gi)) {
+        const raw = pair[1].trim().toLowerCase()
+        const number = Number(pair[2].replace(',', '.'))
+        const key = MEASURE_ALIAS[raw] || MEASURE_ALIAS[raw.replace(/^lingkar\s+/, '')] || raw.replace(/^lingkar\s+/, '')
+        // Lebar (setengah lingkar, diukur rata) → lingkar agar setara ukuran badan.
+        if (key.startsWith('half:')) values.set(key.slice(5), number * 2)
+        else if (!values.has(key)) values.set(key, number)
+      }
       if (values.size) rows.push({ size: tokens[1], values })
     }
     if (rows.length) groups.push({ name: match[1].trim(), rows })
@@ -200,7 +230,7 @@ export function parseSizeCharts(text: string): ChartGroup[] {
   return groups
 }
 
-const BODY_PARTS = ['pinggang', 'dada', 'panggul', 'pinggul', 'bahu', 'lengan', 'paha']
+const BODY_PARTS = ['pinggang', 'dada', 'panggul', 'pinggul', 'bahu', 'lengan', 'paha', 'perut']
 
 /**
  * Ukuran badan yang disebut pelanggan ("lingkar pinggang 79", atau "79" setelah ditanya
@@ -238,15 +268,23 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
       if (lower !== numeric) continue
       const sized = group.rows.filter((row) => row.values.has(part))
       if (!sized.length) continue
-      // Ukuran jadi harus ≥ ukuran badan (toleransi 1 cm); ambil yang paling kecil yang muat.
+      // Ukuran jadi yang PALING DEKAT dengan ukuran badan; bila sama dekat, pilih yang lebih besar.
       const sorted = [...sized].sort((a, b) => a.values.get(part)! - b.values.get(part)!)
-      const fit = sorted.find((row) => row.values.get(part)! >= value - 1)
+      const largest = sorted[sorted.length - 1].values.get(part)!
+      const fit =
+        value > largest + 2
+          ? undefined
+          : sorted.reduce((best, row) => {
+              const diff = Math.abs(row.values.get(part)! - value)
+              const bestDiff = Math.abs(best.values.get(part)! - value)
+              return diff < bestDiff || (diff === bestDiff && row.values.get(part)! > best.values.get(part)!) ? row : best
+            }, sorted[0])
       const index = fit ? sorted.indexOf(fit) : sorted.length - 1
       const around = sorted.slice(Math.max(0, index - 1), index + 2)
       lines.push(
         `${group.name}: ${part} badan ${value} cm → ${around.map((row) => `${row.size} = ${row.values.get(part)} cm`).join(', ')}. ` +
           (fit
-            ? `Paling pas: ${fit.size} (${fit.values.get(part)} cm, selisih ${Math.round((fit.values.get(part)! - value) * 10) / 10} cm).`
+            ? `Paling dekat: ${fit.size} (${fit.values.get(part)} cm, selisih ${Math.abs(Math.round((fit.values.get(part)! - value) * 10) / 10)} cm). Sebut nomor ini; jangan menaikkan nomor tanpa alasan.`
             : 'Lebih besar dari size terbesar: sarankan custom/tanya CS.')
       )
     }
