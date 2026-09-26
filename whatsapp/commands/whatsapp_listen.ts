@@ -271,6 +271,10 @@ export default class WhatsappListen extends BaseCommand {
 
   private socket?: WASocket
   private connecting = false
+  // Gagal konek berturut-turut: jeda bertahap + coba variasi versi/perangkat.
+  private connectFailures = 0
+  private retryAt = 0
+  private connectVariant = 0
   private stopping = false
   private lastProfileRefreshAt = 0
   private orderGroupRunning = false
@@ -789,6 +793,7 @@ export default class WhatsappListen extends BaseCommand {
   }
 
   private async connect() {
+    if (Date.now() < this.retryAt) return
     this.connecting = true
     this.socketOpen = false
     this.receivedPending = false
@@ -796,8 +801,12 @@ export default class WhatsappListen extends BaseCommand {
     try {
       const authVersion = (await workspaceState()).auth_version
       const auth = await databaseAuthState(currentLine())
-      const logger = pino({ level: this.verbose ? 'info' : 'silent' })
-      const version = await latestWaVersion()
+      // Sebelum terhubung, error Baileys dicatat agar penyebab gagal konek terlihat di log.
+      const logger = pino({ level: this.verbose ? 'info' : 'error' })
+      // Variasi bila gagal berulang: versi WA Web terbaru/bawaan × perangkat Desktop/Chrome.
+      const variant = this.connectVariant % 4
+      const version = variant % 2 === 0 ? await latestWaVersion() : undefined
+      const registered = Boolean(auth.state.creds.registered || auth.state.creds.me)
       const socket = workspaceSocket(
         makeWASocket({
           ...(version ? { version } : {}),
@@ -808,7 +817,7 @@ export default class WhatsappListen extends BaseCommand {
           logger,
           markOnlineOnConnect: false,
           // Riwayat lengkap hanya dikirim WhatsApp ke perangkat "desktop" saat QR di-scan.
-          browser: Browsers.macOS('Desktop'),
+          browser: variant < 2 ? Browsers.macOS('Desktop') : Browsers.macOS('Chrome'),
           syncFullHistory: true,
           shouldSyncHistoryMessage: () => true,
           generateHighQualityLinkPreview: false,
@@ -820,6 +829,7 @@ export default class WhatsappListen extends BaseCommand {
         resolveScope = resolve
       })
       let connectedScope: WorkspaceScope | undefined
+      let opened = false
       const onScoped = <K extends keyof BaileysEventMap>(
         name: K,
         handler: (event: BaileysEventMap[K]) => Promise<void>
@@ -847,6 +857,10 @@ export default class WhatsappListen extends BaseCommand {
                 if (settings.sweepEnabled)
                   await requestRecentAiReviews('reconnected', settings.sweepMaxAgeHours)
               })
+          }
+          if (qr) {
+            this.connectFailures = 0
+            this.retryAt = 0
           }
           if (qr)
             await this.setState({
@@ -879,6 +893,10 @@ export default class WhatsappListen extends BaseCommand {
             }
             this.sessionScope = connectedScope
             this.socketOpen = true
+            opened = true
+            this.connectFailures = 0
+            this.retryAt = 0
+            if (!this.verbose) logger.level = 'silent'
             resolveScope(connectedScope)
             await this.setState({ status: 'connected', phone, qr_data_url: null, last_error: null })
             if (this.receivedPending)
@@ -901,13 +919,38 @@ export default class WhatsappListen extends BaseCommand {
             this.receivedPending = false
             const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
             const reason = String((lastDisconnect?.error as any)?.message || '').slice(0, 200)
+            const wasOpen = opened
+            if (!wasOpen && statusCode !== DisconnectReason.loggedOut) {
+              this.connectFailures++
+              if (this.connectFailures % 2 === 0) this.connectVariant++
+              this.retryAt = Date.now() + Math.min(60_000, 3000 * 2 ** Math.min(this.connectFailures - 1, 5))
+            }
             this.logger.error(
-              `Koneksi WhatsApp${this.primary ? '' : ` #${currentLine()}`} tertutup (kode ${statusCode ?? '-'}${reason ? `: ${reason}` : ''}).`
+              `Koneksi WhatsApp${this.primary ? '' : ` #${currentLine()}`} tertutup (kode ${statusCode ?? '-'}${reason ? `: ${reason}` : ''}; ${registered ? 'sesi lama' : 'sesi baru'}, percobaan ${this.connectFailures}, varian ${variant}).`
             )
             this.socket = undefined
             if (statusCode === DisconnectReason.loggedOut && !this.primary) {
               // Nomor tambahan dilepas dari HP: hapus sesinya, baris line ikut dihapus.
               await this.removeLine()
+            } else if (
+              this.primary &&
+              registered &&
+              !wasOpen &&
+              this.connectFailures >= 8
+            ) {
+              // Sesi lama tidak bisa dipakai lagi → buang sesi, tampilkan QR baru otomatis.
+              this.logger.error('Sesi WhatsApp lama gagal terus; sesi direset agar QR baru muncul.')
+              this.connectFailures = 0
+              this.retryAt = 0
+              await archiveWorkspace()
+              await this.disconnect()
+              await this.setState({
+                desired_connected: true,
+                status: 'connecting',
+                phone: null,
+                qr_data_url: null,
+                last_error: 'Sesi lama direset.',
+              })
             } else if (statusCode === DisconnectReason.loggedOut) {
               await archiveWorkspace()
               await this.disconnect()
