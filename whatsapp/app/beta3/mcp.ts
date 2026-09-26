@@ -139,10 +139,16 @@ export async function syncLeanCatalog(
 ): Promise<CatalogSyncResult> {
   const config = await readLeanMcpConfig()
   if (!config.url) return { configured: false, unchanged: false, count: 0, version: '' }
-  const stored = await readLeanState('catalog_version')
+  // Hanya produk yang tampil di toko: produk tersembunyi (mis. pesanan khusus/invoice seperti
+  // jas almamater) dan produk arsip tidak boleh ditawarkan AI ke pelanggan.
+  const stored = await readLeanState('catalog_version_storefront')
   const digest = await callLeanTool<{ items?: unknown[]; version?: string; unchanged?: boolean }>(
     'catalog_digest',
-    { format: 'json', ...(options.force || !stored ? {} : { if_version: stored }) },
+    {
+      format: 'json',
+      storefront_only: true,
+      ...(options.force || !stored ? {} : { if_version: stored }),
+    },
     config,
     30_000
   )
@@ -167,7 +173,7 @@ export async function syncLeanCatalog(
     extra.size_charts?.text ? String(extra.size_charts.text).slice(0, 4000) : ''
   )
   const version = digest.version ? String(digest.version) : ''
-  if (version) await writeLeanState('catalog_version', version)
+  if (version) await writeLeanState('catalog_version_storefront', version)
   return { configured: true, unchanged: false, count, version }
 }
 

@@ -101,7 +101,13 @@ export function normalizeCatalogInput(raw: unknown): LeanCatalogInput {
     note: String(item.note ?? item.catatan ?? '')
       .trim()
       .slice(0, 255),
-    active: item.active === undefined ? true : Boolean(item.active),
+    // Cadangan bila server lama mengabaikan storefront_only: arsip/tersembunyi tidak aktif.
+    active:
+      item.archived === true || item.hidden === true
+        ? false
+        : item.active === undefined
+          ? true
+          : Boolean(item.active),
   }
 }
 
