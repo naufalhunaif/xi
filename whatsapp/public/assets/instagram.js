@@ -24,8 +24,8 @@
     byId('igWebhook').textContent = !data.connected
       ? t('DM masuk ke inbox dan dijawab AI. Komentar dibalas singkat lalu diarahkan ke DM atau WhatsApp.')
       : data.lastWebhookAt
-        ? t('Webhook terakhir diterima: {0}', when(data.lastWebhookAt))
-        : t('Belum ada webhook yang masuk sejak aplikasi dijalankan.')
+        ? `${t('Webhook terakhir diterima: {0}', when(data.lastWebhookAt))}${data.lastWebhookNote ? ` · ${data.lastWebhookNote}` : ''}`
+        : t('Belum ada webhook yang masuk dari Meta.')
     byId('igError').textContent = data.lastError || ''
     byId('igDisconnect').hidden = !data.connected
     byId('igAppId').value = data.appId || ''

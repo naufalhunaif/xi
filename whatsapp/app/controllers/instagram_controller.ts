@@ -21,8 +21,18 @@ import { shareFilePath, shareMime } from '#instagram/media'
 const errorText = (error: unknown) =>
   (error instanceof Error ? error.message : String(error)).slice(0, 290)
 
-/** Diagnostik ringan: kapan webhook terakhir masuk (per proses web). */
-const webhookSeen: { at: Date | null; rejectedAt: Date | null } = { at: null, rejectedAt: null }
+/** Ringkasan isi webhook untuk diagnostik di Pengaturan. */
+function webhookSummary(payload: any) {
+  const entries = Array.isArray(payload?.entry) ? payload.entry : []
+  if (entries.some((entry: any) => String(entry?.id) === '0')) return 'tes dari Meta'
+  const kinds = new Set<string>()
+  for (const entry of entries) {
+    if (Array.isArray(entry?.messaging)) kinds.add('DM')
+    for (const change of entry?.changes || [])
+      kinds.add(change?.field === 'comments' ? 'komentar' : String(change?.field || 'lain'))
+  }
+  return [...kinds].join(', ') || 'kosong'
+}
 const REJECTED = 'Webhook ditolak: App Secret tidak cocok.'
 
 export default class InstagramController {
@@ -48,23 +58,28 @@ export default class InstagramController {
     const config = await inWorkspace(scope, () => readInstagram())
     const raw = request.raw() || ''
     if (!validSignature(config.appSecret, raw, request.header('x-hub-signature-256'))) {
-      webhookSeen.rejectedAt = new Date()
       await inWorkspace(scope, () =>
         updateInstagram({
+          last_webhook_at: new Date(),
+          last_webhook_note: 'ditolak: tanda tangan tidak cocok',
           last_error: `${REJECTED} Isi "Instagram app secret" dari menu Instagram → API setup with Instagram login (bukan App Secret Facebook).`,
         })
       ).catch(() => {})
       return response.unauthorized('')
     }
-    webhookSeen.at = new Date()
-    if (config.lastError.startsWith(REJECTED))
-      await inWorkspace(scope, () => updateInstagram({ last_error: null })).catch(() => {})
     let payload: any
     try {
       payload = JSON.parse(raw)
     } catch {
       return response.badRequest('')
     }
+    await inWorkspace(scope, () =>
+      updateInstagram({
+        last_webhook_at: new Date(),
+        last_webhook_note: webhookSummary(payload),
+        ...(config.lastError.startsWith(REJECTED) ? { last_error: null } : {}),
+      })
+    ).catch(() => {})
     void handleInstagramWebhook(payload).catch((error) =>
       console.error(`Instagram webhook: ${errorText(error)}`)
     )
@@ -107,8 +122,8 @@ export default class InstagramController {
       commentTarget: config.commentTarget,
       hideSpam: config.hideSpam,
       lastError: config.lastError,
-      lastWebhookAt: webhookSeen.at,
-      lastRejectedAt: webhookSeen.rejectedAt,
+      lastWebhookAt: config.lastWebhookAt,
+      lastWebhookNote: config.lastWebhookNote,
       comments: Object.fromEntries(counts.map((row: any) => [row.status, Number(row.total)])),
     })
   }

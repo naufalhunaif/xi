@@ -75,6 +75,15 @@ export async function handleInstagramWebhook(payload: InstagramWebhook) {
         }
       }
       for (const change of entry.changes || []) {
+        // Sebagian event DM (termasuk tombol Test Meta) datang sebagai changes.field=messages.
+        if (change.field === 'messages' && String(entry.id) !== '0') {
+          try {
+            await ingestMessage(config, change.value as unknown as MessagingEvent)
+          } catch (error) {
+            console.error(`Instagram DM: ${error instanceof Error ? error.message : String(error)}`)
+          }
+          continue
+        }
         if (change.field !== 'comments' || !config.commentsEnabled) continue
         const value = change.value || {}
         if (!value.id || !value.from?.id || value.from.id === config.igUserId) continue

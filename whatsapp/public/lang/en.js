@@ -1145,4 +1145,5 @@ window.waLocales.en = {
   "Kendala": "Issue",
   "Buka DM": "Open DM",
   "DM & WhatsApp": "DM & WhatsApp",
+  "Belum ada webhook yang masuk dari Meta.": "No webhook has arrived from Meta yet.",
 }

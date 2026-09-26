@@ -56,12 +56,16 @@ export async function ensureInstagramTables() {
     [randomBytes(16).toString('hex'), new Date()]
   )
   // Kolom tambahan (instalasi lama): id DM penerima balasan pribadi komentar.
-  try {
-    await db.rawQuery(
-      'ALTER TABLE whatsapp_instagram_comments ADD COLUMN dm_igsid VARCHAR(64) NULL'
-    )
-  } catch (error) {
-    if ((error as any)?.errno !== 1060) throw error
+  for (const statement of [
+    'ALTER TABLE whatsapp_instagram_comments ADD COLUMN dm_igsid VARCHAR(64) NULL',
+    'ALTER TABLE whatsapp_instagram ADD COLUMN last_webhook_at DATETIME NULL',
+    'ALTER TABLE whatsapp_instagram ADD COLUMN last_webhook_note VARCHAR(160) NULL',
+  ]) {
+    try {
+      await db.rawQuery(statement)
+    } catch (error) {
+      if ((error as any)?.errno !== 1060) throw error
+    }
   }
   ready.add(key)
 }
@@ -92,6 +96,8 @@ export type InstagramConfig = {
   commentTarget: 'dm' | 'wa' | 'both'
   hideSpam: boolean
   lastError: string
+  lastWebhookAt: Date | null
+  lastWebhookNote: string
   connected: boolean
 }
 
@@ -112,6 +118,8 @@ export async function readInstagram(): Promise<InstagramConfig> {
     commentTarget: target,
     hideSpam: Boolean(row.hide_spam),
     lastError: String(row.last_error || ''),
+    lastWebhookAt: row.last_webhook_at ? new Date(row.last_webhook_at) : null,
+    lastWebhookNote: String(row.last_webhook_note || ''),
     connected: Boolean(row.access_token && row.ig_user_id),
   }
 }
