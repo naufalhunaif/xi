@@ -145,6 +145,41 @@ export async function replyComment(token: string, commentId: string, message: st
   })
 }
 
+export type IgComment = {
+  id: string
+  text?: string
+  timestamp?: string
+  username?: string
+  from?: { id?: string; username?: string }
+  parent_id?: string
+  media?: { id?: string }
+}
+
+/** Postingan terbaru akun sendiri (untuk cek komentar berkala). */
+export async function recentMedia(token: string, limit = 10) {
+  const data = await call<{ data?: Array<{ id: string; timestamp?: string; comments_count?: number }> }>(
+    `${GRAPH}/me/media?fields=id,timestamp,comments_count&limit=${limit}`,
+    { headers: bearer(token) }
+  )
+  return data.data || []
+}
+
+/** Komentar + balasan di satu postingan (terbaru dulu). */
+export async function mediaComments(token: string, mediaId: string) {
+  const fields = 'id,text,timestamp,username,from,parent_id,replies{id,text,timestamp,username,from,parent_id}'
+  const data = await call<{ data?: Array<IgComment & { replies?: { data?: IgComment[] } }> }>(
+    `${GRAPH}/${mediaId}/comments?fields=${encodeURIComponent(fields)}&limit=50`,
+    { headers: bearer(token) }
+  )
+  const out: IgComment[] = []
+  for (const comment of data.data || []) {
+    out.push({ ...comment, media: { id: mediaId } })
+    for (const reply of comment.replies?.data || [])
+      out.push({ ...reply, parent_id: reply.parent_id || comment.id, media: { id: mediaId } })
+  }
+  return out
+}
+
 export async function hideComment(token: string, commentId: string) {
   return call(`${GRAPH}/${commentId}?hide=true`, { method: 'POST', headers: bearer(token) })
 }

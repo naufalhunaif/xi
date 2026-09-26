@@ -6,8 +6,8 @@ import { readSettings } from '#services/settings_service'
 import { isAiWorking } from '#services/ai_work_schedule'
 import { runLeanProvider } from '#beta3/provider'
 import { selectLeanSkill } from '#beta3/reply_service'
-import { readInstagram, type InstagramConfig } from '#instagram/store'
-import { hideComment, privateReply, replyComment } from '#instagram/api'
+import { readInstagram, updateInstagram, type InstagramConfig } from '#instagram/store'
+import { hideComment, mediaComments, privateReply, recentMedia, replyComment } from '#instagram/api'
 
 export const COMMENT_SCHEMA = {
   type: 'object',
@@ -136,10 +136,62 @@ async function recentlyMessaged(fromId: string) {
   )
 }
 
+const POLL_EVERY_MS = Number(process.env.INSTAGRAM_COMMENT_POLL_MS || 150_000)
+const lastPoll = new Map<string, number>()
+
+/**
+ * Tanpa App Review Meta tidak mengirim webhook komentar, jadi komentar di postingan
+ * sendiri dicek berkala (±2,5 menit). Hanya komentar baru yang diambil; webhook
+ * (bila nanti disetujui) dan cek berkala tidak saling menggandakan (comment_id unik).
+ */
+export async function pollInstagramComments(config: InstagramConfig, now = Date.now()) {
+  const key = `${workspaceScope().prefix}:${config.igUserId}`
+  if (now - (lastPoll.get(key) || 0) < POLL_EVERY_MS) return 0
+  lastPoll.set(key, now)
+  // Jangan membalas komentar lama: maksimal 6 jam ke belakang dan sejak akun dihubungkan.
+  const since = Math.max(now - 6 * 3_600_000, config.connectedAt?.getTime() || 0)
+  let added = 0
+  for (const media of await recentMedia(config.accessToken, 10)) {
+    if (!media.comments_count) continue
+    for (const comment of await mediaComments(config.accessToken, media.id)) {
+      const at = comment.timestamp ? new Date(comment.timestamp).getTime() : 0
+      if (!comment.id || !at || at < since) continue
+      const fromId = String(comment.from?.id || '')
+      const username = String(comment.from?.username || comment.username || '')
+      if (fromId === config.igUserId || (config.username && username === config.username)) continue
+      const result = await db.rawQuery(
+        `INSERT IGNORE INTO whatsapp_instagram_comments
+          (comment_id, media_id, parent_id, from_id, username, text, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'new', ?, ?)`,
+        [
+          comment.id,
+          media.id,
+          comment.parent_id || null,
+          fromId,
+          username,
+          String(comment.text || '').slice(0, 4000),
+          new Date(at),
+          new Date(),
+        ]
+      )
+      added += Number((Array.isArray(result) ? result[0] : result)?.affectedRows || 0)
+    }
+  }
+  return added
+}
+
 /** Proses beberapa komentar baru. Dipanggil listener tiap beberapa detik. */
 export async function processInstagramComments(limit = 3) {
   const config = await readInstagram()
   if (!config.connected || !config.commentsEnabled) return 0
+  try {
+    await pollInstagramComments(config)
+    if (config.lastError.startsWith('Cek komentar:')) await updateInstagram({ last_error: null })
+  } catch (error) {
+    await updateInstagram({
+      last_error: `Cek komentar: ${(error instanceof Error ? error.message : String(error)).slice(0, 250)}`,
+    }).catch(() => {})
+  }
   const settings = await readSettings()
   if (!isAiWorking(settings)) return 0
   // Proses yang terputus tidak diulang (bisa sudah terbalas); ditandai gagal.

@@ -98,6 +98,7 @@ export type InstagramConfig = {
   lastError: string
   lastWebhookAt: Date | null
   lastWebhookNote: string
+  connectedAt: Date | null
   connected: boolean
 }
 
@@ -120,6 +121,7 @@ export async function readInstagram(): Promise<InstagramConfig> {
     lastError: String(row.last_error || ''),
     lastWebhookAt: row.last_webhook_at ? new Date(row.last_webhook_at) : null,
     lastWebhookNote: String(row.last_webhook_note || ''),
+    connectedAt: row.connected_at ? new Date(row.connected_at) : null,
     connected: Boolean(row.access_token && row.ig_user_id),
   }
 }
