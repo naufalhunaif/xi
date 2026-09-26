@@ -67,11 +67,15 @@ export async function latestInboxMessages() {
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
             AND d.status IN ('paid', 'cancelled') AND d.updated_at >= n.updated_at))`
     : PAYMENT_SQL
-  // Order = pesanan berjalan: form masuk, menunggu bayar, atau lunas tapi belum sampai grup.
+  // Order = chat yang sedang/baru memesan: form masuk, menunggu bayar, lunas 14 hari
+  // terakhir (atau belum sampai grup), atau spesifikasi pesanan sedang disusun AI.
   const orderSql = beta3
     ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
           AND (b.status IN ('pending', 'awaiting_payment')
-            OR (b.status = 'paid' AND b.group_status IN ('pending', 'failed'))))`
+            OR (b.status = 'paid' AND (b.group_status IN ('pending', 'failed')
+              OR b.updated_at >= NOW() - INTERVAL 14 DAY))))
+        OR EXISTS (SELECT 1 FROM whatsapp_beta3_specs sp WHERE sp.jid = m.jid AND sp.spec <> ''
+          AND sp.updated_at >= NOW() - INTERVAL 14 DAY)`
     : ORDER_SQL
   // Nama: kontak ini, pasangan LID ↔ nomor HP (dua arah), lalu nama WA terakhir dari
   // pesan masuk (pesan keluar tidak membawa nama pelanggan).

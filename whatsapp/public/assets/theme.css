@@ -407,6 +407,7 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 }
 .workspace-ui .wa-inbox-tabs > button[aria-pressed="true"] span,
 .workspace-ui .wa-inbox-tabs > button[aria-pressed="true"] #unansweredCount { background: #18865b; color: #fff; }
+.workspace-ui .wa-inbox-tabs > button span:empty { display: none; }
 .workspace-ui .wa-inbox-tabs > .wa-inbox-unanswered { margin-left: 4px; position: relative; }
 .workspace-ui .wa-inbox-tabs > .wa-inbox-unanswered::before {
   content: ""; position: absolute; left: -5px; top: 7px; bottom: 7px; width: 1px; background: var(--line);

@@ -546,13 +546,12 @@
       const key = button.dataset.inboxFilter
       button.setAttribute('aria-pressed', String(key === state.filter))
       const count = rows.filter((row) => matches(row, key)).length
-      button.querySelector('[data-filter-count]').textContent = String(count)
+      button.querySelector('[data-filter-count]').textContent = count ? String(count) : ''
       button.title = t("{0} percakapan{1}", count, key === 'payment' ? t(' menunggu konfirmasi pembayaran') : '')
     })
     byId('unansweredFilter').setAttribute('aria-pressed', String(state.unanswered))
-    byId('unansweredCount').textContent = String(
-      rows.filter((row) => matches(row, state.filter) && Number(row.dataset.unanswered) > 0).length
-    )
+    const unansweredCount = rows.filter((row) => matches(row, state.filter) && Number(row.dataset.unanswered) > 0).length
+    byId('unansweredCount').textContent = unansweredCount ? String(unansweredCount) : ''
     let visible = 0
     const queryDigits = searchDigits(inboxQuery)
     for (const row of rows) {
