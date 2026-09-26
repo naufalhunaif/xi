@@ -36,11 +36,11 @@
   function renderRules(rules) {
     if (!rulesList) return
     rulesList.replaceChildren()
-    if (!rules.length) rulesList.append(el('li', 'wa-note', t('Belum ada aturan.')))
+    if (!rules.length) rulesList.append(el('li', 'wa-empty', t('Belum ada aturan.')))
     for (const rule of rules) {
       const item = el('li', 'wa-quality-item')
       item.append(el('span', '', rule.text))
-      const remove = el('button', 'button', t('Hapus'))
+      const remove = el('button', 'button small', t('Hapus'))
       remove.type = 'button'
       remove.addEventListener('click', async () => {
         try {
@@ -106,14 +106,14 @@
       const head = el('div', 'wa-quality-test-head')
       const badge =
         test.status === 'running'
-          ? el('span', 'wa-badge', t('Menguji…'))
+          ? el('span', 'wa-pill warn', t('Menguji…'))
           : test.status === 'queued'
-            ? el('span', 'wa-badge', t('Antre'))
+            ? el('span', 'wa-pill warn', t('Antre'))
             : test.lastPass === null
-              ? el('span', 'wa-badge', t('Belum diuji'))
-              : el('span', `wa-badge ${test.lastPass ? 'ok' : 'bad'}`, test.lastPass ? t('Lulus') : t('Gagal'))
+              ? el('span', 'wa-pill', t('Belum diuji'))
+              : el('span', `wa-pill ${test.lastPass ? 'ok' : 'err'}`, test.lastPass ? t('Lulus') : t('Gagal'))
       head.append(badge, el('strong', '', test.customerText.split('\n').pop().slice(0, 90)))
-      const remove = el('button', 'button', t('Hapus'))
+      const remove = el('button', 'button small', t('Hapus'))
       remove.type = 'button'
       remove.addEventListener('click', async () => {
         await call(`/api/beta3/tests/${test.id}`, 'DELETE').catch(() => {})
@@ -176,17 +176,24 @@
 
   /* ---------- Koreksi dari room ---------- */
   let dialog = null
-  function openCorrection(messageId, aiText) {
+  function openCorrection(messageId, aiText, trigger) {
     dialog?.remove()
     dialog = el('div', 'wa-correct-overlay')
     const box = el('div', 'wa-correct-box')
     box.setAttribute('role', 'dialog')
     box.setAttribute('aria-modal', 'true')
-    box.append(el('strong', '', t('Koreksi balasan AI')))
+    const header = el('div', 'wa-card-head')
+    header.append(el('strong', '', t('Koreksi balasan AI')))
+    const x = el('button', 'shell-icon-button', '✕')
+    x.type = 'button'
+    x.setAttribute('aria-label', t('Tutup'))
+    header.append(x)
+    box.append(header)
     const original = el('p', 'wa-correct-original', aiText)
     box.append(original)
     const answer = el('textarea')
     answer.rows = 4
+    answer.setAttribute('aria-label', t('Jawaban yang benar'))
     answer.placeholder = t('Tulis jawaban yang seharusnya…')
     box.append(answer)
     const kinds = el('div', 'wa-correct-kinds')
@@ -226,8 +233,10 @@
     const close = () => {
       dialog?.remove()
       dialog = null
+      trigger?.focus()
     }
     cancel.addEventListener('click', close)
+    x.addEventListener('click', close)
     dialog.addEventListener('click', (event) => event.target === dialog && close())
     box.addEventListener('keydown', (event) => event.key === 'Escape' && close())
     save.addEventListener('click', async () => {
@@ -256,6 +265,6 @@
     if (!button) return
     event.preventDefault()
     const article = button.closest('article')
-    openCorrection(Number(button.dataset.correctId), article?.dataset.body || '')
+    openCorrection(Number(button.dataset.correctId), article?.dataset.body || '', button)
   })
 })()

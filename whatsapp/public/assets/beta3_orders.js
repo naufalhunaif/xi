@@ -61,8 +61,11 @@
   }
   const groupName = (jid) => groups.find((g) => g.jid === jid)?.name || ''
   function groupPicker(order) {
-    const wrap = el('label', undefined, 'wa-b3-group')
-    wrap.append(el('span', t('Kirim ke grup')))
+    const wrap = el('section', undefined, 'wa-b3-section wa-b3-group')
+    wrap.append(el('h3', t('Grup produksi')))
+    const field = el('label', undefined, 'wa-b3-group-field')
+    field.append(el('span', t('Grup tujuan')))
+    const row = el('div', undefined, 'wa-b3-group-row')
     const select = el('select')
     select.append(new Option(groups.length ? t('Pilih grup…') : t('Belum ada grup — perbarui daftar'), ''))
     for (const group of groups) select.append(new Option(group.name, group.jid))
@@ -79,8 +82,17 @@
         notice(error.message, true)
       }
     })
+    refresh.classList.add('wa-b3-icon-button')
     refresh.title = t('Perbarui daftar grup')
-    wrap.append(select, refresh)
+    refresh.setAttribute('aria-label', t('Perbarui daftar grup'))
+    row.append(select, refresh)
+    field.append(row)
+    wrap.append(field)
+    if (groupLabel[order.group_status]) {
+      const tone = { sent: 'ok', pending: 'warn', failed: 'err' }[order.group_status] || ''
+      const state = el('span', [groupLabel[order.group_status], groupName(order.group_jid)].filter(Boolean).join(' · '), `wa-pill ${tone}`)
+      wrap.append(state)
+    }
     return { wrap, value: () => select.value }
   }
 
@@ -129,7 +141,7 @@
       const head = el('td')
       head.append(el('span', when(order.created_at)), el('br'), el('small', order.order_number || `#${order.id}`, 'wa-muted'))
       const who = el('td')
-      who.append(el('span', order.customer_name || '-'), el('br'), el('small', order.regency || order.district || '', 'wa-muted'))
+      who.append(el('span', order.customer_name || order.contact_name || '-'), el('br'), el('small', order.regency || order.district || '', 'wa-muted'))
       const items = el('td')
       // Satu baris ringkas dari teks pesanan: produk · jas/celana · size.
       const summary = String(order.text || order.spec || order.items || '')
@@ -224,10 +236,44 @@
     closeOrder()
   })
 
+  // Kode layanan ekspedisi → nama yang dipahami CS (JNE REG/YES/JTR).
+  const serviceName = (service) => {
+    const code = String(service || '').trim()
+    if (!code) return ''
+    if (/yes|one ?day/i.test(code)) return 'JNE YES'
+    if (/jtr|trucking|kargo|cargo/i.test(code)) return 'JNE JTR'
+    if (/^(ctc|reg)/i.test(code)) return 'JNE REG'
+    return code
+  }
+  // Nomor HP asli saja; ID internal (@lid) bukan nomor dan tidak ditampilkan.
+  const phoneOf = (order) => {
+    const digits = String(order.phone || '').replace(/\D/g, '')
+    return /^(62|0)8\d{7,12}$/.test(digits) ? String(order.phone) : ''
+  }
+  const customerOf = (order) => order.customer_name || order.contact_name || ''
+  const statusPillTone = { pending: 'warn', awaiting_payment: 'warn', paid: 'ok', cancelled: '' }
+  const section = (title, className = '') => {
+    const node = el('section', undefined, `wa-b3-section ${className}`.trim())
+    node.append(el('h3', title))
+    return node
+  }
+
   function renderDetail(order) {
     const box = byId('beta3OrderDetail')
     box.replaceChildren()
-    byId('beta3OrderDrawerTitle').textContent = `${order.customer_name || '-'} · ${statusLabel[order.status] || order.status}`
+    const number = order.order_number || `#${order.id}`
+    byId('beta3OrderDrawerTitle').textContent = [number, customerOf(order)].filter(Boolean).join(' · ')
+
+    // Ringkasan: status + waktu.
+    const head = el('div', undefined, 'wa-b3-detail-head')
+    const dp = order.status === 'paid' && order.paid_amount && order.total && Number(order.paid_amount) < Number(order.total)
+    head.append(
+      el('span', dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, `wa-pill ${dp ? 'warn' : statusPillTone[order.status] || ''}`),
+      el('small', when(order.created_at), 'wa-muted')
+    )
+    if (order.source === 'rekap') head.append(el('small', t('Rekap dari chat'), 'wa-muted'))
+    box.append(head)
+
     if (Array.isArray(order.photos) && order.photos.length) {
       const photos = el('div', undefined, 'wa-order-photos')
       for (const photo of order.photos) {
@@ -242,18 +288,39 @@
       }
       box.append(photos)
     }
-    box.append(el('pre', String(order.text || order.spec || order.items || '—'), 'wa-b3-spec'))
+
+    const items = section(t('Pesanan'))
+    items.append(el('pre', String(order.text || order.spec || order.items || '—'), 'wa-b3-spec'))
+    box.append(items)
+
     const address = [order.address, order.district, order.regency, order.postal_code]
       .filter(Boolean)
       .filter((part, index, all) => index === 0 || !String(all[0]).toLowerCase().includes(String(part).toLowerCase()))
       .join(', ')
-    const to = [order.phone, address].filter(Boolean).join(' · ')
-    if (to) box.append(el('p', `${t('Kirim ke')}: ${to}`, 'wa-muted'))
+    const delivery = section(t('Penerima & pengiriman'), 'wa-order-delivery')
+    const fields = [
+      [t('Penerima'), customerOf(order)],
+      [t('Nomor'), phoneOf(order)],
+      [t('Alamat'), address],
+      [t('Pengiriman'), serviceName(order.shipping_service)],
+    ].filter(([, value]) => value)
+    if (fields.length) {
+      const list = el('dl', undefined, 'wa-b3-fields')
+      for (const [label, value] of fields) {
+        const row = el('div')
+        row.append(el('dt', label), el('dd', value))
+        list.append(row)
+      }
+      delivery.append(list)
+    } else delivery.append(el('p', t('Alamat belum ada.'), 'wa-note'))
+    box.append(delivery)
+
     if (order.total) {
+      const costs = section(t('Rincian biaya'))
       const summary = el('dl', undefined, 'wa-cart-summary')
       for (const [label, amount, cls] of [
         [t('Subtotal'), order.subtotal],
-        [`${t('Ongkir')}${order.shipping_service ? ` ${order.shipping_service}` : ''}`, order.shipping_cost],
+        [`${t('Ongkir')}${order.shipping_service ? ` (${serviceName(order.shipping_service).replace('JNE ', '')})` : ''}`, order.shipping_cost],
         [t('Total'), order.total, 'wa-cart-total'],
       ]) {
         if (amount === null || amount === undefined) continue
@@ -261,21 +328,26 @@
         row.append(el('dt', label), el('dd', money(amount)))
         summary.append(row)
       }
-      if (order.status === 'paid' && order.paid_amount && Number(order.paid_amount) < Number(order.total)) {
+      if (dp) {
         for (const [label, amount] of [[t('Dibayar (DP)'), order.paid_amount], [t('Sisa'), Number(order.total) - Number(order.paid_amount)]]) {
           const row = el('div')
           row.append(el('dt', label), el('dd', money(amount)))
           summary.append(row)
         }
       }
-      box.append(summary)
+      costs.append(summary)
+      box.append(costs)
     }
-    const actions = el('div', undefined, 'actions')
+    const actions = el('div', undefined, 'actions wa-b3-actions')
     const picker = ['awaiting_payment', 'paid'].includes(order.status) ? groupPicker(order) : null
     if (picker) box.append(picker.wrap)
     const act = (label, path, done, primary = true) =>
       button(label, async () => {
         if (path.endsWith('/cancel') && !confirm(t('Batalkan order ini?'))) return
+        if (/\/(resend-group|paid)$/.test(path) && picker) {
+          const target = groupName(picker.value()) || t('grup produksi bawaan')
+          if (!confirm(t('Kirim pesanan ini ke {0}?', target))) return
+        }
         try {
           await api(path, 'POST', picker && !path.endsWith('/cancel') ? { groupJid: picker.value() || null } : {})
           notice(done)
@@ -285,7 +357,7 @@
         }
       }, primary)
     if (order.status === 'pending') {
-      if (order.auto_total_reason) box.append(el('p', `${t('Total belum otomatis')}: ${order.auto_total_reason}`, 'wa-muted'))
+      if (order.auto_total_reason) box.append(el('p', `${t('Total belum otomatis')}: ${order.auto_total_reason}`, 'wa-alert warn'))
       let options = []
       try {
         options = (JSON.parse(order.shipping_options || 'null')?.prices || []).filter((row) => Number(row.price) > 0)
@@ -327,11 +399,12 @@
       actions.append(act(t('Batalkan'), `/api/beta3/orders/${order.id}/cancel`, t('Order dibatalkan.'), false))
     } else if (order.status === 'paid') {
       actions.append(
-        act(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), `/api/beta3/orders/${order.id}/resend-group`, t('Diantrekan ke grup produksi.'), false)
+        act(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), `/api/beta3/orders/${order.id}/resend-group`, t('Diantrekan ke grup produksi.'), order.group_status !== 'sent')
       )
-      if (order.group_error) box.append(el('p', `${t('Grup gagal')}: ${order.group_error}`, 'error'))
+      if (order.group_error) (picker?.wrap || box).append(el('p', `${t('Grup gagal')}: ${order.group_error}`, 'wa-alert'))
     }
-    if (actions.childElementCount) box.append(actions)
+    // Tombol grup berada di bagian Grup produksi; tindakan lain di bawah.
+    if (actions.childElementCount) (order.status === 'paid' && picker ? picker.wrap : box).append(actions)
   }
   byId('beta3OrdersRefresh').addEventListener('click', load)
   byId('beta3OrdersSearch').addEventListener('input', () => {

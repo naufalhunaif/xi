@@ -160,8 +160,15 @@ export default class Beta3Controller {
       listLeanOrders(status || undefined, q || undefined),
       countLeanOrders(),
     ])
+    // Nama pelanggan dari kontak bila order belum punya nama (chat lama / rekap).
+    const jids = [...new Set(orders.map((order: Record<string, any>) => String(order.jid || '')).filter(Boolean))]
+    const contacts = jids.length
+      ? await db.from('whatsapp_contacts').whereIn('jid', jids).select('jid', 'name').catch(() => [])
+      : []
+    const nameOf = new Map(contacts.map((row: any) => [String(row.jid), String(row.name || '')]))
     const withText = orders.map((order: Record<string, any>) => ({
       spec: order.spec as unknown,
+      contact_name: nameOf.get(String(order.jid || '')) || '',
       ...order,
       // Foto dicocokkan dari isi pesanan saja, bukan dari catatan chat.
       chat_note: '',

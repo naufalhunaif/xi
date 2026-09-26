@@ -531,3 +531,33 @@ html[data-theme='dark'] .wa-b3-chip--stage[data-stage="selesai"] { background: #
 #beta3RecapDays { font: inherit; font-size: 13px; padding: 4px 6px; }
 .wa-b3-status { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted, #5d665f); }
 .wa-b3-photos figcaption { max-width: 104px; }
+
+/* Beta 3 · detail order (dialog kanan): ringkasan → pesanan → penerima → biaya → grup. */
+.wa-order-editor#beta3OrderDetail { display: grid; gap: 16px; align-content: start; font-size: 12px; }
+.wa-b3-detail-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.wa-b3-section { display: grid; gap: 8px; min-width: 0; }
+.wa-order-editor .wa-b3-section > h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wa-b3-section.wa-order-delivery { padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; }
+.wa-b3-fields { display: grid; gap: 8px; margin: 0; }
+.wa-b3-fields > div { display: grid; gap: 2px; min-width: 0; }
+.wa-b3-fields dt { font-size: 11px; color: var(--muted); }
+.wa-b3-fields dd { margin: 0; font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.wa-b3-section .wa-cart-summary { margin: 0; }
+.wa-b3-section.wa-b3-group { padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--wa-surface, #fff); }
+.wa-b3-group-field { display: grid; gap: 6px; }
+.wa-b3-group-field > span { font-size: 11px; color: var(--muted); }
+.wa-b3-group-row { display: flex; gap: 8px; min-width: 0; }
+.wa-b3-group-row select { flex: 1; min-width: 0; }
+.wa-b3-group .wa-pill { justify-self: start; }
+.wa-b3-icon-button { flex: 0 0 auto; width: var(--wa-control-height, 36px); padding: 0; justify-content: center; }
+.wa-b3-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.wa-b3-group .wa-b3-actions { justify-content: stretch; }
+.wa-b3-group .wa-b3-actions .button { flex: 1; }
+.wa-order-editor#beta3OrderDetail .wa-order-photos { margin: 0; }
