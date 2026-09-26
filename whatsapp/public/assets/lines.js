@@ -61,7 +61,7 @@
 
   function render(data) {
     list.replaceChildren()
-    list.append(row(t('Nomor utama'), data.primary.phone ? `+${data.primary.phone}` : '—', data.primary.status))
+    // Nomor utama dikelola di kartu atasnya (Hubungkan/Putuskan + QR).
     for (const line of data.lines || []) {
       const button = document.createElement('button')
       button.type = 'button'

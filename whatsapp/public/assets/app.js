@@ -93,22 +93,22 @@
     updateCodexStatus()
     updateClaudeStatus()
   })
+  // Koneksi WhatsApp dikelola di Pengaturan → Nomor WhatsApp; chat hanya menampilkan tautan bila belum terhubung.
   function renderConnectionStatus(status, phone = '') {
     const label = statusLabels[status] || t('Belum terhubung')
-    const digits = String(phone).replace(/\D/g, '')
+    const digits = String(phone || '').replace(/\D/g, '')
     const number = digits.startsWith('62')
       ? digits.replace(/^62(\d{3})(\d{4})(\d{1,4})$/, '+62 $1 $2 $3')
       : digits
+    const hint = byId('connectHint')
+    if (hint) hint.hidden = status === 'connected'
+    if (!byId('statusText')) return
     byId('statusText').textContent = label
-    byId('phoneText').textContent = number
-    byId('phoneText').hidden = !number
-    byId('statusDot').className = `wa-connection-symbol ${status}`
-    const container = byId('statusText').closest('.wa-connection-status')
-    container.title = `WhatsApp · ${label}${number ? ` · ${number}` : ''}`
-    container.setAttribute('aria-label', container.title)
+    byId('phoneText').textContent = number || t('Belum ada nomor terhubung')
+    const tone = status === 'connected' ? 'ok' : ['connecting', 'qr'].includes(status) ? 'warn' : 'err'
+    byId('statusPill').className = `wa-pill ${tone}`
   }
   async function updateStatus() {
-    if (!byId('statusText')) return
     try {
       const state = await api('/api/status')
       const status = String(state.status || 'disconnected')
@@ -118,18 +118,14 @@
         badge.textContent = String(state.pendingOrders)
         badge.hidden = !Number(state.pendingOrders)
       }
-      const qrPanel = byId('qrPanel')
-      const qrImage = byId('qrImage')
-      qrPanel.hidden = !(status === 'qr' && state.qr_data_url)
-      if (state.qr_data_url) qrImage.src = state.qr_data_url
-      byId('connectButton').disabled = ['connecting', 'qr', 'connected', 'worker_offline'].includes(
-        status
-      )
+      if (!byId('connectButton')) return
+      byId('qrPanel').hidden = !(status === 'qr' && state.qr_data_url)
+      if (state.qr_data_url) byId('qrImage').src = state.qr_data_url
       const canDisconnect =
         ['connected', 'connecting', 'qr'].includes(status) || Boolean(state.desired_connected)
       byId('connectButton').hidden = canDisconnect
+      byId('connectButton').disabled = status === 'worker_offline'
       byId('disconnectButton').hidden = !canDisconnect
-      byId('disconnectButton').disabled = !canDisconnect
     } catch {
       renderConnectionStatus('disconnected')
     }
@@ -143,7 +139,10 @@
     }
   }
   byId('connectButton')?.addEventListener('click', () => connectionAction('/api/connect'))
-  byId('disconnectButton')?.addEventListener('click', () => connectionAction('/api/disconnect'))
+  byId('disconnectButton')?.addEventListener('click', () => {
+    if (!window.confirm(t('Putuskan WhatsApp nomor utama? Chat yang sudah ada tetap tersimpan.'))) return
+    void connectionAction('/api/disconnect')
+  })
   const messages = byId('messages')
   const messageList = byId('messageList')
   const compareMessages = (left, right) =>

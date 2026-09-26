@@ -1181,4 +1181,7 @@ window.waLocales.en = {
   "Nonaktifkan": "Disable",
   "Hapus akun {0}?": "Delete account {0}?",
   "Akun Gemini ditambahkan.": "Gemini account added.",
+  "Belum ada nomor terhubung": "No number connected yet",
+  "Di HP buka WhatsApp → Perangkat tertaut → Tautkan perangkat, lalu scan QR ini.": "On your phone open WhatsApp → Linked devices → Link a device, then scan this QR.",
+  "Putuskan WhatsApp nomor utama? Chat yang sudah ada tetap tersimpan.": "Disconnect the main WhatsApp number? Existing chats are kept.",
 }
