@@ -16,6 +16,7 @@ import {
   markAiAccountLimited,
   markAiAccountUsed,
   nextAiRecovery,
+  recordAiEvent,
   updateAiAccount,
   usableAiAccounts,
   type AiProviderName,
@@ -81,6 +82,7 @@ export async function runLeanProvider(
   }
   let lastError: unknown
   for (const account of accounts) {
+    await recordAiEvent(account.id, 'start', phase).catch(() => {})
     try {
       const result = await withAiAccount(aiAccountRef(account), () =>
         runLeanOnce(
@@ -94,6 +96,7 @@ export async function runLeanProvider(
         )
       )
       await markAiAccountUsed(account.id).catch(() => {})
+      await recordAiEvent(account.id, 'ok', phase).catch(() => {})
       return result
     } catch (error) {
       const detail = aiFailureDetail(error, {
@@ -101,6 +104,12 @@ export async function runLeanProvider(
         provider: account.provider === 'claude' ? 'claude' : 'chatgpt',
       })
       lastError = error
+      await recordAiEvent(
+        account.id,
+        SWITCHABLE.has(detail.code) ? 'limited' : 'fail',
+        phase,
+        detail.code
+      ).catch(() => {})
       if (STOP_CODES.has(detail.code)) throw error
       // Kuota habis / perlu login → akun dijeda. Gangguan lain → cukup coba akun berikutnya.
       if (SWITCHABLE.has(detail.code))

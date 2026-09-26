@@ -73,6 +73,7 @@ router
     router.post('/api/lines', [LinesController, 'store'])
     router.post('/api/lines/:id/disconnect', [LinesController, 'disconnect'])
     router.get('/api/ai/accounts', [AiAccountsController, 'index'])
+    router.get('/api/ai/orchestra', [AiAccountsController, 'orchestra'])
     router.post('/api/ai/accounts', [AiAccountsController, 'store'])
     router.post('/api/ai/accounts/:id/update', [AiAccountsController, 'update'])
     router.post('/api/ai/accounts/order', [AiAccountsController, 'order'])

@@ -214,3 +214,69 @@ export async function markAiAccountUsed(id: number) {
 
 export const aiAccountRef = (account: AiAccount): AiAccountRef | null =>
   account.legacy ? null : { id: account.id, provider: account.provider }
+
+// ── Jejak kerja AI (untuk visual "orkestra" di Pengaturan) ─────────────────────────
+export type AiEventKind = 'start' | 'ok' | 'limited' | 'fail'
+let eventsReady = false
+async function ensureEvents() {
+  if (eventsReady) return
+  await db.rawQuery(`CREATE TABLE IF NOT EXISTS whatsapp_ai_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    account_id INT UNSIGNED NOT NULL,
+    kind VARCHAR(12) NOT NULL,
+    phase VARCHAR(40) NULL,
+    detail VARCHAR(200) NULL,
+    created_at DATETIME(3) NOT NULL,
+    KEY whatsapp_ai_events_account (account_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  eventsReady = true
+}
+
+export async function recordAiEvent(accountId: number, kind: AiEventKind, phase = '', detail = '') {
+  await ensureEvents()
+  await db.table('whatsapp_ai_events').insert({
+    account_id: accountId,
+    kind,
+    phase: phase.slice(0, 40) || null,
+    detail: detail.slice(0, 200) || null,
+    created_at: new Date(),
+  })
+  // Simpan jejak terbaru saja.
+  if (Math.random() < 0.02)
+    await db.rawQuery(
+      'DELETE FROM whatsapp_ai_events WHERE id < (SELECT id FROM (SELECT id FROM whatsapp_ai_events ORDER BY id DESC LIMIT 1 OFFSET 500) t)'
+    )
+}
+
+export async function recentAiEvents(after = 0, limit = 40) {
+  await ensureEvents()
+  const rows = await db
+    .from('whatsapp_ai_events')
+    .where('id', '>', after)
+    .orderBy('id', 'desc')
+    .limit(limit)
+  return rows.reverse().map((row: any) => ({
+    id: Number(row.id),
+    accountId: Number(row.account_id),
+    kind: String(row.kind) as AiEventKind,
+    phase: String(row.phase || ''),
+    detail: String(row.detail || ''),
+    at: new Date(row.created_at).getTime(),
+  }))
+}
+
+/** Akun yang sedang mengerjakan (event start terakhir belum ditutup, < 3 menit). */
+export async function busyAiAccounts(now = Date.now()) {
+  await ensureEvents()
+  const rows = await db
+    .from('whatsapp_ai_events')
+    .where('created_at', '>', new Date(now - 180_000))
+    .orderBy('id', 'asc')
+  const open = new Map<number, number>()
+  for (const row of rows as any[]) {
+    const id = Number(row.account_id)
+    if (row.kind === 'start') open.set(id, (open.get(id) || 0) + 1)
+    else if (open.get(id)) open.set(id, open.get(id)! - 1)
+  }
+  return [...open.entries()].filter(([, n]) => n > 0).map(([id]) => id)
+}

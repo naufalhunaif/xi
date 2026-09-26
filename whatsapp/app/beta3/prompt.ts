@@ -59,30 +59,57 @@ export const LEAN_OUTPUT_SCHEMA = {
     referensi: {
       type: 'array',
       description:
-        'Opsional. Isi bila pelanggan mengirim gambar di giliran ini sebagai contoh bagian yang diinginkan. Gambar diteruskan ke penjahit dengan caption "Model {bagian} seperti ini".',
+        'Array kosong bila tidak ada. Isi bila pelanggan mengirim gambar di giliran ini sebagai contoh bagian yang diinginkan. Gambar diteruskan ke penjahit dengan caption "Model {bagian} seperti ini".',
       items: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          gambar: { type: 'integer', description: 'Nomor lampiran gambar giliran ini (1 = gambar pertama).' },
-          bagian: { type: 'string', description: 'Satu-dua kata sehari-hari: kerah, badan, saku, kancing, lengan, celana, warna.' },
+          gambar: {
+            type: 'integer',
+            description: 'Nomor lampiran gambar giliran ini (1 = gambar pertama).',
+          },
+          bagian: {
+            type: 'string',
+            description:
+              'Satu-dua kata sehari-hari: kerah, badan, saku, kancing, lengan, celana, warna.',
+          },
         },
         required: ['gambar', 'bagian'],
       },
     },
     pembayaran: {
-      type: 'object',
-      additionalProperties: false,
-      description:
-        'Isi dari maksud chat (termasuk pesan CS manusia): total yang SUDAH dikirim toko ke pelanggan, dan pembayaran yang SUDAH dikonfirmasi toko. 0/false bila belum ada. Jangan mengarang angka.',
-      properties: {
-        total: { type: 'integer', description: 'Total yang sudah dikirim toko (rupiah), 0 bila belum.' },
-        ongkir: { type: 'integer', description: 'Ongkir di total itu, 0 bila tidak jelas.' },
-        layanan: { type: 'string', description: 'Layanan kirim di total itu (REG/YES/JTR), kosong bila tidak jelas.' },
-        dibayar: { type: 'integer', description: 'Nominal yang sudah ditransfer pelanggan (DP atau lunas), 0 bila belum/tidak jelas.' },
-        dikonfirmasi: { type: 'boolean', description: 'true hanya bila toko sudah menyatakan dana masuk (mis. "pembayaran sudah kami konfirmasi, prosess ya").' },
-      },
-      required: ['total', 'ongkir', 'layanan', 'dibayar', 'dikonfirmasi'],
+      // Mode ketat (ChatGPT) mewajibkan semua kunci ada: null = tidak ada info.
+      anyOf: [
+        {
+          type: 'object',
+          additionalProperties: false,
+          description:
+            'Isi dari maksud chat (termasuk pesan CS manusia): total yang SUDAH dikirim toko ke pelanggan, dan pembayaran yang SUDAH dikonfirmasi toko. 0/false bila belum ada. Jangan mengarang angka. null bila belum ada info sama sekali.',
+          properties: {
+            total: {
+              type: 'integer',
+              description: 'Total yang sudah dikirim toko (rupiah), 0 bila belum.',
+            },
+            ongkir: { type: 'integer', description: 'Ongkir di total itu, 0 bila tidak jelas.' },
+            layanan: {
+              type: 'string',
+              description: 'Layanan kirim di total itu (REG/YES/JTR), kosong bila tidak jelas.',
+            },
+            dibayar: {
+              type: 'integer',
+              description:
+                'Nominal yang sudah ditransfer pelanggan (DP atau lunas), 0 bila belum/tidak jelas.',
+            },
+            dikonfirmasi: {
+              type: 'boolean',
+              description:
+                'true hanya bila toko sudah menyatakan dana masuk (mis. "pembayaran sudah kami konfirmasi, prosess ya").',
+            },
+          },
+          required: ['total', 'ongkir', 'layanan', 'dibayar', 'dikonfirmasi'],
+        },
+        { type: 'null' },
+      ],
     },
     susulan: {
       type: 'string',
@@ -90,34 +117,57 @@ export const LEAN_OUTPUT_SCHEMA = {
         'Opsional. Satu kalimat pendek untuk memastikan kelanjutan (mis. "jadi lanjut yang choco bos?"). TIDAK dikirim sekarang; sistem mengirimnya hanya bila pelanggan diam beberapa menit. Kosongkan bila pesan utama sudah berisi pertanyaan atau tidak ada yang perlu dipastikan.',
     },
     order: {
-      type: 'object',
-      additionalProperties: false,
-      description:
-        'Isi HANYA pada giliran CATATAN SISTEM menyebut form order tercatat. Sistem memverifikasi tiap harga ke KATALOG dan layanan ke ONGKIR; bila cocok, total + rekening dikirim otomatis setelah pesanmu. Kosongkan/abaikan di giliran lain.',
-      properties: {
-        rincian: {
-          type: 'string',
+      anyOf: [
+        {
+          type: 'object',
+          additionalProperties: false,
           description:
-            'Satu baris per item, nama persis dari KATALOG + harga, mis. "Setelan Peak Suit - Black size S, celana no 30 705.000". Setelan memakai produk "Setelan …" dari KATALOG, bukan jas + celana dijumlah sendiri.',
+            'Isi HANYA pada giliran CATATAN SISTEM menyebut form order tercatat. Sistem memverifikasi tiap harga ke KATALOG dan layanan ke ONGKIR; bila cocok, total + rekening dikirim otomatis setelah pesanmu. Isi null di giliran lain.',
+          properties: {
+            rincian: {
+              type: 'string',
+              description:
+                'Satu baris per item, nama persis dari KATALOG + harga, mis. "Setelan Peak Suit - Black size S, celana no 30 705.000". Setelan memakai produk "Setelan …" dari KATALOG, bukan jas + celana dijumlah sendiri.',
+            },
+            subtotal: { type: 'integer', description: 'Jumlah harga semua item dalam rupiah.' },
+            layanan: {
+              type: 'string',
+              description:
+                'Nama layanan ongkir yang dipilih pelanggan persis seperti di ONGKIR (mis. "CTCYES"); kosong bila belum dipilih.',
+            },
+          },
+          required: ['rincian', 'subtotal', 'layanan'],
         },
-        subtotal: { type: 'integer', description: 'Jumlah harga semua item dalam rupiah.' },
-        layanan: {
-          type: 'string',
-          description:
-            'Nama layanan ongkir yang dipilih pelanggan persis seperti di ONGKIR (mis. "CTCYES"); kosong bila belum dipilih.',
-        },
-      },
-      required: ['rincian', 'subtotal', 'layanan'],
+        { type: 'null' },
+      ],
     },
   },
-  required: ['pesan', 'foto', 'catatan', 'tahap', 'serah_cs', 'alasan', 'susulan', 'spesifikasi'],
+  required: [
+    'pesan',
+    'foto',
+    'catatan',
+    'tahap',
+    'serah_cs',
+    'alasan',
+    'susulan',
+    'spesifikasi',
+    'referensi',
+    'pembayaran',
+    'order',
+  ],
 } as const
 
 export type LeanOrderDraft = { rincian: string; subtotal: number; layanan: string }
 
 export type LeanRefDraft = { gambar: number; bagian: string }
 
-export type LeanPaymentInfo = { total: number; ongkir: number; layanan: string; dibayar: number; dikonfirmasi: boolean }
+export type LeanPaymentInfo = {
+  total: number
+  ongkir: number
+  layanan: string
+  dibayar: number
+  dikonfirmasi: boolean
+}
 
 export type LeanDecision = {
   order?: LeanOrderDraft
@@ -274,10 +324,21 @@ export function parseLeanDecision(text: string): LeanDecision {
     ...(raw.pembayaran && typeof raw.pembayaran === 'object'
       ? {
           pembayaran: {
-            total: Math.max(0, Math.round(Number((raw.pembayaran as Record<string, unknown>).total) || 0)),
-            ongkir: Math.max(0, Math.round(Number((raw.pembayaran as Record<string, unknown>).ongkir) || 0)),
-            layanan: String((raw.pembayaran as Record<string, unknown>).layanan || '').trim().slice(0, 40),
-            dibayar: Math.max(0, Math.round(Number((raw.pembayaran as Record<string, unknown>).dibayar) || 0)),
+            total: Math.max(
+              0,
+              Math.round(Number((raw.pembayaran as Record<string, unknown>).total) || 0)
+            ),
+            ongkir: Math.max(
+              0,
+              Math.round(Number((raw.pembayaran as Record<string, unknown>).ongkir) || 0)
+            ),
+            layanan: String((raw.pembayaran as Record<string, unknown>).layanan || '')
+              .trim()
+              .slice(0, 40),
+            dibayar: Math.max(
+              0,
+              Math.round(Number((raw.pembayaran as Record<string, unknown>).dibayar) || 0)
+            ),
             dikonfirmasi: (raw.pembayaran as Record<string, unknown>).dikonfirmasi === true,
           },
         }
@@ -286,7 +347,9 @@ export function parseLeanDecision(text: string): LeanDecision {
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
       .map((item) => ({
         gambar: Math.round(Number(item.gambar) || 0),
-        bagian: String(item.bagian || '').trim().slice(0, 40),
+        bagian: String(item.bagian || '')
+          .trim()
+          .slice(0, 40),
       }))
       .filter((item) => item.gambar > 0 && item.bagian)
       .slice(0, 6),
@@ -317,7 +380,9 @@ export function closedDaysFromStore(text: string) {
   if (!hours) return [0, 6]
   const closed: number[] = []
   for (const part of hours.split(/,\s*/)) {
-    const m = part.trim().match(/^(Sen|Sel|Rab|Kam|Jum|Sab|Min)(?:-(Sen|Sel|Rab|Kam|Jum|Sab|Min))?\s+tutup$/i)
+    const m = part
+      .trim()
+      .match(/^(Sen|Sel|Rab|Kam|Jum|Sab|Min)(?:-(Sen|Sel|Rab|Kam|Jum|Sab|Min))?\s+tutup$/i)
     if (!m) continue
     const from = DAY_INDEX[m[1].toLowerCase()]
     const to = DAY_INDEX[(m[2] || m[1]).toLowerCase()]
@@ -328,7 +393,12 @@ export function closedDaysFromStore(text: string) {
 }
 
 /** Tanggal (WIB) setelah `days` hari; hari kerja melewati `closedDays` (0 = Minggu). */
-export function addProductionDays(now: Date, days: number, working: boolean, closedDays: number[] = [0, 6]) {
+export function addProductionDays(
+  now: Date,
+  days: number,
+  working: boolean,
+  closedDays: number[] = [0, 6]
+) {
   const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' })
     .format(now)
     .split('-')
@@ -348,19 +418,23 @@ const shortDate = (date: Date) =>
   new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date)
 
 /** Estimasi produksi dari Pengaturan → Produksi, ditulis satu kalimat untuk AI. */
-export function renderProductionEstimate(policy: {
-  rules: Record<
-    string,
-    {
-      enabled: boolean
-      minDays: number | null
-      maxDays: number | null
-      estimateDays: number | null
-      dayType: string
-      startsAfter: string
-    }
-  >
-}, now: Date = new Date(), store = '') {
+export function renderProductionEstimate(
+  policy: {
+    rules: Record<
+      string,
+      {
+        enabled: boolean
+        minDays: number | null
+        maxDays: number | null
+        estimateDays: number | null
+        dayType: string
+        startsAfter: string
+      }
+    >
+  },
+  now: Date = new Date(),
+  store = ''
+) {
   const closedDays = closedDaysFromStore(store)
   const holiday = /^LIBUR:/m.test(store)
   const label: Record<string, string> = {
@@ -395,6 +469,9 @@ export function renderProductionEstimate(policy: {
   }
   if (!lines.length)
     return 'ESTIMASI PRODUKSI: belum diatur pemilik. Kalau ditanya lama pengerjaan: "nanti saya konfirmasi ke bagian produksi ya bos", jangan menyebut angka.'
-  if (holiday) lines.push('Toko sedang LIBUR (lihat TOKO): tanggal siap kirim bisa mundur — permintaan tanggal kirim ditanyakan ke tim.')
+  if (holiday)
+    lines.push(
+      'Toko sedang LIBUR (lihat TOKO): tanggal siap kirim bisa mundur — permintaan tanggal kirim ditanyakan ke tim.'
+    )
   return `ESTIMASI PRODUKSI (dari pengaturan pemilik; sebut sebagai perkiraan, bukan janji tanggal):\n${lines.join('\n')}`
 }

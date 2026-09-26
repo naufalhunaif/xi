@@ -643,6 +643,7 @@
       @elseif(page === 'directory')
         @include('partials/contact_directory')
       @else
+        <div class="wa-settings-wrap">
         <section id="settings" class="wa-settings-page">
           <div class="wa-settings-header">
             <h1 class="wa-settings-heading" data-i18n="Pengaturan">Pengaturan</h1>
@@ -830,6 +831,8 @@
             </div>
           </div>
         </section>
+        @include('partials/ai_orchestra')
+        </div>
       @end
     </main>
   </div>

@@ -1,0 +1,17 @@
+{{-- Orkestra AI: akun yang sedang bekerja menyala, perpindahan akun terlihat langsung. --}}
+<aside id="aiOrchestra" class="wa-orchestra" aria-labelledby="aiOrchestraTitle">
+  <div class="wa-orchestra-head">
+    <strong id="aiOrchestraTitle" data-i18n="Orkestra AI">Orkestra AI</strong>
+    <small id="aiOrchestraNow" aria-live="polite"></small>
+  </div>
+  <div class="wa-orchestra-stage">
+    <svg id="aiOrchestraGraph" viewBox="-180 -180 360 360" role="img" aria-label="Peta akun AI" data-i18n-aria-label="Peta akun AI"></svg>
+    <div id="aiOrchestraTip" class="wa-orchestra-tip" hidden></div>
+  </div>
+  <div class="wa-orchestra-legend" aria-hidden="true">
+    <span><i class="dot chatgpt"></i>ChatGPT</span>
+    <span><i class="dot claude"></i>Claude</span>
+    <span><i class="dot gemini"></i>Gemini</span>
+  </div>
+  <ol id="aiOrchestraLog" class="wa-orchestra-log" aria-label="Aktivitas AI terbaru" data-i18n-aria-label="Aktivitas AI terbaru"></ol>
+</aside>

@@ -5,6 +5,8 @@ import { withAiAccount } from '#services/ai_account_context'
 import {
   AI_ACCOUNT_PROVIDERS,
   aiAccountRef,
+  busyAiAccounts,
+  recentAiEvents,
   createAiAccount,
   deleteAiAccount,
   listAiAccounts,
@@ -61,6 +63,31 @@ export default class AiAccountsController {
     const accounts = await listAiAccounts()
     const states = await Promise.all(accounts.map((a) => connected(a).catch(() => false)))
     return response.json({ accounts: accounts.map((a, i) => view(a, states[i])) })
+  }
+
+  /** Data ringan untuk visual orkestra: tanpa cek login (tidak memanggil CLI). */
+  async orchestra({ request, response }: HttpContext) {
+    response.header('Cache-Control', 'no-store')
+    const after = Math.max(0, Number(request.input('after', 0)) || 0)
+    const [accounts, events, busy] = await Promise.all([
+      listAiAccounts(),
+      recentAiEvents(after),
+      busyAiAccounts(),
+    ])
+    const now = Date.now()
+    return response.json({
+      now,
+      busy,
+      events,
+      accounts: accounts.map((a) => ({
+        id: a.id,
+        provider: a.provider,
+        name: a.label || `${NAMES[a.provider]}${a.legacy ? ' utama' : ` #${a.id}`}`,
+        enabled: a.enabled,
+        limitedUntil: a.limitedUntil > now ? a.limitedUntil : 0,
+        lastUsedAt: a.lastUsedAt ? a.lastUsedAt.getTime() : 0,
+      })),
+    })
   }
 
   async store({ request, response }: HttpContext) {
