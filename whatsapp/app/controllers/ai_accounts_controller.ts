@@ -41,6 +41,13 @@ async function connected(account: AiAccount) {
   )
 }
 
+/** AI boleh aktif selama ada minimal satu akun AI yang aktif dan tersambung, apa pun jenisnya. */
+export async function anyAiAccountReady() {
+  const accounts = (await listAiAccounts()).filter((account) => account.enabled)
+  for (const account of accounts) if (await connected(account).catch(() => false)) return true
+  return false
+}
+
 function view(account: AiAccount, isConnected: boolean, now = Date.now()) {
   return {
     id: account.id,

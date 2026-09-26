@@ -27,14 +27,12 @@ import {
 } from '#services/settings_service'
 import {
   codexBinaryStatus,
-  isChatgptConnected,
   oauthState,
   startOAuthLogin,
 } from '#services/codex_oauth_service'
 import {
   claudeBinaryStatus,
   claudeOAuthState,
-  isClaudeConnected,
   startClaudeOAuthLogin,
   verifyClaudeOAuthLogin,
 } from '#services/claude_oauth_service'
@@ -623,13 +621,10 @@ export default class DashboardController {
         enabled === true &&
         (request.input('aiEnabled') === true || request.input('aiProvider') !== undefined)
       ) {
-        const provider =
-          request.input('aiProvider', current.aiProvider) === 'claude' ? 'claude' : 'chatgpt'
-        const connected =
-          provider === 'claude' ? await isClaudeConnected() : await isChatgptConnected()
-        if (!connected) {
+        const { anyAiAccountReady } = await import('#controllers/ai_accounts_controller')
+        if (!(await anyAiAccountReady())) {
           return response.unprocessableEntity({
-            error: `Hubungkan ${provider === 'claude' ? 'Claude' : 'ChatGPT'} OAuth.`,
+            error: 'Tambahkan minimal satu akun AI di Pengaturan → AI.',
           })
         }
       }

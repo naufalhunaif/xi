@@ -685,6 +685,7 @@ window.waLocales.id = {
   "Mengunduh…": "Mengunduh…",
   "Gagal dimuat": "Gagal dimuat",
   "Media lama": "Media lama",
+  "Tambahkan minimal satu akun AI di Pengaturan → AI.": "Tambahkan minimal satu akun AI di Pengaturan → AI.",
   "Pesan suara": "Pesan suara",
   "Lokasi": "Lokasi",
   "Lampirkan file": "Lampirkan file",

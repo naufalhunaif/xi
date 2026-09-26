@@ -685,6 +685,7 @@ window.waLocales.en = {
   "Mengunduh…": "Downloading…",
   "Gagal dimuat": "Failed to load",
   "Media lama": "Older media",
+  "Tambahkan minimal satu akun AI di Pengaturan → AI.": "Add at least one AI account in Settings → AI.",
   "Pesan suara": "Voice note",
   "Lokasi": "Location",
   "Lampirkan file": "Attach a file",
