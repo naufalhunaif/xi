@@ -331,6 +331,11 @@ export async function saveSettings(input: Record<string, unknown>) {
       }
     }
   })
+  if (values.ai_provider && values.ai_provider !== current.aiProvider) {
+    // Mesin utama berganti → akun utamanya naik ke urutan pertama.
+    const { promoteLegacyAiAccount } = await import('#services/ai_accounts')
+    await promoteLegacyAiAccount(values.ai_provider as 'chatgpt' | 'claude').catch(() => {})
+  }
   if (aiEnabled && !current.aiEnabled) {
     await requestRecentAiReviews(
       'enabled',

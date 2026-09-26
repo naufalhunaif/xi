@@ -1,6 +1,6 @@
 // Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
 import { spawn } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import env from '#start/env'
@@ -10,6 +10,16 @@ import { codexPerformanceArgs, claudePerformanceArgs } from '#services/ai_runtim
 import { observeProviderProcess } from '#services/provider_process_diagnostics'
 import { recordUsage, usageFromEvent, type TokenUsage } from '#services/usage_service'
 import { LEAN_OUTPUT_SCHEMA } from '#beta3/prompt'
+import { withAiAccount } from '#services/ai_account_context'
+import {
+  aiAccountRef,
+  markAiAccountLimited,
+  markAiAccountUsed,
+  nextAiRecovery,
+  usableAiAccounts,
+  type AiProviderName,
+} from '#services/ai_accounts'
+import { AiProcessFailure, aiFailureDetail } from '#services/ai_failure_service'
 
 /**
  * Pemanggil AI jalur ramping: satu proses CLI (Codex/Claude OAuth yang sama),
@@ -31,12 +41,20 @@ export type LeanProviderResult = {
   text: string
   usage: TokenUsage | null
   durationMs: number
-  provider: 'chatgpt' | 'claude'
+  provider: AiProviderName
   model: string
 }
 
 const TIMEOUT_MS = 120_000
+export const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 
+/** Kegagalan yang berarti akun ini tidak bisa melayani sekarang → coba akun berikutnya. */
+const SWITCHABLE = new Set(['USAGE_LIMIT', 'ACCESS_DENIED', 'AI_AUTH_REQUIRED'])
+
+/**
+ * Banyak akun AI: dicoba sesuai urutan di Pengaturan → AI. Akun yang habis kuota
+ * atau perlu login dijeda sementara, lalu otomatis dipakai lagi setelah pulih.
+ */
 export async function runLeanProvider(
   settings: LeanProviderSettings,
   prompt: { system: string; user: string },
@@ -44,8 +62,73 @@ export async function runLeanProvider(
   phase = 'beta3-reply',
   schema: Record<string, unknown> = LEAN_OUTPUT_SCHEMA
 ): Promise<LeanProviderResult> {
-  const provider = settings.aiProvider === 'claude' ? 'claude' : 'chatgpt'
-  const model = provider === 'claude' ? settings.claudeModel : settings.chatgptModel
+  const accounts = await usableAiAccounts().catch(() => null)
+  if (!accounts) return runLeanOnce(settings, settings.aiProvider, {}, prompt, imagePaths, phase, schema)
+  if (!accounts.length) {
+    const recovery = await nextAiRecovery().catch(() => 0)
+    throw new AiProcessFailure({
+      stage: 'provider',
+      code: 'USAGE_LIMIT',
+      message: recovery
+        ? `Semua akun AI sedang jeda sampai ${new Date(recovery).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' })}.`
+        : 'Belum ada akun AI yang aktif.',
+      action: 'Tambah atau aktifkan akun di Pengaturan → AI.',
+      retryable: true,
+    })
+  }
+  let lastError: unknown
+  for (const account of accounts) {
+    try {
+      const result = await withAiAccount(aiAccountRef(account), () =>
+        runLeanOnce(
+          settings,
+          account.provider,
+          { model: account.model, apiKey: account.apiKey },
+          prompt,
+          imagePaths,
+          phase,
+          schema
+        )
+      )
+      await markAiAccountUsed(account.id).catch(() => {})
+      return result
+    } catch (error) {
+      const detail = aiFailureDetail(error, {
+        stage: 'provider',
+        provider: account.provider === 'claude' ? 'claude' : 'chatgpt',
+      })
+      if (!SWITCHABLE.has(detail.code)) throw error
+      await markAiAccountLimited(account.id, detail.code, detail.message).catch(() => {})
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
+async function runLeanOnce(
+  settings: LeanProviderSettings,
+  providerName: AiProviderName,
+  account: { model?: string; apiKey?: string },
+  prompt: { system: string; user: string },
+  imagePaths: string[],
+  phase: string,
+  schema: Record<string, unknown>
+): Promise<LeanProviderResult> {
+  const provider: AiProviderName =
+    providerName === 'claude' ? 'claude' : providerName === 'gemini' ? 'gemini' : 'chatgpt'
+  const model =
+    account.model ||
+    (provider === 'claude'
+      ? settings.claudeModel
+      : provider === 'gemini'
+        ? GEMINI_DEFAULT_MODEL
+        : settings.chatgptModel)
+  const tuned =
+    provider === 'claude'
+      ? { ...settings, claudeModel: model }
+      : provider === 'chatgpt'
+        ? { ...settings, chatgptModel: model }
+        : settings
   const workingDirectory = await mkdtemp(join(tmpdir(), 'wa-lean-'))
   const started = Date.now()
   let usage: TokenUsage | null = null
@@ -65,8 +148,10 @@ export async function runLeanProvider(
     }
     const text =
       provider === 'claude'
-        ? await runClaudeLean(settings, prompt, workingDirectory, schemaPath, imagePaths, observe)
-        : await runCodexLean(settings, prompt, workingDirectory, schemaPath, imagePaths, observe)
+        ? await runClaudeLean(tuned, prompt, workingDirectory, schema, imagePaths, observe)
+        : provider === 'gemini'
+          ? await runGeminiLean(model, account.apiKey || '', prompt, schema, imagePaths, observe)
+          : await runCodexLean(tuned, prompt, workingDirectory, schemaPath, imagePaths, observe)
     status = 'completed'
     return { text, usage, durationMs: Date.now() - started, provider, model }
   } finally {
@@ -209,13 +294,13 @@ async function runClaudeLean(
   settings: LeanProviderSettings,
   prompt: { system: string; user: string },
   workingDirectory: string,
-  schemaPath: string,
+  outputSchema: Record<string, unknown>,
   imagePaths: string[],
   onEvent: (event: Record<string, any>) => void
 ) {
   const executable = await claudeBinary(settings.claudeBin)
-  const schema = JSON.stringify(LEAN_OUTPUT_SCHEMA)
-  void schemaPath
+  // Skema sesuai pemanggil (balasan, rekap, dll.), bukan selalu skema balasan.
+  const schema = JSON.stringify(outputSchema)
   const user = imagePaths.length
     ? `${prompt.user}\n\nLampiran gambar pelanggan (baca dengan tool Read):\n${imagePaths.map((path, index) => `${index + 1}. ${path}`).join('\n')}`
     : prompt.user
@@ -260,4 +345,91 @@ async function runClaudeLean(
         : String(event.result || '')
       : undefined
   )
+}
+
+/** Gemini lewat API key (Google AI Studio). Satu panggilan HTTP, keluaran JSON. */
+async function runGeminiLean(
+  model: string,
+  apiKey: string,
+  prompt: { system: string; user: string },
+  schema: Record<string, unknown>,
+  imagePaths: string[],
+  onEvent: (event: Record<string, any>) => void
+) {
+  if (!apiKey) throw new AiProcessFailure({
+    stage: 'provider',
+    code: 'AI_AUTH_REQUIRED',
+    message: 'API key Gemini belum diisi.',
+    action: 'Isi API key di Pengaturan → AI.',
+    retryable: false,
+  })
+  const images: Array<Record<string, unknown>> = []
+  for (const path of imagePaths.slice(0, 4)) {
+    const data = await readFile(path).catch(() => null)
+    if (!data) continue
+    const mime = /\.png$/i.test(path) ? 'image/png' : /\.webp$/i.test(path) ? 'image/webp' : 'image/jpeg'
+    images.push({ inline_data: { mime_type: mime, data: data.toString('base64') } })
+  }
+  const call = async (withSchema: boolean) => {
+    const body = {
+      system_instruction: {
+        parts: [
+          {
+            text: withSchema
+              ? prompt.system
+              : `${prompt.system}\n\nBalas HANYA dengan satu objek JSON sesuai skema berikut:\n${JSON.stringify(schema)}`,
+          },
+        ],
+      },
+      contents: [{ role: 'user', parts: [{ text: prompt.user }, ...images] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        ...(withSchema ? { responseJsonSchema: schema } : {}),
+      },
+    }
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      }
+    )
+    const data = (await response.json().catch(() => ({}))) as any
+    return { response, data }
+  }
+  let { response, data } = await call(true)
+  // Versi API/model lama belum mendukung skema JSON → ulangi dengan skema di instruksi.
+  if (response.status === 400 && /schema|responseJsonSchema/i.test(JSON.stringify(data?.error || '')))
+    ({ response, data } = await call(false))
+  if (!response.ok) {
+    const message = String(data?.error?.message || `HTTP ${response.status}`).slice(0, 300)
+    if (response.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(message))
+      throw new Error(`Gemini: usage limit — ${message}`)
+    if (response.status === 401 || response.status === 403)
+      throw new AiProcessFailure({
+        stage: 'provider',
+        code: 'AI_AUTH_REQUIRED',
+        message: 'API key Gemini ditolak.',
+        action: 'Periksa API key di Pengaturan → AI.',
+        retryable: false,
+      })
+    throw new Error(`Gemini: ${message}`)
+  }
+  const meta = data?.usageMetadata || {}
+  onEvent({
+    type: 'gemini.usage',
+    usage: {
+      input: Number(meta.promptTokenCount || 0),
+      output: Number(meta.candidatesTokenCount || 0) + Number(meta.thoughtsTokenCount || 0),
+      cached: Number(meta.cachedContentTokenCount || 0),
+    },
+  })
+  const text = (data?.candidates?.[0]?.content?.parts || [])
+    .map((part: any) => String(part?.text || ''))
+    .join('')
+    .trim()
+  if (!text) throw new Error('Gemini tidak menghasilkan balasan.')
+  return text
 }

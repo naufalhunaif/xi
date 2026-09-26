@@ -19,19 +19,38 @@
     <option value="claude" {{ settings.aiProvider === 'claude' ? 'selected' : '' }}>Claude</option>
   </select>
 </label>
-<label class="wa-toggle-row">
-  <span data-i18n="Alih otomatis saat kuota habis">Alih otomatis saat kuota habis</span>
-  <button
-    name="aiFailover"
-    class="wa-switch"
-    type="button"
-    role="switch"
-    aria-label="Alih otomatis saat kuota habis"
-    aria-checked="{{ settings.aiFailover ? 'true' : 'false' }}"
-    value="{{ settings.aiFailover ? 'true' : 'false' }}"
-   data-i18n-aria-label="Alih otomatis saat kuota habis"></button>
-</label>
-<small class="wa-muted" data-i18n="Saat mesin terpilih menolak karena batas pemakaian, giliran itu dijalankan ulang pada mesin satunya. Mesin cadangan harus sudah login dan punya akses MCP sendiri.">Saat mesin terpilih menolak karena batas pemakaian, giliran itu dijalankan ulang pada mesin satunya. Mesin cadangan harus sudah login dan punya akses MCP sendiri.</small>
+<div class="wa-card" id="aiAccountsCard">
+  <div class="wa-card-head">
+    <div class="wa-card-title">
+      <strong data-i18n="Akun AI & urutan cadangan">Akun AI & urutan cadangan</strong>
+      <small data-i18n="Dipakai dari atas. Jika satu akun habis kuota atau perlu login, AI otomatis pindah ke akun berikutnya dan kembali setelah pulih.">Dipakai dari atas. Jika satu akun habis kuota atau perlu login, AI otomatis pindah ke akun berikutnya dan kembali setelah pulih.</small>
+    </div>
+  </div>
+  <div class="wa-kv" id="aiAccountsList"></div>
+  <div class="wa-form-grid">
+    <label>
+      <span data-i18n="Tambah akun">Tambah akun</span>
+      <select id="aiAccountProvider">
+        <option value="chatgpt">ChatGPT</option>
+        <option value="claude">Claude</option>
+        <option value="gemini">Gemini</option>
+      </select>
+    </label>
+    <label>
+      <span data-i18n="Nama (opsional)">Nama (opsional)</span>
+      <input id="aiAccountLabel" type="text" maxlength="80" autocomplete="off" placeholder="mis. Akun kantor" data-i18n-placeholder="mis. Akun kantor" />
+    </label>
+    <label class="wa-span-full" id="aiAccountKeyField" hidden>
+      <span data-i18n="API key Gemini">API key Gemini</span>
+      <input id="aiAccountKey" type="password" autocomplete="off" spellcheck="false" />
+      <small class="wa-note"><span data-i18n="Buat API key di">Buat API key di</span> <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a></small>
+    </label>
+    <div class="actions wa-actions-start wa-span-full">
+      <button id="aiAccountAdd" type="button" class="button primary" data-i18n="Tambah akun">Tambah akun</button>
+      <small id="aiAccountsStatus" role="status" aria-live="polite"></small>
+    </div>
+  </div>
+</div>
 <div
   class="wa-ai-provider"
   data-ai-provider-panel="chatgpt"

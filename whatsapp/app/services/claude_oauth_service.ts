@@ -6,6 +6,7 @@ import env from '#start/env'
 import { readSettings } from '#services/settings_service'
 import { workspaceOAuthDirectory } from '#services/workspace_oauth'
 import { workspaceScope } from '#services/workspace_context'
+import { aiAccountKey } from '#services/ai_account_context'
 import { randomUUID } from 'node:crypto'
 import { writeClaudeVerification } from '#services/oauth_verification'
 import { resetQuota } from '#services/ai_quota_store'
@@ -33,7 +34,7 @@ const logins = new Map<
   }
 >()
 function loginState() {
-  const key = workspaceScope().prefix
+  const key = aiAccountKey(workspaceScope().prefix)
   if (!logins.has(key))
     logins.set(key, {
       loginOutput: '',

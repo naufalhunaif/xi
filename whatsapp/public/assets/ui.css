@@ -194,3 +194,9 @@ html[data-theme='dark'] .workspace-ui {
 .workspace-ui .wa-kv-row .actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .workspace-ui .wa-line-qr { width: 220px; height: 220px; margin: 8px 0; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid var(--line); }
 .workspace-ui .wa-line-chip { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; background: var(--wa-subtle); color: var(--muted); font-size: 9px; font-weight: 600; vertical-align: 1px; }
+
+/* Akun AI: login per akun di bawah barisnya. */
+.workspace-ui #aiAccountsCard [hidden] { display: none !important; }
+.workspace-ui .wa-ai-login { display: grid; gap: 8px; justify-items: start; padding: 8px 0 10px; }
+.workspace-ui .wa-ai-login input { max-width: 260px; }
+.workspace-ui .wa-ai-code { font-size: 18px; font-weight: 600; letter-spacing: 2px; }

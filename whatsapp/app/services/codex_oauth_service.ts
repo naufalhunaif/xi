@@ -9,6 +9,7 @@ import {
   codexCommand,
 } from '#services/workspace_oauth'
 import { workspaceScope } from '#services/workspace_context'
+import { aiAccountKey } from '#services/ai_account_context'
 import { watchDeviceLogin } from '#services/codex_device_login'
 import { resetQuota } from '#services/ai_quota_store'
 
@@ -29,7 +30,7 @@ const logins = new Map<
   }
 >()
 function loginState() {
-  const key = workspaceScope().prefix
+  const key = aiAccountKey(workspaceScope().prefix)
   if (!logins.has(key)) logins.set(key, {})
   return logins.get(key)!
 }
@@ -117,7 +118,7 @@ export async function oauthState() {
 
 const starts = new Map<string, Promise<LoginState>>()
 export async function startOAuthLogin(restart = false) {
-  const key = workspaceScope().prefix
+  const key = aiAccountKey(workspaceScope().prefix)
   const existing = starts.get(key)
   if (existing) return existing
   const operation = beginOAuthLogin(restart)

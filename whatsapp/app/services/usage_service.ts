@@ -13,6 +13,15 @@ function tokens(value: unknown) {
  * back is a different problem from not caching at all, and needs a different fix.
  */
 export function usageFromEvent(provider: string, event: Record<string, any>): TokenUsage | null {
+  if (event.type === 'gemini.usage') {
+    const usage = event.usage || {}
+    return {
+      input: tokens(usage.input),
+      output: tokens(usage.output),
+      cached: tokens(usage.cached),
+      cacheWrite: 0,
+    }
+  }
   if (event.type !== (provider === 'claude' ? 'result' : 'turn.completed')) return null
   const usage = event.usage
   if (!usage || typeof usage.input_tokens !== 'number' || typeof usage.output_tokens !== 'number')
