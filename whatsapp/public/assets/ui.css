@@ -319,3 +319,9 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-ai-spread > span { font-size: 12px; color: var(--text); }
 .workspace-ui .wa-ai-spread .wa-segmented { margin: 0; }
 .workspace-ui .wa-ai-spread .wa-note { grid-column: 1 / -1; }
+
+/* Akun AI: pilihan model per akun. */
+.workspace-ui .wa-ai-info { display: grid; gap: 3px; min-width: 0; }
+.workspace-ui .wa-ai-info .wa-ai-model { width: 100%; max-width: 230px; height: 28px; padding: 0 6px; font-size: 11px; }
+.workspace-ui .wa-ai-info small { font-size: 10.5px; color: var(--muted); overflow-wrap: anywhere; }
+.workspace-ui .wa-ai-info small.wa-ai-error { color: var(--wa-err); }

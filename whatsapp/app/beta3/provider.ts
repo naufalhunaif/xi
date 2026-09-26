@@ -49,6 +49,8 @@ export type LeanProviderResult = {
 const TIMEOUT_MS = 120_000
 // Alias selalu menunjuk Flash terbaru (model 2.5 kini tertutup untuk API key baru).
 export const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest'
+/** Cadangan saat model Gemini pilihan sedang penuh (dicoba berurutan, akun sama). */
+const GEMINI_FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-latest']
 
 /** Kegagalan yang berarti akun ini tidak bisa melayani sekarang → coba akun berikutnya. */
 const SWITCHABLE = new Set(['USAGE_LIMIT', 'ACCESS_DENIED', 'AI_AUTH_REQUIRED'])
@@ -292,7 +294,8 @@ function collect(
     observeProviderProcess(child, provider)
     child.stdout?.on('data', (chunk) => {
       output += String(chunk)
-      if (output.length > 500_000) {
+      // Satu baris bisa besar (hasil tool Read berisi gambar base64), jadi batasnya longgar.
+      if (output.length > 40_000_000) {
         child.kill('SIGKILL')
         finish(new Error('Respons AI terlalu besar.'))
         return
@@ -448,7 +451,7 @@ async function runGeminiLean(
     const mime = /\.png$/i.test(path) ? 'image/png' : /\.webp$/i.test(path) ? 'image/webp' : 'image/jpeg'
     images.push({ inline_data: { mime_type: mime, data: data.toString('base64') } })
   }
-  const call = async (withSchema: boolean) => {
+  const call = async (withSchema: boolean, useModel = model) => {
     const body = {
       system_instruction: {
         parts: [
@@ -468,7 +471,7 @@ async function runGeminiLean(
     let response: Response
     try {
       response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(useModel)}:generateContent`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -485,10 +488,21 @@ async function runGeminiLean(
     const data = (await response.json().catch(() => ({}))) as any
     return { response, data }
   }
+  let withSchema = true
   let { response, data } = await call(true)
   // Versi API/model lama belum mendukung skema JSON → ulangi dengan skema di instruksi.
-  if (response.status === 400 && /schema|responseJsonSchema/i.test(JSON.stringify(data?.error || '')))
-    ({ response, data } = await call(false))
+  if (response.status === 400 && /schema|responseJsonSchema/i.test(JSON.stringify(data?.error || ''))) {
+    withSchema = false
+    ;({ response, data } = await call(false))
+  }
+  // Model sedang penuh ("high demand"/503) → coba model Gemini lain yang lebih ringan dulu.
+  const busy = () =>
+    response.status === 503 ||
+    /high demand|overloaded|UNAVAILABLE|try again later/i.test(JSON.stringify(data?.error || ''))
+  for (const fallback of GEMINI_FALLBACK_MODELS) {
+    if (!busy() || fallback === model) continue
+    ;({ response, data } = await call(withSchema, fallback))
+  }
   if (!response.ok) {
     const message = String(data?.error?.message || `HTTP ${response.status}`).slice(0, 300)
     if (response.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(message))

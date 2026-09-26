@@ -1227,4 +1227,10 @@ window.waLocales.en = {
   "Akun paling atas selalu dipakai dulu; akun di bawahnya jadi cadangan saat habis.": "The top account is always used first; accounts below are backups when it runs out.",
   "{0} token / 5 jam": "{0} tokens / 5 h",
   "{0} token dalam 5 jam": "{0} tokens in 5 hours",
+  "Model {0}": "Model {0}",
+  "Otomatis (Flash terbaru)": "Auto (latest Flash)",
+  "Model otomatis": "Automatic model",
+  "ID model untuk {0}": "Model ID for {0}",
+  "Model {0}: {1}": "Model {0}: {1}",
+  "otomatis": "automatic",
 }

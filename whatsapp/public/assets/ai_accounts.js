@@ -148,7 +148,11 @@
       const usage = tokens
         ? t('{0} token / 5 jam', tokens >= 1000 ? `${(tokens / 1000).toFixed(tokens >= 100000 ? 0 : 1)}rb` : String(tokens))
         : ''
-      const info = el('code', '', [usage, account.lastError || account.model || ''].filter(Boolean).join(' · '))
+      // Model per akun: tiap akun boleh memakai model berbeda.
+      const info = el('div', 'wa-ai-info')
+      info.append(modelPicker(account))
+      const note = [usage, account.lastError || ''].filter(Boolean).join(' · ')
+      if (note) info.append(el('small', account.lastError ? 'wa-ai-error' : '', note))
       const side = el('div', 'actions')
       side.append(el('span', `wa-pill ${tone}`, label))
       const holder = el('div', 'wa-span-full')
@@ -224,6 +228,40 @@
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', end)
     window.addEventListener('pointercancel', end)
+  }
+
+  const MODELS = {
+    chatgpt: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5'],
+    claude: ['opus', 'sonnet', 'haiku'],
+    gemini: ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'],
+  }
+  function modelPicker(account) {
+    const select = el('select', 'wa-ai-model')
+    select.setAttribute('aria-label', t('Model {0}', account.name))
+    const options = [...(MODELS[account.provider] || [])]
+    if (account.model && !options.includes(account.model)) options.push(account.model)
+    select.append(new Option(account.provider === 'gemini' ? t('Otomatis (Flash terbaru)') : t('Model otomatis'), ''))
+    for (const model of options) select.append(new Option(model, model))
+    select.append(new Option(t('Model lainnya…'), '__custom__'))
+    select.value = account.model || ''
+    select.addEventListener('change', async () => {
+      let model = select.value
+      if (model === '__custom__') {
+        model = (window.prompt(t('ID model untuk {0}', account.name), account.model || '') || '').trim()
+        if (!model) {
+          select.value = account.model || ''
+          return
+        }
+      }
+      try {
+        await call(`/api/ai/accounts/${account.id}/update`, 'POST', { model, resume: true })
+        status(t('Model {0}: {1}', account.name, model || t('otomatis')))
+      } catch (error) {
+        status(error.message)
+      }
+      refresh()
+    })
+    return select
   }
 
   // Berurutan = akun atas dipakai dulu, bawah jadi cadangan. Merata = token 5 jam terakhir paling sedikit didahulukan.

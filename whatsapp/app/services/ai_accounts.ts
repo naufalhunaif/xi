@@ -232,9 +232,63 @@ const cooldownMs = (code: string) =>
       ? 30 * 60_000
       : 5 * 60_000
 
+/** Menit sampai jam tertentu (di zona waktu tertentu bila disebut) berikutnya. */
+function untilClock(hour: number, minute: number, timeZone: string | undefined, now: number) {
+  let parts: Record<string, number> = {}
+  try {
+    parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date(now))
+        .filter((p) => p.type === 'hour' || p.type === 'minute')
+        .map((p) => [p.type, Number(p.value)])
+    )
+  } catch {
+    const d = new Date(now)
+    parts = { hour: d.getHours(), minute: d.getMinutes() }
+  }
+  let minutes = hour * 60 + minute - (parts.hour * 60 + parts.minute)
+  if (minutes <= 0) minutes += 1440
+  return now + minutes * 60_000
+}
+
+/**
+ * Waktu pulih dari pesan layanan: "try again at 11:42 PM", "resets 5pm (Asia/Jakarta)",
+ * "try again in 2 days 3 hours", "retry in 41s", "...limit reached|1759999999".
+ */
+export function resetFromMessage(message: string, now = Date.now()): number | null {
+  const text = String(message || '')
+  const epoch = text.match(/\|(\d{10})\b/)
+  if (epoch) return Number(epoch[1]) * 1000
+  const tz = text.match(/\(([A-Za-z]+\/[A-Za-z_]+)\)/)?.[1]
+  const clock = text.match(/(?:try again at|resets?(?: at)?|reset at)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i)
+  if (clock) {
+    let hour = Number(clock[1]) % 24
+    const minute = Number(clock[2] || 0)
+    const meridiem = clock[3]?.toLowerCase()
+    if (meridiem === 'pm' && hour < 12) hour += 12
+    if (meridiem === 'am' && hour === 12) hour = 0
+    return untilClock(hour, minute, tz, now)
+  }
+  const span = text.match(/(?:try again|retry|resets?)\s+in\s+(\d[\d\sa-z.,]*)/i)?.[1]
+  if (span) {
+    const unit = (re: RegExp) => Number(span.match(re)?.[1] || 0)
+    const ms =
+      unit(/(\d+(?:\.\d+)?)\s*(?:days?|d)\b/i) * 86_400_000 +
+      unit(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b/i) * 3_600_000 +
+      unit(/(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)\b/i) * 60_000 +
+      unit(/(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s)\b/i) * 1000
+    if (ms > 0) return now + ms
+  }
+  return null
+}
+
 export async function markAiAccountLimited(id: number, code: string, message: string, now = Date.now()) {
+  // Kuota habis: pakai waktu pulih yang disebut layanan (1 menit – 7 hari), bila ada.
+  const reset = code === 'USAGE_LIMIT' ? resetFromMessage(message, now) : null
+  const until =
+    reset && reset > now + 30_000 && reset < now + 7 * 86_400_000 ? reset + 60_000 : now + cooldownMs(code)
   await updateAiAccount(id, {
-    limited_until: now + cooldownMs(code),
+    limited_until: until,
     limited_code: code.slice(0, 64),
     last_error: message.slice(0, 290),
   })
