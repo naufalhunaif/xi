@@ -49,6 +49,7 @@ import {
 } from '#beta3/mcp'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { saveAiRefs } from '#beta3/refs_service'
+import { collectContext } from '#beta3/context_service'
 
 /**
  * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
@@ -490,6 +491,7 @@ export async function createLeanReply(input: {
     chatNote,
     spec,
     history: rows,
+    context: collectContext({ history: rows, catalog: digest.rows, text: input.text }),
     message: `${replyContext(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
     production: settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : '',
