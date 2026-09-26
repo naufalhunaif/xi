@@ -815,9 +815,9 @@ export default class WhatsappListen extends BaseCommand {
       const auth = await databaseAuthState(currentLine())
       // Sebelum terhubung, error Baileys dicatat agar penyebab gagal konek terlihat di log.
       const logger = pino({ level: this.verbose ? 'info' : 'error' })
-      // Variasi bila gagal berulang: versi WA Web terbaru/bawaan × perangkat Desktop/Chrome.
-      const variant = this.connectVariant % 4
-      const version = variant % 2 === 0 ? await latestWaVersion() : undefined
+      // Bila gagal berulang: bergantian versi WA Web terbaru / bawaan Baileys.
+      const variant = this.connectVariant % 2
+      const version = variant === 0 ? await latestWaVersion() : undefined
       const registered = Boolean(auth.state.creds.registered || auth.state.creds.me)
       const socket = workspaceSocket(
         makeWASocket({
@@ -828,8 +828,8 @@ export default class WhatsappListen extends BaseCommand {
           },
           logger,
           markOnlineOnConnect: false,
-          // Riwayat lengkap hanya dikirim WhatsApp ke perangkat "desktop" saat QR di-scan.
-          browser: variant < 2 ? Browsers.macOS('Desktop') : Browsers.macOS('Chrome'),
+          // Perangkat "Desktop" kini ditolak WhatsApp sebelum QR muncul (kode 428) → pakai Chrome.
+          browser: Browsers.macOS('Chrome'),
           syncFullHistory: true,
           shouldSyncHistoryMessage: () => true,
           generateHighQualityLinkPreview: false,
@@ -932,7 +932,8 @@ export default class WhatsappListen extends BaseCommand {
             const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
             const reason = String((lastDisconnect?.error as any)?.message || '').slice(0, 200)
             const wasOpen = opened
-            if (!wasOpen && statusCode !== DisconnectReason.loggedOut) {
+            // 408 = QR kedaluwarsa tanpa di-scan: bukan kegagalan, langsung buat QR baru.
+            if (!wasOpen && statusCode !== DisconnectReason.loggedOut && statusCode !== 408) {
               this.connectFailures++
               if (this.connectFailures % 2 === 0) this.connectVariant++
               this.retryAt = Date.now() + Math.min(60_000, 3000 * 2 ** Math.min(this.connectFailures - 1, 5))
