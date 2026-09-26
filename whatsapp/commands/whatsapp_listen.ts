@@ -23,6 +23,7 @@ import db from '#services/workspace_database'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import makeWASocket, {
+  Browsers,
   DisconnectReason,
   downloadMediaMessage,
   makeCacheableSignalKeyStore,
@@ -635,7 +636,9 @@ export default class WhatsappListen extends BaseCommand {
           },
           logger,
           markOnlineOnConnect: false,
-          syncFullHistory: false,
+          // Riwayat lengkap hanya dikirim WhatsApp ke perangkat "desktop" saat QR di-scan.
+          browser: Browsers.macOS('Desktop'),
+          syncFullHistory: true,
           shouldSyncHistoryMessage: () => true,
           generateHighQualityLinkPreview: false,
         })
@@ -1031,6 +1034,9 @@ export default class WhatsappListen extends BaseCommand {
       .orderBy('id', 'desc')
       .first()
     const createdAt = this.messageDate(message)
+    // Riwayat lama: cukup teks + thumbnail. Media lama umumnya sudah kedaluwarsa di
+    // server WhatsApp dan mengunduhnya satu per satu membuat sinkron sangat lambat.
+    const downloadable = Boolean(media?.visual) && Date.now() - createdAt.getTime() < 3 * 86_400_000
     await db.table('whatsapp_messages').insert({
       message_id: id,
       jid,
@@ -1042,14 +1048,14 @@ export default class WhatsappListen extends BaseCommand {
       media_url: null,
       thumbnail_url: media?.thumbnailUrl || null,
       media_mime: media?.mediaMime || null,
-      media_status: media?.visual ? 'downloading' : null,
+      media_status: media?.visual ? (downloadable ? 'downloading' : 'failed') : null,
       reply_to_message_id: this.replyIdOf(message) || null,
       status: message.key.fromMe ? 'sent' : 'received',
       created_at: createdAt,
     })
     void this.rememberContact(jid, message.pushName || '').catch(() => {})
     // Chat/thumbnail is already available; downloads must not block the next message.
-    const mediaDownload = media?.visual
+    const mediaDownload = downloadable && media
       ? this.downloadMedia(message, media).catch(async () => {
           await this.retainSyncFailure(message, 1)
           return null
