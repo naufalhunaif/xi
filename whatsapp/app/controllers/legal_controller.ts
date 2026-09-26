@@ -35,14 +35,7 @@ small{display:block;margin-top:18px;color:var(--muted);font-size:12px}
 export function landingPage(_host = '') {
   return shell(
     'Chat',
-    `<h1>Layanan pelanggan toko</h1>
-<p>Aplikasi internal untuk tim toko.</p>
-<ul>
-<li>Balas chat pelanggan dengan bantuan AI</li>
-<li>Catat pesanan, ongkir, dan pembayaran</li>
-<li>Backup data ke Google Drive pemilik toko</li>
-</ul>
-<a class="button" href="/login">Masuk</a>`
+    `<a class="button" href="/login">Login</a>`
   )
 }
 
