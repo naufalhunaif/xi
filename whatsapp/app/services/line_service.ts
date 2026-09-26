@@ -1,4 +1,4 @@
-// Nomor WhatsApp tambahan (line ≥ 2). Tabel global: satu daftar untuk semua workspace.
+// Nomor tambahan (line ≥ 2). Tabel global: satu daftar untuk semua workspace.
 import { randomUUID } from 'node:crypto'
 import db from '#services/workspace_database'
 

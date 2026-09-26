@@ -37,7 +37,7 @@ export default class WorkspaceMiddleware {
       (mutation && !allowed && (!scope.id || expected !== scope.version))
     ) {
       return ctx.response.conflict({
-        error: 'Hubungkan nomor WhatsApp terlebih dahulu atau muat ulang halaman.',
+        error: 'Hubungkan nomor terlebih dahulu atau muat ulang halaman.',
         workspaceChanged: true,
       })
     }

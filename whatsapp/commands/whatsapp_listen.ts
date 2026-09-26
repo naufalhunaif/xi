@@ -939,7 +939,7 @@ export default class WhatsappListen extends BaseCommand {
               this.retryAt = Date.now() + Math.min(60_000, 3000 * 2 ** Math.min(this.connectFailures - 1, 5))
             }
             this.logger.error(
-              `Koneksi WhatsApp${this.primary ? '' : ` #${currentLine()}`} tertutup (kode ${statusCode ?? '-'}${reason ? `: ${reason}` : ''}; ${registered ? 'sesi lama' : 'sesi baru'}, percobaan ${this.connectFailures}, varian ${variant}).`
+              `Koneksi${this.primary ? '' : ` #${currentLine()}`} tertutup (kode ${statusCode ?? '-'}${reason ? `: ${reason}` : ''}; ${registered ? 'sesi lama' : 'sesi baru'}, percobaan ${this.connectFailures}, varian ${variant}).`
             )
             this.socket = undefined
             if (statusCode === DisconnectReason.loggedOut && !this.primary) {
@@ -1073,7 +1073,7 @@ export default class WhatsappListen extends BaseCommand {
       })
     } catch (error) {
       this.socket = undefined
-      this.logger.error(`Gagal memulai koneksi WhatsApp: ${error instanceof Error ? error.message : String(error)}`)
+      this.logger.error(`Gagal memulai koneksi nomor: ${error instanceof Error ? error.message : String(error)}`)
       await this.setState({
         status: 'error',
         last_error: error instanceof Error ? error.message : String(error),

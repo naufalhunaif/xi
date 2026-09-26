@@ -218,7 +218,7 @@ export default class AccountController {
     } catch {
       return response
         .status(503)
-        .send('Login belum berhasil. Buka kembali halaman login WhatsApp untuk mencoba lagi.')
+        .send('Login belum berhasil. Buka kembali halaman login untuk mencoba lagi.')
     }
   }
 

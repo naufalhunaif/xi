@@ -90,7 +90,7 @@ export class SharedMcpProvider implements OAuthClientProvider {
   }
   get clientMetadata() {
     return {
-      client_name: 'WhatsApp Workspace',
+      client_name: 'Chat Workspace',
       redirect_uris: [this.data.redirect],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],

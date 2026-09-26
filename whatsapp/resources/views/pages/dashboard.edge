@@ -1,8 +1,7 @@
 @layout({ appUrl, bundle })
   <aside class="sidebar" id="sidebar">
-    <a class="brand" href="{{ appUrl }}" aria-label="WhatsApp Workspace" title="WhatsApp Workspace">
-      <img class="brand-logo" src="{{ appUrl }}/assets/brand.svg" width="30" height="30" alt="" />
-      <span class="brand-name">WhatsApp<span class="workspace-label">Workspace</span></span>
+    <a class="brand" href="{{ appUrl }}" aria-label="Chat" title="Chat">
+      <svg class="brand-icon" viewBox="0 0 512 512" width="26" height="26" aria-hidden="true"><path d="M87.49 380c1.19-4.38-1.44-10.47-3.95-14.86a44.86 44.86 0 00-2.54-3.8 199.81 199.81 0 01-33-110C47.65 139.09 140.73 48 255.83 48 356.21 48 440 117.54 459.58 209.85a199 199 0 014.42 41.64c0 112.41-89.49 204.93-204.59 204.93-18.3 0-43-4.6-56.47-8.37s-26.92-8.77-30.39-10.11a31.09 31.09 0 00-11.12-2.07 30.71 30.71 0 00-12.09 2.43l-67.83 24.48a16 16 0 01-4.67 1.22 9.6 9.6 0 01-9.57-9.74 15.85 15.85 0 01.6-3.29z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32"/></svg>
     </a>
     <div class="nav-caption" data-i18n="PENGELOLAAN">PENGELOLAAN</div>
     <nav aria-label="Navigasi utama" data-i18n-aria-label="Navigasi utama">
@@ -112,9 +111,9 @@
             >
               <span class="app-launcher-icon">
                 <span class="icon">
-                  <img src="{{ appUrl }}/assets/bundle/icons/send-outline.svg" alt="" />
+                  <svg  viewBox="0 0 512 512" width="17" height="17" aria-hidden="true"><path d="M87.49 380c1.19-4.38-1.44-10.47-3.95-14.86a44.86 44.86 0 00-2.54-3.8 199.81 199.81 0 01-33-110C47.65 139.09 140.73 48 255.83 48 356.21 48 440 117.54 459.58 209.85a199 199 0 014.42 41.64c0 112.41-89.49 204.93-204.59 204.93-18.3 0-43-4.6-56.47-8.37s-26.92-8.77-30.39-10.11a31.09 31.09 0 00-11.12-2.07 30.71 30.71 0 00-12.09 2.43l-67.83 24.48a16 16 0 01-4.67 1.22 9.6 9.6 0 01-9.57-9.74 15.85 15.85 0 01.6-3.29z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32"/></svg>
                 </span>
-              </span><span>WhatsApp</span>
+              </span><span>Chat</span>
             </a>
             <a
               class="app-launcher-item app-launcher-account"
@@ -177,7 +176,7 @@
           <aside class="wa-panel wa-contact-panel">
             <div class="wa-inbox-heading">
               <strong>Chat</strong>
-              <a id="connectHint" class="wa-connect-hint" href="{{ appUrl }}/settings#numbers" hidden data-i18n="Hubungkan WhatsApp">Hubungkan WhatsApp</a>
+              <a id="connectHint" class="wa-connect-hint" href="{{ appUrl }}/settings#numbers" hidden data-i18n="Hubungkan nomor">Hubungkan nomor</a>
             </div>
 
             <div class="wa-inbox-search">
@@ -651,7 +650,7 @@
           </div>
           <div class="wa-settings-layout">
             <nav class="wa-settings-menu" aria-label="Menu pengaturan" data-i18n-aria-label="Menu pengaturan">
-              <a href="#numbers" data-settings-menu="numbers" data-i18n="Nomor WhatsApp">Nomor WhatsApp</a>
+              <a href="#numbers" data-settings-menu="numbers" data-i18n="Nomor">Nomor</a>
               <a href="#general" data-settings-menu="general" data-i18n="Umum">Umum</a>
               <a href="#ai" data-settings-menu="ai" aria-current="page">AI</a>
               <a href="#work-hours" data-settings-menu="work-hours" data-i18n="Jam kerja AI">Jam kerja AI</a>
@@ -674,7 +673,7 @@
                   <div class="wa-data-reset">
                     <div class="wa-data-reset-heading"><strong data-i18n="Reset data">Reset data</strong><span id="dataResetPhone">—</span></div>
                     <p data-i18n="Hapus percakapan, media, pesanan, pembayaran, saldo, alamat tersimpan, dan ingatan AI pada nomor aktif.">Hapus percakapan, media, pesanan, pembayaran, saldo, alamat tersimpan, dan ingatan AI pada nomor aktif.</p>
-                    <p data-i18n="Kontak dasar, skill, pengaturan, akun AI, dan koneksi WhatsApp tetap ada. Tidak menghapus data di Orion/MCP.">Kontak dasar, skill, pengaturan, akun AI, dan koneksi WhatsApp tetap ada. Tidak menghapus data di Orion/MCP.</p>
+                    <p data-i18n="Kontak dasar, skill, pengaturan, akun AI, dan koneksi nomor tetap ada. Tidak menghapus data di Orion/MCP.">Kontak dasar, skill, pengaturan, akun AI, dan koneksi nomor tetap ada. Tidak menghapus data di Orion/MCP.</p>
                     <strong class="wa-data-reset-warning" data-i18n="Permanen. Cadangkan data penting sebelum melanjutkan.">Permanen. Cadangkan data penting sebelum melanjutkan.</strong>
                     <button id="dataResetButton" type="button" class="button danger" disabled data-i18n="Hapus data & mulai dari nol">Hapus data & mulai dari nol</button>
                     <small id="dataResetStatus" role="status" aria-live="polite"></small>
@@ -728,7 +727,7 @@
                   @include('partials/settings/work_hours')
                 </section>
                 <section id="settings-numbers" data-settings-panel="numbers" aria-labelledby="settings-title-numbers" hidden>
-                  <h2 id="settings-title-numbers" data-i18n="Nomor WhatsApp">Nomor WhatsApp</h2>
+                  <h2 id="settings-title-numbers" data-i18n="Nomor">Nomor</h2>
                   <div class="wa-card" id="connectionCard">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
@@ -743,8 +742,8 @@
                     </div>
                     <p class="wa-note" data-i18n="Opsional. Nomor tambahan di bawah bisa dipakai tanpa nomor utama.">Opsional. Nomor tambahan di bawah bisa dipakai tanpa nomor utama.</p>
                     <div id="qrPanel" class="wa-connect-qr" hidden>
-                      <img id="qrImage" class="wa-line-qr" alt="QR WhatsApp" />
-                      <small class="wa-note" data-i18n="Di HP buka WhatsApp → Perangkat tertaut → Tautkan perangkat, lalu scan QR ini.">Di HP buka WhatsApp → Perangkat tertaut → Tautkan perangkat, lalu scan QR ini.</small>
+                      <img id="qrImage" class="wa-line-qr" alt="Kode QR" />
+                      <small class="wa-note" data-i18n="Di HP buka Perangkat tertaut → Tautkan perangkat, lalu scan QR ini.">Di HP buka Perangkat tertaut → Tautkan perangkat, lalu scan QR ini.</small>
                     </div>
                   </div>
                   <div class="wa-card" id="linesCard">

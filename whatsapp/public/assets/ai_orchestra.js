@@ -57,7 +57,7 @@
   hub.halo = make('circle', { class: 'halo', r: 16 }, hub.el)
   hub.core = make('circle', { class: 'core', r: 9 }, hub.el)
   hub.label = make('text', { class: 'label', y: 20, 'text-anchor': 'middle' }, hub.el)
-  hub.label.textContent = 'WhatsApp'
+  hub.label.textContent = 'Chat'
   hub.baseR = 9
 
   const nodes = new Map() // akun AI

@@ -27,7 +27,7 @@
     not_queued: 'Belum diantrekan',
     queued: 'Dalam antrean',
     sending: 'Mengirim',
-    sent: 'Terkirim ke WhatsApp',
+    sent: 'Terkirim',
     failed: 'Gagal sebelum kirim',
     uncertain: 'Periksa hasil kirim',
     cancelled: 'Dibatalkan',
@@ -265,7 +265,7 @@
       ? t('Menunggu sinkronisasi grup…')
       : routing.groups.length
         ? t('{0} grup tersedia', routing.groups.length)
-        : t('Hubungkan WhatsApp lalu perbarui grup.')
+        : t('Hubungkan nomor lalu perbarui grup.')
   }
   function field(form, title, name, value, type = 'text', choices) {
     const label = node('label')
@@ -436,7 +436,7 @@
     )
     const groupForm = node('form', '', 'wa-order-fields')
     groupForm.id = 'orderDestinationForm'
-    const group = field(groupForm, 'Grup WhatsApp', 'groupJid', order.groupJid, 'text', [])
+    const group = field(groupForm, 'Grup', 'groupJid', order.groupJid, 'text', [])
     group.id = 'orderDestinationGroup'
     groups(group, order.groupJid)
     field(groupForm, 'Kirim setelah', 'paymentTrigger', order.paymentTrigger, 'text', [

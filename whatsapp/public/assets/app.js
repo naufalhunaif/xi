@@ -93,7 +93,7 @@
     updateCodexStatus()
     updateClaudeStatus()
   })
-  // Koneksi WhatsApp dikelola di Pengaturan → Nomor WhatsApp; chat hanya menampilkan tautan bila belum terhubung.
+  // Koneksi dikelola di Pengaturan → Nomor; chat hanya menampilkan tautan bila belum terhubung.
   function renderConnectionStatus(status, phone = '', linesConnected = 0) {
     const label = statusLabels[status] || t('Belum terhubung')
     const digits = String(phone || '').replace(/\D/g, '')
@@ -140,7 +140,7 @@
   }
   byId('connectButton')?.addEventListener('click', () => connectionAction('/api/connect'))
   byId('disconnectButton')?.addEventListener('click', () => {
-    if (!window.confirm(t('Putuskan WhatsApp nomor utama? Chat yang sudah ada tetap tersimpan.'))) return
+    if (!window.confirm(t('Putuskan nomor utama? Chat yang sudah ada tetap tersimpan.'))) return
     void connectionAction('/api/disconnect')
   })
   const messages = byId('messages')

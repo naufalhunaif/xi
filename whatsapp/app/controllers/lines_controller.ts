@@ -5,7 +5,7 @@ import { createLine, listLines, readLine, requestLineDisconnect } from '#service
 
 const ONLINE_MS = 30_000
 
-/** Nomor WhatsApp: nomor utama + nomor tambahan yang dijawab AI yang sama. */
+/** Nomor: nomor utama + nomor tambahan yang dijawab AI yang sama. */
 export default class LinesController {
   async index({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')

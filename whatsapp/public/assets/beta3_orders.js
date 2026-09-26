@@ -49,7 +49,7 @@
       ? new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
       : ''
 
-  // Grup WhatsApp tujuan: bisa dipilih per order (bawaan = grup produksi default).
+  // Grup tujuan: bisa dipilih per order (bawaan = grup produksi default).
   let groups = []
   let defaultGroup = ''
   async function loadGroups() {

@@ -14,7 +14,7 @@ export function normalizeWorkspacePhone(value: unknown) {
     .split('@')[0]
     .split(':')[0]
     .replace(/^\+/, '')
-  if (!/^\d{6,20}$/.test(phone)) throw new Error('Nomor WhatsApp tidak valid.')
+  if (!/^\d{6,20}$/.test(phone)) throw new Error('Nomor tidak valid.')
   return phone
 }
 function scopeOf(row: any, version: string): WorkspaceScope {
@@ -259,7 +259,7 @@ export async function clearWorkspaceSession() {
 
 export async function withActiveWorkspace<T>(action: () => Promise<T>) {
   const scope = await activeWorkspace()
-  if (!scope.id) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!scope.id) throw new Error('Hubungkan nomor terlebih dahulu.')
   return inWorkspace(scope, action)
 }
 

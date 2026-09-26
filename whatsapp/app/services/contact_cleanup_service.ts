@@ -41,7 +41,7 @@ export async function contactCleanupTarget(value: unknown) {
     throw new Error('Pilih room pelanggan yang valid.')
   const contact = await db.from('whatsapp_contacts').where('jid', value).first()
   if (!contact && !(await db.from('whatsapp_messages').where('jid', value).first()))
-    throw new Error('Pelanggan tidak ditemukan di nomor WhatsApp aktif.')
+    throw new Error('Pelanggan tidak ditemukan di nomor aktif.')
   const phoneJid = value.endsWith('@s.whatsapp.net')
     ? value
     : CUSTOMER_JID.test(contact?.phone_jid || '') && contact.phone_jid.endsWith('@s.whatsapp.net')

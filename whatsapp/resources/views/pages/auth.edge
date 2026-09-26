@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="{{ csrfToken }}" />
-    <title>{{ mode === 'setup' ? 'Buat akun pemilik' : 'Masuk' }} · WhatsApp</title>
+    <title>{{ mode === 'setup' ? 'Buat akun pemilik' : 'Masuk' }} · Chat</title>
     <link rel="icon" href="{{ appUrl }}/assets/brand.svg" type="image/svg+xml" />
     <script src="{{ appUrl }}/assets/theme.js?v=1"></script>
-    <link rel="stylesheet" href="{{ appUrl }}/assets/auth.css?v=1" />
+    <link rel="stylesheet" href="{{ appUrl }}/assets/auth.css?v=2" />
   </head>
   <body>
     <main class="card">
-      <div class="brand"><img src="{{ appUrl }}/assets/brand.svg" alt="" /><strong>WhatsApp</strong></div>
+      <div class="brand" aria-label="Chat"><svg class="brand-icon" viewBox="0 0 512 512" width="30" height="30" aria-hidden="true"><path d="M87.49 380c1.19-4.38-1.44-10.47-3.95-14.86a44.86 44.86 0 00-2.54-3.8 199.81 199.81 0 01-33-110C47.65 139.09 140.73 48 255.83 48 356.21 48 440 117.54 459.58 209.85a199 199 0 014.42 41.64c0 112.41-89.49 204.93-204.59 204.93-18.3 0-43-4.6-56.47-8.37s-26.92-8.77-30.39-10.11a31.09 31.09 0 00-11.12-2.07 30.71 30.71 0 00-12.09 2.43l-67.83 24.48a16 16 0 01-4.67 1.22 9.6 9.6 0 01-9.57-9.74 15.85 15.85 0 01.6-3.29z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32"/></svg></div>
       @if(mode === 'setup')
         <h1>Buat akun pemilik</h1>
         <p class="hint">Belum ada akun. Akun pertama ini menjadi pemilik aplikasi.</p>
@@ -38,7 +38,7 @@
         @end
         <button type="submit">{{ mode === 'setup' ? 'Buat akun & masuk' : 'Masuk' }}</button>
       </form>
-      <footer>WhatsApp v{{ appVersion }}</footer>
+      <footer>v{{ appVersion }}</footer>
     </main>
   </body>
 </html>

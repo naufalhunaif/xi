@@ -81,7 +81,7 @@
       if (line.qr) {
         const qr = document.createElement('img')
         qr.className = 'wa-line-qr'
-        qr.alt = t('QR WhatsApp')
+        qr.alt = t('Kode QR')
         qr.src = line.qr
         list.append(qr)
       }
@@ -112,7 +112,7 @@
     button.disabled = true
     try {
       await call('/api/lines', 'POST')
-      status(t('Menyiapkan QR… scan dari WhatsApp nomor tambahan (Perangkat tertaut).'))
+      status(t('Menyiapkan QR… scan dari HP nomor tambahan (Perangkat tertaut).'))
       refresh()
     } catch (error) {
       status(error.message)

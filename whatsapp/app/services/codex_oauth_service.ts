@@ -132,7 +132,7 @@ export async function startOAuthLogin(restart = false) {
 
 async function beginOAuthLogin(restart: boolean) {
   const state = loginState()
-  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor terlebih dahulu.')
   if (await isChatgptConnected()) return details(true)
   if (state.session?.snapshot().pending && !restart) {
     await state.session.ready

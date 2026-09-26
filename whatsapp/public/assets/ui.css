@@ -239,7 +239,7 @@ html[data-theme='dark'] .workspace-ui {
   .workspace-ui .wa-orchestra {
     display: grid; gap: 10px; position: sticky; top: 20px; margin-top: 52px; padding: 14px;
     border: 1px solid var(--line); border-radius: 10px; background: var(--wa-surface, #fff);
-    --orc-chatgpt: #10a37f; --orc-claude: #d97757; --orc-gemini: #4f7df3; --orc-hub: #25d366;
+    --orc-chatgpt: #10a37f; --orc-claude: #d97757; --orc-gemini: #4f7df3; --orc-hub: var(--text);
     --orc-edge: color-mix(in srgb, var(--muted) 35%, transparent);
   }
 }
@@ -384,3 +384,8 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 /* Order: pilih grup tujuan per pesanan. */
 .workspace-ui .wa-b3-group { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; margin: 8px 0; font-size: 12px; }
 .workspace-ui .wa-b3-group select { min-width: 0; height: 32px; }
+
+/* Branding polos: satu ikon chat (Ionicons chatbubble-outline) mengikuti warna teks. */
+.workspace-ui .brand { color: var(--text); }
+.workspace-ui .brand .brand-icon { display: block; flex: none; }
+.workspace-ui .app-launcher-icon svg { display: block; }

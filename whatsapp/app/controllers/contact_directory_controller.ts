@@ -28,8 +28,8 @@ export default class ContactDirectoryController {
     const query = String(request.input('query', '')).slice(0, 100)
     const headers =
       request.input('language') === 'id'
-        ? ['Kontak', 'Nomor WhatsApp', 'Penerima', 'Nomor penerima', 'Alamat']
-        : ['Contact', 'WhatsApp number', 'Recipient', 'Recipient number', 'Address']
+        ? ['Kontak', 'Nomor', 'Penerima', 'Nomor penerima', 'Alamat']
+        : ['Contact', 'Number', 'Recipient', 'Recipient number', 'Address']
     async function* csv() {
       yield '\uFEFF' + headers.map(csvCell).join(',') + '\r\n'
       let after = ''

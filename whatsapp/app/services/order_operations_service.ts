@@ -85,7 +85,7 @@ async function ensureRouting(trx?: TransactionClientContract) {
 async function groupAllowed(jid: unknown, trx?: TransactionClientContract) {
   if (jid === null || jid === '') return null
   if (typeof jid !== 'string' || !/^[0-9-]+@g\.us$/.test(jid))
-    throw new Error('Pilih grup WhatsApp yang tersedia.')
+    throw new Error('Pilih grup yang tersedia.')
   if (
     !(await (trx || db)
       .from('whatsapp_order_groups')

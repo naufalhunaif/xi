@@ -58,9 +58,9 @@
   }
   async function startReset(all = false) {
     const warning = all
-      ? `${phone ? `+${phone}\n\n` : ''}${t('Hapus seluruh chat, media, cart, order, pembayaran, saldo, alamat tersimpan, ingatan AI, dan antrean nomor aktif? Tidak dapat dibatalkan. Cadangkan data penting terlebih dahulu. Kontak dasar, skill, pengaturan, akun AI, dan koneksi WhatsApp tetap disimpan. Data nomor lain dan Orion/MCP tidak diubah.')}`
+      ? `${phone ? `+${phone}\n\n` : ''}${t('Hapus seluruh chat, media, cart, order, pembayaran, saldo, alamat tersimpan, ingatan AI, dan antrean nomor aktif? Tidak dapat dibatalkan. Cadangkan data penting terlebih dahulu. Kontak dasar, skill, pengaturan, akun AI, dan koneksi nomor tetap disimpan. Data nomor lain dan Orion/MCP tidak diubah.')}`
       : t(
-          'Hapus chat dan media pada nomor aktif? Tidak dapat dibatalkan. Catatan AI per chat (Beta 2) ikut dihapus. Kontak, cart, order, saldo, akun AI, skill, katalog, pengaturan, dan sesi WhatsApp tetap tersimpan. Media referensi pesanan tetap disimpan.'
+          'Hapus chat dan media pada nomor aktif? Tidak dapat dibatalkan. Catatan AI per chat (Beta 2) ikut dihapus. Kontak, cart, order, saldo, akun AI, skill, katalog, pengaturan, dan sesi nomor tetap tersimpan. Media referensi pesanan tetap disimpan.'
         )
     if (pending || (all && !phone) || !window.confirm(warning)) return
     if (

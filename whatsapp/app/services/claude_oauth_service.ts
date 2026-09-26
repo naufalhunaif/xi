@@ -159,7 +159,7 @@ export async function claudeOAuthState() {
 
 export async function startClaudeOAuthLogin(restart = false) {
   const state = loginState()
-  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor terlebih dahulu.')
   if (await isClaudeConnected()) return details(true)
   if (state.loginProcess && !restart) return details(false)
   if (state.loginProcess) {
@@ -204,7 +204,7 @@ export async function startClaudeOAuthLogin(restart = false) {
 }
 
 export async function verifyClaudeOAuthLogin(loginId: unknown, code: unknown) {
-  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!workspaceScope().id && !currentAiAccount()) throw new Error('Hubungkan nomor terlebih dahulu.')
   await writeClaudeVerification(loginState(), loginId, code)
   return { submitted: true }
 }

@@ -110,7 +110,7 @@ export async function startMcpOAuthLogin(
   restart = false,
   browserBinding = ''
 ) {
-  if (!workspaceScope().id) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!workspaceScope().id) throw new Error('Hubungkan nomor terlebih dahulu.')
   const row = await connection(slug)
   if (!row) throw new Error('Sumber data tidak valid.')
   const key = loginKey(provider, slug)
@@ -291,7 +291,7 @@ export async function verifyMcpOAuthCallback(
   loginId: unknown,
   callbackUrl: unknown
 ) {
-  if (!workspaceScope().id) throw new Error('Hubungkan nomor WhatsApp terlebih dahulu.')
+  if (!workspaceScope().id) throw new Error('Hubungkan nomor terlebih dahulu.')
   const login = logins.get(loginKey(provider, slug))
   const target = claimMcpCallback(login, loginId, loginUrl(login), callbackUrl)
   try {

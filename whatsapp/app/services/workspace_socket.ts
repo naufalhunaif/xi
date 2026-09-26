@@ -14,7 +14,7 @@ export function workspaceSocket(socket: WASocket): WASocket {
           const scope = workspaceScope()
           const state = await workspaceState()
           if (!scope.id || Number(state.active_id) !== scope.id || state.version !== scope.version || state.cleanup_workspace_id)
-            throw new Error('Nomor WhatsApp sudah tidak aktif.')
+            throw new Error('Nomor sudah tidak aktif.')
           return value.apply(target, args)
         }
       return value.bind(target)
