@@ -244,7 +244,8 @@ html[data-theme='dark'] .workspace-ui {
   }
 }
 html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --orc-claude: #f09a78; --orc-gemini: #7fa3ff; }
-.workspace-ui .wa-orchestra-head { display: grid; gap: 2px; }
+.workspace-ui .wa-orchestra-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.workspace-ui .wa-orchestra-head > div { display: grid; gap: 2px; min-width: 0; }
 .workspace-ui .wa-orchestra-head strong { font-size: 13px; font-weight: 600; color: var(--text); }
 .workspace-ui .wa-orchestra-head small { font-size: 11px; color: var(--muted); min-height: 16px; }
 .workspace-ui .wa-orchestra-stage {
@@ -325,3 +326,43 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-ai-info .wa-ai-model { width: 100%; max-width: 230px; height: 28px; padding: 0 6px; font-size: 11px; }
 .workspace-ui .wa-ai-info small { font-size: 10.5px; color: var(--muted); overflow-wrap: anywhere; }
 .workspace-ui .wa-ai-info small.wa-ai-error { color: var(--wa-err); }
+
+/* Orkestra: pelanggan, zoom/geser, mode besar. */
+.workspace-ui .wa-orchestra { --orc-person: color-mix(in srgb, var(--muted) 70%, transparent); --orc-order: #8b5cf6; --orc-pay: #d4a017; --orc-cs: #e0662f; --orc-wait: #e0457b; }
+.workspace-ui .wa-orchestra-stage svg { cursor: grab; }
+.workspace-ui .wa-orchestra-stage svg.panning { cursor: grabbing; }
+.workspace-ui .orc-link { stroke: color-mix(in srgb, var(--muted) 22%, transparent); stroke-width: .6; }
+.workspace-ui .orc-link.loose { stroke-dasharray: 2 3; }
+.workspace-ui .orc-link.fresh.p-chatgpt { stroke: color-mix(in srgb, var(--orc-chatgpt) 55%, transparent); }
+.workspace-ui .orc-link.fresh.p-claude { stroke: color-mix(in srgb, var(--orc-claude) 55%, transparent); }
+.workspace-ui .orc-link.fresh.p-gemini { stroke: color-mix(in srgb, var(--orc-gemini) 55%, transparent); }
+.workspace-ui .orc-person { cursor: pointer; outline: none; }
+.workspace-ui .orc-person .dot { fill: var(--orc-person); stroke: var(--wa-surface, #fff); stroke-width: 1; transition: r .3s; }
+.workspace-ui .orc-person.c-waiting .dot { fill: var(--orc-wait); }
+.workspace-ui .orc-person.c-order .dot { fill: var(--orc-order); }
+.workspace-ui .orc-person.c-payment .dot { fill: var(--orc-pay); }
+.workspace-ui .orc-person.c-cs .dot { fill: var(--orc-cs); }
+.workspace-ui .orc-person.unread .dot { stroke: var(--text); stroke-width: 1.2; }
+.workspace-ui .orc-person .plabel { fill: var(--muted); font-size: 7px; opacity: 0; pointer-events: none; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 2.5px; transition: opacity .2s; }
+.workspace-ui .orc-person.fresh .plabel,
+.workspace-ui .orc-zoomed .orc-person .plabel,
+.workspace-ui .orc-person:hover .plabel,
+.workspace-ui .orc-person:focus-visible .plabel { opacity: 1; }
+.workspace-ui .orc-person:hover .dot, .workspace-ui .orc-person:focus-visible .dot { stroke: var(--text); stroke-width: 1.5; }
+.workspace-ui .orc-person.flash-ok .dot { animation: orc-pop .9s ease-out; }
+@keyframes orc-pop { 30% { r: 8; } }
+.workspace-ui .wa-orchestra-hint { position: absolute; left: 8px; bottom: 6px; font-size: 9.5px; color: var(--muted); opacity: .75; pointer-events: none; }
+.workspace-ui .wa-orchestra-legend { flex-wrap: wrap; row-gap: 4px; }
+.workspace-ui .wa-orchestra-legend .dot.person { background: var(--orc-person); }
+.workspace-ui .wa-orchestra-legend .dot.waiting { background: var(--orc-wait); }
+.workspace-ui .wa-orchestra-legend .dot.order { background: var(--orc-order); }
+.workspace-ui .wa-orchestra-legend .dot.payment { background: var(--orc-pay); }
+.workspace-ui .wa-orchestra-legend .dot.cs { background: var(--orc-cs); }
+@media (min-width: 1200px) {
+  .workspace-ui .wa-orchestra.expanded {
+    position: fixed; inset: 16px; z-index: 60; margin: 0; grid-template-rows: auto minmax(0, 1fr) auto auto;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, .25);
+  }
+  .workspace-ui .wa-orchestra.expanded .wa-orchestra-stage { aspect-ratio: auto; min-height: 0; }
+  .workspace-ui .wa-orchestra.expanded .wa-orchestra-log { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

@@ -1,4 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import db from '#services/workspace_database'
+import { workspaceScope } from '#services/workspace_context'
+import { latestInboxMessages } from '#services/contact_inbox_service'
 import app from '@adonisjs/core/services/app'
 import { rm } from 'node:fs/promises'
 import { withAiAccount } from '#services/ai_account_context'
@@ -7,6 +10,7 @@ import {
   aiAccountRef,
   busyAiAccounts,
   recentAiEvents,
+  lastAccountByJid,
   aiTokenUsage,
   aiSpreadMode,
   setAiSpreadMode,
@@ -60,6 +64,45 @@ async function found(params: Record<string, any>) {
   return account
 }
 
+/**
+ * Pelanggan terbaru (maks 80) + akun yang terakhir melayani, untuk peta ala graph view.
+ * Disimpan 15 detik: daftar kotak masuk cukup berat untuk ditanya tiap 2 detik.
+ */
+const customerCache = new Map<string, { at: number; data: any[] }>()
+async function orchestraCustomers(now: number) {
+  const key = workspaceScope().prefix
+  const cached = customerCache.get(key)
+  if (cached && now - cached.at < 15_000) return cached.data
+  const inbox = workspaceScope().id
+    ? ((await latestInboxMessages().catch(() => [])) as any[]).filter((row) => !String(row.jid).endsWith('@g.us')).slice(0, 80)
+    : []
+  const handled = await lastAccountByJid(
+    inbox.map((row) => String(row.jid)),
+    now - 7 * 86_400_000
+  ).catch(() => new Map<string, number>())
+  const profiles = inbox.length
+    ? await db.from('whatsapp_contacts').whereIn('jid', inbox.map((row) => String(row.jid))).select('jid', 'handling_mode', 'name')
+    : []
+  const modeOf = new Map(profiles.map((p: any) => [String(p.jid), p]))
+  const customers = inbox.map((row) => {
+    const profile: any = modeOf.get(String(row.jid))
+    const phone = String(row.phone_jid || '').split('@')[0]
+    return {
+      jid: String(row.jid),
+      name: String(profile?.name || row.contact_name || (phone ? `+${phone}` : 'Tanpa nama')).slice(0, 40),
+      mode: profile?.handling_mode === 'cs' ? 'cs' : 'ai',
+      order: Boolean(Number(row.has_order)),
+      payment: Boolean(Number(row.needs_payment)),
+      unread: Number(row.unread_count || 0),
+      unanswered: Number(row.unanswered_count || 0),
+      at: new Date(row.created_at).getTime(),
+      accountId: handled.get(String(row.jid)) || 0,
+    }
+  })
+  customerCache.set(key, { at: now, data: customers })
+  return customers
+}
+
 /** Banyak akun AI: daftar, urutan cadangan, login per akun, API key Gemini. */
 export default class AiAccountsController {
   async index({ response }: HttpContext) {
@@ -88,11 +131,13 @@ export default class AiAccountsController {
       aiTokenUsage(now - SPREAD_WINDOW_MS),
       aiSpreadMode(),
     ])
+    const customers = await orchestraCustomers(now)
     return response.json({
       now,
       busy,
       events,
       spread,
+      customers,
       accounts: accounts.map((a) => ({
         id: a.id,
         provider: a.provider,

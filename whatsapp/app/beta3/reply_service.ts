@@ -477,7 +477,9 @@ export async function createLeanReply(input: {
   })
 
   onTrace?.({ key: 'beta3-ai', label: 'Menyusun balasan · tanpa tool', status: 'running' })
-  const result = await runLeanProvider(settings, prompt, input.imagePaths || [])
+  const result = await runLeanProvider(settings, prompt, input.imagePaths || [], undefined, undefined, {
+    jid,
+  })
   const decision = parseLeanDecision(result.text)
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
   if (decision.referensi?.length && input.imageIds?.length) {

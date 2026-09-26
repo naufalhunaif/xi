@@ -321,6 +321,7 @@ async function ensureEvents() {
     KEY whatsapp_ai_events_account (account_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
   await db.rawQuery('ALTER TABLE whatsapp_ai_events ADD COLUMN IF NOT EXISTS tokens INT UNSIGNED NULL')
+  await db.rawQuery('ALTER TABLE whatsapp_ai_events ADD COLUMN IF NOT EXISTS jid VARCHAR(190) NULL')
   await db.rawQuery('ALTER TABLE whatsapp_ai_events ADD INDEX IF NOT EXISTS whatsapp_ai_events_created (created_at)')
   eventsReady = true
 }
@@ -330,7 +331,8 @@ export async function recordAiEvent(
   kind: AiEventKind,
   phase = '',
   detail = '',
-  tokens: number | null = null
+  tokens: number | null = null,
+  jid = ''
 ) {
   await ensureEvents()
   await db.table('whatsapp_ai_events').insert({
@@ -339,6 +341,7 @@ export async function recordAiEvent(
     phase: phase.slice(0, 40) || null,
     detail: detail.slice(0, 200) || null,
     tokens: tokens === null ? null : Math.max(0, Math.round(tokens)),
+    jid: jid.slice(0, 190) || null,
     created_at: new Date(),
   })
   // Simpan jejak 8 hari (cukup untuk jendela 5 jam & mingguan).
@@ -372,8 +375,25 @@ export async function recentAiEvents(after = 0, limit = 40) {
     kind: String(row.kind) as AiEventKind,
     phase: String(row.phase || ''),
     detail: String(row.detail || ''),
+    jid: String(row.jid || ''),
     at: new Date(row.created_at).getTime(),
   }))
+}
+
+/** Akun yang terakhir mengerjakan tiap pelanggan (untuk garis pelanggan → akun). */
+export async function lastAccountByJid(jids: string[], sinceMs: number) {
+  await ensureEvents()
+  if (!jids.length) return new Map<string, number>()
+  const rows = await db
+    .from('whatsapp_ai_events')
+    .whereIn('jid', jids)
+    .where('kind', 'ok')
+    .where('created_at', '>=', new Date(sinceMs))
+    .orderBy('id', 'asc')
+    .select('jid', 'account_id')
+  const map = new Map<string, number>()
+  for (const row of rows as any[]) map.set(String(row.jid), Number(row.account_id))
+  return map
 }
 
 /** Akun yang sedang mengerjakan (event start terakhir belum ditutup, < 3 menit). */

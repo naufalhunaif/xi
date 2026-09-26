@@ -66,8 +66,10 @@ export async function runLeanProvider(
   prompt: { system: string; user: string },
   imagePaths: string[] = [],
   phase = 'beta3-reply',
-  schema: Record<string, unknown> = LEAN_OUTPUT_SCHEMA
+  schema: Record<string, unknown> = LEAN_OUTPUT_SCHEMA,
+  meta: { jid?: string } = {}
 ): Promise<LeanProviderResult> {
+  const jid = meta.jid || ''
   const accounts = await usableAiAccounts().catch(() => null)
   if (!accounts) return runLeanOnce(settings, settings.aiProvider, {}, prompt, imagePaths, phase, schema)
   if (!accounts.length) {
@@ -84,7 +86,7 @@ export async function runLeanProvider(
   }
   let lastError: unknown
   for (const account of accounts) {
-    await recordAiEvent(account.id, 'start', phase).catch(() => {})
+    await recordAiEvent(account.id, 'start', phase, '', null, jid).catch(() => {})
     try {
       const result = await withAiAccount(aiAccountRef(account), () =>
         runLeanOnce(
@@ -99,7 +101,7 @@ export async function runLeanProvider(
       )
       await markAiAccountUsed(account.id).catch(() => {})
       const tokens = result.usage ? result.usage.input + result.usage.output : null
-      await recordAiEvent(account.id, 'ok', phase, '', tokens).catch(() => {})
+      await recordAiEvent(account.id, 'ok', phase, '', tokens, jid).catch(() => {})
       return result
     } catch (error) {
       const detail = aiFailureDetail(error, {
@@ -112,7 +114,9 @@ export async function runLeanProvider(
         account.id,
         SWITCHABLE.has(detail.code) ? 'limited' : 'fail',
         phase,
-        `${detail.code}: ${reason}`
+        `${detail.code}: ${reason}`,
+        null,
+        jid
       ).catch(() => {})
       if (STOP_CODES.has(detail.code)) throw error
       // Kuota habis / perlu login → akun dijeda. Gangguan lain → cukup coba akun berikutnya.
