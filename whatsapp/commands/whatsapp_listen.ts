@@ -58,11 +58,6 @@ import * as beta3Catalog from '#beta3/catalog_service'
 import * as beta3Refs from '#beta3/refs_service'
 import * as beta3Recap from '#beta3/recap_service'
 import * as beta3SkillSync from '#beta3/skill_sync'
-import { isInstagramJid, readInstagram, updateInstagram } from '#instagram/store'
-import { refreshToken as refreshInstagramToken } from '#instagram/api'
-import { canReplyInstagram, sendInstagram } from '#instagram/sender'
-import { processInstagramComments } from '#instagram/comments'
-import { readFile } from 'node:fs/promises'
 const beta3 = {
   ...beta3Reply,
   ...beta3Order,
@@ -237,13 +232,6 @@ export default class WhatsappListen extends BaseCommand {
   private goalSweepRunning = false
   private lastGoalSweepAt = 0
   private evaluationRunning = false
-  private instagramRunning = false
-  private lastInstagramAt = 0
-  private instagramCommentsRunning = false
-  private lastInstagramCommentsAt = 0
-  private lastInstagramGoalsAt = 0
-  private lastInstagramRefreshAt = 0
-  private instagramTurns = 0
   private lastEvaluationAt = 0
 
   static commandName = 'whatsapp:listen'
@@ -387,27 +375,6 @@ export default class WhatsappListen extends BaseCommand {
             ) {
               this.lastSyncRetryAt = Date.now()
               void this.track(() => this.retrySyncMessages())
-            }
-            if (!this.instagramRunning && Date.now() - this.lastInstagramAt >= 4000) {
-              this.lastInstagramAt = Date.now()
-              this.instagramRunning = true
-              void this.processInstagram(scope)
-                .catch((error) => this.logger.error(`Instagram: ${String(error)}`))
-                .finally(() => {
-                  this.instagramRunning = false
-                })
-            }
-            if (
-              !this.instagramCommentsRunning &&
-              Date.now() - this.lastInstagramCommentsAt >= 10_000
-            ) {
-              this.lastInstagramCommentsAt = Date.now()
-              this.instagramCommentsRunning = true
-              void inWorkspace(scope, () => processInstagramComments())
-                .catch((error) => this.logger.error(`Komentar Instagram: ${String(error)}`))
-                .finally(() => {
-                  this.instagramCommentsRunning = false
-                })
             }
             if (!this.evaluationRunning && Date.now() - this.lastEvaluationAt >= 30_000) {
               this.lastEvaluationAt = Date.now()
@@ -837,12 +804,12 @@ export default class WhatsappListen extends BaseCommand {
         const ingestion = this.ingestMessages(messages, true)
         for (const contact of contacts) {
           await this.rememberContactIdentity(contact)
-          if (contact.id)
+          for (const jid of this.contactAliases(contact))
             await this.rememberContact(
-              contact.id,
-              contact.notify || contact.name || '',
+              jid,
+              contact.name || contact.notify || contact.verifiedName || '',
               false,
-              contact.imgUrl
+              jid === contact.id ? contact.imgUrl : undefined
             ).catch(() => {})
         }
         await ingestion
@@ -874,24 +841,24 @@ export default class WhatsappListen extends BaseCommand {
       onScoped('contacts.upsert', async (contacts) => {
         for (const contact of contacts) {
           await this.rememberContactIdentity(contact)
-          if (contact.id)
+          for (const jid of this.contactAliases(contact))
             await this.rememberContact(
-              contact.id,
-              contact.notify || contact.name || '',
+              jid,
+              contact.name || contact.notify || contact.verifiedName || '',
               false,
-              contact.imgUrl
+              jid === contact.id ? contact.imgUrl : undefined
             )
         }
       })
       onScoped('contacts.update', async (contacts) => {
         for (const contact of contacts) {
           await this.rememberContactIdentity(contact)
-          if (contact.id)
+          for (const jid of this.contactAliases(contact))
             await this.rememberContact(
-              contact.id,
-              contact.notify || contact.name || '',
-              true,
-              contact.imgUrl
+              jid,
+              contact.name || contact.notify || contact.verifiedName || '',
+              jid === contact.id,
+              jid === contact.id ? contact.imgUrl : undefined
             )
         }
       })
@@ -1167,6 +1134,18 @@ export default class WhatsappListen extends BaseCommand {
       (lid) => socket.signalRepository.lidMapping.getPNForLID(lid),
       alternate
     )
+  }
+
+  /**
+   * Satu kontak WhatsApp bisa punya dua ID (LID dan nomor HP). Room chat sering
+   * memakai LID sedangkan daftar kontak memakai nomor, jadi nama disimpan di keduanya.
+   */
+  private contactAliases(contact: { id?: string; lid?: string; phoneNumber?: string }) {
+    const jids = [contact.id, contact.lid, contact.phoneNumber]
+      .map((value) => String(value || '').trim())
+      .map((value) => (/^\d{6,20}$/.test(value) ? `${value}@s.whatsapp.net` : value))
+      .filter((value) => /^[^@\s]+@(?:s\.whatsapp\.net|lid)$/.test(value))
+    return [...new Set(jids)]
   }
 
   private async rememberContactIdentity(contact: {
@@ -1491,7 +1470,6 @@ export default class WhatsappListen extends BaseCommand {
       .from('whatsapp_messages')
       .where('direction', 'out')
       .where('status', 'queued')
-      .whereNot('jid', 'like', '%@ig')
       .orderBy('id', 'asc')
       .limit(20)
     for (const message of queued) {
@@ -2124,7 +2102,7 @@ export default class WhatsappListen extends BaseCommand {
   private async runBeta3Turn(
     jid: string,
     run: GoalRun,
-    socket: WASocket | undefined,
+    socket: WASocket,
     settings: Awaited<ReturnType<typeof readSettings>>,
     input: {
       text: string
@@ -2135,15 +2113,11 @@ export default class WhatsappListen extends BaseCommand {
     }
   ) {
     let trace: Awaited<ReturnType<typeof startTrace>> | undefined
-    const instagram = isInstagramJid(jid)
     const canSend = async () =>
-      instagram
-        ? (await isCurrentGoalRun(run)) && (await this.canSendInstagramAi(jid))
-        : Boolean(socket) &&
-          (await isCurrentGoalRun(run)) &&
-          (await this.waitForDeliverySync(socket!)) &&
-          (await this.canSendAiReply(jid, socket!)) &&
-          (await isCurrentGoalRun(run))
+      (await isCurrentGoalRun(run)) &&
+      (await this.waitForDeliverySync(socket)) &&
+      (await this.canSendAiReply(jid, socket)) &&
+      (await isCurrentGoalRun(run))
     try {
       trace = await startTrace(jid, {
         text: input.text,
@@ -2174,47 +2148,13 @@ export default class WhatsappListen extends BaseCommand {
       if (!(await markGoalDelivery(run))) return
       let firstMessageId: string | undefined
       const sendBubble = async (body: string, image?: { bytes: Buffer; url: string }) => {
-        if (instagram) {
-          if (!(await canSend())) return false
-          await this.setActivity(jid, 'typing')
-          await wait(Math.min(5000, 1000 + body.length * 20))
-          if (!(await canSend())) return false
-          const messageId = await sendInstagram(jid, {
-            text: body,
-            image: image ? { bytes: image.bytes } : undefined,
-          })
-          await saveSentAiMessage({
-            message_id: messageId,
-            jid,
-            contact_name: null,
-            direction: 'out',
-            sender_type: 'ai',
-            body,
-            media_type: image ? 'image' : null,
-            media_url: image?.url || null,
-            thumbnail_url: image?.url || null,
-            media_mime: image ? 'image/jpeg' : null,
-            media_name: null,
-            media_size: image?.bytes.length || null,
-            media_status: image ? 'ready' : null,
-            reply_to_message_id: null,
-            status: 'sent',
-            created_at: new Date(),
-          })
-          if (!firstMessageId)
-            await markRoomRead(jid, run.anchor_id).catch(() => {})
-          firstMessageId ||= messageId
-          await this.setActivity(jid, null)
-          return true
-        }
-        const waSocket = socket!
         return trackOutgoingMessage(jid, async (outgoingId) => {
           const sent = await sendPreparedReply(
-            waSocket,
+            socket,
             jid,
             firstMessageId ? [] : input.keys,
             () =>
-              waSocket.sendMessage(
+              socket.sendMessage(
                 jid,
                 image
                   ? { image: image.bytes, caption: body, mimetype: 'image/jpeg' as const }
@@ -2226,7 +2166,7 @@ export default class WhatsappListen extends BaseCommand {
               read: () =>
                 firstMessageId
                   ? Promise.resolve()
-                  : readIncomingThrough(waSocket, jid, Number(run.anchor_id), canSend),
+                  : readIncomingThrough(socket, jid, Number(run.anchor_id), canSend),
               onTyping: async () => {
                 await this.setActivity(jid, 'typing')
               },
@@ -2394,7 +2334,6 @@ export default class WhatsappListen extends BaseCommand {
            LEFT JOIN whatsapp_contacts c ON c.jid = t.jid
            LEFT JOIN whatsapp_chat_goals g ON g.jid = t.jid
           WHERE t.direction = 'in'
-            AND t.jid NOT LIKE '%@ig'
             AND COALESCE(c.handling_mode, 'ai') <> 'cs'
             AND COALESCE(c.ai_excluded, 0) = 0
             AND COALESCE(g.analyzed_anchor_id, 0) <> t.id
@@ -2605,9 +2544,7 @@ export default class WhatsappListen extends BaseCommand {
    * menunggu) dilewati oleh beginGoalTurn, jadi tidak dijawab dua kali.
    */
   private async answerBacklogBeta3(jid: string, settings: Awaited<ReturnType<typeof readSettings>>) {
-    const instagram = isInstagramJid(jid)
-    if ((!this.socket && !instagram) || !isAiWorking(settings) || !settings.hasSkill) return
-    if (instagram && !(await this.canSendInstagramAi(jid))) return
+    if (!this.socket || !isAiWorking(settings) || !settings.hasSkill) return
     const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
     if (contact?.ai_excluded || contact?.handling_mode === 'cs') return
     const lastOut = await db
@@ -2655,165 +2592,6 @@ export default class WhatsappListen extends BaseCommand {
       imagePaths: images.map((image) => image.path),
       imageIds: images.map((image) => image.id),
     })
-  }
-
-  /** AI boleh membalas DM Instagram: AI aktif, room tidak dipegang CS, masih dalam 24 jam. */
-  private async canSendInstagramAi(jid: string) {
-    if (this.stopping) return false
-    const settings = await readSettings()
-    const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
-    return (
-      isAiWorking(settings) &&
-      settings.hasSkill &&
-      contact?.handling_mode !== 'cs' &&
-      !contact?.ai_excluded &&
-      (await canReplyInstagram(jid))
-    )
-  }
-
-  /**
-   * Instagram berjalan terpisah dari soket WhatsApp: kirim antrean CS/sistem,
-   * jawab DM yang belum dibalas, susulan, dan perpanjang token.
-   */
-  private async processInstagram(scope: WorkspaceScope) {
-    await inWorkspace(scope, async () => {
-      if (this.stopping) return
-      const config = await readInstagram()
-      if (!config.connected) return
-      const expiresIn = config.tokenExpiresAt ? config.tokenExpiresAt.getTime() - Date.now() : 0
-      if (expiresIn < 15 * 24 * 3_600_000 && Date.now() - this.lastInstagramRefreshAt > 6 * 3_600_000) {
-        this.lastInstagramRefreshAt = Date.now()
-        try {
-          const token = await refreshInstagramToken(config.accessToken)
-          await updateInstagram({
-            access_token: token.accessToken,
-            token_expires_at: token.expiresAt,
-            last_error: null,
-          })
-        } catch (error) {
-          await updateInstagram({
-            last_error: (error instanceof Error ? error.message : String(error)).slice(0, 290),
-          })
-        }
-      }
-      await this.flushInstagramOutbox()
-      if (!config.dmEnabled) return
-      await this.sweepInstagram()
-      if (Date.now() - this.lastInstagramGoalsAt >= 60_000) {
-        this.lastInstagramGoalsAt = Date.now()
-        const settings = await readSettings(true)
-        if (settings.sweepEnabled && isAiWorking(settings) && settings.hasSkill)
-          for (const goal of await dueConversationGoals(new Date(), 'ig')) {
-            const jid = String(goal.jid)
-            if (!isInstagramJid(jid) || this.chatLocks.has(jid)) continue
-            if (!(await canReplyInstagram(jid))) {
-              // Di luar 24 jam Instagram tidak mengizinkan susulan; jadwal dilepas.
-              await db.from('whatsapp_chat_goals').where('jid', jid).update({ next_run_at: null })
-              continue
-            }
-            const task = this.runBeta3Nudge(jid, undefined)
-            this.chatLocks.set(jid, task)
-            try {
-              await task
-            } finally {
-              if (this.chatLocks.get(jid) === task) this.chatLocks.delete(jid)
-            }
-          }
-      }
-    })
-  }
-
-  /** Pesan CS/sistem (total, rekening) untuk room Instagram. */
-  private async flushInstagramOutbox() {
-    const queued = await db
-      .from('whatsapp_messages')
-      .where('direction', 'out')
-      .where('status', 'queued')
-      .where('jid', 'like', '%@ig')
-      .orderBy('id', 'asc')
-      .limit(20)
-    for (const message of queued) {
-      let sentId = ''
-      try {
-        if (message.sender_type === 'ai' && !(await this.canSendInstagramAi(message.jid))) continue
-        if (!(await canReplyInstagram(message.jid)))
-          throw new Error('Di luar 24 jam sejak pesan terakhir pelanggan.')
-        let image: { bytes: Buffer; mime?: string } | undefined
-        if (message.media_type) {
-          if (message.media_type !== 'image') throw new Error('Instagram hanya mendukung gambar.')
-          const path = message.media_upload_id
-            ? csMediaPath(message.media_upload_id)
-            : this.app.makePath('public', 'media', String(message.media_url || '').split('/').pop() || '')
-          image = { bytes: await readFile(path), mime: message.media_mime || 'image/jpeg' }
-        }
-        sentId = await sendInstagram(message.jid, { text: String(message.body || ''), image })
-        await db
-          .from('whatsapp_messages')
-          .where('reply_to_message_id', message.message_id)
-          .update({ reply_to_message_id: sentId })
-        await db
-          .from('whatsapp_messages')
-          .where('id', message.id)
-          .update({ status: 'sent', message_id: sentId })
-      } catch (error) {
-        this.logger.error(
-          `Kirim Instagram: ${error instanceof Error ? error.message : String(error)}`
-        )
-        await db.from('whatsapp_messages').where('id', message.id).update({ status: 'failed' })
-        continue
-      }
-      if (message.sender_type === 'cs') {
-        await resumeAiAfterHumanReply(message.jid)
-        try {
-          await beta3.learnFromHumanReply(message.jid, sentId)
-        } catch {
-          /* Contoh opsional. */
-        }
-      }
-    }
-  }
-
-  /** DM Instagram yang pesan terakhirnya dari pelanggan dan belum dijawab. */
-  private async sweepInstagram() {
-    const settings = await readSettings(true)
-    if (!isAiWorking(settings) || !settings.hasSkill) return
-    const windowMs = Math.max(4000, settings.turnWindowMs || 6000)
-    const result = await db.rawQuery(
-      `SELECT t.jid, t.created_at
-         FROM whatsapp_messages t
-         JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
-                FROM whatsapp_messages
-               WHERE jid LIKE '%@ig' AND created_at >= ? AND status NOT IN ('failed', 'queued')) x
-           ON x.id = t.id AND x.position = 1
-         LEFT JOIN whatsapp_contacts c ON c.jid = t.jid
-         LEFT JOIN whatsapp_chat_goals g ON g.jid = t.jid
-        WHERE t.direction = 'in'
-          AND t.created_at <= ?
-          AND COALESCE(c.handling_mode, 'ai') <> 'cs'
-          AND COALESCE(c.ai_excluded, 0) = 0
-          AND COALESCE(g.analyzed_anchor_id, 0) <> t.id
-          AND NOT (COALESCE(g.status, '') = 'processing' AND g.anchor_id = t.id)
-          AND NOT (COALESCE(g.status, '') = 'paused' AND g.anchor_id = t.id AND COALESCE(g.last_error, '') <> '')
-        ORDER BY t.created_at ASC
-        LIMIT 10`,
-      [new Date(Date.now() - 24 * 3_600_000), new Date(Date.now() - windowMs)]
-    )
-    const rows = (Array.isArray(result) ? result[0] : result) as Array<{ jid: string }>
-    for (const row of rows || []) {
-      if (this.instagramTurns >= 3) break
-      const jid = String(row.jid)
-      if (this.chatLocks.has(jid)) continue
-      this.instagramTurns += 1
-      const task = this.answerBacklogBeta3(jid, settings)
-      this.chatLocks.set(jid, task)
-      void task
-        .catch((error) => this.logger.error(`DM Instagram: ${String(error)}`))
-        .finally(async () => {
-          this.instagramTurns -= 1
-          if (this.chatLocks.get(jid) === task) this.chatLocks.delete(jid)
-          await this.setActivity(jid, null).catch(() => {})
-        })
-    }
   }
 
   private async canSendAiReply(jid: string, socket: WASocket) {
@@ -3798,38 +3576,7 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
     }
   }
 
-  private async runBeta3Nudge(jid: string, socket: WASocket | undefined) {
-    if (isInstagramJid(jid)) {
-      if (!(await this.canSendInstagramAi(jid))) return
-      const nudge = await beta3.claimLeanNudge(jid)
-      if (!nudge) return
-      try {
-        if (!(await this.canSendInstagramAi(jid))) return
-        const messageId = await sendInstagram(jid, { text: nudge.text })
-        await saveSentAiMessage({
-          message_id: messageId,
-          jid,
-          contact_name: null,
-          direction: 'out',
-          sender_type: 'ai',
-          body: nudge.text,
-          media_type: null,
-          media_url: null,
-          thumbnail_url: null,
-          media_mime: null,
-          media_name: null,
-          media_size: null,
-          media_status: null,
-          reply_to_message_id: null,
-          status: 'sent',
-          created_at: new Date(),
-        })
-      } catch (error) {
-        this.logger.error(`Susulan Instagram: ${error instanceof Error ? error.message : String(error)}`)
-      }
-      return
-    }
-    if (!socket) return
+  private async runBeta3Nudge(jid: string, socket: WASocket) {
     const nudge = await beta3.claimLeanNudge(jid)
     if (!nudge) return
     const canSend = async () =>
@@ -3884,7 +3631,6 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
       const settings = await readSettings(true)
       if (!isAiWorking(settings) || !settings.hasSkill || !settings.sweepEnabled) return
       for (const goal of await dueConversationGoals()) {
-        if (isInstagramJid(goal.jid)) continue
         const contact = await db.from('whatsapp_contacts').where('jid', goal.jid).first()
         if (contact?.ai_excluded) continue
         if (

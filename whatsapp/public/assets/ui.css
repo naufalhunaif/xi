@@ -9,8 +9,6 @@
   --wa-warn-bg: #fff4dc;
   --wa-err: #a52f2f;
   --wa-err-bg: #feecec;
-  --wa-ig: #b4306e;
-  --wa-ig-bg: #fcebf3;
   --wa-subtle: #f5f5f3;
 }
 html[data-theme='dark'] .workspace-ui {
@@ -20,8 +18,6 @@ html[data-theme='dark'] .workspace-ui {
   --wa-warn-bg: #261d0b;
   --wa-err: #f3aca8;
   --wa-err-bg: #280e11;
-  --wa-ig: #f2a7c9;
-  --wa-ig-bg: #2a1020;
   --wa-subtle: #222225;
 }
 
@@ -159,24 +155,7 @@ html[data-theme='dark'] .workspace-ui {
   .workspace-ui .wa-kv-row > span { grid-column: 1 / -1; }
 }
 
-/* Penanda kanal kecil di daftar percakapan. */
-.workspace-ui .wa-channel {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 15px;
-  margin-right: 5px;
-  padding: 0 4px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  vertical-align: 1px;
-}
-.workspace-ui .wa-channel.ig { background: var(--wa-ig-bg); color: var(--wa-ig); }
-.workspace-ui .wa-channel.wa { background: var(--wa-ok-bg); color: var(--wa-ok); }
-
-/* Kontrol segmen: pilihan setara dan saling eksklusif (kanal inbox). */
+/* Kontrol segmen: pilihan setara dan saling eksklusif (maks. 4). */
 .workspace-ui .wa-segmented {
   display: grid;
   grid-auto-flow: column;
@@ -211,35 +190,4 @@ html[data-theme='dark'] .workspace-ui {
 }
 .workspace-ui .wa-segmented button:focus-visible { outline: 2px solid var(--wa-ok); outline-offset: -2px; }
 .workspace-ui .wa-segmented button span { font-size: 10px; font-variant-numeric: tabular-nums; opacity: 0.8; }
-
-/* Daftar komentar Instagram (mengikuti gaya baris kontak). */
-.workspace-ui .wa-comments { min-height: 0; flex: 1; overflow: auto; }
-.workspace-ui .wa-comment { border-bottom: 1px solid var(--line); }
-.workspace-ui .wa-comment > summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 13px;
-  list-style: none;
-  cursor: pointer;
-}
-.workspace-ui .wa-comment > summary::-webkit-details-marker { display: none; }
-.workspace-ui .wa-comment > summary:hover,
-.workspace-ui .wa-comment[open] > summary { background: var(--wa-subtle); }
-.workspace-ui .wa-comment > summary .wa-pill { margin-left: auto; flex: none; }
-.workspace-ui .wa-comment .wa-contact-avatar { background: var(--wa-ig-bg); color: var(--wa-ig); }
-.workspace-ui .wa-comment-body {
-  display: grid;
-  gap: 8px;
-  padding: 4px 13px 13px 55px;
-  font-size: 11px;
-  line-height: 16px;
-}
-.workspace-ui .wa-comment-body p { margin: 0; overflow-wrap: anywhere; }
-.workspace-ui .wa-comment-body dl { display: grid; gap: 6px; margin: 0; }
-.workspace-ui .wa-comment-body dt { font-size: 10px; color: var(--muted); }
-.workspace-ui .wa-comment-body dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
-.workspace-ui .wa-comment-body .button { justify-self: start; }
-.workspace-ui .wa-contact[data-channel='ig'] .wa-contact-avatar:not(img) { background: var(--wa-ig-bg); color: var(--wa-ig); }
-.workspace-ui .wa-kv-row .button.small,
-.workspace-ui .wa-comment-body .button.small { height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px; }
+.workspace-ui .wa-kv-row .button.small { height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px; }

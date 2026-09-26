@@ -12,7 +12,6 @@ const SkillEditsController = () => import('#controllers/skill_edits_controller')
 const LearningController = () => import('#controllers/learning_controller')
 const LeanController = () => import('#controllers/lean_controller')
 const Beta3Controller = () => import('#controllers/beta3_controller')
-const InstagramController = () => import('#controllers/instagram_controller')
 
 router.get('/login', [AccountController, 'login']).as('account.login')
 router.post('/login', [AccountController, 'loginPost'])
@@ -21,12 +20,6 @@ router.post('/setup', [AccountController, 'setupPost'])
 // Dedicated expiring bearer, fixed workspace; works without session/account or app DB middleware.
 router.get('/api/ops/diagnostics', [() => import('#controllers/diagnostics_controller'), 'show'])
 router.get('/auth/callback', [AccountController, 'callback']).as('account.callback')
-// Instagram: webhook & gambar keluar dipanggil server Meta (tanpa login; webhook diverifikasi tanda tangan).
-router.get('/instagram/webhook', [InstagramController, 'verify'])
-router.post('/instagram/webhook', [InstagramController, 'receive'])
-router.get('/ig-media/:name', [InstagramController, 'media'])
-router.get('/privacy', [InstagramController, 'policy']).as('instagram.privacy')
-router.get('/data-deletion', [InstagramController, 'policy']).as('instagram.deletion')
 
 router
   .group(() => {
@@ -74,13 +67,6 @@ router
     router.post('/api/beta3/recap', [Beta3Controller, 'startRecap'])
     router.get('/api/beta3/customer', [Beta3Controller, 'customer'])
     router.post('/api/beta3/customer', [Beta3Controller, 'saveCustomer'])
-    router.get('/api/instagram', [InstagramController, 'show'])
-    router.get('/api/instagram/comments', [InstagramController, 'comments'])
-    router.post('/api/instagram', [InstagramController, 'save'])
-    router.post('/api/instagram/disconnect', [InstagramController, 'disconnect'])
-    router.post('/api/instagram/token', [InstagramController, 'saveToken'])
-    router.get('/instagram/connect', [InstagramController, 'connect'])
-    router.get('/instagram/callback', [InstagramController, 'callback'])
     router.get('/contacts', [ContactDirectoryController, 'page']).as('directory')
     router.get('/api/contact-directory', [ContactDirectoryController, 'index'])
     router.get('/api/contact-directory/export', [ContactDirectoryController, 'export'])

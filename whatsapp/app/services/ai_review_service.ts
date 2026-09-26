@@ -28,10 +28,7 @@ export async function requestRecentAiReviews(reason: ReviewReason, maxAgeHours: 
     .where((query) => query.whereNull('c.ai_excluded').orWhere('c.ai_excluded', false))
     .where((query) => query.whereNull('c.handling_mode').orWhereNot('c.handling_mode', 'cs'))
     .where((query) =>
-      query
-        .where('m.jid', 'like', '%@lid')
-        .orWhere('m.jid', 'like', '%@s.whatsapp.net')
-        .orWhere('m.jid', 'like', '%@ig')
+      query.where('m.jid', 'like', '%@lid').orWhere('m.jid', 'like', '%@s.whatsapp.net')
     )
     .distinct('m.jid')
   for (const room of rooms) {

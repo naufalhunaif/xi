@@ -25,7 +25,6 @@
     "#mails/*": "./app/mails/*.js",
     "#services/*": "./app/services/*.js",
     "#beta3/*": "./app/beta3/*.js",
-    "#instagram/*": "./app/instagram/*.js",
     "#listeners/*": "./app/listeners/*.js",
     "#generated/*": "./.adonisjs/server/*.js",
     "#events/*": "./app/events/*.js",

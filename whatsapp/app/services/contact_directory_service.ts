@@ -53,12 +53,7 @@ export async function contactDirectory(input: {
   const limit = Math.max(1, Math.min(200, Math.floor(Number(input.limit) || 30)))
   const query = db
     .from('whatsapp_contacts as c')
-    .where((q) =>
-      q
-        .where('c.jid', 'like', '%@lid')
-        .orWhere('c.jid', 'like', '%@s.whatsapp.net')
-        .orWhere('c.jid', 'like', '%@ig')
-    )
+    .where((q) => q.where('c.jid', 'like', '%@lid').orWhere('c.jid', 'like', '%@s.whatsapp.net'))
   const search = text(input.query).slice(0, 100)
   if (search)
     query.where((q) => {

@@ -21,7 +21,7 @@ type InboxMessage = {
 export async function markRoomRead(jid: string, throughId: number) {
   await initializeDatabase()
   if (
-    !/^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid) ||
+    !/^[^@\s]+@(?:s\.whatsapp\.net|lid)$/.test(jid) ||
     !Number.isSafeInteger(throughId) ||
     throughId < 1
   )
@@ -77,7 +77,13 @@ export async function latestInboxMessages() {
         ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages WHERE direction = 'out' AND status IN ('sent', 'delivered', 'read')
     )
-    SELECT m.id, m.jid, m.contact_name, m.body, m.media_type,
+    SELECT m.id, m.jid,
+      -- Nama: kontak ini, kontak nomor HP pasangannya (LID ↔ nomor), atau nama WA
+      -- terakhir dari pesan masuk. Pesan keluar tidak membawa nama pelanggan.
+      COALESCE(NULLIF(c.name, ''), NULLIF(pc.name, ''), m.contact_name,
+        (SELECT n.contact_name FROM whatsapp_messages n WHERE n.jid = m.jid AND n.direction = 'in'
+          AND n.contact_name IS NOT NULL AND n.contact_name <> '' ORDER BY n.id DESC LIMIT 1)) AS contact_name,
+      m.body, m.media_type,
       m.direction, m.created_at,
       (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid
         AND u.direction = 'in' AND u.id > COALESCE(c.workspace_read_id, 0)) AS unread_count,
@@ -90,6 +96,7 @@ export async function latestInboxMessages() {
     JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages) ranked ON ranked.id = m.id AND ranked.position = 1
     LEFT JOIN whatsapp_contacts c ON c.jid = m.jid
+    LEFT JOIN whatsapp_contacts pc ON pc.jid = c.phone_jid AND pc.jid <> m.jid
     LEFT JOIN successful_replies r ON r.jid = m.jid AND r.position = 1
     LEFT JOIN whatsapp_carts cart ON cart.jid = m.jid
     ORDER BY m.created_at DESC, m.id DESC`)

@@ -269,7 +269,7 @@ export async function saveGoalDecision(
   }
 }
 
-export async function dueConversationGoals(now = new Date(), channel: 'wa' | 'ig' = 'wa') {
+export async function dueConversationGoals(now = new Date()) {
   // No automatic retry after uncertain sends/crashes. Fresh input can reevaluate the goal.
   await db
     .from('whatsapp_chat_goals')
@@ -288,8 +288,6 @@ export async function dueConversationGoals(now = new Date(), channel: 'wa' | 'ig
     .whereIn('g.status', ['waiting', 'waiting_answer', 'waiting_payment'])
     .where('g.next_run_at', '<=', now)
     .where((query) => query.whereNull('c.handling_mode').orWhereNot('c.handling_mode', 'cs'))
-    // Room Instagram dijadwalkan terpisah (tanpa soket WhatsApp).
-    .where('g.jid', channel === 'ig' ? 'like' : 'not like', '%@ig')
     .orderBy('g.next_run_at', 'asc')
     .limit(10)
 }

@@ -7,7 +7,7 @@ Wajib dibaca sebelum membuat atau mengubah halaman. Tujuannya: setiap layar rapi
 1. **Tindakan dulu, teks belakangan.** Tampilkan status, data, dan tombol yang dibutuhkan. Tidak ada paragraf pengantar; bantuan pakai satu baris `wa-note` atau popover ⓘ.
 2. **Satu topik per kartu.** Kelompokkan isian yang saling terkait dalam satu `wa-card`. Urutan kartu: status → isian utama → data teknis → pengaturan tambahan.
 3. **Satu tombol utama per kartu.** Tombol utama `button primary`; sisanya `button` netral. Tindakan berisiko wajib konfirmasi.
-4. **Warna selalu bertemu label.** Hijau = baik, kuning = perlu dicek, merah = gagal, pink = Instagram. Jangan mengandalkan warna saja.
+4. **Warna selalu bertemu label.** Hijau = baik, kuning = perlu dicek, merah = gagal. Jangan mengandalkan warna saja.
 5. **Pakai komponen yang ada.** Jangan membuat gaya baru atau `style="..."` inline. Kalau butuh komponen baru, tambahkan ke `public/assets/ui.css` dan dokumentasikan di sini.
 6. **Ringkas & enterprise.** Referensi: GitHub, Linear, Stripe, Notion. Bukan gaya Dribbble. Radius maksimal 6 px untuk kontrol dan kartu, tanpa bayangan berat.
 
@@ -32,7 +32,6 @@ Warna diambil dari variabel CSS. Dark mode cukup mengganti variabel, jadi jangan
 | `--wa-ok` / `--wa-ok-bg` | Berhasil, aktif, terhubung, AI |
 | `--wa-warn` / `--wa-warn-bg` | Perlu dicek, antre, menunggu |
 | `--wa-err` / `--wa-err-bg` | Gagal, error, ditolak |
-| `--wa-ig` / `--wa-ig-bg` | Penanda Instagram |
 | `--wa-control-height` | Tinggi kontrol: 36 px desktop, 40 px sentuh |
 
 | Tipografi | Ukuran |
@@ -55,7 +54,7 @@ Jarak memakai kelipatan 4: 4, 6, 8, 12, 16. Gap dalam kartu 12 px, padding kartu
       <strong>Judul singkat</strong>
       <small>Satu baris keterangan (opsional)</small>
     </div>
-    <div class="actions"><span class="wa-pill ok">Terhubung</span><button class="button">Aksi</button></div>
+    <div class="actions"><span class="wa-pill ok">Aktif</span><button class="button">Aksi</button></div>
   </div>
   <!-- isi kartu -->
 </div>
@@ -78,7 +77,7 @@ Jarak memakai kelipatan 4: 4, 6, 8, 12, 16. Gap dalam kartu 12 px, padding kartu
 ### Tombol
 - `button primary` hanya untuk satu aksi utama, `button` untuk yang lain, `button small` di baris tabel/daftar.
 - Tombol merah hanya di Danger zone (`button danger`).
-- Label berupa kata kerja singkat: "Simpan", "Hubungkan", "Salin", "Buka DM".
+- Label berupa kata kerja singkat: "Simpan", "Hubungkan", "Salin", "Buka".
 
 ### Switch & pilihan
 ```html
@@ -98,13 +97,12 @@ Jarak memakai kelipatan 4: 4, 6, 8, 12, 16. Gap dalam kartu 12 px, padding kartu
 ```
 
 ### Navigasi dalam daftar
-- **Segmen** (`wa-segmented`): pilihan setara dan saling eksklusif, maksimal 4 (mis. Semua / WhatsApp / Instagram / Komentar).
-- **Tab filter** (`wa-inbox-filters`): menyaring antrean di dalam segmen (AI, Perlu CS, Pembayaran, Order).
-- State tersimpan di URL (`?channel=`, `?inbox=`), bukan di memori saja.
+- **Segmen** (`wa-segmented`): pilihan setara dan saling eksklusif, maksimal 4.
+- **Tab filter** (`wa-inbox-filters`): menyaring antrean (AI, Perlu CS, Pembayaran, Order).
+- State tersimpan di URL (mis. `?inbox=`), bukan di memori saja.
 
 ### Baris daftar
-- Kontak: `wa-contact` = avatar 32 px + nama (11 px, tebal) + pratinjau (10 px, muted) + meta kanan. Room Instagram diberi `<span class="wa-channel ig">IG</span>` sebelum nama dan avatar pink.
-- Komentar: `wa-comment` (`details`) dengan ringkasan satu baris + status di kanan; isi detail memakai `dl` (label kecil di atas nilai).
+- Kontak: `wa-contact` = avatar 32 px + nama (11 px, tebal) + pratinjau (10 px, muted) + meta kanan.
 - Kosong: `<div class="wa-empty">Belum ada …</div>`, satu kalimat pendek.
 
 ### Lainnya
@@ -115,7 +113,7 @@ Jarak memakai kelipatan 4: 4, 6, 8, 12, 16. Gap dalam kartu 12 px, padding kartu
 ## 5. Pola halaman
 
 - **Pengaturan:** `section[data-settings-panel]` → `h2` → kartu-kartu. Menu kiri satu kata/dua kata. Pengaturan sederhana autosave, pengaturan yang menghubungkan layanan memakai tombol eksplisit.
-- **Inbox:** kolom daftar (segmen → tab filter → daftar) + panel chat. Daftar dan chat scroll sendiri-sendiri.
+- **Inbox:** kolom daftar (tab filter → daftar) + panel chat. Daftar dan chat scroll sendiri-sendiri.
 - **Tabel (Order, Kontak):** pencarian/filter di atas, tabel penuh, detail di dialog kanan (maks. 640 px, layar penuh di mobile).
 
 ## 6. Teks & bahasa
@@ -128,7 +126,7 @@ Jarak memakai kelipatan 4: 4, 6, 8, 12, 16. Gap dalam kartu 12 px, padding kartu
 
 | File | Isi |
 | --- | --- |
-| `public/assets/ui.css` | Komponen bersama untuk halaman/fitur baru (kartu, pill, alert, kv, segmen, kanal, komentar) |
+| `public/assets/ui.css` | Komponen bersama untuk halaman/fitur baru (kartu, pill, alert, kv, segmen) |
 | `public/assets/forms.css` | Ukuran dan fokus kontrol form |
 | `public/assets/theme.css` | Token warna light/dark |
 | `public/assets/app.css` | Layout lama (inbox, pengaturan, trace) — jangan tambah komponen baru di sini |
