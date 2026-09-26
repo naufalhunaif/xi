@@ -1111,4 +1111,6 @@ window.waLocales.en = {
   "Simpan token": "Save token",
   "Tempel access token dulu.": "Paste the access token first.",
   "Memeriksa token…": "Checking token…",
+  "Webhook terakhir diterima: {0}": "Last webhook received: {0}",
+  "Belum ada webhook yang masuk sejak aplikasi dijalankan. Kirim DM uji dari akun lain, lalu muat ulang halaman ini.": "No webhook received since the app started. Send a test DM from another account, then reload this page.",
 }

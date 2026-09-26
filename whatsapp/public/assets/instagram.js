@@ -28,6 +28,13 @@
       toggle.value = String(on)
       toggle.setAttribute('aria-checked', String(on))
     }
+    const when = (value) =>
+      new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+    byId('igWebhook').textContent = !data.connected
+      ? ''
+      : data.lastWebhookAt
+        ? t('Webhook terakhir diterima: {0}', when(data.lastWebhookAt))
+        : t('Belum ada webhook yang masuk sejak aplikasi dijalankan. Kirim DM uji dari akun lain, lalu muat ulang halaman ini.')
     const c = data.comments || {}
     const done = (c.done || 0) + (c.hidden || 0) + (c.spam || 0)
     byId('igStats').textContent = data.connected

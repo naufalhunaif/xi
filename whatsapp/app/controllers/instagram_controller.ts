@@ -21,6 +21,10 @@ import { shareFilePath, shareMime } from '#instagram/media'
 const errorText = (error: unknown) =>
   (error instanceof Error ? error.message : String(error)).slice(0, 290)
 
+/** Diagnostik ringan: kapan webhook terakhir masuk (per proses web). */
+const webhookSeen: { at: Date | null; rejectedAt: Date | null } = { at: null, rejectedAt: null }
+const REJECTED = 'Webhook ditolak: App Secret tidak cocok.'
+
 export default class InstagramController {
   /** Verifikasi webhook dari Meta (GET hub.challenge). */
   async verify({ request, response }: HttpContext) {
@@ -43,8 +47,18 @@ export default class InstagramController {
     if (!scope.id) return response.ok('')
     const config = await inWorkspace(scope, () => readInstagram())
     const raw = request.raw() || ''
-    if (!validSignature(config.appSecret, raw, request.header('x-hub-signature-256')))
+    if (!validSignature(config.appSecret, raw, request.header('x-hub-signature-256'))) {
+      webhookSeen.rejectedAt = new Date()
+      await inWorkspace(scope, () =>
+        updateInstagram({
+          last_error: `${REJECTED} Isi "Instagram app secret" dari menu Instagram → API setup with Instagram login (bukan App Secret Facebook).`,
+        })
+      ).catch(() => {})
       return response.unauthorized('')
+    }
+    webhookSeen.at = new Date()
+    if (config.lastError.startsWith(REJECTED))
+      await inWorkspace(scope, () => updateInstagram({ last_error: null })).catch(() => {})
     let payload: any
     try {
       payload = JSON.parse(raw)
@@ -93,6 +107,8 @@ export default class InstagramController {
       commentTarget: config.commentTarget,
       hideSpam: config.hideSpam,
       lastError: config.lastError,
+      lastWebhookAt: webhookSeen.at,
+      lastRejectedAt: webhookSeen.rejectedAt,
       comments: Object.fromEntries(counts.map((row: any) => [row.status, Number(row.total)])),
     })
   }
