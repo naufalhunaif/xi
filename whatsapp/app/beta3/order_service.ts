@@ -729,15 +729,24 @@ export function matchAutoTotal(
     return { ok: false, reason: `subtotal AI ${draft.subtotal} ≠ katalog ${sum}` }
   if (sum <= 0) return { ok: false, reason: 'harga katalog kosong' }
   const key = (text: string) => text.toLowerCase().replace(/[^a-z]/g, '')
+  // Pelanggan melihat nama REG/YES/JTR; kode ekspedisi CTC/CTCYES/CTCJTR setara.
+  const alias = (text: string) => key(text).replace(/^ctc/, '') || 'reg'
   let chosen = draft.layanan
-    ? prices.find((row) => key(row.service) === key(draft.layanan) && row.price > 0)
+    ? prices.find(
+        (row) =>
+          (key(row.service) === key(draft.layanan) || alias(row.service) === alias(draft.layanan)) &&
+          row.price > 0
+      )
     : null
   if (!chosen && !draft.layanan) {
     // Nama layanan (tanpa angka) sebagai kata utuh di teks petunjuk; terpanjang menang (CTCYES sebelum CTC).
     const hay = ` ${hints.join(' ')} `.toLowerCase()
     const candidates = prices
       .filter((row) => row.price > 0)
-      .map((row) => ({ row, name: row.service.replace(/\d+$/, '').toLowerCase() }))
+      .flatMap((row) => {
+        const name = row.service.replace(/\d+$/, '').toLowerCase()
+        return [{ row, name }, { row, name: alias(name) }]
+      })
       .filter(({ name }) => name.length >= 3 && new RegExp(`[^a-z]${name}[^a-z]`).test(hay))
       .sort((a, b) => b.name.length - a.name.length)
     chosen = candidates[0]?.row || null

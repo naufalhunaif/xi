@@ -130,6 +130,31 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
   }))
 }
 
+/** Ganti bubble yang menyebut ongkir berderet dalam satu kalimat dengan blok ongkir rapi. */
+export function tidyShippingBubbles(bubbles: string[], notes: string[], address: string) {
+  const block = notes
+    .map((note) => note.match(/<<<ONGKIR\n([\s\S]+?)\nONGKIR>>>/)?.[1])
+    .filter(Boolean)
+    .pop()
+  if (!block) return bubbles
+  const prices = block
+    .split('\n')
+    .slice(1)
+    .map((line) => line.match(/\s(\d{1,3}(?:\.\d{3})+)/)?.[1])
+    .filter(Boolean) as string[]
+  if (prices.length < 1) return bubbles
+  return bubbles.map((bubble) => {
+    const hits = prices.filter((price) => bubble.includes(price)).length
+    if (hits < Math.min(2, prices.length) || bubble.includes(block.split('\n')[1])) return bubble
+    const question =
+      bubble
+        .split(/(?<=[.!?])\s+/)
+        .filter((part) => part.trim().endsWith('?') && !prices.some((price) => part.includes(price)))
+        .pop() || `Mau pakai yang mana ${address}?`
+    return `${block}\n\n${question.trim()}`
+  })
+}
+
 /** Pesan sekarang yang membalas pesan lain: sebut jelas produk yang dimaksud. */
 function replyContext(rows: LeanHistoryRow[]) {
   const quotes = [...new Set(rows.filter((row) => row.current && row.replyTo).map((row) => row.replyTo))]
@@ -308,7 +333,7 @@ export async function createLeanReply(input: {
       if (rateText) {
         toolNotes.push(rateText)
         systemNote +=
-          '\n\nCATATAN SISTEM: pelanggan mengirim alamat pengiriman; sebut ongkirnya dari bagian ONGKIR di balasan ini (satu kalimat), jangan hanya "alamatnya sudah dicatat".'
+          '\n\nCATATAN SISTEM: pelanggan mengirim alamat pengiriman; sebut ongkirnya memakai blok ONGKIR (satu layanan per baris) di balasan ini, jangan hanya "alamatnya sudah dicatat".'
       }
       onTrace?.({
         key: 'beta3-rates',
@@ -534,6 +559,10 @@ export async function createLeanReply(input: {
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
   if (style) {
     decision.pesan = normalizeStyle(decision.pesan, style)
+  }
+  // Ongkir selalu tampil rapi (satu layanan per baris), model apa pun yang menulis.
+  decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
+  if (style) {
     if (decision.susulan) decision.susulan = normalizeStyle([decision.susulan], style)[0] || ''
   }
   if (decision.referensi?.length && input.imageIds?.length) {
