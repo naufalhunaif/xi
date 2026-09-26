@@ -67,6 +67,17 @@ export async function exchangeCode(config: InstagramConfig, code: string, redire
   }
 }
 
+/** Token yang dibuat di dashboard Meta ("Generate access token") → id & username akun. */
+export async function accountFromToken(token: string) {
+  const me = await call<{ user_id?: string; id?: string; username?: string }>(
+    `${GRAPH}/me?fields=user_id,username`,
+    { headers: bearer(token) }
+  )
+  const igUserId = String(me.user_id || me.id || '')
+  if (!igUserId) throw new Error('Instagram: token tidak valid.')
+  return { igUserId, username: String(me.username || '') }
+}
+
 export async function refreshToken(token: string) {
   const data = await call<{ access_token: string; expires_in: number }>(
     `https://graph.instagram.com/refresh_access_token?${new URLSearchParams({

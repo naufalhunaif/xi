@@ -74,6 +74,23 @@
     if (!(await save(credentials()))) return
     window.location.href = `${base}/instagram/connect`
   })
+  byId('igSaveToken').addEventListener('click', async () => {
+    const button = byId('igSaveToken')
+    const accessToken = byId('igAccessToken').value.trim()
+    if (!accessToken) return message(t('Tempel access token dulu.'))
+    button.disabled = true
+    message(t('Memeriksa token…'))
+    try {
+      if (!(await save(credentials()))) return
+      render(await call('/api/instagram/token', 'POST', { accessToken }))
+      byId('igAccessToken').value = ''
+      message(t('Instagram terhubung.'))
+    } catch (error) {
+      message(error.message)
+    } finally {
+      button.disabled = false
+    }
+  })
   byId('igDisconnect').addEventListener('click', async () => {
     try {
       render(await call('/api/instagram/disconnect', 'POST'))

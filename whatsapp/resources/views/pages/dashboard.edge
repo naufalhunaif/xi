@@ -809,6 +809,15 @@
                       <button type="button" class="button primary" id="igConnect" data-i18n="Hubungkan Instagram">Hubungkan Instagram</button>
                       <button type="button" class="button" id="igDisconnect" hidden data-i18n="Putuskan">Putuskan</button>
                     </div>
+                    <details class="wa-ig-token">
+                      <summary data-i18n="Atau tempel access token dari Meta">Atau tempel access token dari Meta</summary>
+                      <p class="wa-muted" data-i18n="Meta Developer → Instagram → API setup with Instagram login → Generate access tokens → salin token akun Anda.">Meta Developer → Instagram → API setup with Instagram login → Generate access tokens → salin token akun Anda.</p>
+                      <label>
+                        <span>Access token</span>
+                        <input id="igAccessToken" type="password" autocomplete="off" spellcheck="false" data-settings-ignore />
+                      </label>
+                      <div class="actions"><button type="button" class="button primary" id="igSaveToken" data-i18n="Simpan token">Simpan token</button></div>
+                    </details>
                     <details>
                       <summary data-i18n="Data untuk Meta Developer">Data untuk Meta Developer</summary>
                       <p>OAuth redirect URI: <code id="igCallbackUrl"></code></p>

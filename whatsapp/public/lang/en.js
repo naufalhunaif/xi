@@ -1106,4 +1106,9 @@ window.waLocales.en = {
   "Gagal menghubungkan Instagram. Lihat masalah terakhir di atas.": "Could not connect Instagram. See the last issue above.",
   "Isi App ID dan App Secret dulu.": "Fill in the App ID and App Secret first.",
   "Instagram diputuskan.": "Instagram disconnected.",
+  "Atau tempel access token dari Meta": "Or paste an access token from Meta",
+  "Meta Developer → Instagram → API setup with Instagram login → Generate access tokens → salin token akun Anda.": "Meta Developer → Instagram → API setup with Instagram login → Generate access tokens → copy your account token.",
+  "Simpan token": "Save token",
+  "Tempel access token dulu.": "Paste the access token first.",
+  "Memeriksa token…": "Checking token…",
 }

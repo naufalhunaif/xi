@@ -75,6 +75,7 @@ router
     router.get('/api/instagram', [InstagramController, 'show'])
     router.post('/api/instagram', [InstagramController, 'save'])
     router.post('/api/instagram/disconnect', [InstagramController, 'disconnect'])
+    router.post('/api/instagram/token', [InstagramController, 'saveToken'])
     router.get('/instagram/connect', [InstagramController, 'connect'])
     router.get('/instagram/callback', [InstagramController, 'callback'])
     router.get('/contacts', [ContactDirectoryController, 'page']).as('directory')

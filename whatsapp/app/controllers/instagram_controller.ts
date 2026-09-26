@@ -7,7 +7,14 @@ import { activeWorkspace } from '#services/workspace_service'
 import { publicAppUrl } from '#services/public_url'
 import db from '#services/workspace_database'
 import { readInstagram, updateInstagram } from '#instagram/store'
-import { authorizeUrl, exchangeCode, subscribeApp, validSignature } from '#instagram/api'
+import {
+  accountFromToken,
+  authorizeUrl,
+  exchangeCode,
+  refreshToken,
+  subscribeApp,
+  validSignature,
+} from '#instagram/api'
 import { handleInstagramWebhook } from '#instagram/webhook'
 import { shareFilePath, shareMime } from '#instagram/media'
 
@@ -149,6 +156,33 @@ export default class InstagramController {
       .withQs(false)
       .status(303)
       .toPath(`${publicAppUrl(request)}/settings?instagram=${result}#instagram`)
+  }
+
+  /** Alternatif login: tempel access token dari dashboard Meta (Generate access token). */
+  async saveToken({ request, response }: HttpContext) {
+    const raw = String(request.input('accessToken', '')).trim().replace(/\s+/g, '')
+    if (!/^[A-Za-z0-9_\-.|]{20,1000}$/.test(raw))
+      return response.unprocessableEntity({ error: 'Access token tidak valid.' })
+    try {
+      const account = await accountFromToken(raw)
+      // Token dari dashboard sudah jangka panjang (±60 hari); diperpanjang bila bisa.
+      let token = { accessToken: raw, expiresAt: new Date(Date.now() + 55 * 24 * 3_600_000) }
+      token = await refreshToken(raw).catch(() => token)
+      await updateInstagram({
+        access_token: token.accessToken,
+        token_expires_at: token.expiresAt,
+        ig_user_id: account.igUserId,
+        username: account.username,
+        connected_at: new Date(),
+        last_error: null,
+      })
+      await subscribeApp(token.accessToken).catch(async (error) => {
+        await updateInstagram({ last_error: errorText(error) })
+      })
+      return this.show({ request, response } as HttpContext)
+    } catch (error) {
+      return response.unprocessableEntity({ error: errorText(error) })
+    }
   }
 
   async disconnect({ request, response }: HttpContext) {
