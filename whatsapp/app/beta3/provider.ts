@@ -88,17 +88,31 @@ export async function runLeanProvider(
   for (const account of accounts) {
     await recordAiEvent(account.id, 'start', phase, '', null, jid).catch(() => {})
     try {
-      const result = await withAiAccount(aiAccountRef(account), () =>
-        runLeanOnce(
-          settings,
-          account.provider,
-          { model: account.model, apiKey: account.apiKey },
-          prompt,
-          imagePaths,
-          phase,
-          schema
+      const attempt = (useDefault: boolean) =>
+        withAiAccount(aiAccountRef(account), () =>
+          runLeanOnce(
+            useDefault ? { ...settings, chatgptModel: '', claudeModel: '' } : settings,
+            account.provider,
+            { model: useDefault ? '' : account.model, apiKey: account.apiKey },
+            prompt,
+            imagePaths,
+            phase,
+            schema
+          )
         )
-      )
+      // Model yang tidak tersedia untuk langganan akun ini (mis. akun ChatGPT lain paketnya
+      // berbeda) → pakai model bawaan akun tersebut, bukan pindah/menjeda akun.
+      let result: LeanProviderResult
+      if (account.provider !== 'gemini' && modelFallback.has(account.id)) result = await attempt(true)
+      else {
+        try {
+          result = await attempt(false)
+        } catch (error) {
+          if (account.provider === 'gemini' || !modelUnavailable(error)) throw error
+          result = await attempt(true)
+          modelFallback.add(account.id)
+        }
+      }
       await markAiAccountUsed(account.id).catch(() => {})
       const tokens = result.usage ? result.usage.input + result.usage.output : null
       await recordAiEvent(account.id, 'ok', phase, '', tokens, jid).catch(() => {})
@@ -129,6 +143,17 @@ export async function runLeanProvider(
     }
   }
   throw lastError
+}
+
+/** Akun yang modelnya ditolak layanan; memakai model bawaan akun sampai proses dimulai ulang. */
+const modelFallback = new Set<number>()
+function modelUnavailable(error: unknown) {
+  const text = error instanceof Error ? error.message : String(error)
+  return (
+    /invalid_request_error|model_not_found|400/.test(text) &&
+    /model/i.test(text) &&
+    /not (?:supported|available|found|exist)|does not exist|unsupported|no access|not have access|invalid model|isn't|is not/i.test(text)
+  )
 }
 
 /** Tes satu akun dengan permintaan kecil; hasil/alasan gagal ditampilkan di Pengaturan. */
