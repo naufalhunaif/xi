@@ -143,3 +143,41 @@ export function refCaption(ref: LeanRef) {
   return part ? `Model ${part} seperti ini` : 'Model seperti ini'
 }
 
+
+/**
+ * Cadangan bila order tidak punya foto katalog maupun referensi: gambar yang dikirim
+ * pelanggan di percakapan order ini (7 hari sebelum order dibuat, setelah order
+ * sebelumnya). Gambar setelah order dibuat dilewati karena biasanya bukti transfer.
+ */
+export async function customerImagesForOrder(order: Record<string, any>, limit = 4) {
+  const jid = String(order.jid || '')
+  if (!jid || !order.created_at) return []
+  const createdAt = new Date(order.created_at)
+  const previous = await db
+    .from('whatsapp_beta3_orders')
+    .where('jid', jid)
+    .where('id', '<', Number(order.id))
+    .orderBy('id', 'desc')
+    .select('created_at')
+    .first()
+    .catch(() => null)
+  const since = new Date(
+    Math.max(createdAt.getTime() - 7 * 86_400_000, previous?.created_at ? new Date(previous.created_at).getTime() : 0)
+  )
+  const rows = await db
+    .from('whatsapp_messages')
+    .where('jid', jid)
+    .where('direction', 'in')
+    .where('media_type', 'image')
+    .whereNotNull('media_url')
+    .where('created_at', '>=', since)
+    .where('created_at', '<=', createdAt)
+    .orderBy('id', 'desc')
+    .limit(limit)
+    .select('media_url', 'body')
+    .catch(() => [])
+  return rows.reverse().map((row: any) => ({
+    url: String(row.media_url),
+    caption: String(row.body || '').trim() || 'Model seperti ini',
+  }))
+}

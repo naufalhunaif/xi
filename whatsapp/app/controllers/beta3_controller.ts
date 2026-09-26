@@ -29,7 +29,7 @@ import db from '#services/workspace_database'
 import { queueOutgoingMessage } from '#services/message_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
-import { listActiveRefs, refCaption, refsForOrder } from '#beta3/refs_service'
+import { customerImagesForOrder, listActiveRefs, refCaption, refsForOrder } from '#beta3/refs_service'
 import { readRecapProgress, requestRecap } from '#beta3/recap_service'
 import { skillStatus, syncRemoteSkills } from '#beta3/skill_sync'
 import { ensureDefaults, readSettings } from '#services/settings_service'
@@ -187,7 +187,13 @@ export default class Beta3Controller {
         }
       })
     )
-    return response.json({ orders: await attachOrderPhotos(withRefs), counts })
+    const withPhotos = await attachOrderPhotos(withRefs)
+    // Sama seperti kiriman grup: tanpa foto katalog & referensi → gambar pelanggan di chat order.
+    for (const order of withPhotos as Array<Record<string, any>>) {
+      if (order.photos?.length || order.refs?.length) continue
+      order.refs = await customerImagesForOrder(order).catch(() => [])
+    }
+    return response.json({ orders: withPhotos, counts })
   }
 
   /** CS mengisi ongkir + subtotal → sistem kirim total lalu rekening ke pelanggan. */

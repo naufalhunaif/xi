@@ -783,7 +783,21 @@ export default class WhatsappListen extends BaseCommand {
           mainRef = refs[0]
         } catch {}
       }
-      const caption = mainRef ? `${text}\n\n${beta3Refs.refCaption(mainRef)}` : text
+      // Tanpa foto katalog & tanpa referensi: pakai gambar yang dikirim pelanggan di chat order ini.
+      let chatImages: Array<{ url: string; caption: string }> = []
+      if (!images.length && !refs.length) {
+        chatImages = await beta3Refs.customerImagesForOrder(order).catch(() => [])
+        for (const picture of chatImages) {
+          try {
+            images.push({ bytes: await beta3Refs.loadImage(picture.url), caption: picture.caption })
+          } catch {}
+        }
+      }
+      const caption = mainRef
+        ? `${text}\n\n${beta3Refs.refCaption(mainRef)}`
+        : chatImages.length && images.length
+          ? `${text}\n\n${images[0].caption}`
+          : text
       const sent = await socket.sendMessage(
         groupJid,
         images.length
