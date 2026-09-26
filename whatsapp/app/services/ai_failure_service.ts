@@ -86,7 +86,7 @@ export function aiFailureDetail(error: unknown, context: FailureContext): AiFail
       true
     )
   if (
-    /unauthorized|\b401\b|invalid_grant|invalid_token|not logged in|login required|authentication|hubungkan ulang|sesi.*(?:berakhir|kedaluwarsa)/i.test(
+    /unauthorized|\b401\b|invalid_grant|invalid_token|not logged in|login required|authentication|hubungkan ulang|sesi.*(?:berakhir|kedaluwarsa)|run \/login|please (?:run )?\/?log ?in|invalid api key|token (?:has )?expired|api key.*(?:ditolak|belum diisi)/i.test(
       text
     )
   )
@@ -111,7 +111,11 @@ export function aiFailureDetail(error: unknown, context: FailureContext): AiFail
       'Input melampaui kapasitas konteks layanan AI.',
       'Periksa ukuran prompt dan kapasitas model; jangan mengulang input yang sama.'
     )
-  if (/\b429\b|rate.?limit|usage.?limit|quota|exceeded.*limit|hit.*limit/i.test(text))
+  if (
+    /\b429\b|rate.?limit|usage.?limit|quota|exceeded.*limit|hit.*limit|limit (?:reached|exceeded)|reached.*limit|resets? (?:at|in|\d)|out of (?:credits|usage)|credit balance|RESOURCE_EXHAUSTED/i.test(
+      text
+    )
+  )
     return detail(
       'USAGE_LIMIT',
       'Batas pemakaian layanan tercapai.',

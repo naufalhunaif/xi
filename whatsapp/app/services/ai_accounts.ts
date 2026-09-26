@@ -67,12 +67,21 @@ async function ensureTable() {
         provider: secondary,
         label: '',
         position: 2,
-        enabled: settings?.aiFailover ? 1 : 0,
+        enabled: 1,
         legacy: 1,
         created_at: now,
         updated_at: now,
       },
     ])
+  }
+  // Dulu akun utama kedua hanya aktif bila "alih otomatis" dinyalakan. Kini semua akun
+  // di daftar dipakai: aktifkan sekali, kecuali yang sengaja dinonaktifkan pengguna.
+  const [cols] = await db.rawQuery(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'whatsapp_ai_accounts' AND column_name = 'user_set'"
+  )
+  if (!Number(cols?.[0]?.n || 0)) {
+    await db.rawQuery('ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS user_set TINYINT(1) NOT NULL DEFAULT 0')
+    await db.from('whatsapp_ai_accounts').where('legacy', 1).update({ enabled: 1 })
   }
   ready = true
 }

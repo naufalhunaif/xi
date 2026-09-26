@@ -82,7 +82,10 @@ export default class AiAccountsController {
   async update({ params, request, response }: HttpContext) {
     const account = await found(params)
     const values: Record<string, unknown> = {}
-    if (request.input('enabled') !== undefined) values.enabled = request.input('enabled') ? 1 : 0
+    if (request.input('enabled') !== undefined) {
+      values.enabled = request.input('enabled') ? 1 : 0
+      values.user_set = 1
+    }
     if (request.input('label') !== undefined) values.label = String(request.input('label')).trim().slice(0, 80)
     if (request.input('model') !== undefined) values.model = String(request.input('model')).trim().slice(0, 80)
     if (request.input('apiKey') !== undefined && account.provider === 'gemini') {

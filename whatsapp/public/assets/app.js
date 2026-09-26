@@ -1183,9 +1183,10 @@
   byId('oauthRestart')?.addEventListener('click', () => restartOAuth('chatgpt'))
   byId('claudeOauthRestart')?.addEventListener('click', () => restartOAuth('claude'))
   function updateProviderPanels() {
-    const provider = byId('aiProvider')?.value || 'chatgpt'
+    // Tanpa pilihan mesin: akun AI di daftar yang dipakai; panel ChatGPT & Claude tampil semua.
+    const provider = byId('aiProvider')?.value || ''
     document.querySelectorAll('[data-ai-provider-panel]').forEach((panel) => {
-      panel.hidden = panel.dataset.aiProviderPanel !== provider
+      panel.hidden = Boolean(provider) && panel.dataset.aiProviderPanel !== provider
     })
     updateMcpOAuth()
   }

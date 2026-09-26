@@ -154,11 +154,7 @@
           refresh()
         }))
       if (!account.connected && account.provider !== 'gemini')
-        side.append(
-          account.legacy
-            ? el('small', '', t('login di bawah'))
-            : button(t('Login'), () => login(account, holder))
-        )
+        side.append(button(t('Login'), () => login(account, holder)))
       if (account.provider === 'gemini')
         side.append(button(t('Ganti key'), async () => {
           const key = window.prompt(t('API key Gemini baru'))

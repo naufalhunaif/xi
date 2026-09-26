@@ -16,6 +16,7 @@ import {
   markAiAccountLimited,
   markAiAccountUsed,
   nextAiRecovery,
+  updateAiAccount,
   usableAiAccounts,
   type AiProviderName,
 } from '#services/ai_accounts'
@@ -50,6 +51,8 @@ export const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flas
 
 /** Kegagalan yang berarti akun ini tidak bisa melayani sekarang → coba akun berikutnya. */
 const SWITCHABLE = new Set(['USAGE_LIMIT', 'ACCESS_DENIED', 'AI_AUTH_REQUIRED'])
+/** Kegagalan yang akan terulang di akun mana pun (isi/skema) → tidak perlu pindah akun. */
+const STOP_CODES = new Set(['AI_CONTEXT_LIMIT', 'AI_SCHEMA_INVALID', 'DATABASE_UNAVAILABLE'])
 
 /**
  * Banyak akun AI: dicoba sesuai urutan di Pengaturan → AI. Akun yang habis kuota
@@ -97,9 +100,15 @@ export async function runLeanProvider(
         stage: 'provider',
         provider: account.provider === 'claude' ? 'claude' : 'chatgpt',
       })
-      if (!SWITCHABLE.has(detail.code)) throw error
-      await markAiAccountLimited(account.id, detail.code, detail.message).catch(() => {})
       lastError = error
+      if (STOP_CODES.has(detail.code)) throw error
+      // Kuota habis / perlu login → akun dijeda. Gangguan lain → cukup coba akun berikutnya.
+      if (SWITCHABLE.has(detail.code))
+        await markAiAccountLimited(account.id, detail.code, detail.message).catch(() => {})
+      else
+        await updateAiAccount(account.id, {
+          last_error: (error instanceof Error ? error.message : String(error)).slice(0, 290),
+        }).catch(() => {})
     }
   }
   throw lastError
@@ -167,6 +176,19 @@ async function runLeanOnce(
   }
 }
 
+/** Teks error dari event Codex (`error`, `turn.failed`) atau Claude (`result` is_error, pesan API). */
+function eventFailure(event: Record<string, any>) {
+  if (event.type === 'error') return String(event.message || event.error?.message || 'error')
+  if (event.type === 'turn.failed') return String(event.error?.message || 'turn failed')
+  if (event.type === 'result' && (event.is_error || String(event.subtype || '').startsWith('error')))
+    return String(event.result || event.error || event.subtype || 'error')
+  if (event.type === 'assistant' && event.error) {
+    const text = (event.message?.content || []).map((part: any) => part?.text || '').join(' ')
+    return `${event.error}: ${text}`.trim()
+  }
+  return ''
+}
+
 function collect(
   child: ReturnType<typeof spawn>,
   provider: 'chatgpt' | 'claude',
@@ -177,6 +199,8 @@ function collect(
   return new Promise<string>((resolve, reject) => {
     let output = ''
     let errors = ''
+    // Pesan error dari event JSON (kuota habis, belum login) — sering tidak ada di stderr.
+    let eventError = ''
     let finalText = ''
     let settled = false
     const finish = (error?: Error) => {
@@ -185,7 +209,7 @@ function collect(
       clearTimeout(timeout)
       if (error) reject(error)
       else if (finalText.trim()) resolve(finalText.trim())
-      else reject(new Error(errors.trim() || 'AI tidak menghasilkan balasan.'))
+      else reject(new Error(eventError || errors.trim() || 'AI tidak menghasilkan balasan.'))
     }
     const parseLines = () => {
       const lines = output.split('\n')
@@ -194,6 +218,8 @@ function collect(
         try {
           const event = JSON.parse(line) as Record<string, any>
           onEvent(event)
+          const failure = eventFailure(event)
+          if (failure) eventError = failure.slice(0, 600)
           const text = extract(event)
           if (text) finalText = text
         } catch {
@@ -228,8 +254,8 @@ function collect(
     child.on('close', (code) => {
       output += '\n'
       parseLines()
-      if (code === 0) finish()
-      else finish(new Error(errors.trim() || `AI berhenti dengan kode ${code}.`))
+      if (code === 0 && !(eventError && !finalText.trim())) finish()
+      else finish(new Error(eventError || errors.trim() || `AI berhenti dengan kode ${code}.`))
     })
     child.stdin?.on('error', (error) => finish(error))
     child.stdin?.end(stdin)

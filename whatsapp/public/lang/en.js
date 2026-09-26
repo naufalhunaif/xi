@@ -1192,4 +1192,5 @@ window.waLocales.en = {
   "Hasil sebelumnya": "Previous result",
   "Hasil berikutnya": "Next result",
   "Tidak ada hasil": "No results",
+  "Pengaturan lanjutan: model & kecepatan akun utama": "Advanced: model & speed for main accounts",
 }

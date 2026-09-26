@@ -226,3 +226,7 @@ html[data-theme='dark'] .workspace-ui {
 .workspace-ui .wa-room-search small { flex: none; min-width: 42px; font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; }
 .workspace-ui .message.search-hit { outline: 2px solid color-mix(in srgb, var(--wa-warn) 45%, transparent); outline-offset: 2px; }
 .workspace-ui .message.search-current { outline: 2px solid var(--wa-warn); background-image: linear-gradient(var(--wa-warn-bg), var(--wa-warn-bg)); }
+
+/* Pengaturan lanjutan akun utama (model/kecepatan) dilipat. */
+.workspace-ui .wa-ai-advanced > summary { font-size: 13px; font-weight: 600; }
+.workspace-ui .wa-ai-advanced .wa-ai-provider + .wa-ai-provider { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }

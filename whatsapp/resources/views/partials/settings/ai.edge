@@ -10,15 +10,6 @@
     value="{{ settings.aiEnabled ? 'true' : 'false' }}"
    data-i18n-aria-label="Balas otomatis"></button>
 </label>
-<label>
-  <span data-i18n="Mesin AI">Mesin AI</span>
-  <select id="aiProvider" name="aiProvider">
-    <option value="chatgpt" {{ settings.aiProvider === 'chatgpt' ? 'selected' : '' }}>
-      ChatGPT
-    </option>
-    <option value="claude" {{ settings.aiProvider === 'claude' ? 'selected' : '' }}>Claude</option>
-  </select>
-</label>
 <div class="wa-card" id="aiAccountsCard">
   <div class="wa-card-head">
     <div class="wa-card-title">
@@ -51,10 +42,11 @@
     </div>
   </div>
 </div>
+<details class="wa-card wa-ai-advanced">
+  <summary data-i18n="Pengaturan lanjutan: model & kecepatan akun utama">Pengaturan lanjutan: model & kecepatan akun utama</summary>
 <div
   class="wa-ai-provider"
   data-ai-provider-panel="chatgpt"
-  {{ settings.aiProvider === 'chatgpt' ? '' : 'hidden' }}
 >
   <div class="wa-oauth-row">
     <span>ChatGPT OAuth</span>
@@ -161,7 +153,6 @@
 <div
   class="wa-ai-provider"
   data-ai-provider-panel="claude"
-  {{ settings.aiProvider === 'claude' ? '' : 'hidden' }}
 >
   <div class="wa-oauth-row">
     <span>Claude OAuth</span>
@@ -262,3 +253,4 @@
     </div>
   </div>
 </div>
+</details>
