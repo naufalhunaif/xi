@@ -54,7 +54,7 @@ async function latestWaVersion() {
 }
 import { databaseAuthState, clearAuthRows } from '#services/baileys_auth_service'
 import { currentLine, setCurrentLine, lineColumns, lineOf } from '#services/line_context'
-import { listLines, readLine, updateLine } from '#services/line_service'
+import { listLines, readLine, removeLineNow, updateLine } from '#services/line_service'
 import { spawn, type ChildProcess } from 'node:child_process'
 import {
   createReply,
@@ -498,16 +498,28 @@ export default class WhatsappListen extends BaseCommand {
   }
 
   /** Nomor tambahan diputus: logout, hapus sesi & baris line, lalu proses selesai. */
+  /**
+   * Tutup soket untuk dihapus: logout hanya bila benar-benar terhubung (maks 5 detik);
+   * soket yang masih menampilkan QR langsung diakhiri (logout di sana bisa menggantung).
+   */
+  private async closeSocket(socket: WASocket | undefined, wasOpen: boolean) {
+    if (!socket) return
+    if (wasOpen)
+      await Promise.race([socket.logout().catch(() => {}), wait(5000)]).catch(() => {})
+    try {
+      socket.end(undefined)
+    } catch {
+      /* sudah tertutup */
+    }
+  }
+
   private async removeLine() {
     const line = currentLine()
     const socket = this.socket
+    const wasOpen = this.socketOpen
     this.socket = undefined
     this.socketOpen = false
-    try {
-      await socket?.logout()
-    } catch {
-      socket?.end(undefined)
-    }
+    await this.closeSocket(socket, wasOpen)
     await db.transaction(async (trx) => {
       await clearAuthRows(trx, line)
       await trx.from('whatsapp_lines').where('id', line).delete()
@@ -516,8 +528,25 @@ export default class WhatsappListen extends BaseCommand {
   }
 
   /** Worker utama menyalakan satu proses per nomor tambahan dan menghidupkannya lagi bila mati. */
+  private lineRemovalSeen = new Map<number, number>()
   private async superviseLines() {
-    const lines = await listLines()
+    let lines = await listLines()
+    // Nomor yang diminta dihapus tapi prosesnya macet > 20 detik → dihapus paksa.
+    for (const line of lines) {
+      if (line.status !== 'disconnecting') {
+        this.lineRemovalSeen.delete(line.id)
+        continue
+      }
+      const since = this.lineRemovalSeen.get(line.id) ?? Date.now()
+      this.lineRemovalSeen.set(line.id, since)
+      if (Date.now() - since > 20_000) {
+        this.lineChildren.get(line.id)?.kill('SIGKILL')
+        await removeLineNow(line.id).catch(() => {})
+        this.lineRemovalSeen.delete(line.id)
+        this.logger.info(`Nomor tambahan #${line.id}: dihapus paksa.`)
+      }
+    }
+    lines = await listLines()
     const wanted = new Set(lines.filter((line) => line.desired_connected || line.status === 'disconnecting').map((line) => line.id))
     for (const [id, child] of this.lineChildren) {
       if (!wanted.has(id) && child.exitCode === null) child.kill('SIGTERM')
@@ -4017,16 +4046,13 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
 
   private async disconnect() {
     const socket = this.socket
+    const wasOpen = this.socketOpen
     this.socket = undefined
     this.socketOpen = false
     this.receivedPending = false
     for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
     this.pendingTurns.clear()
-    try {
-      await socket?.logout()
-    } catch {
-      socket?.end(undefined)
-    }
+    await this.closeSocket(socket, wasOpen)
     await Promise.allSettled([...this.chatLocks.values(), this.ingestion])
     while (this.tasks.size) await Promise.allSettled([...this.tasks])
     this.chatLocks.clear()

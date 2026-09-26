@@ -73,6 +73,14 @@ export async function createLine() {
 }
 
 /** Putuskan: proses line logout, menghapus sesi, lalu menghapus baris ini. */
+/** Hapus nomor tambahan beserta sesinya sekarang juga (proses nomor itu berhenti sendiri). */
+export async function removeLineNow(id: number) {
+  await db.transaction(async (trx) => {
+    await trx.from('baileys_auth').where('auth_key', 'like', `${lineAuthPrefix(id)}%`).delete()
+    await trx.from('whatsapp_lines').where('id', id).delete()
+  })
+}
+
 export async function requestLineDisconnect(id: number) {
   await updateLine(id, { desired_connected: 0, status: 'disconnecting' })
 }

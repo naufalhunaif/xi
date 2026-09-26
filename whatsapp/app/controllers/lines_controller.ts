@@ -1,7 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { activeWorkspace } from '#services/workspace_service'
 import { readConnectionStatus } from '#services/connection_status_service'
-import { createLine, listLines, readLine, requestLineDisconnect } from '#services/line_service'
+import { createLine, listLines, readLine, removeLineNow, requestLineDisconnect } from '#services/line_service'
 
 const ONLINE_MS = 30_000
 
@@ -43,6 +43,12 @@ export default class LinesController {
   async disconnect({ params, response }: HttpContext) {
     const line = await readLine(Number(params.id))
     if (!line) return response.notFound({ error: 'Nomor tidak ditemukan.' })
+    // Belum pernah tersambung (masih QR/gagal) → langsung dihapus. Yang tersambung
+    // di-logout dulu oleh prosesnya; bila macet lebih dari 20 detik, dihapus paksa.
+    if (line.status !== 'connected') {
+      await removeLineNow(line.id)
+      return response.json({ ok: true })
+    }
     await requestLineDisconnect(line.id)
     return response.json({ ok: true })
   }
