@@ -54,7 +54,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     spesifikasi: {
       type: 'string',
       description:
-        'Catatan untuk penjahit, ditulis ulang LENGKAP tiap giliran, baris pendek tanpa harga/label/nomor: per item "Produk - Warna", "Jas, Celana" (yang dibuat), "Size M/31", "Tinggi 164/68" bila ada, lalu tiap detail custom satu baris dengan kata sehari-hari. Item dipisah baris kosong. Kosong bila pelanggan belum memilih apa pun.',
+        'Catatan untuk penjahit, ditulis ulang LENGKAP tiap giliran, baris pendek tanpa harga/label/nomor: per item "Produk - Warna", "Jas, Celana" (yang dibuat), "Size M/31", "Tinggi 164/68" bila ada, lalu tiap detail custom satu baris dengan kata sehari-hari (mis. "Kerah shawl", "Kancing 1", "Tanpa saku dada"). Ukuran badan custom satu baris: "Ukuran badan: dada 96, pinggang 80, lengan 60". Model dari gambar pelanggan: tulis "Model sesuai gambar" lalu bagiannya. Item dipisah baris kosong. Kosong bila pelanggan belum memilih apa pun.',
     },
     referensi: {
       type: 'array',
@@ -287,7 +287,8 @@ export function buildLeanPrompt(input: {
     ],
     [
       'keluaran',
-      'Inisiatif (maks satu per balasan, SETELAH pertanyaan pelanggan dijawab): kirim foto (field foto) bila pelanggan membahas model/warna yang belum dilihatnya; tawarkan sekalian celana/setelan saat memilih jas; tanyakan tinggi & berat bila size belum jelas; tawarkan form order bila model & size sudah jelas. Jangan berinisiatif bila pelanggan sedang komplain atau minta CS.\n' +
+      'Custom (gambar/model/ukuran dari pelanggan): catat semua detail di spesifikasi, tandai gambar di referensi (bagian: kerah, badan, saku, dst; seluruh model = "model"). Bila detail custom tidak disebut bisa di skill/ATURAN TOKO atau mungkin menambah biaya, jangan menjanjikan bisa & jangan menyebut biaya sendiri: bilang dicek ke tim dulu dan serah_cs = true dengan alasan "konfirmasi custom". Ukuran badan custom tetap dibandingkan dengan size chart.\n' +
+        'Inisiatif (maks satu per balasan, SETELAH pertanyaan pelanggan dijawab): kirim foto (field foto) bila pelanggan membahas model/warna yang belum dilihatnya; tawarkan sekalian celana/setelan saat memilih jas; tanyakan tinggi & berat bila size belum jelas; tawarkan form order bila model & size sudah jelas. Jangan berinisiatif bila pelanggan sedang komplain atau minta CS.\n' +
         'Pengiriman hanya via JNE (REG/YES); ekspedisi lain (J&T, SiCepat, dll) tidak tersedia. Kargo JNE (JTR) minimal 8 kg, hanya untuk pesanan besar.\n' +
         'Pahami maksud pelanggan dari seluruh RIWAYAT, bukan hanya pesan terakhir; jangan menanyakan ulang hal yang sudah jelas. Ditanya harga dan produknya sudah jelas (dikutip, baru dikirim fotonya, atau sudah disebut) → langsung sebut harganya dari KATALOG. Produk belum jelas → sebut kisaran harga dari KATALOG sambil menanyakan modelnya.\n' +
         'Balas sebagai JSON sesuai schema: pesan (array bubble), foto (nama varian katalog), catatan, tahap, serah_cs, alasan, susulan, spesifikasi. Jangan menulis apa pun di luar JSON.',
