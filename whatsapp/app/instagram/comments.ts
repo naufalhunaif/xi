@@ -72,18 +72,33 @@ export function commentRoute(
 ) {
   const help = NEEDS_HELP.has(jenis)
   const dm = help && canDm && target !== 'wa'
-  const waPublic = help && Boolean(wa) && (target === 'wa' || (target === 'both' && !dm))
+  const waPublic = help && (target === 'wa' || (target === 'both' && !dm))
   const waInDm = dm && target === 'both' && Boolean(wa)
   return { dm, waPublic, waInDm }
 }
 
-function routeInstruction(target: InstagramConfig['commentTarget'], hasWa: boolean) {
-  if (target === 'wa' && hasWa)
-    return 'Untuk tanya/minat/keluhan: balasan publik mengajak lanjut chat via WhatsApp (link ditambahkan sistem di akhir, jangan tulis nomor/link sendiri).'
-  return 'Untuk tanya/minat/keluhan: balasan publik cukup bilang sudah dibalas lewat DM (mis. "sudah kami DM ya kak"). Jangan tulis nomor/link.'
+function routeInstruction(target: InstagramConfig['commentTarget']) {
+  const rule =
+    target === 'wa'
+      ? 'Untuk tanya/minat/keluhan: balasan publik mengajak lanjut lewat WhatsApp kami.'
+      : target === 'dm'
+        ? 'Untuk tanya/minat/keluhan: balasan publik bilang sudah kami balas lewat DM (mis. "sudah kami DM ya kak").'
+        : 'Untuk tanya/minat/keluhan: balasan publik bilang sudah kami DM, atau bisa juga lewat WhatsApp kami.'
+  return `${rule} Cukup sebut DM/WhatsApp — jangan tulis nomor, link, atau username.`
 }
 
-async function decide(config: InstagramConfig, row: Record<string, any>, hasWa: boolean) {
+/** Balasan publik tidak boleh memuat link atau nomor (cukup menyebut DM/WhatsApp). */
+export function cleanPublicReply(text: string) {
+  return text
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\b(?:wa\.me|api\.whatsapp\.com|bit\.ly)\/\S*/gi, '')
+    .replace(/(?:\+?62|0)[\d\s.-]{8,}\d/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.!?])/g, '$1')
+    .trim()
+}
+
+async function decide(config: InstagramConfig, row: Record<string, any>) {
   const settings = await readSettings(true)
   let skill = ''
   try {
@@ -91,7 +106,7 @@ async function decide(config: InstagramConfig, row: Record<string, any>, hasWa: 
   } catch {}
   const system = [
     'Kamu admin Instagram toko. Baca MAKSUD komentar (bukan kata kunci), lalu isi JSON.',
-    routeInstruction(config.commentTarget, hasWa),
+    routeInstruction(config.commentTarget),
     'Pujian: balas terima kasih singkat. Lain (obrolan/tag teman tanpa minat): balasan singkat atau kosong. Spam: semua kosong.',
     'Gunakan gaya sapaan dan bahasa toko dari aturan di bawah bila ada. Jangan mengarang harga, stok, atau janji.',
     skill ? `\nAturan & gaya toko (ringkas):\n${skill}` : '',
@@ -153,7 +168,7 @@ export async function processInstagramComments(limit = 3) {
         update.status = 'skipped'
         continue
       }
-      const decision = await decide(config, row, Boolean(wa))
+      const decision = await decide(config, row)
       if (!decision) throw new Error('Jawaban AI tidak valid.')
       update.kind = decision.jenis
       if (decision.jenis === 'spam') {
@@ -176,11 +191,11 @@ export async function processInstagramComments(limit = 3) {
         // Komentar tidak dicampur ke chat DM; cukup dicatat id penerimanya.
         if (sent.recipient_id) update.dm_igsid = String(sent.recipient_id)
       }
-      let publicText = decision.balasan_publik
+      let publicText = cleanPublicReply(decision.balasan_publik)
       // Utas balasan (bukan komentar utama) hanya dibalas bila ada maksud bertanya/beli.
       if (row.parent_id && !NEEDS_HELP.has(decision.jenis)) publicText = ''
-      if (route.waPublic && publicText) publicText = `${publicText} ${wa}`
-      else if (route.waPublic) publicText = `Info lengkap chat WhatsApp kami ya: ${wa}`
+      else if (!publicText && route.dm) publicText = 'Sudah kami DM ya kak 🙏'
+      else if (!publicText && route.waPublic) publicText = 'Info lengkap bisa lewat WhatsApp kami ya kak 🙏'
       if (publicText) {
         await replyComment(config.accessToken, row.comment_id, publicText.slice(0, 2000))
         update.public_reply = publicText

@@ -1144,4 +1144,5 @@ window.waLocales.en = {
   "DM terkirim": "DM sent",
   "Kendala": "Issue",
   "Buka DM": "Open DM",
+  "DM & WhatsApp": "DM & WhatsApp",
 }

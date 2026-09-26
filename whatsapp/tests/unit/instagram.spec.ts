@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { createHmac } from 'node:crypto'
 import { validSignature, authorizeUrl } from '#instagram/api'
 import { igMessageId } from '#instagram/webhook'
-import { commentRoute, parseCommentDecision, waLink } from '#instagram/comments'
+import { cleanPublicReply, commentRoute, parseCommentDecision, waLink } from '#instagram/comments'
 import { instagramJid, instagramUserId, isInstagramJid } from '#instagram/store'
 import { isDirectContactJid } from '#services/message_service'
 
@@ -41,6 +41,16 @@ test.group('Instagram', () => {
     assert.deepEqual(commentRoute('dm', 'tanya', true, wa), { dm: true, waPublic: false, waInDm: false })
     assert.deepEqual(commentRoute('wa', 'tanya', true, wa), { dm: false, waPublic: true, waInDm: false })
     assert.deepEqual(commentRoute('both', 'pujian', true, wa), { dm: false, waPublic: false, waInDm: false })
+    assert.deepEqual(commentRoute('wa', 'tanya', true, ''), { dm: false, waPublic: true, waInDm: false })
+  })
+
+  test('balasan komentar publik tanpa link dan nomor', ({ assert }) => {
+    assert.equal(
+      cleanPublicReply('Chat WhatsApp kami ya kak wa.me/6281234567890 atau https://bit.ly/x'),
+      'Chat WhatsApp kami ya kak atau'
+    )
+    assert.equal(cleanPublicReply('Hubungi 0812-3456-7890 ya'), 'Hubungi ya')
+    assert.equal(cleanPublicReply('Sudah kami DM ya kak 🙏'), 'Sudah kami DM ya kak 🙏')
   })
 
   test('jawaban AI komentar dibaca aman', ({ assert }) => {
