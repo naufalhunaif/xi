@@ -1246,7 +1246,16 @@ export default class WhatsappListen extends BaseCommand {
     if (!id || !jid || !/@(?:s\.whatsapp\.net|lid)$/.test(jid)) return
     await this.refreshCustomerPhone(jid, message.key.remoteJidAlt)
     if (message.key.fromMe && isTrackedOutgoingMessage(jid, id)) return
-    if (await db.from('whatsapp_messages').where('message_id', id).first()) return
+    const known = await db.from('whatsapp_messages').where('message_id', id).first()
+    if (known) {
+      // Riwayat yang datang lagi: lengkapi foto yang dulu belum sempat terunduh.
+      if (!known.media_url && ['failed', 'expired', 'later'].includes(known.media_status)) {
+        const again = await this.prepareMedia(message)
+        if (again?.visual && Date.now() - this.messageDate(message).getTime() < 60 * 86_400_000)
+          this.queueOldMedia(message, again)
+      }
+      return
+    }
     const text = this.textOf(message)
     const media = await this.prepareMedia(message)
     if (!text && !media) return
