@@ -56,10 +56,11 @@ export async function storeStyle(examples: LeanExample[] = []): Promise<StylePro
 /** Bagian prompt: aturan gaya yang sama persis untuk model apa pun. */
 export function styleGuide(profile: StyleProfile) {
   const lines = [
-    'GAYA BALASAN TOKO (wajib sama, model apa pun yang menjawab):',
+    'GAYA BALASAN TOKO (ikuti skill & contoh CS; ini hanya penyeragam format):',
     profile.address ? `- Sapa pelanggan dengan "${profile.address}" (jangan kak/kakak/anda/sapaan lain).` : '',
     profile.emoji ? '- Emoji boleh secukupnya, maksimal satu per bubble.' : '- Tanpa emoji.',
-    `- Pendek seperti chat CS asli: umumnya ±${Math.max(30, Math.min(160, profile.length))} huruf per bubble, maksimal 2 bubble.`,
+    // Sengaja tanpa batas jumlah huruf: batas panjang membuat jawaban terpotong dan
+    // kurang informatif (harga/detail hilang). Panjang mengikuti skill & contoh CS.
     '- Bahasa santai sehari-hari seperti contoh CS; tanpa format markdown (**tebal**, #judul, tabel). Rincian harga boleh per baris.',
     '- Jangan membuka dengan salam panjang atau menutup dengan kalimat basa-basi yang sama tiap kali.',
   ]
