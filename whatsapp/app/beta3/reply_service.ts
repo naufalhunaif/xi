@@ -535,7 +535,9 @@ export async function createLeanReply(input: {
     fabrics: await readLeanState('fabrics'),
     sizeCharts,
     catalog: digest.text,
-    examples: pickExamples(examples, input.text, stage),
+    // Koreksi pemilik selalu ikut (12 terbaru); contoh lain dipilih yang paling mirip.
+    examples: pickExamples(examples.filter((example) => example.source !== 'koreksi'), input.text, stage),
+    corrections: examples.filter((example) => example.source === 'koreksi').slice(-12),
     styleGuide: style ? styleGuide(style) : '',
     rules: renderRules(rules),
     customerNote,
@@ -683,8 +685,30 @@ export async function createLeanReply(input: {
   }
 }
 
-export const LEAN_NUDGE_DELAY_MS = 10 * 60_000
+export const LEAN_NUDGE_DELAY_MS = 20 * 60_000
 export const LEAN_NUDGE_MAX_PER_CHAT = 2
+
+/**
+ * Waktu susulan mengikuti tahap: pilih model/size 20 menit, data pengiriman 45 menit,
+ * menunggu transfer 3 jam. Tidak dikirim 21.00–08.00 WIB (digeser ke 09.00).
+ */
+export function nudgeTime(stage: string, now = Date.now()) {
+  const delay = stage === 'tunggu_bayar'
+    ? 3 * 60 * 60_000
+    : ['minta_alamat', 'kirim_form', 'tunggu_form'].includes(stage)
+      ? 45 * 60_000
+      : LEAN_NUDGE_DELAY_MS
+  const due = new Date(now + delay)
+  const wibHour = (due.getUTCHours() + 7) % 24
+  if (wibHour >= 21 || wibHour < 8) {
+    // Geser ke 09.00 WIB (02.00 UTC) berikutnya.
+    const next = new Date(due)
+    next.setUTCHours(2, 0, 0, 0)
+    if (next.getTime() <= due.getTime()) next.setUTCDate(next.getUTCDate() + 1)
+    return next
+  }
+  return due
+}
 
 /**
  * Tutup goal giliran ini: status ikut tahap. Kalau AI menyiapkan `susulan`,
@@ -696,7 +720,16 @@ export async function finishLeanGoal(
   decision: LeanDecision
 ) {
   const previous = await db.from('whatsapp_chat_goals').where('jid', run.jid).first()
-  const nudges = Number(previous?.followup_count || 0)
+  // Hitungan susulan mulai dari nol lagi setiap pelanggan membalas.
+  const lastIn = await db
+    .from('whatsapp_messages')
+    .where('jid', run.jid)
+    .where('direction', 'in')
+    .orderBy('id', 'desc')
+    .first()
+  const lastNudge = previous?.last_followup_at ? new Date(previous.last_followup_at).getTime() : 0
+  const nudges =
+    lastIn && new Date(lastIn.created_at).getTime() > lastNudge ? 0 : Number(previous?.followup_count || 0)
   const status = decision.serah_cs
     ? 'paused'
     : decision.tahap.startsWith('tunggu') ||
@@ -718,7 +751,8 @@ export async function finishLeanGoal(
     next_action: nudge,
     policy_json: nudge ? JSON.stringify({ lean: true, nudge, stage: decision.tahap }) : null,
     skill_hash: null,
-    next_run_at: nudge ? new Date(Date.now() + LEAN_NUDGE_DELAY_MS) : null,
+    ...(nudges === 0 && Number(previous?.followup_count || 0) ? { followup_count: 0 } : {}),
+    next_run_at: nudge ? nudgeTime(decision.tahap) : null,
     last_error: null,
     updated_at: new Date(),
   }

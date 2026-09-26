@@ -195,9 +195,13 @@ async function runOne(test: Record<string, any>, settings: LeanSettings) {
     catalog: digest.text,
     // Contoh dari koreksi kasus ini sendiri tidak dipakai, supaya uji tetap jujur.
     examples: pickExamples(
-      examples.filter((example) => example.csText.trim() !== String(test.expected_text).trim()),
+      examples.filter((example) => example.source !== 'koreksi'),
       text
     ),
+    corrections: examples
+      .filter((example) => example.source === 'koreksi')
+      .filter((example) => example.csText.trim() !== String(test.expected_text).trim())
+      .slice(-12),
     styleGuide: style ? styleGuide(style) : '',
     rules: renderRules(rules),
     customerNote: '',

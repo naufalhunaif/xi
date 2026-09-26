@@ -114,7 +114,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     susulan: {
       type: 'string',
       description:
-        'Opsional. Satu kalimat pendek untuk memastikan kelanjutan (mis. "jadi lanjut yang choco bos?"). TIDAK dikirim sekarang; sistem mengirimnya hanya bila pelanggan diam beberapa menit. Kosongkan bila pesan utama sudah berisi pertanyaan atau tidak ada yang perlu dipastikan.',
+        'Satu kalimat susulan yang MEMBANTU, bukan menagih. TIDAK dikirim sekarang; sistem mengirimnya hanya bila pelanggan diam (waktu mengikuti tahap, tidak di malam hari). Isi dengan bantuan konkret sesuai tahap: tawarkan foto warna/model lain, bantu size dari tinggi & berat, sebut estimasi jadi, atau ingatkan total/rekening dengan sopan. Jangan "jadi gimana bos?" atau mengulang pertanyaan pesan utama. Kosong bila pelanggan bilang nanti/pikir-pikir dulu, pesanan selesai, atau diserahkan ke CS.',
     },
     order: {
       anyOf: [
@@ -242,6 +242,7 @@ export function buildLeanPrompt(input: {
   styleGuide?: string
   context?: string
   rules?: string
+  corrections?: LeanExample[]
 }) {
   const payment = input.paymentMethods.length
     ? `REKENING RESMI (satu-satunya sumber rekening; sebut hanya saat pelanggan tanya transfer kemana atau total sudah disepakati):\n${input.paymentMethods.map((method) => `${method.name} ${method.destination}${method.accountName ? ` an ${method.accountName}` : ''}`).join('\n')}`
@@ -252,10 +253,10 @@ export function buildLeanPrompt(input: {
       input.store ||
         'TOKO: lokasi dan jam belum diatur pemilik. Kalau ditanya lokasi/jam: "saya tanyakan dulu ke tim ya bos" dan serah_cs = true.',
     ],
-    ['aturan', input.rules || ''],
     ['katalog', input.catalog],
     ['sizechart', input.sizeCharts || ''],
     ['bahan', input.fabrics || ''],
+    ['koreksi', renderCorrections(input.corrections || [])],
     ['contoh', renderExamples(input.examples)],
     ['gaya', input.styleGuide || ''],
     [
@@ -286,17 +287,32 @@ export function buildLeanPrompt(input: {
     ],
     [
       'keluaran',
-      'Pengiriman hanya via JNE (REG/YES); ekspedisi lain (J&T, SiCepat, dll) tidak tersedia. Kargo JNE (JTR) minimal 8 kg, hanya untuk pesanan besar.\n' +
+      'Inisiatif (maks satu per balasan, SETELAH pertanyaan pelanggan dijawab): kirim foto (field foto) bila pelanggan membahas model/warna yang belum dilihatnya; tawarkan sekalian celana/setelan saat memilih jas; tanyakan tinggi & berat bila size belum jelas; tawarkan form order bila model & size sudah jelas. Jangan berinisiatif bila pelanggan sedang komplain atau minta CS.\n' +
+        'Pengiriman hanya via JNE (REG/YES); ekspedisi lain (J&T, SiCepat, dll) tidak tersedia. Kargo JNE (JTR) minimal 8 kg, hanya untuk pesanan besar.\n' +
         'Pahami maksud pelanggan dari seluruh RIWAYAT, bukan hanya pesan terakhir; jangan menanyakan ulang hal yang sudah jelas. Ditanya harga dan produknya sudah jelas (dikutip, baru dikirim fotonya, atau sudah disebut) → langsung sebut harganya dari KATALOG. Produk belum jelas → sebut kisaran harga dari KATALOG sambil menanyakan modelnya.\n' +
         'Balas sebagai JSON sesuai schema: pesan (array bubble), foto (nama varian katalog), catatan, tahap, serah_cs, alasan, susulan, spesifikasi. Jangan menulis apa pun di luar JSON.',
     ],
   ]
   const user = sections.map(([, value]) => value).join('\n\n')
+  // Aturan Toko di system prompt: prioritas tertinggi, untuk model apa pun.
+  const system = [input.skill.trim(), input.rules || ''].filter(Boolean).join('\n\n')
   return {
-    system: input.skill.trim(),
+    system,
     user,
-    size: promptBreakdown([['skill', input.skill], ...sections]),
+    size: promptBreakdown([['skill', input.skill], ['aturan', input.rules || ''], ...sections]),
   }
+}
+
+/** Koreksi pemilik: selalu ikut (terbaru), bukan dipilih berdasarkan kata kunci. */
+export function renderCorrections(corrections: LeanExample[]) {
+  if (!corrections.length) return ''
+  return [
+    'KOREKSI DARI PEMILIK (jawaban AI sebelumnya salah; pada situasi serupa jawab seperti ini — mengalahkan contoh lain):',
+    ...corrections.map(
+      (item, index) =>
+        `${index + 1}. Pelanggan: ${item.customerText.replace(/\n/g, ' / ')}\n   Seharusnya: ${item.csText.replace(/\n/g, '\n   ')}`
+    ),
+  ].join('\n')
 }
 
 export function parseLeanDecision(text: string): LeanDecision {
