@@ -63,6 +63,7 @@ function view(account: AiAccount, isConnected: boolean, now = Date.now()) {
     limitedCode: account.limitedUntil > now ? account.limitedCode : '',
     lastError: account.lastError,
     lastUsedAt: account.lastUsedAt,
+    modelBlocked: account.modelBlocked,
   }
 }
 

@@ -43,6 +43,8 @@ export type AiAccount = {
   lastUsedAt: Date | null
   /** 'all' = semua tugas; 'background' = hanya tugas latar (katalog, rekap), bukan balasan pelanggan. */
   scope: 'all' | 'background'
+  /** Model yang ditolak layanan untuk akun ini; akun memakai model bawaannya sendiri. */
+  modelBlocked: string
 }
 
 let ready = false
@@ -120,7 +122,18 @@ async function ensureTable() {
     await db.rawQuery("ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS scope VARCHAR(12) NOT NULL DEFAULT 'all'")
     await db.from('whatsapp_ai_accounts').where('provider', 'gemini').update({ scope: 'background' })
   }
+  const [blockedCol] = await db.rawQuery(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'whatsapp_ai_accounts' AND column_name = 'model_blocked'"
+  )
+  if (!Number(blockedCol?.[0]?.n || 0))
+    await db.rawQuery("ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS model_blocked VARCHAR(80) NOT NULL DEFAULT ''")
   ready = true
+}
+
+/** Ingat model yang ditolak untuk akun ini (tahan restart & berlaku di semua proses nomor). */
+export async function blockAiModel(id: number, model: string) {
+  await ensureTable()
+  await db.from('whatsapp_ai_accounts').where('id', id).update({ model_blocked: model.slice(0, 80) })
 }
 
 const map = (row: any): AiAccount => ({
@@ -137,6 +150,7 @@ const map = (row: any): AiAccount => ({
   lastError: String(row.last_error || ''),
   lastUsedAt: row.last_used_at ? new Date(row.last_used_at) : null,
   scope: row.scope === 'background' ? 'background' : 'all',
+  modelBlocked: String(row.model_blocked || ''),
 })
 
 export async function listAiAccounts() {

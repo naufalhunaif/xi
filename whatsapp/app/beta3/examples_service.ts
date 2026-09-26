@@ -53,7 +53,11 @@ export function pickExamples(
 ): LeanExample[] {
   const words = keywords(message)
   const scored = examples
-    .map((example) => ({ example, score: scoreExample(example, words, stage) }))
+    .map((example) => {
+      const score = scoreExample(example, words, stage)
+      // Koreksi pemilik didahulukan bila relevan.
+      return { example, score: score > 0 && example.source === 'koreksi' ? score + 2 : score }
+    })
     .sort((a, b) => b.score - a.score || (a.example.id || 0) - (b.example.id || 0))
   const chosen = scored.filter((item) => item.score > 0).slice(0, limit)
   // Kalau pesan terlalu pendek untuk dicocokkan, tetap beri contoh tahap saat ini.

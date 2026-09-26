@@ -151,7 +151,10 @@
       // Model per akun: tiap akun boleh memakai model berbeda.
       const info = el('div', 'wa-ai-info')
       info.append(modelPicker(account), scopePicker(account))
-      const note = [usage, account.lastError || ''].filter(Boolean).join(' · ')
+      const blocked = account.modelBlocked
+        ? t('Model {0} tidak tersedia di akun ini, memakai model bawaan', account.modelBlocked)
+        : ''
+      const note = [usage, blocked, account.lastError || ''].filter(Boolean).join(' · ')
       if (note) info.append(el('small', account.lastError ? 'wa-ai-error' : '', note))
       const side = el('div', 'actions')
       side.append(el('span', `wa-pill ${tone}`, label))

@@ -102,6 +102,21 @@ export const LEAN_TABLE_STATEMENTS = [
     KEY whatsapp_beta3_refs_jid (jid, order_id),
     KEY whatsapp_beta3_refs_order (order_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS whatsapp_beta3_tests (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    jid VARCHAR(190) NOT NULL DEFAULT '',
+    history MEDIUMTEXT NOT NULL,
+    customer_text TEXT NOT NULL,
+    wrong_text TEXT NOT NULL,
+    expected_text TEXT NOT NULL,
+    last_answer TEXT NULL,
+    last_pass TINYINT(1) NULL,
+    last_reason VARCHAR(500) NULL,
+    last_model VARCHAR(80) NULL,
+    last_run_at DATETIME NULL,
+    status VARCHAR(12) NOT NULL DEFAULT 'idle',
+    created_at DATETIME NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_state (
     name VARCHAR(64) NOT NULL PRIMARY KEY,
     value TEXT NULL,

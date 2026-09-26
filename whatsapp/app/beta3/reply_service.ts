@@ -50,6 +50,7 @@ import {
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
+import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 
 /**
@@ -222,13 +223,14 @@ export async function createLeanReply(input: {
     })
 
   await seedLeanExamples().catch(() => 0)
-  const [digest, examples, customerNote, chatNote, rows, spec] = await Promise.all([
+  const [digest, examples, customerNote, chatNote, rows, spec, rules] = await Promise.all([
     catalogDigest(),
     listLeanExamples(),
     readCustomerNote(jid),
     readBeta3ChatNote(jid),
     history(jid, new Set(input.messageIds)),
     readOrderSpec(jid),
+    listRules(),
   ])
   const stage = stageFromNote(chatNote)
   // Gaya balasan toko: sama untuk ChatGPT, Claude, dan Gemini.
@@ -535,6 +537,7 @@ export async function createLeanReply(input: {
     catalog: digest.text,
     examples: pickExamples(examples, input.text, stage),
     styleGuide: style ? styleGuide(style) : '',
+    rules: renderRules(rules),
     customerNote,
     chatNote,
     spec,
@@ -565,6 +568,28 @@ export async function createLeanReply(input: {
   decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
   // Deretan pilihan/harga/produk dalam satu kalimat → satu per baris (semua model).
   decision.pesan = decision.pesan.map(tidyLists)
+  // Pemeriksa sebelum kirim: harga yang tidak ada di katalog/ongkir/chat tidak dikirim.
+  if (!decision.serah_cs && decision.pesan.length) {
+    const allowed = allowedPrices(digest.rows, [
+      ...toolNotes,
+      systemNote,
+      input.text,
+      ...rows.map((row) => String(row.body || '')),
+      spec || '',
+      ...settings.paymentMethods.map((method) => method.destination),
+    ])
+    const unknown = unknownPrices(decision.pesan, allowed)
+    if (unknown.length) {
+      decision.serah_cs = true
+      decision.alasan = `Pemeriksa harga: ${unknown.map((value) => value.toLocaleString('id-ID')).join(', ')} tidak ada di katalog/ongkir, balasan ditahan untuk CS. ${decision.alasan}`.slice(0, 500)
+      onTrace?.({
+        key: 'beta3-guard',
+        label: `Balasan ditahan · harga ${unknown.map((value) => value.toLocaleString('id-ID')).join(', ')} tidak dikenal`,
+        status: 'failed',
+        detail: { unknown, pesan: decision.pesan },
+      })
+    }
+  }
   if (style) {
     if (decision.susulan) decision.susulan = normalizeStyle([decision.susulan], style)[0] || ''
   }

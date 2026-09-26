@@ -353,6 +353,15 @@
       detail.textContent = t('Detail proses')
       article.append(detail)
     }
+    if (message.direction === 'out' && senderType === 'ai' && message.body) {
+      // Koreksi pemilik: jadi contoh jawaban / aturan toko + kasus uji (quality.js).
+      const correct = document.createElement('button')
+      correct.type = 'button'
+      correct.className = 'wa-trace-link wa-correct-link'
+      correct.dataset.correctId = String(message.id)
+      correct.textContent = t('Koreksi')
+      article.append(correct)
+    }
     return article
   }
   function renderMessages(items) {

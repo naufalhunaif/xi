@@ -12,6 +12,7 @@ import { recordUsage, usageFromEvent, type TokenUsage } from '#services/usage_se
 import { LEAN_OUTPUT_SCHEMA } from '#beta3/prompt'
 import { withAiAccount } from '#services/ai_account_context'
 import {
+  blockAiModel,
   aiAccountRef,
   markAiAccountLimited,
   markAiAccountUsed,
@@ -67,10 +68,13 @@ export async function runLeanProvider(
   imagePaths: string[] = [],
   phase = 'beta3-reply',
   schema: Record<string, unknown> = LEAN_OUTPUT_SCHEMA,
-  meta: { jid?: string } = {}
+  meta: { jid?: string; providers?: AiProviderName[] } = {}
 ): Promise<LeanProviderResult> {
   const jid = meta.jid || ''
-  const accounts = await usableAiAccounts(Date.now(), phase).catch(() => null)
+  const all = await usableAiAccounts(Date.now(), phase).catch(() => null)
+  // Tugas tertentu (kasus uji) hanya memakai penyedia tertentu bila ada yang siap.
+  const picked = all && meta.providers?.length ? all.filter((a) => meta.providers!.includes(a.provider)) : all
+  const accounts = picked && picked.length ? picked : all
   if (!accounts) return runLeanOnce(settings, settings.aiProvider, {}, prompt, imagePaths, phase, schema)
   if (!accounts.length) {
     const recovery = await nextAiRecovery().catch(() => 0)
@@ -102,15 +106,18 @@ export async function runLeanProvider(
         )
       // Model yang tidak tersedia untuk langganan akun ini (mis. akun ChatGPT lain paketnya
       // berbeda) → pakai model bawaan akun tersebut, bukan pindah/menjeda akun.
+      const wanted =
+        account.model || (account.provider === 'claude' ? settings.claudeModel : settings.chatgptModel) || ''
       let result: LeanProviderResult
-      if (account.provider !== 'gemini' && modelFallback.has(account.id)) result = await attempt(true)
+      if (account.provider !== 'gemini' && wanted && account.modelBlocked === wanted)
+        result = await attempt(true)
       else {
         try {
           result = await attempt(false)
         } catch (error) {
-          if (account.provider === 'gemini' || !modelUnavailable(error)) throw error
+          if (account.provider === 'gemini' || !wanted || !modelUnavailable(error)) throw error
           result = await attempt(true)
-          modelFallback.add(account.id)
+          await blockAiModel(account.id, wanted).catch(() => {})
         }
       }
       await markAiAccountUsed(account.id).catch(() => {})
@@ -145,8 +152,6 @@ export async function runLeanProvider(
   throw lastError
 }
 
-/** Akun yang modelnya ditolak layanan; memakai model bawaan akun sampai proses dimulai ulang. */
-const modelFallback = new Set<number>()
 function modelUnavailable(error: unknown) {
   const text = error instanceof Error ? error.message : String(error)
   return (

@@ -32,7 +32,16 @@ import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { listActiveRefs, refCaption, refsForOrder } from '#beta3/refs_service'
 import { readRecapProgress, requestRecap } from '#beta3/recap_service'
 import { skillStatus, syncRemoteSkills } from '#beta3/skill_sync'
-import { ensureDefaults } from '#services/settings_service'
+import { ensureDefaults, readSettings } from '#services/settings_service'
+import {
+  addRule,
+  listRules,
+  listTests,
+  removeRule,
+  removeTest,
+  runTests,
+  saveCorrection,
+} from '#beta3/quality_service'
 import {
   readLeanMcpConfig,
   listLeanMcpSources,
@@ -352,5 +361,62 @@ export default class Beta3Controller {
     const jid = String(body.jid || '')
     if (!jid) return response.badRequest({ error: 'jid wajib.' })
     return response.json({ jid, note: await writeCustomerNote(jid, String(body.note || '')) })
+  }
+
+  // ---- Kualitas: Aturan Toko, Koreksi, Kasus uji ----
+  async rules({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    return response.json({ rules: await listRules() })
+  }
+
+  async addRule({ request, response }: HttpContext) {
+    try {
+      return response.json({ rules: await addRule(String(request.input('text', ''))) })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
+  }
+
+  async removeRule({ params, response }: HttpContext) {
+    return response.json({ rules: await removeRule(Number(params.id)) })
+  }
+
+  async correction({ request, response }: HttpContext) {
+    try {
+      const kind = request.input('kind') === 'rule' ? 'rule' : 'example'
+      return response.json(
+        await saveCorrection({
+          messageId: Number(request.input('messageId')),
+          correct: String(request.input('correct', '')),
+          kind,
+          rule: String(request.input('rule', '')),
+        })
+      )
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
+  }
+
+  async tests({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    return response.json({ tests: await listTests() })
+  }
+
+  async runTests({ request, response }: HttpContext) {
+    const settings = await readSettings(true)
+    const ids = (Array.isArray(request.input('ids')) ? request.input('ids') : [])
+      .map(Number)
+      .filter((id: number) => id > 0)
+    return response.json(
+      await runTests(
+        { ...settings, aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt' } as any,
+        ids
+      )
+    )
+  }
+
+  async removeTest({ params, response }: HttpContext) {
+    await removeTest(Number(params.id))
+    return response.noContent()
   }
 }
