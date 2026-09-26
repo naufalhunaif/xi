@@ -49,7 +49,7 @@ import {
 } from '#beta3/mcp'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { saveAiRefs } from '#beta3/refs_service'
-import { collectContext } from '#beta3/context_service'
+import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 
 /**
  * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
@@ -211,8 +211,21 @@ export async function createLeanReply(input: {
   // Tool dipanggil KODE pada event: TB/BB → fit advisor, form → ongkir. Model tidak memanggil tool.
   const mcp = await readLeanMcpConfig()
   const toolNotes: string[] = []
-  const measure = extractBodyMeasure(input.text)
   const fitLastKey = `fit:last:${jid}`
+  // Tinggi & berat bisa dikirim terpisah; rangkai dari riwayat. Fit advisor dipanggil saat
+  // pesan ini melengkapi datanya atau pelanggan menanyakan size/rekomendasi.
+  const asksSize =
+    /\b(size|ukuran|celana|nomor|no|rekomendasi|rekomen|pake apa|pakai apa|cocok|muat|pas)\b/i.test(input.text)
+  const historyMeasure = measureFromHistory(rows)
+  const lastFit = parseJson<{ note: string; at: number; key?: string }>(await readLeanState(fitLastKey))
+  const measure =
+    extractBodyMeasure(input.text) ||
+    (historyMeasure &&
+    (asksSize ||
+      /\d{2,3}/.test(input.text) ||
+      lastFit?.key !== `${historyMeasure.height}:${historyMeasure.weight}`)
+      ? historyMeasure
+      : null)
   if (measure && mcp.url) {
     // Jas dan celana sekaligus, supaya "celananya no berapa" nanti tidak ditebak model.
     const cacheKey = `fit:${jid}:${measure.height}:${measure.weight}`
@@ -228,7 +241,10 @@ export async function createLeanReply(input: {
         if (cached) await writeLeanState(cacheKey, cached)
       }
       if (cached) {
-        await writeLeanState(fitLastKey, JSON.stringify({ note: cached, at: Date.now() }))
+        await writeLeanState(
+          fitLastKey,
+          JSON.stringify({ note: cached, at: Date.now(), key: `${measure.height}:${measure.weight}` })
+        )
         toolNotes.push(cached)
         onTrace?.({
           key: 'beta3-fit',
@@ -245,10 +261,16 @@ export async function createLeanReply(input: {
         detail: { error: error instanceof Error ? error.message : String(error) },
       })
     }
-  } else if (/\b(size|ukuran|celana|nomor|no)\b/i.test(input.text)) {
+  } else if (asksSize) {
     // Pertanyaan size/celana beberapa pesan setelah TB/BB: ulangi rekomendasi yang sama (3 jam).
-    const last = parseJson<{ note: string; at: number }>(await readLeanState(fitLastKey))
-    if (last?.note && Date.now() - last.at < 3 * 60 * 60_000) toolNotes.push(last.note)
+    if (lastFit?.note && Date.now() - lastFit.at < 3 * 60 * 60_000) toolNotes.push(lastFit.note)
+  }
+  // Ukuran badan (pinggang/dada/…) dibandingkan dengan SIZE CHART oleh kode.
+  const sizeCharts = await readLeanState('size_charts')
+  const chartNote = compareWithSizeChart(rows, String(sizeCharts || ''))
+  if (chartNote) {
+    toolNotes.push(chartNote)
+    onTrace?.({ key: 'beta3-sizechart', label: 'Size chart dibandingkan', status: 'completed', detail: {} })
   }
 
   // Jalur 2: form order dibaca kode, disimpan untuk CS. AI tetap menulis balasannya.
@@ -483,7 +505,7 @@ export async function createLeanReply(input: {
     skill: skill.content,
     store,
     fabrics: await readLeanState('fabrics'),
-    sizeCharts: await readLeanState('size_charts'),
+    sizeCharts,
     catalog: digest.text,
     examples: pickExamples(examples, input.text, stage),
     styleGuide: style ? styleGuide(style) : '',

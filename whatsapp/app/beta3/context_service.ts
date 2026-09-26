@@ -121,7 +121,7 @@ export function collectContext(input: {
     .map((row) => row.body || '')
     .join('\n')
   const known: string[] = []
-  const measure = extractBodyMeasure(said)
+  const measure = measureFromHistory(rows) || extractBodyMeasure(said)
   if (measure) known.push(`tinggi ${measure.height} cm, berat ${measure.weight} kg`)
   const size = said.match(/\b(?:size|ukuran)\s*(xxxl|3xl|xxl|xl|l|m|s|\d{2})\b/i)
   if (size) known.push(`size ${size[1].toUpperCase()}`)
@@ -140,4 +140,118 @@ export function collectContext(input: {
 
   if (!lines.length) return ''
   return `KONTEKS TERKUMPUL (disusun sistem dari riwayat & katalog; anggap fakta):\n- ${lines.join('\n- ')}`
+}
+
+/**
+ * Tinggi & berat yang dikirim terpisah ("Tinggi 167" lalu "54" setelah ditanya berat),
+ * dirangkai dari riwayat pelanggan. Angka tunggal dipakai sesuai pertanyaan AI/CS sebelumnya.
+ */
+export function measureFromHistory(rows: LeanHistoryRow[]) {
+  let height = 0
+  let weight = 0
+  let asked = ''
+  for (const row of rows.slice(-20)) {
+    const text = String(row.body || '').toLowerCase()
+    if (row.direction === 'out') {
+      asked = /berat/.test(text) ? 'berat' : /tinggi/.test(text) ? 'tinggi' : asked
+      continue
+    }
+    const both = extractBodyMeasure(text)
+    if (both) {
+      height = both.height
+      weight = both.weight
+      continue
+    }
+    const h = text.match(/(?:tinggi|tb)\D{0,6}(\d{3})/) || text.match(/\b(1\d{2})\s*cm\b/)
+    const w = text.match(/(?:berat|bb)\D{0,6}(\d{2,3})/) || text.match(/\b(\d{2,3})\s*kg\b/)
+    if (h) height = Number(h[1])
+    if (w) weight = Number(w[1])
+    const bare = text.trim().match(/^(?:sekitar\s*|kurang lebih\s*|±\s*)?(\d{2,3})(?:\s*(?:an|kg|cm))?$/)
+    if (bare && !h && !w) {
+      const value = Number(bare[1])
+      if (asked === 'berat' && value >= 30 && value <= 200) weight = value
+      else if (asked === 'tinggi' && value >= 120 && value <= 230) height = value
+    }
+  }
+  if (height < 120 || height > 230 || weight < 30 || weight > 200) return null
+  return { height, weight }
+}
+
+type ChartRow = { size: string; values: Map<string, number> }
+type ChartGroup = { name: string; rows: ChartRow[] }
+
+/** "  Celana (cm): 30 pinggang 78 panggul 98; 31 pinggang 81 ..." → grup & baris. */
+export function parseSizeCharts(text: string): ChartGroup[] {
+  const groups: ChartGroup[] = []
+  for (const line of String(text || '').split('\n')) {
+    const match = line.match(/^\s*(.+?)\s*\([^)]*\):\s*(.+)$/)
+    if (!match) continue
+    const rows: ChartRow[] = []
+    for (const part of match[2].split(';')) {
+      const tokens = part.trim().match(/^(\S+)\s+(.*)$/)
+      if (!tokens) continue
+      const values = new Map<string, number>()
+      for (const pair of tokens[2].matchAll(/([a-z][a-z ]*?)\s+(\d+(?:[.,]\d+)?)/gi))
+        values.set(pair[1].trim().toLowerCase().replace(/^lingkar\s+/, ''), Number(pair[2].replace(',', '.')))
+      if (values.size) rows.push({ size: tokens[1], values })
+    }
+    if (rows.length) groups.push({ name: match[1].trim(), rows })
+  }
+  return groups
+}
+
+const BODY_PARTS = ['pinggang', 'dada', 'panggul', 'pinggul', 'bahu', 'lengan', 'paha']
+
+/**
+ * Ukuran badan yang disebut pelanggan ("lingkar pinggang 79", atau "79" setelah ditanya
+ * pinggang) dibandingkan dengan SIZE CHART oleh kode, jadi model tidak menebak.
+ */
+export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) {
+  const groups = parseSizeCharts(chartText)
+  if (!groups.length) return ''
+  const body = new Map<string, number>()
+  let asked = ''
+  for (const row of rows.slice(-20)) {
+    const text = String(row.body || '').toLowerCase()
+    if (row.direction === 'out') {
+      asked = BODY_PARTS.find((part) => text.includes(part)) || (/berat|tinggi/.test(text) ? '' : asked)
+      continue
+    }
+    let found = false
+    for (const part of BODY_PARTS) {
+      const hit = text.match(new RegExp(`${part}\\D{0,12}(\\d{2,3}(?:[.,]\\d)?)`))
+      if (hit) {
+        body.set(part === 'pinggul' ? 'panggul' : part, Number(hit[1].replace(',', '.')))
+        found = true
+      }
+    }
+    const bare = text.trim().match(/^(?:sekitar\s*|kurang lebih\s*)?(\d{2,3})(?:\s*(?:an|cm))?(?:\s*sih)?$/)
+    if (!found && bare && asked) body.set(asked === 'pinggul' ? 'panggul' : asked, Number(bare[1]))
+  }
+  if (!body.size) return ''
+  const lines: string[] = []
+  for (const [part, value] of body) {
+    // Pinggang/panggul/paha → celana (size angka); dada/bahu/lengan → atasan (size huruf).
+    const lower = ['pinggang', 'panggul', 'paha'].includes(part)
+    for (const group of groups) {
+      const numeric = group.rows.every((row) => /^\d+$/.test(row.size))
+      if (lower !== numeric) continue
+      const sized = group.rows.filter((row) => row.values.has(part))
+      if (!sized.length) continue
+      // Ukuran jadi harus ≥ ukuran badan (toleransi 1 cm); ambil yang paling kecil yang muat.
+      const sorted = [...sized].sort((a, b) => a.values.get(part)! - b.values.get(part)!)
+      const fit = sorted.find((row) => row.values.get(part)! >= value - 1)
+      const index = fit ? sorted.indexOf(fit) : sorted.length - 1
+      const around = sorted.slice(Math.max(0, index - 1), index + 2)
+      lines.push(
+        `${group.name}: ${part} badan ${value} cm → ${around.map((row) => `${row.size} = ${row.values.get(part)} cm`).join(', ')}. ` +
+          (fit
+            ? `Paling pas: ${fit.size} (${fit.values.get(part)} cm, selisih ${Math.round((fit.values.get(part)! - value) * 10) / 10} cm).`
+            : 'Lebih besar dari size terbesar: sarankan custom/tanya CS.')
+      )
+    }
+  }
+  return lines.length
+    ? `PERBANDINGAN SIZE CHART (dihitung sistem dari ukuran badan pelanggan; ukuran jadi ±1-2 cm):\n- ${lines.join('\n- ')}\nPakai hasil ini; bila berbeda dengan Fit Advisor, sebutkan keduanya singkat dan utamakan ukuran badan yang diukur.`
+    : ''
 }
