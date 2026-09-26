@@ -22,6 +22,7 @@ const globalTables = new Set([
   // Akun AI berlaku untuk semua nomor/workspace.
   'whatsapp_ai_accounts',
   'whatsapp_ai_events',
+  'whatsapp_ai_prefs',
 ])
 export function workspaceIdentifier(identifier: string) {
   if (/^whatsapp_[a-z0-9_]+$/.test(identifier) && !globalTables.has(identifier))

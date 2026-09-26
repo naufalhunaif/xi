@@ -1220,4 +1220,11 @@ window.waLocales.en = {
   "Menguji {0}…": "Testing {0}…",
   "{0} berhasil ({1} detik, model {2}).": "{0} works ({1} s, model {2}).",
   "{0} gagal: {1}": "{0} failed: {1}",
+  "Pembagian kerja": "Work sharing",
+  "Berurutan": "In order",
+  "Merata": "Even",
+  "Akun yang paling sedikit terpakai dalam 5 jam terakhir dipakai lebih dulu, jadi kuota semua akun habis merata.": "The account with the least usage in the last 5 hours goes first, so every account's quota is used evenly.",
+  "Akun paling atas selalu dipakai dulu; akun di bawahnya jadi cadangan saat habis.": "The top account is always used first; accounts below are backups when it runs out.",
+  "{0} token / 5 jam": "{0} tokens / 5 h",
+  "{0} token dalam 5 jam": "{0} tokens in 5 hours",
 }

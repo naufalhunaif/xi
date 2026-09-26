@@ -96,7 +96,8 @@ export async function runLeanProvider(
         )
       )
       await markAiAccountUsed(account.id).catch(() => {})
-      await recordAiEvent(account.id, 'ok', phase).catch(() => {})
+      const tokens = result.usage ? result.usage.input + result.usage.output : null
+      await recordAiEvent(account.id, 'ok', phase, '', tokens).catch(() => {})
       return result
     } catch (error) {
       const detail = aiFailureDetail(error, {

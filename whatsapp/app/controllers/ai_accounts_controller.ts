@@ -7,6 +7,10 @@ import {
   aiAccountRef,
   busyAiAccounts,
   recentAiEvents,
+  aiTokenUsage,
+  aiSpreadMode,
+  setAiSpreadMode,
+  SPREAD_WINDOW_MS,
   createAiAccount,
   deleteAiAccount,
   listAiAccounts,
@@ -61,24 +65,34 @@ export default class AiAccountsController {
   async index({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
     const accounts = await listAiAccounts()
-    const states = await Promise.all(accounts.map((a) => connected(a).catch(() => false)))
-    return response.json({ accounts: accounts.map((a, i) => view(a, states[i])) })
+    const [states, used, spread] = await Promise.all([
+      Promise.all(accounts.map((a) => connected(a).catch(() => false))),
+      aiTokenUsage(Date.now() - SPREAD_WINDOW_MS),
+      aiSpreadMode(),
+    ])
+    return response.json({
+      spread,
+      accounts: accounts.map((a, i) => ({ ...view(a, states[i]), tokens5h: used.get(a.id) || 0 })),
+    })
   }
 
   /** Data ringan untuk visual orkestra: tanpa cek login (tidak memanggil CLI). */
   async orchestra({ request, response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
     const after = Math.max(0, Number(request.input('after', 0)) || 0)
-    const [accounts, events, busy] = await Promise.all([
+    const now = Date.now()
+    const [accounts, events, busy, used, spread] = await Promise.all([
       listAiAccounts(),
       recentAiEvents(after),
       busyAiAccounts(),
+      aiTokenUsage(now - SPREAD_WINDOW_MS),
+      aiSpreadMode(),
     ])
-    const now = Date.now()
     return response.json({
       now,
       busy,
       events,
+      spread,
       accounts: accounts.map((a) => ({
         id: a.id,
         provider: a.provider,
@@ -86,8 +100,14 @@ export default class AiAccountsController {
         enabled: a.enabled,
         limitedUntil: a.limitedUntil > now ? a.limitedUntil : 0,
         lastUsedAt: a.lastUsedAt ? a.lastUsedAt.getTime() : 0,
+        tokens5h: used.get(a.id) || 0,
       })),
     })
+  }
+
+  async spread({ request, response }: HttpContext) {
+    await setAiSpreadMode(request.input('mode') === 'even' ? 'even' : 'order')
+    return response.json({ ok: true, mode: await aiSpreadMode() })
   }
 
   async store({ request, response }: HttpContext) {

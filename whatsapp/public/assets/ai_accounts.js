@@ -144,7 +144,11 @@
       handle.addEventListener('pointerdown', (event) => startDrag(event, wrap))
       name.append(handle, el('span', '', account.name))
       const [label, tone] = state(account)
-      const info = el('code', '', account.lastError || account.model || '')
+      const tokens = Number(account.tokens5h || 0)
+      const usage = tokens
+        ? t('{0} token / 5 jam', tokens >= 1000 ? `${(tokens / 1000).toFixed(tokens >= 100000 ? 0 : 1)}rb` : String(tokens))
+        : ''
+      const info = el('code', '', [usage, account.lastError || account.model || ''].filter(Boolean).join(' · '))
       const side = el('div', 'actions')
       side.append(el('span', `wa-pill ${tone}`, label))
       const holder = el('div', 'wa-span-full')
@@ -222,6 +226,27 @@
     window.addEventListener('pointercancel', end)
   }
 
+  // Berurutan = akun atas dipakai dulu, bawah jadi cadangan. Merata = token 5 jam terakhir paling sedikit didahulukan.
+  function showSpread(mode) {
+    card.querySelectorAll('[data-ai-spread]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.aiSpread === mode)))
+    const hint = byId('aiSpreadHint')
+    if (hint)
+      hint.textContent =
+        mode === 'even'
+          ? t('Akun yang paling sedikit terpakai dalam 5 jam terakhir dipakai lebih dulu, jadi kuota semua akun habis merata.')
+          : t('Akun paling atas selalu dipakai dulu; akun di bawahnya jadi cadangan saat habis.')
+  }
+  card.querySelectorAll('[data-ai-spread]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      showSpread(b.dataset.aiSpread)
+      try {
+        await call('/api/ai/accounts/spread', 'POST', { mode: b.dataset.aiSpread })
+      } catch (error) {
+        status(error.message)
+      }
+    })
+  )
+
   let timer
   async function refresh() {
     clearTimeout(timer)
@@ -229,6 +254,7 @@
     try {
       const data = await call('/api/ai/accounts')
       render(data.accounts || [])
+      showSpread(data.spread || 'order')
     } catch (error) {
       status(error.message)
     }

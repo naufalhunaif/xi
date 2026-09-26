@@ -92,6 +92,9 @@
       node.el.setAttribute('class', `orc-node p-${account.provider} s-${state}`)
       node.edge.setAttribute('class', `orc-edge p-${account.provider} s-${state}`)
       node.badge.textContent = String(index + 1)
+      // Ukuran simpul = porsi token 5 jam terakhir (terlihat merata atau tidak).
+      const maxTokens = Math.max(1, ...accounts.map((a) => a.tokens5h || 0))
+      node.el.querySelector('.core').setAttribute('r', String(8 + 7 * Math.sqrt((account.tokens5h || 0) / maxTokens)))
       node.label.textContent = account.name
       node.sub.textContent =
         state === 'paused' ? t('jeda s/d {0}', clock(account.limitedUntil)) : state === 'busy' ? t('bekerja…') : ''
@@ -125,7 +128,9 @@
     title.textContent = `${node.order}. ${node.account.name}`
     const line = document.createElement('span')
     line.textContent = `${stateText(node)} · ${t('dipakai')} ${ago(node.account.lastUsedAt)}`
-    tip.append(title, line)
+    const tokens = document.createElement('span')
+    tokens.textContent = t('{0} token dalam 5 jam', (node.account.tokens5h || 0).toLocaleString('id-ID'))
+    tip.append(title, line, tokens)
     tip.hidden = false
     const box = svg.getBoundingClientRect()
     const scale = box.width / 360

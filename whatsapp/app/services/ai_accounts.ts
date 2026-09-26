@@ -113,14 +113,47 @@ export async function readAiAccount(id: number) {
   return row ? map(row) : null
 }
 
-/** Akun yang boleh dicoba sekarang, sesuai urutan. */
+/**
+ * Akun yang boleh dicoba sekarang. Mode "urutan": sesuai urutan daftar.
+ * Mode "rata": yang paling sedikit memakai token dalam 5 jam terakhir didahulukan
+ * (jendela batas pemakaian ChatGPT/Claude), sehingga kuota semua akun terpakai merata.
+ */
 export async function usableAiAccounts(now = Date.now()) {
-  return (await listAiAccounts()).filter(
+  const usable = (await listAiAccounts()).filter(
     (account) =>
       account.enabled &&
       account.limitedUntil <= now &&
       (account.provider !== 'gemini' || Boolean(account.apiKey))
   )
+  if ((await aiSpreadMode()) !== 'even' || usable.length < 2) return usable
+  const used = await aiTokenUsage(now - SPREAD_WINDOW_MS)
+  return [...usable].sort(
+    (a, b) => (used.get(a.id) || 0) - (used.get(b.id) || 0) || a.position - b.position
+  )
+}
+
+export const SPREAD_WINDOW_MS = 5 * 3_600_000
+
+// Preferensi global: cara membagi pekerjaan antar akun.
+export type AiSpreadMode = 'order' | 'even'
+let prefsReady = false
+async function ensurePrefs() {
+  if (prefsReady) return
+  await db.rawQuery(`CREATE TABLE IF NOT EXISTS whatsapp_ai_prefs (
+    id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    spread VARCHAR(10) NOT NULL DEFAULT 'order'
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  await db.rawQuery("INSERT IGNORE INTO whatsapp_ai_prefs (id, spread) VALUES (1, 'order')")
+  prefsReady = true
+}
+export async function aiSpreadMode(): Promise<AiSpreadMode> {
+  await ensurePrefs()
+  const row = await db.from('whatsapp_ai_prefs').where('id', 1).first()
+  return row?.spread === 'even' ? 'even' : 'order'
+}
+export async function setAiSpreadMode(mode: AiSpreadMode) {
+  await ensurePrefs()
+  await db.from('whatsapp_ai_prefs').where('id', 1).update({ spread: mode === 'even' ? 'even' : 'order' })
 }
 
 /** Semua akun sedang jeda: kapan yang paling cepat pulih. */
@@ -233,23 +266,43 @@ async function ensureEvents() {
     created_at DATETIME(3) NOT NULL,
     KEY whatsapp_ai_events_account (account_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  await db.rawQuery('ALTER TABLE whatsapp_ai_events ADD COLUMN IF NOT EXISTS tokens INT UNSIGNED NULL')
+  await db.rawQuery('ALTER TABLE whatsapp_ai_events ADD INDEX IF NOT EXISTS whatsapp_ai_events_created (created_at)')
   eventsReady = true
 }
 
-export async function recordAiEvent(accountId: number, kind: AiEventKind, phase = '', detail = '') {
+export async function recordAiEvent(
+  accountId: number,
+  kind: AiEventKind,
+  phase = '',
+  detail = '',
+  tokens: number | null = null
+) {
   await ensureEvents()
   await db.table('whatsapp_ai_events').insert({
     account_id: accountId,
     kind,
     phase: phase.slice(0, 40) || null,
     detail: detail.slice(0, 200) || null,
+    tokens: tokens === null ? null : Math.max(0, Math.round(tokens)),
     created_at: new Date(),
   })
-  // Simpan jejak terbaru saja.
-  if (Math.random() < 0.02)
-    await db.rawQuery(
-      'DELETE FROM whatsapp_ai_events WHERE id < (SELECT id FROM (SELECT id FROM whatsapp_ai_events ORDER BY id DESC LIMIT 1 OFFSET 500) t)'
-    )
+  // Simpan jejak 8 hari (cukup untuk jendela 5 jam & mingguan).
+  if (Math.random() < 0.01)
+    await db.from('whatsapp_ai_events').where('created_at', '<', new Date(Date.now() - 8 * 86_400_000)).delete()
+}
+
+/** Token per akun sejak waktu tertentu. */
+export async function aiTokenUsage(sinceMs: number) {
+  await ensureEvents()
+  const rows = await db
+    .from('whatsapp_ai_events')
+    .where('kind', 'ok')
+    .where('created_at', '>=', new Date(sinceMs))
+    .groupBy('account_id')
+    .select('account_id')
+    .sum('tokens as total')
+  return new Map<number, number>(rows.map((row: any) => [Number(row.account_id), Number(row.total || 0)]))
 }
 
 export async function recentAiEvents(after = 0, limit = 40) {
