@@ -193,7 +193,11 @@ export async function promoteLegacyAiAccount(provider: 'chatgpt' | 'claude') {
 
 /** Jeda berbeda per penyebab: kuota lebih lama, gangguan sementara lebih singkat. */
 const cooldownMs = (code: string) =>
-  code === 'USAGE_LIMIT' ? 60 * 60_000 : code === 'AI_AUTH_REQUIRED' ? 30 * 60_000 : 10 * 60_000
+  code === 'USAGE_LIMIT'
+    ? 60 * 60_000
+    : code === 'AI_AUTH_REQUIRED' || code === 'ACCESS_DENIED'
+      ? 30 * 60_000
+      : 5 * 60_000
 
 export async function markAiAccountLimited(id: number, code: string, message: string, now = Date.now()) {
   await updateAiAccount(id, {

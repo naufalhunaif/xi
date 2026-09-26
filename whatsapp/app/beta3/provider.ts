@@ -17,7 +17,6 @@ import {
   markAiAccountUsed,
   nextAiRecovery,
   recordAiEvent,
-  updateAiAccount,
   usableAiAccounts,
   type AiProviderName,
 } from '#services/ai_accounts'
@@ -104,20 +103,21 @@ export async function runLeanProvider(
         provider: account.provider === 'claude' ? 'claude' : 'chatgpt',
       })
       lastError = error
+      const reason = (error instanceof Error ? error.message : String(error)).replace(/\s+/g, ' ')
       await recordAiEvent(
         account.id,
         SWITCHABLE.has(detail.code) ? 'limited' : 'fail',
         phase,
-        detail.code
+        `${detail.code}: ${reason}`
       ).catch(() => {})
       if (STOP_CODES.has(detail.code)) throw error
       // Kuota habis / perlu login → akun dijeda. Gangguan lain → cukup coba akun berikutnya.
-      if (SWITCHABLE.has(detail.code))
-        await markAiAccountLimited(account.id, detail.code, detail.message).catch(() => {})
-      else
-        await updateAiAccount(account.id, {
-          last_error: (error instanceof Error ? error.message : String(error)).slice(0, 290),
-        }).catch(() => {})
+      // Kuota/login → jeda lama; gangguan lain → jeda singkat agar tidak dicoba tiap pesan.
+      await markAiAccountLimited(
+        account.id,
+        SWITCHABLE.has(detail.code) ? detail.code : 'AI_PROCESS_FAILED',
+        SWITCHABLE.has(detail.code) ? `${detail.message} ${reason}` : reason
+      ).catch(() => {})
     }
   }
   throw lastError
@@ -422,15 +422,23 @@ async function runGeminiLean(
         ...(withSchema ? { responseJsonSchema: schema } : {}),
       },
     }
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      }
-    )
+    let response: Response
+    try {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        }
+      )
+    } catch (error) {
+      const cause = (error as any)?.cause?.code || (error as any)?.cause?.message || ''
+      throw new Error(
+        `Gemini: server Google tidak bisa dihubungi (${cause || (error instanceof Error ? error.message : String(error))}).`
+      )
+    }
     const data = (await response.json().catch(() => ({}))) as any
     return { response, data }
   }
@@ -442,7 +450,11 @@ async function runGeminiLean(
     const message = String(data?.error?.message || `HTTP ${response.status}`).slice(0, 300)
     if (response.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(message))
       throw new Error(`Gemini: usage limit — ${message}`)
-    if (response.status === 401 || response.status === 403)
+    if (
+      response.status === 401 ||
+      response.status === 403 ||
+      /API_KEY_INVALID|API key not valid|PERMISSION_DENIED/i.test(JSON.stringify(data?.error || ''))
+    )
       throw new AiProcessFailure({
         stage: 'provider',
         code: 'AI_AUTH_REQUIRED',

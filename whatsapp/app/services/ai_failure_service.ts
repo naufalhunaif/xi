@@ -86,7 +86,7 @@ export function aiFailureDetail(error: unknown, context: FailureContext): AiFail
       true
     )
   if (
-    /unauthorized|\b401\b|invalid_grant|invalid_token|not logged in|login required|authentication|hubungkan ulang|sesi.*(?:berakhir|kedaluwarsa)|run \/login|please (?:run )?\/?log ?in|invalid api key|token (?:has )?expired|api key.*(?:ditolak|belum diisi)/i.test(
+    /unauthorized|\b401\b|invalid_grant|invalid_token|not logged in|login required|authentication|hubungkan ulang|sesi.*(?:berakhir|kedaluwarsa)|run \/login|please (?:run )?\/?log ?in|invalid api key|token (?:has )?expired|api key.*(?:ditolak|belum diisi)|API_KEY_INVALID|api key not valid|PERMISSION_DENIED/i.test(
       text
     )
   )

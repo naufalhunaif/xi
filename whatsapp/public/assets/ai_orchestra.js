@@ -221,7 +221,7 @@
     } else {
       lastTrouble = { id: event.accountId, at: event.at, kind: event.kind }
       addLog(
-        event.kind === 'limited' ? t('{0} habis kuota / perlu login', name) : t('{0} gagal ({1})', name, event.detail || '-'),
+        event.kind === 'limited' ? t('{0} habis kuota / perlu login', name) : t('{0} gagal ({1})', name, (event.detail || '-').replace(/^[A-Z_]+: /, '').slice(0, 90)),
         event.kind,
         event.at
       )
