@@ -1244,4 +1244,8 @@ window.waLocales.en = {
   "dilayani {0}": "served by {0}",
   "Klik untuk membuka chat": "Click to open chat",
   "{0} membalas {1}": "{0} replied to {1}",
+  "Tugas {0}": "Tasks for {0}",
+  "Tugas: balas pelanggan + latar": "Tasks: customer replies + background",
+  "Tugas: latar saja (katalog, rekap)": "Tasks: background only (catalog, recap)",
+  "Tugas {0} diperbarui.": "Tasks for {0} updated.",
 }

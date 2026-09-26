@@ -70,7 +70,7 @@ export async function runLeanProvider(
   meta: { jid?: string } = {}
 ): Promise<LeanProviderResult> {
   const jid = meta.jid || ''
-  const accounts = await usableAiAccounts().catch(() => null)
+  const accounts = await usableAiAccounts(Date.now(), phase).catch(() => null)
   if (!accounts) return runLeanOnce(settings, settings.aiProvider, {}, prompt, imagePaths, phase, schema)
   if (!accounts.length) {
     const recovery = await nextAiRecovery().catch(() => 0)
@@ -469,6 +469,8 @@ async function runGeminiLean(
       contents: [{ role: 'user', parts: [{ text: prompt.user }, ...images] }],
       generationConfig: {
         responseMimeType: 'application/json',
+        // Suhu rendah: gaya lebih stabil dan mirip model lain.
+        temperature: 0.3,
         ...(withSchema ? { responseJsonSchema: schema } : {}),
       },
     }

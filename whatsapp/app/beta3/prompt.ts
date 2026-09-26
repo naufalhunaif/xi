@@ -236,6 +236,7 @@ export function buildLeanPrompt(input: {
   sizeCharts?: string
   now?: Date
   imageCount?: number
+  styleGuide?: string
 }) {
   const payment = input.paymentMethods.length
     ? `REKENING RESMI (satu-satunya sumber rekening; sebut hanya saat pelanggan tanya transfer kemana atau total sudah disepakati):\n${input.paymentMethods.map((method) => `${method.name} ${method.destination}${method.accountName ? ` an ${method.accountName}` : ''}`).join('\n')}`
@@ -250,6 +251,7 @@ export function buildLeanPrompt(input: {
     ['sizechart', input.sizeCharts || ''],
     ['bahan', input.fabrics || ''],
     ['contoh', renderExamples(input.examples)],
+    ['gaya', input.styleGuide || ''],
     [
       'pelanggan',
       input.customerNote

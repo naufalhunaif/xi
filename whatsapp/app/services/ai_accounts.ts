@@ -21,6 +21,8 @@ export type AiAccount = {
   limitedCode: string
   lastError: string
   lastUsedAt: Date | null
+  /** 'all' = semua tugas; 'background' = hanya tugas latar (katalog, rekap), bukan balasan pelanggan. */
+  scope: 'all' | 'background'
 }
 
 let ready = false
@@ -83,6 +85,14 @@ async function ensureTable() {
     await db.rawQuery('ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS user_set TINYINT(1) NOT NULL DEFAULT 0')
     await db.from('whatsapp_ai_accounts').where('legacy', 1).update({ enabled: 1 })
   }
+  // Tugas per akun. Gemini (gaya balasannya paling berbeda) awalnya hanya untuk tugas latar.
+  const [scopeCol] = await db.rawQuery(
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'whatsapp_ai_accounts' AND column_name = 'scope'"
+  )
+  if (!Number(scopeCol?.[0]?.n || 0)) {
+    await db.rawQuery("ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS scope VARCHAR(12) NOT NULL DEFAULT 'all'")
+    await db.from('whatsapp_ai_accounts').where('provider', 'gemini').update({ scope: 'background' })
+  }
   ready = true
 }
 
@@ -99,6 +109,7 @@ const map = (row: any): AiAccount => ({
   limitedCode: String(row.limited_code || ''),
   lastError: String(row.last_error || ''),
   lastUsedAt: row.last_used_at ? new Date(row.last_used_at) : null,
+  scope: row.scope === 'background' ? 'background' : 'all',
 })
 
 export async function listAiAccounts() {
@@ -118,13 +129,17 @@ export async function readAiAccount(id: number) {
  * Mode "rata": yang paling sedikit memakai token dalam 5 jam terakhir didahulukan
  * (jendela batas pemakaian ChatGPT/Claude), sehingga kuota semua akun terpakai merata.
  */
-export async function usableAiAccounts(now = Date.now()) {
-  const usable = (await listAiAccounts()).filter(
+export async function usableAiAccounts(now = Date.now(), phase = '') {
+  const ready = (await listAiAccounts()).filter(
     (account) =>
       account.enabled &&
       account.limitedUntil <= now &&
       (account.provider !== 'gemini' || Boolean(account.apiKey))
   )
+  // Balasan ke pelanggan: akun "latar saja" hanya dipakai bila tidak ada akun lain yang siap.
+  const customerFacing = !phase || /reply/.test(phase)
+  const front = customerFacing ? ready.filter((account) => account.scope !== 'background') : ready
+  const usable = front.length ? front : ready
   if ((await aiSpreadMode()) !== 'even' || usable.length < 2) return usable
   const used = await aiTokenUsage(now - SPREAD_WINDOW_MS)
   return [...usable].sort(
@@ -177,6 +192,7 @@ export async function createAiAccount(input: {
     enabled: 1,
     legacy: 0,
     model: String(input.model || '').slice(0, 80),
+    scope: input.provider === 'gemini' ? 'background' : 'all',
     api_key: input.apiKey ? String(input.apiKey).trim() : null,
     created_at: new Date(),
     updated_at: new Date(),

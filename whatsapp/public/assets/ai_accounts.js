@@ -150,7 +150,7 @@
         : ''
       // Model per akun: tiap akun boleh memakai model berbeda.
       const info = el('div', 'wa-ai-info')
-      info.append(modelPicker(account))
+      info.append(modelPicker(account), scopePicker(account))
       const note = [usage, account.lastError || ''].filter(Boolean).join(' · ')
       if (note) info.append(el('small', account.lastError ? 'wa-ai-error' : '', note))
       const side = el('div', 'actions')
@@ -256,6 +256,25 @@
       try {
         await call(`/api/ai/accounts/${account.id}/update`, 'POST', { model, resume: true })
         status(t('Model {0}: {1}', account.name, model || t('otomatis')))
+      } catch (error) {
+        status(error.message)
+      }
+      refresh()
+    })
+    return select
+  }
+
+  // Tugas akun: semua, atau hanya tugas latar (katalog/rekap) agar gaya balasan ke pelanggan seragam.
+  function scopePicker(account) {
+    const select = el('select', 'wa-ai-model')
+    select.setAttribute('aria-label', t('Tugas {0}', account.name))
+    select.append(new Option(t('Tugas: balas pelanggan + latar'), 'all'))
+    select.append(new Option(t('Tugas: latar saja (katalog, rekap)'), 'background'))
+    select.value = account.scope === 'background' ? 'background' : 'all'
+    select.addEventListener('change', async () => {
+      try {
+        await call(`/api/ai/accounts/${account.id}/update`, 'POST', { scope: select.value })
+        status(t('Tugas {0} diperbarui.', account.name))
       } catch (error) {
         status(error.message)
       }

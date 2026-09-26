@@ -29,6 +29,7 @@ import {
   type LeanHistoryRow,
 } from '#beta3/prompt'
 import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
+import { normalizeStyle, storeStyle, styleGuide } from '#beta3/style_service'
 import {
   callLeanTool,
   extractBodyMeasure,
@@ -181,6 +182,8 @@ export async function createLeanReply(input: {
     readOrderSpec(jid),
   ])
   const stage = stageFromNote(chatNote)
+  // Gaya balasan toko: sama untuk ChatGPT, Claude, dan Gemini.
+  const style = await storeStyle(examples).catch(() => null)
 
   // Tool dipanggil KODE pada event: TB/BB → fit advisor, form → ongkir. Model tidak memanggil tool.
   const mcp = await readLeanMcpConfig()
@@ -460,6 +463,7 @@ export async function createLeanReply(input: {
     sizeCharts: await readLeanState('size_charts'),
     catalog: digest.text,
     examples: pickExamples(examples, input.text, stage),
+    styleGuide: style ? styleGuide(style) : '',
     customerNote,
     chatNote,
     spec,
@@ -482,6 +486,10 @@ export async function createLeanReply(input: {
   })
   const decision = parseLeanDecision(result.text)
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
+  if (style) {
+    decision.pesan = normalizeStyle(decision.pesan, style)
+    if (decision.susulan) decision.susulan = normalizeStyle([decision.susulan], style)[0] || ''
+  }
   if (decision.referensi?.length && input.imageIds?.length) {
     const saved = await saveAiRefs(jid, decision.referensi, input.imageIds).catch(() => 0)
     if (saved)

@@ -49,6 +49,7 @@ function view(account: AiAccount, isConnected: boolean, now = Date.now()) {
     legacy: account.legacy,
     enabled: account.enabled,
     model: account.model,
+    scope: account.scope,
     hasKey: Boolean(account.apiKey),
     connected: isConnected,
     limitedUntil: account.limitedUntil > now ? account.limitedUntil : 0,
@@ -174,6 +175,8 @@ export default class AiAccountsController {
   async update({ params, request, response }: HttpContext) {
     const account = await found(params)
     const values: Record<string, unknown> = {}
+    if (request.input('scope') !== undefined)
+      values.scope = request.input('scope') === 'background' ? 'background' : 'all'
     if (request.input('enabled') !== undefined) {
       values.enabled = request.input('enabled') ? 1 : 0
       values.user_set = 1
