@@ -272,16 +272,34 @@
         image.src = source
         image.alt = ''
         mediaWrap.append(image)
+      } else if (['audio', 'document', 'location', 'contact'].includes(message.media_type)) {
+        // Jenis non-foto tanpa berkas: tampilkan keterangan singkat, bukan kotak kosong.
+        const chip = document.createElement('div')
+        chip.className = 'message-document'
+        chip.textContent = {
+          audio: t('Pesan suara'),
+          document: message.media_name || t('Dokumen'),
+          location: t('Lokasi'),
+          contact: t('Kontak'),
+        }[message.media_type]
+        mediaWrap.append(chip)
       } else {
         const placeholder = document.createElement('div')
         placeholder.className = 'message-media-placeholder'
         placeholder.ariaHidden = 'true'
         mediaWrap.append(placeholder)
       }
-      if (['downloading', 'failed'].includes(message.media_status)) {
+      // Media lama yang sudah tidak ada di server cukup ditandai netral, bukan "gagal".
+      const mediaLabel = {
+        downloading: t('Mengunduh…'),
+        later: t('Media lama'),
+        failed: t('Media lama'),
+        expired: t('Media lama'),
+      }[message.media_status]
+      if (mediaLabel && !message.media_url) {
         const state = document.createElement('span')
-        state.className = `message-media-state ${message.media_status === 'failed' ? 'failed' : ''}`
-        state.textContent = message.media_status === 'failed' ? t('Gagal dimuat') : t('Mengunduh…')
+        state.className = 'message-media-state'
+        state.textContent = mediaLabel
         mediaWrap.append(state)
       }
       article.append(mediaWrap)
@@ -294,7 +312,9 @@
       source.textContent = senderType === 'ai' ? 'AI' : 'CS'
       meta.append(source)
     } else {
-      meta.textContent = message.contact_name || message.jid
+      // Riwayat sering tanpa nama pengirim: pakai nama room, jangan tampilkan ID internal.
+      const roomTitle = byId('roomName')?.textContent?.trim()
+      meta.textContent = message.contact_name || roomTitle || fallbackName(message.jid)
     }
     article.append(meta)
     if (message.body) {

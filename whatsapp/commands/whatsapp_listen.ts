@@ -1259,7 +1259,11 @@ export default class WhatsappListen extends BaseCommand {
     const createdAt = this.messageDate(message)
     // Riwayat lama: cukup teks + thumbnail. Media lama umumnya sudah kedaluwarsa di
     // server WhatsApp dan mengunduhnya satu per satu membuat sinkron sangat lambat.
-    const downloadable = Boolean(media?.visual) && Date.now() - createdAt.getTime() < 3 * 86_400_000
+    const ageMs = Date.now() - createdAt.getTime()
+    const downloadable = Boolean(media?.visual) && ageMs < 3 * 86_400_000
+    // Media lama tetap diambil pelan-pelan di belakang (terbaru dulu), tanpa menahan sinkron.
+    const later =
+      Boolean(media?.visual) && !downloadable && ageMs < 60 * 86_400_000 && this.oldMedia.length < 400
     await db.table('whatsapp_messages').insert({
       ...lineColumns(),
       message_id: id,
@@ -1272,12 +1276,13 @@ export default class WhatsappListen extends BaseCommand {
       media_url: null,
       thumbnail_url: media?.thumbnailUrl || null,
       media_mime: media?.mediaMime || null,
-      media_status: media?.visual ? (downloadable ? 'downloading' : 'failed') : null,
+      media_status: media?.visual ? (downloadable ? 'downloading' : later ? 'later' : 'expired') : null,
       reply_to_message_id: this.replyIdOf(message) || null,
       status: message.key.fromMe ? 'sent' : 'received',
       created_at: createdAt,
     })
     void this.rememberContact(jid, message.pushName || '').catch(() => {})
+    if (later && media) this.queueOldMedia(message, media)
     // Chat/thumbnail is already available; downloads must not block the next message.
     const mediaDownload = downloadable && media
       ? this.downloadMedia(message, media).catch(async () => {
@@ -1550,6 +1555,32 @@ export default class WhatsappListen extends BaseCommand {
     }
 
     return { mediaType, mediaMime: mime, extension, thumbnailUrl, thumbnailPath, visual, note }
+  }
+
+  private oldMedia: Array<{ message: WAMessage; media: IncomingMedia }> = []
+  private drainingOldMedia = false
+  private queueOldMedia(message: WAMessage, media: IncomingMedia) {
+    this.oldMedia.push({ message, media })
+    void this.drainOldMedia()
+  }
+  /** Satu per satu, terbaru dulu, hanya saat sinkron sedang senggang. */
+  private async drainOldMedia() {
+    if (this.drainingOldMedia) return
+    this.drainingOldMedia = true
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+    try {
+      while (this.oldMedia.length && !this.stopping) {
+        if (this.ingesting > 0 || !this.socket) {
+          await wait(2000)
+          continue
+        }
+        const next = this.oldMedia.pop()!
+        await this.downloadMedia(next.message, next.media).catch(() => null)
+        await wait(300)
+      }
+    } finally {
+      this.drainingOldMedia = false
+    }
   }
 
   private downloadMedia(message: WAMessage, media: IncomingMedia) {
