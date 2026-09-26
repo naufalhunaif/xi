@@ -20,6 +20,14 @@ router.get('/login', [AccountController, 'login']).as('account.login')
 // Halaman publik untuk Google (Branding): kebijakan privasi & syarat layanan.
 router.get('/privacy', [() => import('#controllers/legal_controller'), 'privacy'])
 router.get('/terms', [() => import('#controllers/legal_controller'), 'terms'])
+// Verifikasi kepemilikan domain Google Search Console (metode "File HTML"): isi file cukup
+// "google-site-verification: <nama file>", jadi nama file apa pun dari Google langsung valid.
+router
+  .get('/:file', ({ params, response }) => {
+    response.header('content-type', 'text/html; charset=utf-8')
+    return response.send(`google-site-verification: ${params.file}`)
+  })
+  .where('file', /^google[a-z0-9]{8,40}\.html$/)
 router.post('/login', [AccountController, 'loginPost'])
 router.get('/setup', [AccountController, 'setup']).as('account.setup')
 router.post('/setup', [AccountController, 'setupPost'])
