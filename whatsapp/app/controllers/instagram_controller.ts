@@ -86,6 +86,26 @@ export default class InstagramController {
     return response.ok('EVENT_RECEIVED')
   }
 
+  /** Halaman publik yang diminta Meta saat app dipublikasikan (Live). */
+  async policy({ request, response }: HttpContext) {
+    const deletion = request.url().includes('data-deletion')
+    const title = deletion ? 'Penghapusan Data' : 'Kebijakan Privasi'
+    const body = deletion
+      ? `<p>Untuk meminta penghapusan data, kirim pesan <strong>"hapus data saya"</strong> lewat DM Instagram atau WhatsApp toko kami.</p>
+         <p>Riwayat percakapan, catatan pesanan, dan data kontak Anda akan dihapus dari sistem kami paling lambat 30 hari setelah permintaan diterima, kecuali data transaksi yang wajib disimpan menurut hukum.</p>`
+      : `<p>Aplikasi ini dipakai toko untuk membalas pesan pelanggan di WhatsApp dan Instagram (DM dan komentar), termasuk dengan bantuan AI.</p>
+         <h2>Data yang kami proses</h2>
+         <p>Nama/username, isi pesan dan komentar, gambar yang Anda kirim, serta data pesanan (nama penerima, nomor HP, alamat) yang Anda berikan sendiri.</p>
+         <h2>Penggunaan</h2>
+         <p>Data hanya dipakai untuk menjawab pertanyaan, memproses pesanan, dan pengiriman. Data tidak dijual dan tidak dibagikan ke pihak lain selain layanan yang diperlukan untuk menjalankan fungsi tersebut (penyedia AI, ekspedisi, Meta).</p>
+         <h2>Penyimpanan & penghapusan</h2>
+         <p>Data disimpan selama diperlukan untuk layanan. Anda dapat meminta penghapusan kapan saja; lihat <a href="data-deletion">Penghapusan Data</a>.</p>`
+    response.header('Content-Type', 'text/html; charset=utf-8')
+    return response.send(`<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<style>body{margin:0;font:13px/1.6 Inter,-apple-system,"Segoe UI",sans-serif;color:#242424;background:#fff}main{max-width:680px;margin:0 auto;padding:32px 16px}h1{font-size:22px;margin:0 0 16px}h2{font-size:14px;margin:20px 0 6px}p{margin:0 0 10px;color:#3d3d3a}a{color:#18865b}@media(prefers-color-scheme:dark){body{background:#000;color:#e6ebe7}p{color:#abb8ae}a{color:#88d9ad}}</style>
+</head><body><main><h1>${title}</h1>${body}</main></body></html>`)
+  }
+
   /** Gambar keluar untuk DM (URL acak sementara; Instagram mengambilnya sendiri). */
   async media({ params, response }: HttpContext) {
     const path = shareFilePath(String(params.name || ''))
@@ -97,7 +117,12 @@ export default class InstagramController {
 
   private urls(request: HttpContext['request']) {
     const base = publicAppUrl(request)
-    return { callbackUrl: `${base}/instagram/callback`, webhookUrl: `${base}/instagram/webhook` }
+    return {
+      callbackUrl: `${base}/instagram/callback`,
+      webhookUrl: `${base}/instagram/webhook`,
+      privacyUrl: `${base}/privacy`,
+      deletionUrl: `${base}/data-deletion`,
+    }
   }
 
   async show({ request, response }: HttpContext) {

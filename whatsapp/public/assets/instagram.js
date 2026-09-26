@@ -35,6 +35,8 @@
     byId('igCallbackUrl').textContent = data.callbackUrl
     byId('igWebhookUrl').textContent = data.webhookUrl
     byId('igVerifyToken').textContent = data.verifyToken
+    byId('igPrivacyUrl').textContent = data.privacyUrl || ''
+    byId('igDeletionUrl').textContent = data.deletionUrl || ''
     byId('igCommentTarget').value = data.commentTarget || 'both'
     for (const toggle of switches) {
       const on = Boolean(data[toggle.dataset.ig])
