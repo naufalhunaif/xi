@@ -356,7 +356,7 @@
     messages.dataset.signature = signature
     const newest = items.at(-1)
     const firstNew = newest && (!latestRenderedMessage || compareMessages(newest, latestRenderedMessage) > 0)
-    const shouldFollowLatest = stickToLatest || Boolean(firstNew)
+    const shouldFollowLatest = (stickToLatest || Boolean(firstNew)) && !roomSearchHoldsView()
     latestRenderedMessage = newest || null
     if (shouldFollowLatest) stickToLatest = true
     const anchor = [...messages.querySelectorAll('.message')].find(
@@ -392,6 +392,7 @@
       const nextAnchor = messages.querySelector(`.message[data-id="${CSS.escape(anchorId)}"]`)
       if (nextAnchor) setMessageScroll(messages.scrollTop + nextAnchor.getBoundingClientRect().top - messages.getBoundingClientRect().top - anchorOffset)
     }
+    applyRoomSearch(false)
   }
   async function updateMessages() {
     if (!messages || updatingMessages) return
@@ -482,6 +483,19 @@
   const fallbackName = (jid) =>
     String(jid).endsWith('@lid') ? t('Tanpa nama') : `+${String(jid).split('@')[0]}`
   const inboxKeys = ['all', 'ai', 'cs', 'payment', 'order']
+  // Pencarian kotak masuk: nama, nomor, pratinjau (langsung) + isi chat (server).
+  const normalizeSearch = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+  const searchDigits = (value) => {
+    const digits = String(value || '').replace(/\D/g, '')
+    return digits.startsWith('0') ? `62${digits.slice(1)}` : digits
+  }
+  let inboxQuery = normalizeSearch(new URLSearchParams(location.search).get('q'))
+  let inboxSearchHits = new Map()
   function inboxState() {
     const params = new URLSearchParams(location.search)
     return {
@@ -511,14 +525,35 @@
       rows.filter((row) => matches(row, state.filter) && Number(row.dataset.unanswered) > 0).length
     )
     let visible = 0
+    const queryDigits = searchDigits(inboxQuery)
     for (const row of rows) {
-      row.hidden = !matches(row, state.filter) || (state.unanswered && !Number(row.dataset.unanswered))
+      const preview = row.querySelector('.wa-contact-content small')
+      const hit = inboxQuery ? inboxSearchHits.get(row.dataset.jid) : null
+      if (inboxQuery) {
+        // Saat mencari, semua tab ikut dicari.
+        const text = row.dataset.search || ''
+        const byText = text.includes(inboxQuery)
+        const byNumber = queryDigits.length >= 3 && (row.dataset.digits || '').includes(queryDigits)
+        row.hidden = !(byText || byNumber || hit)
+        if (preview && hit && !byText && !byNumber) {
+          preview.textContent = hit.snippet
+          preview.classList.add('search-snippet')
+        }
+      } else {
+        row.hidden = !matches(row, state.filter) || (state.unanswered && !Number(row.dataset.unanswered))
+      }
+      if (preview && (!hit || !inboxQuery) && preview.classList.contains('search-snippet')) {
+        preview.textContent = row.dataset.preview || ''
+        preview.classList.remove('search-snippet')
+      }
       if (!row.hidden) visible++
       const url = new URL(row.href)
       url.searchParams.delete('inbox')
       url.searchParams.delete('unanswered')
+      url.searchParams.delete('q')
       if (state.filter !== 'all') url.searchParams.set('inbox', state.filter)
       if (state.unanswered) url.searchParams.set('unanswered', '1')
+      if (inboxQuery) url.searchParams.set('q', inboxQuery)
       row.href = url.href
     }
     // Going back from a room keeps the queue the chat was opened from.
@@ -536,7 +571,9 @@
     if (!visible) {
       const empty = document.createElement('div')
       empty.className = 'wa-empty'
-      empty.textContent = state.unanswered
+      empty.textContent = inboxQuery
+        ? t('Tidak ada hasil')
+        : state.unanswered
         ? t('Semua sudah dibalas')
         : state.filter === 'all' ? t('Belum ada kontak') : t('Tidak ada percakapan di tab ini')
       contacts.append(empty)
@@ -576,6 +613,42 @@
     applyInboxFilters()
   })
   window.addEventListener('popstate', applyInboxFilters)
+  const inboxSearch = byId('inboxSearch')
+  let inboxSearchTimer
+  let inboxSearchVersion = 0
+  async function fetchInboxSearch() {
+    const version = ++inboxSearchVersion
+    if (inboxQuery.length < 2) {
+      inboxSearchHits = new Map()
+      return applyInboxFilters()
+    }
+    try {
+      const data = await api(`/api/search?q=${encodeURIComponent(inboxQuery)}`)
+      if (version !== inboxSearchVersion) return
+      inboxSearchHits = new Map((data.hits || []).map((hit) => [hit.jid, hit]))
+      applyInboxFilters()
+    } catch {}
+  }
+  if (inboxSearch) {
+    inboxSearch.value = new URLSearchParams(location.search).get('q') || ''
+    inboxSearch.addEventListener('input', () => {
+      inboxQuery = normalizeSearch(inboxSearch.value)
+      const url = new URL(location.href)
+      if (inboxQuery) url.searchParams.set('q', inboxSearch.value.trim())
+      else url.searchParams.delete('q')
+      history.replaceState(null, '', url)
+      applyInboxFilters()
+      clearTimeout(inboxSearchTimer)
+      inboxSearchTimer = setTimeout(() => void fetchInboxSearch(), 300)
+    })
+    inboxSearch.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && inboxSearch.value) {
+        inboxSearch.value = ''
+        inboxSearch.dispatchEvent(new Event('input'))
+      }
+    })
+    if (inboxQuery) void fetchInboxSearch()
+  }
   applyInboxFilters()
   let contactsRequestVersion = 0
   function renderContacts(items) {
@@ -601,6 +674,9 @@
       link.dataset.payment = String(Boolean(contact.needs_payment))
       link.dataset.order = String(Boolean(contact.has_order))
       link.dataset.unanswered = String(Number(contact.unanswered_count) || 0)
+      link.dataset.preview = contact.activity || contact.body || ''
+      link.dataset.search = normalizeSearch(`${name} ${contact.contact_name || ''} ${contact.body || ''}`)
+      link.dataset.digits = `${searchDigits(contact.jid)} ${searchDigits(contact.phone_jid)}`
       const avatar = contact.profile_picture_url
         ? document.createElement('img')
         : document.createElement('span')
@@ -1794,6 +1870,93 @@
     mcpResultUrl.searchParams.delete('mcp_oauth')
     window.history.replaceState(null, '', mcpResultUrl.pathname + mcpResultUrl.search + mcpResultUrl.hash)
   }
+  // Cari di dalam room: sorot bubble yang cocok, ↑ lebih lama, ↓ lebih baru.
+  const roomSearchBar = byId('roomSearchBar')
+  const roomSearchInput = byId('roomSearchInput')
+  let roomQuery = ''
+  let roomHitId = null
+  let roomPendingScroll = false
+  function roomSearchHoldsView() {
+    return Boolean(roomQuery && roomHitId)
+  }
+  function roomHits() {
+    if (!messageList || !roomQuery) return []
+    return [...messageList.querySelectorAll('.message')].filter((article) =>
+      normalizeSearch(article.dataset.body).includes(roomQuery)
+    )
+  }
+  function applyRoomSearch(scroll, step = 0) {
+    if (!messageList) return
+    const hits = roomHits()
+    messageList.querySelectorAll('.message.search-hit, .message.search-current').forEach((el) =>
+      el.classList.remove('search-hit', 'search-current')
+    )
+    const count = byId('roomSearchCount')
+    if (!roomQuery) {
+      roomHitId = null
+      if (count) count.textContent = ''
+      return
+    }
+    hits.forEach((el) => el.classList.add('search-hit'))
+    let index = hits.findIndex((el) => el.dataset.id === roomHitId)
+    if (index < 0) index = hits.length - 1
+    else index = Math.min(hits.length - 1, Math.max(0, index + step))
+    const current = hits[index]
+    roomHitId = current?.dataset.id || null
+    if (count) count.textContent = hits.length ? `${index + 1}/${hits.length}` : t('Tidak ada hasil')
+    if (!current) {
+      // Pesan masih dimuat: gulir ke hasil begitu muncul.
+      if (scroll) roomPendingScroll = true
+      return
+    }
+    current.classList.add('search-current')
+    if (scroll || roomPendingScroll) {
+      roomPendingScroll = false
+      stickToLatest = false
+      current.scrollIntoView({ block: 'center' })
+    }
+  }
+  function openRoomSearch(value = '') {
+    if (!roomSearchBar) return
+    roomSearchBar.hidden = false
+    byId('roomSearchButton')?.setAttribute('aria-expanded', 'true')
+    if (value) roomSearchInput.value = value
+    roomQuery = normalizeSearch(roomSearchInput.value)
+    roomHitId = null
+    roomSearchInput.focus()
+    applyRoomSearch(true)
+  }
+  function closeRoomSearch() {
+    if (!roomSearchBar) return
+    roomSearchBar.hidden = true
+    byId('roomSearchButton')?.setAttribute('aria-expanded', 'false')
+    roomSearchInput.value = ''
+    roomQuery = ''
+    applyRoomSearch(false)
+    stickToLatest = true
+    scrollMessagesToLatest()
+  }
+  byId('roomSearchButton')?.addEventListener('click', () =>
+    roomSearchBar?.hidden ? openRoomSearch() : closeRoomSearch()
+  )
+  byId('roomSearchClose')?.addEventListener('click', closeRoomSearch)
+  byId('roomSearchPrev')?.addEventListener('click', () => applyRoomSearch(true, -1))
+  byId('roomSearchNext')?.addEventListener('click', () => applyRoomSearch(true, 1))
+  roomSearchInput?.addEventListener('input', () => {
+    roomQuery = normalizeSearch(roomSearchInput.value)
+    roomHitId = null
+    applyRoomSearch(true)
+  })
+  roomSearchInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      applyRoomSearch(true, event.shiftKey ? 1 : -1)
+    } else if (event.key === 'Escape') closeRoomSearch()
+  })
+  // Dibuka dari hasil pencarian kotak masuk: kata yang sama langsung dicari di room.
+  const openedQuery = new URLSearchParams(location.search).get('q')
+  if (openedQuery && messages?.dataset.jid) openRoomSearch(openedQuery)
+
   updateStatus()
   updateMessages()
   updateOAuth()

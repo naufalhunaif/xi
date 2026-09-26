@@ -108,6 +108,7 @@ router
     router.get('/api/ai/quotas', [DashboardController, 'quotas'])
     router.get('/api/ai/trace', [DashboardController, 'trace'])
     router.get('/api/contacts', [DashboardController, 'contactsList'])
+    router.get('/api/search', [DashboardController, 'searchMessages'])
     router.post('/api/contacts/read', [DashboardController, 'contactRead'])
     router.post('/api/contacts/mode', [DashboardController, 'contactMode'])
     router.get('/api/ai/exclusions', [DashboardController, 'aiExclusions'])

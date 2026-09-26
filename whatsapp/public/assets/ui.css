@@ -213,3 +213,16 @@ html[data-theme='dark'] .workspace-ui {
 .workspace-ui .wa-ai-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .workspace-ui .wa-drag-handle { flex: none; width: 22px; height: 28px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; cursor: grab; touch-action: none; }
 .workspace-ui .wa-ai-item.dragging .wa-drag-handle { cursor: grabbing; }
+
+/* Pencarian: kotak masuk & dalam room. */
+.workspace-ui .wa-inbox-search { padding: 0 12px 8px; }
+.workspace-ui .wa-inbox-search input,
+.workspace-ui .wa-room-search input { width: 100%; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--wa-subtle); color: var(--text); font-size: 13px; }
+.workspace-ui .wa-inbox-search input:focus,
+.workspace-ui .wa-room-search input:focus { outline: 2px solid color-mix(in srgb, var(--wa-ok) 40%, transparent); outline-offset: 0; background: transparent; }
+.workspace-ui .wa-contact small.search-snippet { color: var(--text); font-style: italic; }
+.workspace-ui .wa-room-search { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.workspace-ui .wa-room-search[hidden] { display: none; }
+.workspace-ui .wa-room-search small { flex: none; min-width: 42px; font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; }
+.workspace-ui .message.search-hit { outline: 2px solid color-mix(in srgb, var(--wa-warn) 45%, transparent); outline-offset: 2px; }
+.workspace-ui .message.search-current { outline: 2px solid var(--wa-warn); background-image: linear-gradient(var(--wa-warn-bg), var(--wa-warn-bg)); }

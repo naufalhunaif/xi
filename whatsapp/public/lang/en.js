@@ -1187,4 +1187,9 @@ window.waLocales.en = {
   "Opsional. Nomor tambahan di bawah bisa dipakai tanpa nomor utama.": "Optional. The extra numbers below work without a main number.",
   "Seret untuk mengubah urutan": "Drag to reorder",
   "Urutan disimpan.": "Order saved.",
+  "Cari nama, nomor, atau isi chat": "Search name, number or message",
+  "Cari di chat ini": "Search in this chat",
+  "Hasil sebelumnya": "Previous result",
+  "Hasil berikutnya": "Next result",
+  "Tidak ada hasil": "No results",
 }

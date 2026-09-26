@@ -185,8 +185,7 @@
   // Seret-lepas urutan (mouse & sentuh): baris dipindah langsung, urutan disimpan saat dilepas.
   function startDrag(event, wrap) {
     event.preventDefault()
-    const handle = event.currentTarget
-    handle.setPointerCapture(event.pointerId)
+    // Listener di window: baris yang dipindah (insertBefore) melepas pointer capture.
     wrap.classList.add('dragging')
     const before = [...list.children].map((node) => node.dataset.id).join(',')
     const move = (next) => {
@@ -198,7 +197,9 @@
       list.insertBefore(wrap, next.clientY < box.top + box.height / 2 ? target : target.nextSibling)
     }
     const end = async () => {
-      handle.removeEventListener('pointermove', move)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
       wrap.classList.remove('dragging')
       const ids = [...list.children].map((node) => Number(node.dataset.id))
       if (ids.join(',') === before) return
@@ -210,9 +211,9 @@
       }
       refresh()
     }
-    handle.addEventListener('pointermove', move)
-    handle.addEventListener('pointerup', end, { once: true })
-    handle.addEventListener('pointercancel', end, { once: true })
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
   }
 
   let timer

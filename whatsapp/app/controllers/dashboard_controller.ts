@@ -476,6 +476,34 @@ export default class DashboardController {
     return response.json({ ok: true })
   }
 
+  /** Cari isi chat di semua room: satu hasil terbaru per room + potongan teks. */
+  async searchMessages({ request, response }: HttpContext) {
+    response.header('Cache-Control', 'no-store')
+    const q = String(request.input('q', '')).trim().slice(0, 80)
+    if (q.length < 2) return response.json({ hits: [] })
+    const like = `%${q.replace(/[\\%_]/g, (c) => '\\' + c)}%`
+    const rows = await db
+      .from('whatsapp_messages')
+      .select('id', 'jid', 'body', 'created_at')
+      .whereRaw('body LIKE ?', [like])
+      .whereNot('jid', 'like', '%@g.us')
+      .orderBy('id', 'desc')
+      .limit(300)
+    const seen = new Map<string, { jid: string; id: number; snippet: string; count: number }>()
+    for (const row of rows) {
+      const hit = seen.get(row.jid)
+      if (hit) {
+        hit.count++
+        continue
+      }
+      const body = String(row.body || '')
+      const at = body.toLowerCase().indexOf(q.toLowerCase())
+      const start = Math.max(0, at - 30)
+      const snippet = `${start ? '…' : ''}${body.slice(start, start + 90).replace(/\s+/g, ' ')}`
+      seen.set(row.jid, { jid: row.jid, id: Number(row.id), snippet, count: 1 })
+    }
+    return response.json({ hits: [...seen.values()] })
+  }
   async contactsList({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
     return response.json({ contacts: await this.contacts() })
