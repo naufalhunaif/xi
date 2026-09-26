@@ -190,6 +190,8 @@ export type LeanHistoryRow = {
   mediaType?: string | null
   createdAt: Date | string
   current?: boolean
+  /** Isi pesan yang dikutip/dibalas (mis. foto katalog "Tuxedo - Black"). */
+  replyTo?: string | null
 }
 
 const stamp = (value: Date | string) =>
@@ -215,7 +217,8 @@ export function renderHistory(rows: LeanHistoryRow[]) {
       .trim()
       .replace(/\s*\n\s*/g, ' / ')
       .slice(0, 600)
-    return `${row.current ? '>> ' : ''}[${stamp(row.createdAt)}] ${who}: ${media}${body || '(tanpa teks)'}`
+    const quote = row.replyTo ? `(membalas "${row.replyTo}") ` : ''
+    return `${row.current ? '>> ' : ''}[${stamp(row.createdAt)}] ${who}: ${quote}${media}${body || '(tanpa teks)'}`
   })
   return `RIWAYAT (lama → baru; baris ">>" adalah pesan yang harus dijawab sekarang):\n${lines.join('\n')}`
 }
@@ -279,7 +282,8 @@ export function buildLeanPrompt(input: {
     ],
     [
       'keluaran',
-      'Balas sebagai JSON sesuai schema: pesan (array bubble), foto (nama varian katalog), catatan, tahap, serah_cs, alasan, susulan, spesifikasi. Jangan menulis apa pun di luar JSON.',
+      'Pahami maksud pelanggan dari seluruh RIWAYAT, bukan hanya pesan terakhir; jangan menanyakan ulang hal yang sudah jelas. Ditanya harga dan produknya sudah jelas (dikutip, baru dikirim fotonya, atau sudah disebut) → langsung sebut harganya dari KATALOG. Produk belum jelas → sebut kisaran harga dari KATALOG sambil menanyakan modelnya.\n' +
+        'Balas sebagai JSON sesuai schema: pesan (array bubble), foto (nama varian katalog), catatan, tahap, serah_cs, alasan, susulan, spesifikasi. Jangan menulis apa pun di luar JSON.',
     ],
   ]
   const user = sections.map(([, value]) => value).join('\n\n')

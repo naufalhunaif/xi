@@ -99,13 +99,27 @@ function stageFromNote(note: string) {
 async function history(jid: string, currentIds: Set<string>): Promise<LeanHistoryRow[]> {
   const rows = await db
     .from('whatsapp_messages')
-    .select('message_id', 'direction', 'sender_type', 'body', 'media_type', 'created_at')
+    .select('message_id', 'direction', 'sender_type', 'body', 'media_type', 'created_at', 'reply_to_message_id')
     .where('jid', jid)
     .whereNotIn('status', ['failed', 'queued'])
     .orderBy('created_at', 'desc')
     .orderBy('id', 'desc')
     .limit(HISTORY_LIMIT)
+  // Pesan yang dikutip pelanggan ("yang ini berapa" sambil membalas foto Tuxedo).
+  const quotedIds = [...new Set(rows.map((row) => row.reply_to_message_id).filter(Boolean))]
+  const quoted = new Map<string, string>()
+  if (quotedIds.length) {
+    const found = await db
+      .from('whatsapp_messages')
+      .select('message_id', 'body', 'media_type')
+      .whereIn('message_id', quotedIds as string[])
+    for (const item of found) {
+      const text = String(item.body || '').trim().replace(/\s+/g, ' ').slice(0, 160)
+      quoted.set(String(item.message_id), text || (item.media_type ? `[${item.media_type}]` : ''))
+    }
+  }
   return rows.reverse().map((row) => ({
+    replyTo: row.reply_to_message_id ? quoted.get(String(row.reply_to_message_id)) || null : null,
     direction: row.direction === 'in' ? 'in' : 'out',
     senderType: row.sender_type,
     body: row.body,
@@ -113,6 +127,14 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
     createdAt: row.created_at,
     current: currentIds.has(String(row.message_id)),
   }))
+}
+
+/** Pesan sekarang yang membalas pesan lain: sebut jelas produk yang dimaksud. */
+function replyContext(rows: LeanHistoryRow[]) {
+  const quotes = [...new Set(rows.filter((row) => row.current && row.replyTo).map((row) => row.replyTo))]
+  return quotes.length
+    ? `(Pelanggan membalas pesan: ${quotes.map((quote) => `"${quote}"`).join(', ')} — "yang ini" berarti itu, jangan tanya ulang modelnya.)\n`
+    : ''
 }
 
 /**
@@ -468,7 +490,7 @@ export async function createLeanReply(input: {
     chatNote,
     spec,
     history: rows,
-    message: `${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
+    message: `${replyContext(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
     production: settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : '',
     imageCount: input.imagePaths?.length || 0,

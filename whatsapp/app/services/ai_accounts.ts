@@ -165,12 +165,21 @@ export async function usableAiAccounts(now = Date.now(), phase = '') {
   )
   // Balasan ke pelanggan: akun "latar saja" hanya dipakai bila tidak ada akun lain yang siap.
   const customerFacing = !phase || /reply/.test(phase)
-  const front = customerFacing ? ready.filter((account) => account.scope !== 'background') : ready
-  const usable = front.length ? front : ready
-  if ((await aiSpreadMode()) !== 'even' || usable.length < 2) return usable
+  // Urutan bertingkat untuk balasan pelanggan: model kuat dulu, lalu model ringan
+  // (flash/lite/mini/haiku), terakhir akun "latar saja". Semua tetap jadi cadangan.
+  const light = (account: AiAccount) =>
+    /lite|mini|nano|haiku|flash/i.test(account.model || (account.provider === 'gemini' ? 'flash' : ''))
+  const tiers = customerFacing
+    ? [
+        ready.filter((account) => account.scope !== 'background' && !light(account)),
+        ready.filter((account) => account.scope !== 'background' && light(account)),
+        ready.filter((account) => account.scope === 'background'),
+      ]
+    : [ready]
+  if ((await aiSpreadMode()) !== 'even') return tiers.flat()
   const used = await aiTokenUsage(now - SPREAD_WINDOW_MS)
-  return [...usable].sort(
-    (a, b) => (used.get(a.id) || 0) - (used.get(b.id) || 0) || a.position - b.position
+  return tiers.flatMap((tier) =>
+    [...tier].sort((a, b) => (used.get(a.id) || 0) - (used.get(b.id) || 0) || a.position - b.position)
   )
 }
 
