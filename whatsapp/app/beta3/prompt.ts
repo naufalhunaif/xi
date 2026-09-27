@@ -59,7 +59,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     referensi: {
       type: 'array',
       description:
-        'Array kosong bila tidak ada. Isi bila pelanggan mengirim gambar di giliran ini sebagai contoh bagian yang diinginkan. Gambar diteruskan ke penjahit dengan caption "Model {bagian} seperti ini".',
+        'Array kosong bila tidak ada. Isi bila pelanggan mengirim gambar di giliran ini sebagai contoh bagian yang diinginkan. Gambar diteruskan ke penjahit dengan caption "Model {bagian} seperti ini". Tabel ukuran/size chart/catatan ukuran dari pelanggan: isi (bagian: ukuran) HANYA bila pelanggan minta dibuat dengan ukuran itu, dan tulis "Ukuran sesuai gambar" di spesifikasi; bila hanya untuk membandingkan atau akhirnya memakai ukuran toko, jangan diisi.',
       items: {
         type: 'object',
         additionalProperties: false,

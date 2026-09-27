@@ -105,7 +105,16 @@ export async function paymentProofIds(jid: string) {
   return ids
 }
 
-async function withoutProofs(jid: string, refs: LeanRef[]) {
+// Gambar tabel ukuran hanya ikut bila pelanggan memakai ukurannya sendiri: spesifikasi
+// (ditulis ulang AI tiap giliran) menyebut "Ukuran sesuai gambar". Hanya membandingkan
+// atau akhirnya pakai ukuran toko → tidak ikut ke data pesanan/grup.
+const SIZE_PART = /ukuran|size|tabel|chart|lingkar/i
+const SIZE_USED = /ukuran\s+(sesuai|dari|seperti)\s+(gambar|tabel|foto)|ukuran\s+pelanggan\s+sendiri/i
+
+async function withoutProofs(jid: string, refs: LeanRef[], spec?: string | null) {
+  if (!refs.length) return refs
+  const sizeUsed = SIZE_USED.test(String(spec || ''))
+  refs = refs.filter((ref) => sizeUsed || !SIZE_PART.test(ref.part))
   if (!refs.some((ref) => ref.message_id)) return refs
   const proofs = await paymentProofIds(jid).catch(() => new Set<string>())
   return refs.filter((ref) => !ref.message_id || !proofs.has(ref.message_id))
@@ -115,14 +124,17 @@ async function withoutProofs(jid: string, refs: LeanRef[]) {
 export async function listActiveRefs(jid: string) {
   await ensureLeanTables()
   const rows = await db.from('whatsapp_beta3_refs').where('jid', jid).whereNull('order_id').orderBy('id', 'asc')
-  return withoutProofs(jid, rows.map(parseRow))
+  const spec = await db.from('whatsapp_beta3_specs').where('jid', jid).select('spec').first().catch(() => null)
+  return withoutProofs(jid, rows.map(parseRow), spec?.spec)
 }
 
 export async function refsForOrder(orderId: number) {
   await ensureLeanTables()
   const rows = await db.from('whatsapp_beta3_refs').where('order_id', orderId).orderBy('id', 'asc')
   const refs = rows.map(parseRow)
-  return refs.length ? withoutProofs(refs[0].jid, refs) : refs
+  if (!refs.length) return refs
+  const order = await db.from('whatsapp_beta3_orders').where('id', orderId).select('spec').first().catch(() => null)
+  return withoutProofs(refs[0].jid, refs, order?.spec)
 }
 
 export async function addRef(input: {
@@ -241,8 +253,17 @@ export async function customerImagesForOrder(order: Record<string, any>, limit =
     .limit(limit + 6)
     .select('media_url', 'body', 'message_id')
     .catch(() => [])
+  // Gambar yang sudah dilihat AI tapi tidak ditandai referensi (tabel ukuran untuk
+  // dibandingkan, bukti transfer, dll.) tidak dipakai sebagai gambar model.
   const proofs = await paymentProofIds(jid).catch(() => new Set<string>())
-  const images = rows.filter((row: any) => !proofs.has(String(row.message_id))).slice(0, limit)
+  const judged = new Set(
+    (await db.from('whatsapp_beta3_proofs').where('jid', jid).select('message_id').catch(() => [])).map((row: any) =>
+      String(row.message_id)
+    )
+  )
+  const images = rows
+    .filter((row: any) => !proofs.has(String(row.message_id)) && !judged.has(String(row.message_id)))
+    .slice(0, limit)
   return images.reverse().map((row: any) => ({
     url: String(row.media_url),
     // Teks chat pelanggan (mis. "size L masih ada?") bukan keterangan model.
