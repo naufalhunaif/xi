@@ -88,6 +88,13 @@ export const LEAN_TABLE_STATEMENTS = [
     note TEXT NOT NULL,
     updated_at DATETIME NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS whatsapp_beta3_shipments (
+    message_id VARCHAR(190) NOT NULL PRIMARY KEY,
+    jid VARCHAR(190) NOT NULL,
+    awb VARCHAR(40) NOT NULL,
+    created_at DATETIME NOT NULL,
+    KEY whatsapp_beta3_shipments_jid (jid, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_proofs (
     message_id VARCHAR(190) NOT NULL PRIMARY KEY,
     jid VARCHAR(190) NOT NULL,

@@ -2,6 +2,7 @@ import { isBeta3Mode } from '#services/settings_service'
 import db from '#services/workspace_database'
 import { initializeDatabase } from '#services/init_model'
 import { ensureLeanTables } from '#beta3/tables'
+import { scanShipments } from '#beta3/shipments'
 
 type InboxMessage = {
   id: number
@@ -68,24 +69,36 @@ export async function latestInboxMessages() {
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
             AND d.status IN ('paid', 'cancelled') AND d.updated_at >= n.updated_at))`
     : PAYMENT_SQL
-  // Order = pesanan berjalan: AI sedang menyusun spesifikasi, form masuk, menunggu bayar,
-  // atau lunas tapi belum dikirim ke pelanggan. Selesai = lunas dan toko sudah mengirim
-  // nomor resi di chat (pesan keluar berisi "resi"/"awb" + nomor). Lunas > 45 hari tanpa
-  // resi di chat dianggap selesai agar tab Order tidak menumpuk.
-  const shippedSql = `EXISTS (SELECT 1 FROM whatsapp_messages r WHERE r.jid = m.jid AND r.direction = 'out'
-          AND r.created_at >= b.created_at AND r.body REGEXP 'resi|awb' AND r.body REGEXP '[0-9]{8,}')`
+  // Resi terkirim = pesan keluar (AI/CS/pemilik) yang memuat nomor resi, kata-katanya
+  // bebas (dipindai kode → whatsapp_beta3_shipments). Selesai = chat sudah dikirimi resi dan
+  // tidak ada pesanan baru sesudahnya (order dari rekap dibuat belakangan, jadi tidak dihitung
+  // "baru"). Order = pesanan berjalan yang belum dikirimi resi. Lunas > 45 hari tanpa resi
+  // di chat dianggap selesai.
+  if (beta3) await scanShipments().catch(() => {})
+  const resiSql = (alias: string, after = '') =>
+    `EXISTS (SELECT 1 FROM whatsapp_beta3_shipments ${alias} WHERE ${alias}.jid = m.jid${after})`
+  const lastResiSql = `(SELECT MAX(rl.created_at) FROM whatsapp_beta3_shipments rl WHERE rl.jid = m.jid)`
+  const shippedSql = `(${resiSql('rs', ' AND rs.created_at >= b.created_at')} OR (b.source = 'rekap' AND ${resiSql('r2')}))`
   const orderSql = beta3
     ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
-          AND (b.status IN ('pending', 'awaiting_payment')
+          AND ((b.status IN ('pending', 'awaiting_payment') AND NOT (b.source = 'rekap' AND ${resiSql('r3')}))
             OR (b.status = 'paid' AND b.updated_at >= NOW() - INTERVAL 45 DAY AND NOT ${shippedSql})))
         OR EXISTS (SELECT 1 FROM whatsapp_beta3_specs sp WHERE sp.jid = m.jid AND sp.spec <> ''
           AND sp.updated_at >= NOW() - INTERVAL 14 DAY
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
-            AND d.updated_at >= sp.updated_at))`
+            AND d.updated_at >= sp.updated_at)
+          AND NOT (${resiSql('r4', ' AND r4.created_at >= sp.updated_at')}))`
     : ORDER_SQL
   const doneSql = beta3
-    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'paid'
-          AND (${shippedSql} OR b.updated_at < NOW() - INTERVAL 45 DAY))`
+    ? `(${resiSql('r5')}
+          AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders n WHERE n.jid = m.jid AND n.source <> 'rekap'
+            AND n.status <> 'cancelled' AND n.created_at > ${lastResiSql})
+          AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_specs ns WHERE ns.jid = m.jid AND ns.spec <> ''
+            AND ns.updated_at > ${lastResiSql}))
+        OR EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'paid'
+          AND b.updated_at < NOW() - INTERVAL 45 DAY
+          AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders n2 WHERE n2.jid = m.jid
+            AND n2.status <> 'cancelled' AND n2.created_at > b.updated_at))`
     : `EXISTS (SELECT 1 FROM whatsapp_orders o WHERE o.jid = m.jid AND o.status = 'completed')`
   // Nama: kontak ini, pasangan LID ↔ nomor HP (dua arah), lalu nama WA terakhir dari
   // pesan masuk (pesan keluar tidak membawa nama pelanggan).

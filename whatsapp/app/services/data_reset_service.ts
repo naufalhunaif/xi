@@ -38,6 +38,7 @@ export const RESET_DATA_TABLES = [
 export const RESET_BETA3_TABLES = [
   'whatsapp_beta3_refs',
   'whatsapp_beta3_proofs',
+  'whatsapp_beta3_shipments',
   'whatsapp_beta3_orders',
   'whatsapp_beta3_specs',
   'whatsapp_beta3_chats',

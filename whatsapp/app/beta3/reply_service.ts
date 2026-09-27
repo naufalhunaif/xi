@@ -51,6 +51,7 @@ import {
   renderAwbTracking,
 } from '#beta3/mcp'
 import { DEFAULT_ITEM_GRAMS, orderWeightGrams } from '#beta3/weights'
+import { detectAwb } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
@@ -433,8 +434,8 @@ export async function createLeanReply(input: {
     let awb = extractAwb(input.text)
     if (!awb)
       for (const row of [...rows].reverse()) {
-        if (row.direction !== 'out' || !/resi|awb/i.test(String(row.body || ''))) continue
-        awb = extractAwb(String(row.body || ''))
+        if (row.direction !== 'out') continue
+        awb = detectAwb(String(row.body || ''))
         if (awb) break
       }
     if (awb) {
