@@ -3,6 +3,7 @@ import db from '#services/workspace_database'
 import { readLeanState, writeLeanState } from '#beta3/tables'
 import { sharedMcpToken } from '#services/shared_mcp_oauth_service'
 import { importLeanCatalog } from '#beta3/catalog_service'
+import { DEFAULT_ITEM_GRAMS, gramsToKgText } from '#beta3/weights'
 
 /**
  * Klien MCP satu pintu untuk jalur ramping: dipanggil KODE pada event tertentu
@@ -153,7 +154,10 @@ export async function syncLeanCatalog(
     30_000
   )
   if (!digest) return { configured: false, unchanged: false, count: 0, version: '' }
-  if (digest.unchanged) return { configured: true, unchanged: true, count: 0, version: stored }
+  if (digest.unchanged) {
+    if (!(await readLeanState('product_weights'))) await syncProductWeights(config).catch(() => 0)
+    return { configured: true, unchanged: true, count: 0, version: stored }
+  }
   const count = await importLeanCatalog(digest.items || [], true)
   const extra = digest as {
     store?: { text?: string }
@@ -172,6 +176,7 @@ export async function syncLeanCatalog(
     'size_charts',
     extra.size_charts?.text ? String(extra.size_charts.text).slice(0, 4000) : ''
   )
+  await syncProductWeights(config).catch(() => 0)
   const version = digest.version ? String(digest.version) : ''
   if (version) await writeLeanState('catalog_version_sf2', version)
   return { configured: true, unchanged: false, count, version }
@@ -398,14 +403,77 @@ export function shippingBlock(rates: ShippingRates, weightKg = 1) {
   return `Ongkir ke ${where || 'tujuan'}:\n${lines.join('\n')}`
 }
 
-export function renderShippingRates(rates: ShippingRates) {
+export function renderShippingRates(rates: ShippingRates, grams = DEFAULT_ITEM_GRAMS) {
   const prices = (rates.prices || []).filter((row) => row.price > 0)
   if (!prices.length) return ''
   const where = [rates.destination?.district, rates.destination?.city].filter(Boolean).join(', ')
   const codes = prices
     .map((row) => `${serviceLabel(row.service.replace(/\d+$/, ''))} = ${row.service.replace(/\d+$/, '')}`)
     .join(', ')
+  const kg = grams / 1000
   const cargo = prices.find((row) => isCargo(row.service))
-  const rule = `Pengiriman hanya via JNE (REG/YES; ekspedisi lain tidak tersedia). JTR adalah kargo JNE minimal ${CARGO_MIN_KG} kg${cargo ? ' — jangan ditawarkan untuk pesanan biasa; sebut hanya bila pesanan besar (≥8 kg, mis. seragam/borongan) atau pelanggan menanyakan kargo' : ''}.`
-  return `${rule}\nONGKIR ke ${where || 'tujuan'} (1 kg): ${prices.map((row) => `${row.service.replace(/\d+$/, '')} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${row.etd.replace('day', 'hari')})` : ''}`).join(', ')}. Kode layanan untuk field order: ${codes}. Tanyakan mau pakai yang mana; total = harga barang + ongkir yang dipilih.\nTulis ongkir ke pelanggan PERSIS dengan blok ini (satu layanan per baris, nama REG/YES/JTR, bukan kode CTC), lalu tanya mau pakai yang mana:\n<<<ONGKIR\n${shippingBlock(rates)}\nONGKIR>>>`
+  const rule = `Pengiriman hanya via JNE (REG/YES; ekspedisi lain tidak tersedia). JTR adalah kargo JNE minimal ${CARGO_MIN_KG} kg${cargo ? (kg >= CARGO_MIN_KG ? ' — pesanan ini ≥8 kg, JTR boleh ditawarkan' : ' — pesanan ini di bawah 8 kg, JANGAN tawarkan JTR') : ''}.`
+  return `${rule}\nONGKIR ke ${where || 'tujuan'} (berat pesanan ${gramsToKgText(grams)}): ${prices.map((row) => `${row.service.replace(/\d+$/, '')} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${row.etd.replace('day', 'hari')})` : ''}`).join(', ')}. Kode layanan untuk field order: ${codes}. Tanyakan mau pakai yang mana; total = harga barang + ongkir yang dipilih.\nTulis ongkir ke pelanggan PERSIS dengan blok ini (satu layanan per baris, nama REG/YES/JTR, bukan kode CTC), lalu tanya mau pakai yang mana:\n<<<ONGKIR\n${shippingBlock(rates, kg)}\nONGKIR>>>`
 }
+
+export type AwbTracking = {
+  awb?: string
+  status?: string
+  courier?: string
+  events?: Array<{ label?: string; time?: string; _timestamp?: number | null }>
+}
+
+/** Nomor resi dari teks: token 10–20 huruf/angka yang memuat ≥ 8 angka. */
+export function extractAwb(text: string) {
+  for (const token of String(text || '').toUpperCase().match(/\b[A-Z0-9]{10,20}\b/g) || []) {
+    if ((token.match(/\d/g) || []).length >= 8 && !/^(62|08)\d{8,12}$/.test(token)) return token
+  }
+  return ''
+}
+
+export function renderAwbTracking(result: AwbTracking, awb: string) {
+  const events = [...(result.events || [])]
+    .filter((event) => event.label)
+    .sort((a, b) => Number(b._timestamp || 0) - Number(a._timestamp || 0))
+    .slice(0, 3)
+  const lines = events.map((event) => `- ${event.time ? `${event.time}: ` : ''}${event.label}`)
+  return [
+    `LACAK RESI ${awb}${result.courier ? ` (${result.courier})` : ''}: ${result.status || 'status belum ada'}.`,
+    ...(lines.length ? ['Riwayat terakhir:', ...lines] : []),
+    'Sampaikan singkat posisi paket ke pelanggan; jangan menjanjikan tanggal tiba yang tidak ada di data.',
+  ].join('\n')
+}
+
+const weightKey = (value: unknown) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+/**
+ * Berat produk (weight_grams) dari MCP toko → state product_weights {"produk|warna": gram}.
+ * Dipakai untuk cek ongkir sesuai berat pesanan, bukan asumsi 1 kg.
+ */
+export async function syncProductWeights(config?: LeanMcpConfig) {
+  const map: Record<string, number> = {}
+  for (let offset = 0; offset < 5000; offset += 100) {
+    const page = await callLeanTool<{ products?: Array<Record<string, unknown>> }>(
+      'list_products',
+      { fields: 'weight_grams', limit: 100, offset },
+      config,
+      30_000
+    )
+    const rows = page?.products || []
+    for (const row of rows) {
+      const grams = Math.round(Number(row.weight_grams) || 0)
+      if (grams <= 0) continue
+      const [product, ...rest] = String(row.name || '').split(/\s+[-\u2013\u2014|/]\s+/)
+      const key = `${weightKey(product)}|${weightKey(rest.join(' '))}`
+      if (weightKey(product)) map[key] = grams
+    }
+    if (rows.length < 100) break
+  }
+  if (Object.keys(map).length) await writeLeanState('product_weights', JSON.stringify(map))
+  return Object.keys(map).length
+}
+

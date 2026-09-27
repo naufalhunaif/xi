@@ -46,7 +46,11 @@ import {
   renderShippingRates,
   type FitResult,
   type ShippingRates,
+  type AwbTracking,
+  extractAwb,
+  renderAwbTracking,
 } from '#beta3/mcp'
+import { DEFAULT_ITEM_GRAMS, orderWeightGrams } from '#beta3/weights'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
@@ -233,6 +237,8 @@ export async function createLeanReply(input: {
     listRules(),
   ])
   const stage = stageFromNote(chatNote)
+  // Berat pesanan dari spesifikasi × berat produk (MCP toko): ongkir dicek sesuai berat asli.
+  const orderGrams = await orderWeightGrams(String(spec || '')).catch(() => DEFAULT_ITEM_GRAMS)
   // Gaya balasan toko: sama untuk ChatGPT, Claude, dan Gemini.
   const style = await storeStyle(examples).catch(() => null)
 
@@ -331,8 +337,8 @@ export async function createLeanReply(input: {
   const loose = form ? null : parseLooseAddress(input.text)
   if (loose && mcp.url) {
     try {
-      const rates = await ratesForAddress(loose, last?.resolved || null, mcp)
-      const rateText = rates ? renderShippingRates(rates) : ''
+      const rates = await ratesForAddress(loose, last?.resolved || null, mcp, orderGrams)
+      const rateText = rates ? renderShippingRates(rates, orderGrams) : ''
       if (rateText) {
         toolNotes.push(rateText)
         systemNote +=
@@ -382,15 +388,15 @@ export async function createLeanReply(input: {
         }
       }
       if (resolved) {
-        const cacheKey = `ongkir2:${resolved.code}:${new Date().toISOString().slice(0, 10)}`
+        const cacheKey = `ongkir3:${resolved.code}:${orderGrams}:${new Date().toISOString().slice(0, 10)}`
         note = await readLeanState(cacheKey)
         if (!note) {
           const rates = await callLeanTool<ShippingRates>(
             'check_shipping_rates',
-            { destination: resolved.code, weight_grams: 1000 },
+            { destination: resolved.code, weight_grams: orderGrams },
             mcp
           )
-          note = rates ? renderShippingRates(rates) : ''
+          note = rates ? renderShippingRates(rates, orderGrams) : ''
           if (note) await writeLeanState(cacheKey, note)
         }
       }
@@ -417,6 +423,46 @@ export async function createLeanReply(input: {
     }
   }
 
+  // Lacak resi: pelanggan menanyakan posisi paket → resi dari pesan ini atau dari pesan
+  // toko terakhir yang menyebut resi, lalu track_awb (cache 30 menit).
+  const asksTracking =
+    /\b(resi|paket|lacak|tracking|posisi|sampai mana|sampe mana|nyampe|sudah sampai|udah sampai|belum sampai|belum datang|kapan sampai|kapan datang|kapan tiba)\b/i.test(
+      input.text
+    )
+  if (asksTracking && mcp.url) {
+    let awb = extractAwb(input.text)
+    if (!awb)
+      for (const row of [...rows].reverse()) {
+        if (row.direction !== 'out' || !/resi|awb/i.test(String(row.body || ''))) continue
+        awb = extractAwb(String(row.body || ''))
+        if (awb) break
+      }
+    if (awb) {
+      try {
+        const cacheKey = `awb:${awb}`
+        const cached = parseJson<{ note: string; at: number }>(await readLeanState(cacheKey))
+        let note = cached && Date.now() - cached.at < 30 * 60_000 ? cached.note : ''
+        if (!note) {
+          const result = await callLeanTool<AwbTracking>('track_awb', { awb }, mcp)
+          note = result ? renderAwbTracking(result, awb) : ''
+          if (note) await writeLeanState(cacheKey, JSON.stringify({ note, at: Date.now() }))
+        }
+        if (note) {
+          toolNotes.push(note)
+          onTrace?.({ key: 'beta3-awb', label: `Resi dilacak · ${awb}`, status: 'completed', detail: { awb, note } })
+        }
+      } catch (error) {
+        toolNotes.push(`LACAK RESI ${awb}: data pelacakan belum tersedia. Sampaikan nomor resinya dan bahwa paket sedang dalam perjalanan; jangan menebak posisi.`)
+        onTrace?.({
+          key: 'beta3-awb',
+          label: 'Lacak resi tidak tersedia',
+          status: 'failed',
+          detail: { awb, error: error instanceof Error ? error.message : String(error) },
+        })
+      }
+    }
+  }
+
   if (form) {
     let rates: ShippingRates | null = null
     if (mcp.url && (form.district || form.postalCode)) {
@@ -425,7 +471,8 @@ export async function createLeanReply(input: {
         rates = await ratesForAddress(
           { district: form.district, regency: form.regency, postalCode: form.postalCode },
           lastResolved || null,
-          mcp
+          mcp,
+          orderGrams
         )
         // Alamat tempelan dirapikan ulang dengan nama resmi tujuan dari cek ongkir.
         const tidy = pasted ? tidyLooseAddress(input.text, rates?.destination || null) : null
@@ -458,7 +505,7 @@ export async function createLeanReply(input: {
       chatNote,
       shippingOptions: rates?.prices?.length ? rates : null,
     })
-    const rateText = rates ? renderShippingRates(rates) : ''
+    const rateText = rates ? renderShippingRates(rates, orderGrams) : ''
     if (rateText) toolNotes.push(rateText)
     systemNote =
       '\n\nCATATAN SISTEM: form order pelanggan sudah tercatat (#' +
@@ -497,7 +544,8 @@ export async function createLeanReply(input: {
               postalCode: String(pending.postal_code || ''),
             },
             lastResolved || null,
-            mcp
+            mcp,
+            orderGrams
           )
           if (rates?.prices?.length) await updatePendingOrderRates(orderId, rates)
         } catch (error) {
@@ -509,7 +557,7 @@ export async function createLeanReply(input: {
           })
         }
       }
-      const rateText = rates ? renderShippingRates(rates) : ''
+      const rateText = rates ? renderShippingRates(rates, orderGrams) : ''
       if (rateText) toolNotes.push(rateText)
       systemNote =
         '\n\nCATATAN SISTEM: form order #' +
@@ -888,7 +936,8 @@ async function findDestinations(q: string, mcp: LeanMcpConfig): Promise<Destinat
 async function ratesForAddress(
   address: { district: string; regency: string; postalCode: string },
   lastResolved: DestinationArea | null,
-  mcp: LeanMcpConfig
+  mcp: LeanMcpConfig,
+  grams = DEFAULT_ITEM_GRAMS
 ): Promise<ShippingRates | null> {
   const city = address.regency ? normalizeCity(address.regency) : ''
   const districtMatchesLast =
@@ -909,7 +958,7 @@ async function ratesForAddress(
     try {
       const rates = await callLeanTool<ShippingRates>(
         'check_shipping_rates',
-        { ...args, weight_grams: 1000 },
+        { ...args, weight_grams: grams },
         mcp
       )
       if (rates?.prices?.length) return rates

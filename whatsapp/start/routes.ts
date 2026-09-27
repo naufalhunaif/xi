@@ -79,6 +79,8 @@ router
     router.post('/api/beta3/skill/update', [Beta3Controller, 'updateSkill'])
     router.get('/api/beta3/recap', [Beta3Controller, 'recapStatus'])
     router.post('/api/beta3/recap', [Beta3Controller, 'startRecap'])
+    router.get('/api/beta3/weights', [Beta3Controller, 'weights'])
+    router.post('/api/beta3/weights', [Beta3Controller, 'saveWeights'])
     router.get('/api/beta3/rules', [Beta3Controller, 'rules'])
     router.post('/api/beta3/rules', [Beta3Controller, 'addRule'])
     router.delete('/api/beta3/rules/:id', [Beta3Controller, 'removeRule'])

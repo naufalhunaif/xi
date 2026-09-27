@@ -1347,4 +1347,13 @@ window.waLocales.en = {
   "Muat ulang": "Reload",
   "Minta ulang media dari WhatsApp": "Request the media again from WhatsApp",
   "Media ini tidak bisa dimuat ulang.": "This media cannot be reloaded.",
+  "Berat & ongkir": "Weight & shipping",
+  "Berat per jenis barang": "Weight per item type",
+  "Dipakai menghitung ongkir, termasuk model custom. Belum ada barang dipilih = 1 kg.": "Used to calculate shipping, including custom models. No item chosen yet = 1 kg.",
+  "Berat": "Weight",
+  "Jas / Tuxedo": "Jacket / Tuxedo",
+  "Rompi": "Vest",
+  "Kemeja": "Shirt",
+  "Beskap": "Beskap",
+  "Lainnya / belum jelas": "Other / unclear",
 }

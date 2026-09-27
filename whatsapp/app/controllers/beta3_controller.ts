@@ -51,6 +51,7 @@ import {
 } from '#beta3/mcp'
 import { describeCatalogPhotos } from '#beta3/catalog_vision'
 import { attachOrderPhotos } from '#beta3/order_photos'
+import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '#beta3/weights'
 import env from '#start/env'
 
 /** Beta 2: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
@@ -193,6 +194,9 @@ export default class Beta3Controller {
       if (order.photos?.length || order.refs?.length) continue
       order.refs = await customerImagesForOrder(order).catch(() => [])
     }
+    // Berat pesanan (dasar ongkir) tampil di detail order.
+    for (const order of withPhotos as Array<Record<string, any>>)
+      order.weight_grams = await orderWeightGrams(String(order.spec || order.items || '')).catch(() => null)
     return response.json({ orders: withPhotos, counts })
   }
 
@@ -387,6 +391,18 @@ export default class Beta3Controller {
     const jid = String(body.jid || '')
     if (!jid) return response.badRequest({ error: 'jid wajib.' })
     return response.json({ jid, note: await writeCustomerNote(jid, String(body.note || '')) })
+  }
+
+  // ---- Berat barang per jenis (untuk cek ongkir) ----
+  async weights({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    const weights = await readItemWeights()
+    return response.json({ types: ITEM_TYPES.map((type) => ({ key: type.key, label: type.label, grams: weights[type.key] })) })
+  }
+
+  async saveWeights({ request, response }: HttpContext) {
+    const weights = await saveItemWeights((request.input('weights') || {}) as Record<string, unknown>)
+    return response.json({ types: ITEM_TYPES.map((type) => ({ key: type.key, label: type.label, grams: weights[type.key] })) })
   }
 
   // ---- Kualitas: Aturan Toko, Koreksi, Kasus uji ----

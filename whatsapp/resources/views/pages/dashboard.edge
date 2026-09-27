@@ -659,6 +659,7 @@
               <a href="#business" data-settings-menu="business" data-i18n="Data bisnis">Data bisnis</a>
               <a href="#production" data-settings-menu="production" data-i18n="Produksi & Pre-order">Produksi & Pre-order</a>
               <a href="#payments" data-settings-menu="payments" data-i18n="Pembayaran">Pembayaran</a>
+              <a href="#weights" data-settings-menu="weights" data-i18n="Berat & ongkir">Berat & ongkir</a>
               <a href="#behavior" data-settings-menu="behavior" data-i18n="Perilaku balasan">Perilaku balasan</a>
               <a href="#usage" data-settings-menu="usage">Usage</a>
               <a href="#backup" data-settings-menu="backup">Backup</a>
@@ -736,6 +737,22 @@
                     </div>
                     <div class="wa-kv" id="linesList"></div>
                     <small id="linesStatus" role="status" aria-live="polite"></small>
+                  </div>
+                </section>
+                <section id="settings-weights" data-settings-panel="weights" aria-labelledby="settings-title-weights" hidden>
+                  <h2 id="settings-title-weights" data-i18n="Berat & ongkir">Berat & ongkir</h2>
+                  <div class="wa-card">
+                    <div class="wa-card-head">
+                      <div class="wa-card-title">
+                        <strong data-i18n="Berat per jenis barang">Berat per jenis barang</strong>
+                        <small data-i18n="Dipakai menghitung ongkir, termasuk model custom. Belum ada barang dipilih = 1 kg.">Dipakai menghitung ongkir, termasuk model custom. Belum ada barang dipilih = 1 kg.</small>
+                      </div>
+                    </div>
+                    <div id="weightFields" class="wa-form-grid"></div>
+                    <div class="actions wa-actions-start">
+                      <button id="weightSave" type="button" class="button primary" data-i18n="Simpan">Simpan</button>
+                      <small id="weightStatus" role="status" aria-live="polite"></small>
+                    </div>
                   </div>
                 </section>
                 <section id="settings-backup" data-settings-panel="backup" aria-labelledby="settings-title-backup" hidden>

@@ -1163,4 +1163,13 @@ window.waLocales.id = {
   "Muat ulang": "Muat ulang",
   "Minta ulang media dari WhatsApp": "Minta ulang media dari WhatsApp",
   "Media ini tidak bisa dimuat ulang.": "Media ini tidak bisa dimuat ulang.",
+  "Berat & ongkir": "Berat & ongkir",
+  "Berat per jenis barang": "Berat per jenis barang",
+  "Dipakai menghitung ongkir, termasuk model custom. Belum ada barang dipilih = 1 kg.": "Dipakai menghitung ongkir, termasuk model custom. Belum ada barang dipilih = 1 kg.",
+  "Berat": "Berat",
+  "Jas / Tuxedo": "Jas / Tuxedo",
+  "Rompi": "Rompi",
+  "Kemeja": "Kemeja",
+  "Beskap": "Beskap",
+  "Lainnya / belum jelas": "Lainnya / belum jelas",
 }
