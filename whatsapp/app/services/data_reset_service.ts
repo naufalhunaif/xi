@@ -35,6 +35,16 @@ export const RESET_DATA_TABLES = [
   'whatsapp_messages',
 ] as const
 
+export const RESET_BETA3_TABLES = [
+  'whatsapp_beta3_refs',
+  'whatsapp_beta3_proofs',
+  'whatsapp_beta3_orders',
+  'whatsapp_beta3_specs',
+  'whatsapp_beta3_chats',
+  'whatsapp_beta3_customers',
+  'whatsapp_media_protos',
+] as const
+
 /** Called after the worker has drained all work. The caller persists this manifest for retries. */
 export async function resetDataManifest(
   listMedia = () => readdir(app.makePath('public', 'media'), { withFileTypes: true })
@@ -80,6 +90,9 @@ export async function resetDataManifest(
 export async function resetWorkspaceData(trx: any) {
   if (!workspaceScope().id) throw new Error('Invalid reset workspace')
   for (const table of RESET_DATA_TABLES) await trx.from(table).delete()
+  // Beta 3: pesanan, spesifikasi, referensi gambar, catatan chat & pelanggan ikut dihapus;
+  // katalog, contoh balasan, aturan toko, dan kasus uji tetap. Tabel dibuat lazy → abaikan bila belum ada.
+  for (const table of RESET_BETA3_TABLES) await trx.from(table).delete().catch(() => {})
   // Preserve skills (including learned generic rules) but erase their conversation evidence.
   await trx.from('whatsapp_learning_versions').update({ evidence_json: '[]', error: null })
   // Basic address-book identity and AI exclusions are configuration, not conversation memory.
