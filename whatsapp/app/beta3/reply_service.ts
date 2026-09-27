@@ -603,7 +603,12 @@ export async function createLeanReply(input: {
     /sesuai gambar|seperti gambar|kayak gambar|dari gambar/i.test(decision.spesifikasi) &&
     !/transfer|bukti|struk|resi|bayar/i.test(`${input.text} ${decision.tahap}`)
   )
-    decision.referensi = input.imageIds.map((_, index) => ({ gambar: index + 1, bagian: 'model' }))
+    decision.referensi = input.imageIds.map((_, index) => ({
+      gambar: index + 1,
+      bagian: /ukuran\s+sesuai\s+gambar/i.test(decision.spesifikasi) && !/model\s+sesuai\s+gambar/i.test(decision.spesifikasi)
+        ? 'ukuran'
+        : 'model',
+    }))
   // AI melihat gambarnya: catat mana bukti pembayaran dan mana gambar model/lain.
   // Tahap bukti_dikirim tanpa nomor → semua gambar giliran ini dianggap bukti.
   if (input.imageIds?.length) {
@@ -614,9 +619,9 @@ export async function createLeanReply(input: {
         ? ids.map((_, index) => index + 1)
         : []
     const proofIds = proofNumbers.map((number) => ids[number - 1]).filter(Boolean)
-    await recordImageKinds(jid, ids, proofIds).catch(() => {})
     if (proofNumbers.length)
       decision.referensi = (decision.referensi || []).filter((ref) => !proofNumbers.includes(ref.gambar))
+    await recordImageKinds(jid, ids, proofIds, decision.referensi || []).catch(() => {})
   }
   if (decision.referensi?.length && input.imageIds?.length) {
     const saved = await saveAiRefs(jid, decision.referensi, input.imageIds).catch(() => 0)

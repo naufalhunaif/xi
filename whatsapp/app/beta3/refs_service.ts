@@ -55,17 +55,83 @@ const PROOF_CAPTION = /\b(tf|transfer|trf|bukti|bayar|dibayar|lunas|dp|struk|pel
 const PAY_INFO = /rekening|no\.?\s*rek|transfer ke|atas nama|\ba\.\s?n\.|\b(bca|bri|bni|mandiri|bsi|dana|ovo|gopay|qris|seabank)\b/i
 const PROOF_WINDOW = 48 * 3_600_000
 
-/** Simpan penilaian AI untuk gambar giliran ini: bukti pembayaran atau bukan. */
-export async function recordImageKinds(jid: string, imageIds: string[], proofIds: string[]) {
+/**
+ * Simpan penilaian AI balasan untuk gambar giliran ini: bukti, model/ukuran (ditandai
+ * referensi), atau "dilihat" (tidak ditandai; jenisnya dicek lagi bila dibutuhkan).
+ */
+export async function recordImageKinds(
+  jid: string,
+  imageIds: string[],
+  proofIds: string[],
+  refs: Array<{ gambar: number; bagian: string }> = []
+) {
   if (!imageIds.length) return
   await ensureLeanTables()
   const proofs = new Set(proofIds)
-  for (const id of imageIds.slice(0, 10))
-    await db.rawQuery(
-      `INSERT INTO whatsapp_beta3_proofs (message_id, jid, kind, created_at) VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE kind = IF(kind = 'bukti', kind, VALUES(kind))`,
-      [id, jid, proofs.has(id) ? 'bukti' : 'lain', new Date()]
+  for (const [index, id] of imageIds.slice(0, 10).entries()) {
+    const ref = refs.find((item) => item.gambar === index + 1)
+    const kind = proofs.has(id) ? 'bukti' : ref ? (SIZE_PART.test(ref.bagian) ? 'ukuran' : 'model') : 'dilihat'
+    await saveImageKind(jid, id, kind)
+  }
+}
+
+async function saveImageKind(jid: string, id: string, kind: string) {
+  await db.rawQuery(
+    `INSERT INTO whatsapp_beta3_proofs (message_id, jid, kind, created_at) VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE kind = IF(kind = 'bukti', kind, VALUES(kind))`,
+    [id, jid, kind, new Date()]
+  )
+}
+
+const IMAGE_KIND_SCHEMA = {
+  type: 'object',
+  properties: {
+    jenis: {
+      type: 'array',
+      description:
+        'Satu jenis per gambar, urut sesuai lampiran. model = foto/screenshot pakaian sebagai contoh model; ukuran = tabel ukuran/size chart/catatan ukuran; bukti = bukti transfer/pembayaran; lain = selain itu.',
+      items: { type: 'string', enum: ['model', 'ukuran', 'bukti', 'lain'] },
+    },
+  },
+  required: ['jenis'],
+  additionalProperties: false,
+}
+
+const classifying = new Set<string>()
+/** AI melihat gambar yang belum jelas jenisnya (maks 4 per panggilan); hasil disimpan. */
+export async function classifyImages(jid: string, rows: Array<{ message_id: string; media_url: string }>) {
+  const todo = rows.filter((row) => !classifying.has(row.message_id)).slice(0, 4)
+  if (!todo.length) return new Map<string, string>()
+  todo.forEach((row) => classifying.add(row.message_id))
+  try {
+    const paths = todo.map((row) => app.makePath('public', 'media', basename(String(row.media_url).split('?')[0])))
+    const [{ runLeanProvider }, { readSettings }] = await Promise.all([
+      import('#beta3/provider'),
+      import('#services/settings_service'),
+    ])
+    const raw = await readSettings(true)
+    const result = await runLeanProvider(
+      { ...raw, aiProvider: raw.aiProvider === 'claude' ? 'claude' : 'chatgpt' } as any,
+      {
+        system: 'Kamu memilah gambar yang dikirim pelanggan toko jas untuk tim produksi. Jawab hanya JSON sesuai schema.',
+        user: `Ada ${todo.length} gambar terlampir. Tentukan jenis tiap gambar sesuai urutan.`,
+      },
+      paths,
+      'beta3-image',
+      IMAGE_KIND_SCHEMA
     )
+    const parsed = JSON.parse(result.text) as { jenis?: string[] }
+    const kinds = new Map<string, string>()
+    for (const [index, row] of todo.entries()) {
+      const kind = String(parsed.jenis?.[index] || '')
+      if (!['model', 'ukuran', 'bukti', 'lain'].includes(kind)) continue
+      kinds.set(row.message_id, kind)
+      await saveImageKind(jid, row.message_id, kind)
+    }
+    return kinds
+  } finally {
+    todo.forEach((row) => classifying.delete(row.message_id))
+  }
 }
 
 /** message_id gambar masuk di chat ini yang merupakan bukti transfer. */
@@ -97,7 +163,7 @@ export async function paymentProofIds(jid: string) {
     .map((row: any) => new Date(row.created_at).getTime())
   for (const image of images as any[]) {
     const id = String(image.message_id)
-    if (kinds.has(id)) continue // sudah dinilai AI
+    if (kinds.has(id)) continue // sudah dilihat AI (bukan bukti bila tidak ditandai)
     const at = new Date(image.created_at).getTime()
     const afterPayInfo = payTimes.some((time) => at >= time && at - time <= PROOF_WINDOW)
     if (PROOF_CAPTION.test(String(image.body || '')) || afterPayInfo) ids.add(id)
@@ -217,6 +283,7 @@ export async function loadImage(url: string) {
 /** Caption singkat untuk penjahit: "Model kerah seperti ini". */
 export function refCaption(ref: LeanRef) {
   const part = ref.part.trim().toLowerCase().replace(/^model\s*/, '')
+  if (SIZE_PART.test(part)) return 'Ukuran sesuai gambar ini'
   return part ? `Model ${part} seperti ini` : 'Model seperti ini'
 }
 
@@ -226,7 +293,11 @@ export function refCaption(ref: LeanRef) {
  * pelanggan di percakapan order ini (7 hari sebelum order dibuat, setelah order
  * sebelumnya). Gambar setelah order dibuat dilewati karena biasanya bukti transfer.
  */
-export async function customerImagesForOrder(order: Record<string, any>, limit = 4) {
+export async function customerImagesForOrder(
+  order: Record<string, any>,
+  limit = 4,
+  options: { classify?: boolean } = {}
+) {
   const jid = String(order.jid || '')
   if (!jid || !order.created_at) return []
   const createdAt = new Date(order.created_at)
@@ -253,16 +324,36 @@ export async function customerImagesForOrder(order: Record<string, any>, limit =
     .limit(limit + 6)
     .select('media_url', 'body', 'message_id')
     .catch(() => [])
-  // Gambar yang sudah dilihat AI tapi tidak ditandai referensi (tabel ukuran untuk
-  // dibandingkan, bukti transfer, dll.) tidak dipakai sebagai gambar model.
+  // Hanya gambar model (dan tabel ukuran bila pelanggan memakai ukurannya sendiri).
+  // Jenis gambar dari AI: saat membalas, atau dilihat khusus di sini bila belum jelas.
+  // `classify` false (halaman order): tidak menunggu AI; pemeriksaan jalan di latar.
   const proofs = await paymentProofIds(jid).catch(() => new Set<string>())
-  const judged = new Set(
-    (await db.from('whatsapp_beta3_proofs').where('jid', jid).select('message_id').catch(() => [])).map((row: any) =>
-      String(row.message_id)
+  const stored = new Map<string, string>(
+    (await db.from('whatsapp_beta3_proofs').where('jid', jid).select('message_id', 'kind').catch(() => [])).map(
+      (row: any) => [String(row.message_id), String(row.kind)]
     )
   )
-  const images = rows
-    .filter((row: any) => !proofs.has(String(row.message_id)) && !judged.has(String(row.message_id)))
+  const candidates = rows.filter((row: any) => !proofs.has(String(row.message_id)))
+  const unclear = candidates.filter((row: any) => {
+    const kind = stored.get(String(row.message_id))
+    return !kind || kind === 'dilihat'
+  })
+  if (unclear.length) {
+    const job = classifyImages(jid, unclear.map((row: any) => ({ message_id: String(row.message_id), media_url: String(row.media_url) })))
+    if (options.classify) {
+      const kinds = await job.catch(() => new Map<string, string>())
+      for (const [id, kind] of kinds) stored.set(id, kind)
+    } else void job.catch(() => {})
+  }
+  const sizeUsed = SIZE_USED.test(String(order.spec || ''))
+  const images = candidates
+    .filter((row: any) => {
+      const kind = stored.get(String(row.message_id))
+      if (kind === 'model') return true
+      if (kind === 'ukuran') return sizeUsed
+      if (kind === 'bukti' || kind === 'lain') return false
+      return !kind // belum pernah dinilai (AI tidak tersedia): tetap tampil
+    })
     .slice(0, limit)
   return images.reverse().map((row: any) => ({
     url: String(row.media_url),

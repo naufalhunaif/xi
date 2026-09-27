@@ -808,7 +808,7 @@ export default class WhatsappListen extends BaseCommand {
       // Tanpa foto katalog & tanpa referensi: pakai gambar yang dikirim pelanggan di chat order ini.
       let chatImages: Array<{ url: string; caption: string }> = []
       if (!images.length && !refs.length) {
-        chatImages = await beta3Refs.customerImagesForOrder(order).catch(() => [])
+        chatImages = await beta3Refs.customerImagesForOrder(order, 4, { classify: true }).catch(() => [])
         for (const picture of chatImages) {
           try {
             images.push({ bytes: await beta3Refs.loadImage(picture.url), caption: picture.caption })
