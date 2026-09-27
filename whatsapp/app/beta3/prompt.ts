@@ -77,6 +77,12 @@ export const LEAN_OUTPUT_SCHEMA = {
         required: ['gambar', 'bagian'],
       },
     },
+    bukti: {
+      type: 'array',
+      description:
+        'Nomor lampiran gambar giliran ini yang berupa BUKTI PEMBAYARAN (struk/screenshot transfer, m-banking, e-wallet, QRIS). Array kosong bila tidak ada atau tidak ada gambar. Gambar bukti tidak boleh masuk referensi.',
+      items: { type: 'integer' },
+    },
     pembayaran: {
       // Mode ketat (ChatGPT) mewajibkan semua kunci ada: null = tidak ada info.
       anyOf: [
@@ -152,6 +158,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     'susulan',
     'spesifikasi',
     'referensi',
+    'bukti',
     'pembayaran',
     'order',
   ],
@@ -173,6 +180,7 @@ export type LeanDecision = {
   order?: LeanOrderDraft
   pembayaran?: LeanPaymentInfo
   referensi?: LeanRefDraft[]
+  bukti?: number[]
   pesan: string[]
   foto: string[]
   catatan: string
@@ -283,7 +291,7 @@ export function buildLeanPrompt(input: {
     ['produksi', input.production || ''],
     [
       'sekarang',
-      `SEKARANG: ${stamp(input.now || new Date())} WIB${input.imageCount ? `\nPelanggan melampirkan ${input.imageCount} gambar (lihat lampiran; nomor 1–${input.imageCount} sesuai urutan, untuk field referensi).` : ''}\nPESAN PELANGGAN SEKARANG:\n${input.message || '(hanya media, tanpa teks)'}`,
+      `SEKARANG: ${stamp(input.now || new Date())} WIB${input.imageCount ? `\nPelanggan melampirkan ${input.imageCount} gambar (lihat lampiran; nomor 1–${input.imageCount} sesuai urutan, untuk field referensi/bukti; bedakan bukti pembayaran dari gambar model).` : ''}\nPESAN PELANGGAN SEKARANG:\n${input.message || '(hanya media, tanpa teks)'}`,
     ],
     [
       'keluaran',
@@ -381,6 +389,10 @@ export function parseLeanDecision(text: string): LeanDecision {
       }))
       .filter((item) => item.gambar > 0 && item.bagian)
       .slice(0, 6),
+    bukti: (Array.isArray(raw.bukti) ? raw.bukti : [])
+      .map((value) => Math.round(Number(value) || 0))
+      .filter((value) => value > 0)
+      .slice(0, 10),
     ...(raw.order && typeof raw.order === 'object'
       ? {
           order: {

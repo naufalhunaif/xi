@@ -48,28 +48,31 @@ function parseRow(row: Record<string, any>): LeanRef {
   }
 }
 
-// Bukti transfer bukan gambar model. Dikenali dari: tandai AI (tahap bukti_dikirim),
-// caption ("tf", "bukti", "sudah bayar"), atau dikirim ≤48 jam setelah toko mengirim rekening.
-const PROOF_CAPTION = /\b(tf|transfer|trf|bukti|bayar|dibayar|lunas|dp|struk|resi|sudah masuk|pelunasan)\b/i
+// Bukti transfer bukan gambar model. Utama: penilaian AI yang melihat gambarnya
+// (disimpan per gambar: bukti / lain). Gambar yang belum pernah dilihat AI (riwayat lama)
+// memakai cadangan: caption ("tf", "bukti", …) atau dikirim ≤48 jam setelah toko kirim rekening.
+const PROOF_CAPTION = /\b(tf|transfer|trf|bukti|bayar|dibayar|lunas|dp|struk|pelunasan)\b/i
 const PAY_INFO = /rekening|no\.?\s*rek|transfer ke|atas nama|\ba\.\s?n\.|\b(bca|bri|bni|mandiri|bsi|dana|ovo|gopay|qris|seabank)\b/i
 const PROOF_WINDOW = 48 * 3_600_000
 
-/** Tandai gambar giliran ini sebagai bukti transfer (AI memutuskan tahap bukti_dikirim). */
-export async function markPaymentProofs(jid: string, messageIds: string[]) {
-  if (!messageIds.length) return
+/** Simpan penilaian AI untuk gambar giliran ini: bukti pembayaran atau bukan. */
+export async function recordImageKinds(jid: string, imageIds: string[], proofIds: string[]) {
+  if (!imageIds.length) return
   await ensureLeanTables()
-  for (const id of messageIds.slice(0, 10))
+  const proofs = new Set(proofIds)
+  for (const id of imageIds.slice(0, 10))
     await db.rawQuery(
-      'INSERT IGNORE INTO whatsapp_beta3_proofs (message_id, jid, created_at) VALUES (?, ?, ?)',
-      [id, jid, new Date()]
+      `INSERT INTO whatsapp_beta3_proofs (message_id, jid, kind, created_at) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE kind = IF(kind = 'bukti', kind, VALUES(kind))`,
+      [id, jid, proofs.has(id) ? 'bukti' : 'lain', new Date()]
     )
 }
 
 /** message_id gambar masuk di chat ini yang merupakan bukti transfer. */
 export async function paymentProofIds(jid: string) {
   await ensureLeanTables()
-  const [marked, images, payInfo] = await Promise.all([
-    db.from('whatsapp_beta3_proofs').where('jid', jid).select('message_id').catch(() => []),
+  const [judged, images, payInfo] = await Promise.all([
+    db.from('whatsapp_beta3_proofs').where('jid', jid).select('message_id', 'kind').catch(() => []),
     db
       .from('whatsapp_messages')
       .where('jid', jid)
@@ -87,14 +90,17 @@ export async function paymentProofIds(jid: string) {
       .limit(200)
       .select('body', 'created_at'),
   ])
-  const ids = new Set<string>(marked.map((row: any) => String(row.message_id)))
+  const kinds = new Map<string, string>(judged.map((row: any) => [String(row.message_id), String(row.kind)]))
+  const ids = new Set<string>([...kinds].filter(([, kind]) => kind === 'bukti').map(([id]) => id))
   const payTimes = payInfo
     .filter((row: any) => PAY_INFO.test(String(row.body || '')))
     .map((row: any) => new Date(row.created_at).getTime())
   for (const image of images as any[]) {
+    const id = String(image.message_id)
+    if (kinds.has(id)) continue // sudah dinilai AI
     const at = new Date(image.created_at).getTime()
     const afterPayInfo = payTimes.some((time) => at >= time && at - time <= PROOF_WINDOW)
-    if (PROOF_CAPTION.test(String(image.body || '')) || afterPayInfo) ids.add(String(image.message_id))
+    if (PROOF_CAPTION.test(String(image.body || '')) || afterPayInfo) ids.add(id)
   }
   return ids
 }

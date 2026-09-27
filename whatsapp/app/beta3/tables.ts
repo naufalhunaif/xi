@@ -94,6 +94,8 @@ export const LEAN_TABLE_STATEMENTS = [
     created_at DATETIME NOT NULL,
     KEY whatsapp_beta3_proofs_jid (jid)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE whatsapp_beta3_proofs
+    ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'bukti' AFTER jid`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_refs (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     jid VARCHAR(190) NOT NULL,

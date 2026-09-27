@@ -48,7 +48,7 @@ import {
   type ShippingRates,
 } from '#beta3/mcp'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
-import { markPaymentProofs, saveAiRefs } from '#beta3/refs_service'
+import { recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
@@ -604,10 +604,19 @@ export async function createLeanReply(input: {
     !/transfer|bukti|struk|resi|bayar/i.test(`${input.text} ${decision.tahap}`)
   )
     decision.referensi = input.imageIds.map((_, index) => ({ gambar: index + 1, bagian: 'model' }))
-  // Bukti transfer: gambar giliran ini dicatat sebagai bukti, bukan referensi model.
-  if (input.imageIds?.length && decision.tahap === 'bukti_dikirim') {
-    await markPaymentProofs(jid, input.imageIds).catch(() => {})
-    decision.referensi = []
+  // AI melihat gambarnya: catat mana bukti pembayaran dan mana gambar model/lain.
+  // Tahap bukti_dikirim tanpa nomor → semua gambar giliran ini dianggap bukti.
+  if (input.imageIds?.length) {
+    const ids = input.imageIds
+    const proofNumbers = decision.bukti?.length
+      ? decision.bukti
+      : decision.tahap === 'bukti_dikirim' && !decision.referensi?.length
+        ? ids.map((_, index) => index + 1)
+        : []
+    const proofIds = proofNumbers.map((number) => ids[number - 1]).filter(Boolean)
+    await recordImageKinds(jid, ids, proofIds).catch(() => {})
+    if (proofNumbers.length)
+      decision.referensi = (decision.referensi || []).filter((ref) => !proofNumbers.includes(ref.gambar))
   }
   if (decision.referensi?.length && input.imageIds?.length) {
     const saved = await saveAiRefs(jid, decision.referensi, input.imageIds).catch(() => 0)
