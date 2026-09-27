@@ -1344,4 +1344,7 @@ window.waLocales.en = {
   "Belum ada nomor. Klik Tambah nomor lalu scan QR dari HP.": "No numbers yet. Click Add number, then scan the QR from your phone.",
   "Menyiapkan QR… scan dari HP (Perangkat tertaut).": "Preparing QR… scan it from your phone (Linked devices).",
   "Pembayaran perlu dikonfirmasi": "Payment needs confirmation",
+  "Muat ulang": "Reload",
+  "Minta ulang media dari WhatsApp": "Request the media again from WhatsApp",
+  "Media ini tidak bisa dimuat ulang.": "This media cannot be reloaded.",
 }

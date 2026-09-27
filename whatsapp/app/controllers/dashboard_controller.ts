@@ -417,6 +417,22 @@ export default class DashboardController {
     }
   }
 
+  /** Minta worker mengunduh ulang media yang belum termuat (HP perlu online). */
+  async mediaRetry({ request, response }: HttpContext) {
+    const messageId = String(request.input('message_id') || '').slice(0, 190)
+    if (!messageId) return response.badRequest({ error: 'Pesan tidak valid.' })
+    // Data unduhan tersimpan → unduh langsung; belum ada → minta riwayat chat ke HP dulu.
+    const known = await db.from('whatsapp_media_protos').where('message_id', messageId).first()
+    const changed = await db
+      .from('whatsapp_messages')
+      .where('message_id', messageId)
+      .whereNull('media_url')
+      .whereIn('media_type', ['image', 'video', 'sticker'])
+      .update({ media_status: known ? 'retry' : 'history' })
+    if (!Number(changed)) return response.unprocessableEntity({ error: 'Media ini tidak bisa dimuat ulang.' })
+    return response.json({ ok: true })
+  }
+
   async media({ params, request, response }: HttpContext) {
     if (!/^[a-f0-9-]{36}$/i.test(params.id)) return response.notFound()
     const message = await orderMessages().where('media_upload_id', params.id).first()

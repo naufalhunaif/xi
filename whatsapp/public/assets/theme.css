@@ -449,3 +449,7 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
   width: 18px; height: 18px; border-radius: 50%;
   background: var(--wa-warn-bg); color: var(--wa-warn);
 }
+
+/* Media belum termuat: tombol "Muat ulang" di atas pratinjau. */
+.workspace-ui button.message-media-state { border: 0; cursor: pointer; font: inherit; font-size: 11px; }
+.workspace-ui button.message-media-state:disabled { cursor: default; opacity: .8; }

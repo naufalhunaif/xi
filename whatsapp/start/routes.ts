@@ -137,6 +137,7 @@ router
     router.post('/api/contacts/exclusion', [DashboardController, 'contactExclusion'])
     router.get('/api/messages', [DashboardController, 'messages'])
     router.post('/api/messages/send', [DashboardController, 'sendMessage'])
+    router.post('/api/media/retry', [DashboardController, 'mediaRetry'])
     router.get('/api/media/:id', [DashboardController, 'media'])
     router.post('/api/messages/reaction', [DashboardController, 'reactMessage'])
     router.post('/api/connect', [DashboardController, 'connect'])

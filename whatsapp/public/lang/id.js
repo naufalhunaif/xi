@@ -1160,4 +1160,7 @@ window.waLocales.id = {
   "Dibayar (DP)": "Dibayar (DP)",
   "Sisa": "Sisa",
   "Pembayaran perlu dikonfirmasi": "Pembayaran perlu dikonfirmasi",
+  "Muat ulang": "Muat ulang",
+  "Minta ulang media dari WhatsApp": "Minta ulang media dari WhatsApp",
+  "Media ini tidak bisa dimuat ulang.": "Media ini tidak bisa dimuat ulang.",
 }

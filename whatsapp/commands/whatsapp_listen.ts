@@ -37,6 +37,7 @@ import makeWASocket, {
   type BaileysEventMap,
   type WAMessage,
   type WAMessageKey,
+  proto,
 } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
 import pino from 'pino'
@@ -248,6 +249,7 @@ export default class WhatsappListen extends BaseCommand {
   private chatLocks = new Map<string, Promise<unknown>>()
   private sweeping = false
   private sweepTimer?: NodeJS.Timeout
+  private mediaRetryTimer?: NodeJS.Timeout
   private leanSyncTimer?: NodeJS.Timeout
   private recapTimer?: NodeJS.Timeout
   private recapRunning = false
@@ -327,6 +329,7 @@ export default class WhatsappListen extends BaseCommand {
       clearInterval(heartbeatTimer)
       await stopWorkerHeartbeat(workerId).catch(() => {})
       if (this.sweepTimer) clearInterval(this.sweepTimer)
+      if (this.mediaRetryTimer) clearInterval(this.mediaRetryTimer)
       if (this.leanSyncTimer) clearInterval(this.leanSyncTimer)
       if (this.recapTimer) clearInterval(this.recapTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
@@ -595,6 +598,7 @@ export default class WhatsappListen extends BaseCommand {
     this.app.terminating(async () => {
       this.stopping = true
       if (this.sweepTimer) clearInterval(this.sweepTimer)
+      if (this.mediaRetryTimer) clearInterval(this.mediaRetryTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
       this.socket?.end(undefined)
     })
@@ -1073,6 +1077,12 @@ export default class WhatsappListen extends BaseCommand {
             void inWorkspace(this.sessionScope, () => this.track(() => this.sweepUnanswered()))
         }, SWEEP_INTERVAL_MS)
       }
+      if (!this.mediaRetryTimer) {
+        this.mediaRetryTimer = setInterval(() => {
+          if (this.sessionScope && this.socketOpen)
+            void inWorkspace(this.sessionScope, () => this.retryStoredMedia().catch(() => {}))
+        }, 15_000)
+      }
       this.ensureWorkspaceTimers()
       onScoped('messages.upsert', async ({ messages, type }) => {
         if (this.socket !== socket) return
@@ -1304,8 +1314,15 @@ export default class WhatsappListen extends BaseCommand {
     const known = await db.from('whatsapp_messages').where('message_id', id).first()
     if (known) {
       // Riwayat yang datang lagi: lengkapi foto yang dulu belum sempat terunduh.
-      if (!known.media_url && ['failed', 'expired', 'later'].includes(known.media_status)) {
+      if (!known.media_url && ['failed', 'expired', 'later', 'history', 'history_wait'].includes(known.media_status)) {
         const again = await this.prepareMedia(message)
+        if (again?.visual) await this.rememberMediaProto(message)
+        // Diminta dari chat: langsung antre unduh berapa pun umurnya.
+        if (again?.visual && String(known.media_status).startsWith('history')) {
+          this.historyWaits.delete(id)
+          await db.from('whatsapp_messages').where('message_id', id).update({ media_status: 'retry' })
+          return
+        }
         if (again?.visual && Date.now() - this.messageDate(message).getTime() < 60 * 86_400_000)
           this.queueOldMedia(message, again)
       }
@@ -1346,6 +1363,8 @@ export default class WhatsappListen extends BaseCommand {
       created_at: createdAt,
     })
     void this.rememberContact(jid, message.pushName || '').catch(() => {})
+    // Simpan data unduhan agar media bisa dicoba lagi setelah restart atau diminta dari chat.
+    if (media?.visual && !downloadable) await this.rememberMediaProto(message)
     if (later && media) this.queueOldMedia(message, media)
     // Chat/thumbnail is already available; downloads must not block the next message.
     const mediaDownload = downloadable && media
@@ -1621,6 +1640,119 @@ export default class WhatsappListen extends BaseCommand {
     return { mediaType, mediaMime: mime, extension, thumbnailUrl, thumbnailPath, visual, note }
   }
 
+  /** Data unduhan media (kunci & alamat) disimpan agar bisa dicoba ulang kapan saja. */
+  private async rememberMediaProto(message: WAMessage) {
+    const id = message.key.id
+    if (!id) return
+    try {
+      const data = Buffer.from(proto.WebMessageInfo.encode(message as any).finish()).toString('base64')
+      if (data.length > 300_000) return
+      await db.rawQuery(
+        `INSERT INTO whatsapp_media_protos (message_id, proto, attempts, updated_at) VALUES (?, ?, 0, ?)
+         ON DUPLICATE KEY UPDATE proto = VALUES(proto)`,
+        [id, data, new Date()]
+      )
+    } catch {}
+  }
+
+  private retryingMedia = false
+  private historyWaits = new Map<string, number>()
+  /**
+   * Media yang belum punya data unduhan: minta HP mengirim ulang riwayat di sekitar pesan
+   * itu (on-demand history sync). Bila tidak datang dalam 2 menit → gagal.
+   */
+  private async requestMediaHistory() {
+    const socket = this.socket
+    if (!socket) return
+    const now = Date.now()
+    const waiting = await db.from('whatsapp_messages').where('media_status', 'history_wait').select('message_id')
+    for (const row of waiting) {
+      const since = this.historyWaits.get(String(row.message_id))
+      if (!since || now - since > 120_000) {
+        this.historyWaits.delete(String(row.message_id))
+        await db.from('whatsapp_messages').where('message_id', row.message_id).update({ media_status: 'failed' })
+      }
+    }
+    const asked = await db.from('whatsapp_messages').where('media_status', 'history').orderBy('id', 'desc').limit(3)
+    for (const row of asked) {
+      // Riwayat dikirim mundur dari pesan jangkar: pakai pesan tepat sesudahnya.
+      const anchor = await db
+        .from('whatsapp_messages')
+        .where('jid', row.jid)
+        .where((query) =>
+          query.where('created_at', '>', row.created_at).orWhere((same) => same.where('created_at', row.created_at).where('id', '>', row.id))
+        )
+        .whereNotNull('message_id')
+        .orderBy('created_at', 'asc')
+        .orderBy('id', 'asc')
+        .first()
+      await db.from('whatsapp_messages').where('message_id', row.message_id).update({ media_status: 'history_wait' })
+      this.historyWaits.set(String(row.message_id), now)
+      if (!anchor) continue
+      await socket
+        .fetchMessageHistory(
+          20,
+          { remoteJid: String(row.jid), id: String(anchor.message_id), fromMe: anchor.direction === 'out' },
+          Math.floor(new Date(anchor.created_at).getTime() / 1000)
+        )
+        .catch((error: unknown) =>
+          this.logger.info(`Riwayat media ${row.message_id}: ${error instanceof Error ? error.message : String(error)}`)
+        )
+    }
+  }
+  /**
+   * Coba unduh ulang media yang belum termuat: yang diminta dari chat (status retry)
+   * didahulukan; sisanya (≤60 hari) otomatis maks 3 kali, jeda 10 menit. HP perlu online
+   * agar WhatsApp bisa mengunggah ulang media lama.
+   */
+  private async retryStoredMedia() {
+    if (this.retryingMedia || !this.socket || this.ingesting > 0) return
+    this.retryingMedia = true
+    try {
+      await this.requestMediaHistory().catch(() => {})
+      const since = new Date(Date.now() - 60 * 86_400_000)
+      const pause = new Date(Date.now() - 10 * 60_000)
+      const rows = await db
+        .from('whatsapp_media_protos as p')
+        .join('whatsapp_messages as m', 'm.message_id', 'p.message_id')
+        .whereNull('m.media_url')
+        .where((query) =>
+          query.where('m.media_status', 'retry').orWhere((auto) =>
+            auto
+              .whereIn('m.media_status', ['later', 'failed', 'downloading'])
+              .where('m.created_at', '>=', since)
+              .where('p.attempts', '<', 3)
+              .where('p.updated_at', '<', pause)
+          )
+        )
+        .orderByRaw("m.media_status = 'retry' DESC")
+        .orderBy('m.created_at', 'desc')
+        .limit(5)
+        .select('p.message_id', 'p.proto', 'p.attempts')
+      for (const row of rows) {
+        if (this.stopping || !this.socket) break
+        await db
+          .from('whatsapp_media_protos')
+          .where('message_id', row.message_id)
+          .update({ attempts: Math.min(250, Number(row.attempts) + 1), updated_at: new Date() })
+        let message: WAMessage
+        try {
+          message = proto.WebMessageInfo.decode(Buffer.from(String(row.proto), 'base64')) as unknown as WAMessage
+        } catch {
+          await db.from('whatsapp_media_protos').where('message_id', row.message_id).delete()
+          continue
+        }
+        const media = await this.prepareMedia(message).catch(() => null)
+        if (!media?.visual) continue
+        await db.from('whatsapp_messages').where('message_id', row.message_id).update({ media_status: 'downloading' })
+        await this.downloadMedia(message, media).catch(() => null)
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+    } finally {
+      this.retryingMedia = false
+    }
+  }
+
   private oldMedia: Array<{ message: WAMessage; media: IncomingMedia }> = []
   private drainingOldMedia = false
   private queueOldMedia(message: WAMessage, media: IncomingMedia) {
@@ -1678,12 +1810,14 @@ export default class WhatsappListen extends BaseCommand {
           media_url: `${(env.get('APP_BASE_PATH') || '')}/media/${filename}`,
           media_status: 'ready',
         })
+      await db.from('whatsapp_media_protos').where('message_id', messageId).delete().catch(() => {})
       return mediaPath
     } catch (error) {
       await db
         .from('whatsapp_messages')
         .where('message_id', messageId)
         .update({ media_status: 'failed' })
+      await this.rememberMediaProto(message)
       this.logger.error(
         `Media ${messageId}: ${error instanceof Error ? error.message : String(error)}`
       )

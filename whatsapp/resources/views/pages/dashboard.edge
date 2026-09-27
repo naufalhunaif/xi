@@ -500,10 +500,11 @@
                       @else
                         <div class="message-media-placeholder" aria-hidden="true"></div>
                       @end
-                      @if(message.media_status === 'downloading')
+                      @if(message.media_url)
+                      @elseif(['downloading', 'retry', 'history', 'history_wait'].includes(message.media_status))
                         <span class="message-media-state" data-i18n="Mengunduh…">Mengunduh…</span>
-                      @elseif(message.media_status === 'failed')
-                        <span class="message-media-state failed" data-i18n="Gagal dimuat">Gagal dimuat</span>
+                      @elseif(['failed', 'later', 'expired'].includes(message.media_status))
+                        <button type="button" class="message-media-state" data-media-retry="{{ message.message_id }}" data-i18n="Muat ulang">Muat ulang</button>
                       @end
                     </div>
                   @end

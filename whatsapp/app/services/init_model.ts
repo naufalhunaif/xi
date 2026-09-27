@@ -335,6 +335,12 @@ async function createTables() {
       created_at DATETIME NOT NULL,
       updated_at DATETIME NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS whatsapp_media_protos (
+      message_id VARCHAR(190) NOT NULL PRIMARY KEY,
+      proto MEDIUMTEXT NOT NULL,
+      attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      updated_at DATETIME NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS whatsapp_chat_goals (
       jid VARCHAR(190) NOT NULL PRIMARY KEY,
       version CHAR(36) NOT NULL,

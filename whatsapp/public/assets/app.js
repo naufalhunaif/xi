@@ -292,14 +292,24 @@
       // Media lama yang sudah tidak ada di server cukup ditandai netral, bukan "gagal".
       const mediaLabel = {
         downloading: t('Mengunduh…'),
+        retry: t('Mengunduh…'),
+        history: t('Mengunduh…'),
+        history_wait: t('Mengunduh…'),
         later: t('Media lama'),
         failed: t('Media lama'),
         expired: t('Media lama'),
       }[message.media_status]
       if (mediaLabel && !message.media_url) {
-        const state = document.createElement('span')
+        // Media belum termuat & bisa diambil lagi: tombol "Muat ulang" (HP perlu online).
+        const retry = ['later', 'failed', 'expired'].includes(message.media_status)
+        const state = document.createElement(retry ? 'button' : 'span')
         state.className = 'message-media-state'
-        state.textContent = mediaLabel
+        state.textContent = retry ? t('Muat ulang') : mediaLabel
+        if (retry) {
+          state.type = 'button'
+          state.dataset.mediaRetry = message.message_id
+          state.title = t('Minta ulang media dari WhatsApp')
+        }
         mediaWrap.append(state)
       }
       article.append(mediaWrap)
@@ -494,6 +504,22 @@
       unreadBoundaryId = null
       messages.querySelector('.new-message-divider')?.remove()
       void acknowledgeVisibleRoom()
+    })
+    messages.addEventListener('click', async (event) => {
+      const button = event.target.closest?.('[data-media-retry]')
+      if (!button || button.disabled) return
+      event.preventDefault()
+      event.stopPropagation()
+      button.disabled = true
+      button.textContent = t('Mengunduh…')
+      try {
+        await api('/api/media/retry', {
+          method: 'POST',
+          body: JSON.stringify({ message_id: button.dataset.mediaRetry }),
+        })
+      } catch (error) {
+        button.textContent = error.message || t('Gagal dimuat')
+      }
     })
     const followLoadedMedia = (event) => {
       if (!stickToLatest || !event.target.matches?.('img, video')) return
