@@ -487,12 +487,19 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 @media (max-width: 560px) {
   .workspace-ui #aiAccountsCard .wa-card-head .actions { width: 100%; justify-content: space-between; }
 }
-/* Menu pengaturan: dikelompokkan per kategori. */
+/* Menu pengaturan: tiap kategori dalam blok abu-abu. */
+.workspace-ui .wa-settings-menu { gap: 10px; }
+.workspace-ui .wa-settings-menu .wa-settings-block {
+  display: grid; gap: 2px; padding: 6px; border-radius: 8px; background: var(--wa-subtle, #f5f5f3);
+}
 .workspace-ui .wa-settings-menu .wa-settings-group {
-  margin: 14px 13px 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
+  padding: 4px 7px 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
   text-transform: uppercase; color: var(--muted);
 }
-.workspace-ui .wa-settings-menu .wa-settings-group:first-child { margin-top: 0; }
+.workspace-ui .wa-settings-menu .wa-settings-block a { padding: 9px 7px; }
+.workspace-ui .wa-settings-menu .wa-settings-block a:hover { background: var(--wa-surface, #fff); }
 @media (max-width: 760px) {
+  .workspace-ui .wa-settings-menu .wa-settings-block { display: flex; flex: none; gap: 2px; padding: 4px; }
   .workspace-ui .wa-settings-menu .wa-settings-group { display: none; }
 }
+.workspace-ui .wa-settings-menu a.wa-danger-link { color: var(--wa-err); }

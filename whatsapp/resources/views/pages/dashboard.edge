@@ -646,28 +646,36 @@
           </div>
           <div class="wa-settings-layout">
             <nav class="wa-settings-menu" aria-label="Menu pengaturan" data-i18n-aria-label="Menu pengaturan">
-              <span class="wa-settings-group" data-i18n="Aplikasi">Aplikasi</span>
-              <a href="#general" data-settings-menu="general" data-i18n="Umum">Umum</a>
-              <a href="#numbers" data-settings-menu="numbers" data-i18n="Nomor WhatsApp">Nomor WhatsApp</a>
-              <span class="wa-settings-group">AI</span>
-              <a href="#ai" data-settings-menu="ai" aria-current="page" data-i18n="Akun & model">Akun & model</a>
-              <a href="#work-hours" data-settings-menu="work-hours" data-i18n="Jam kerja AI">Jam kerja AI</a>
-              <a href="#behavior" data-settings-menu="behavior" data-i18n="Perilaku balasan">Perilaku balasan</a>
-              <a href="#skill" data-settings-menu="skill" data-i18n="Skill">Skill</a>
-              @if(bundle)
-              <a href="#skills" data-settings-menu="skills" data-i18n="Editor skill">Editor skill</a>
-              <a href="#evaluation" data-settings-menu="evaluation" data-i18n="Evaluasi">Evaluasi</a>
-              @end
-              <a href="#quality" data-settings-menu="quality" data-i18n="Kualitas">Kualitas</a>
-              <a href="#usage" data-settings-menu="usage">Usage</a>
-              <span class="wa-settings-group" data-i18n="Toko & pesanan">Toko & pesanan</span>
-              <a href="#business" data-settings-menu="business" data-i18n="Data bisnis">Data bisnis</a>
-              <a href="#payments" data-settings-menu="payments" data-i18n="Pembayaran">Pembayaran</a>
-              <a href="#weights" data-settings-menu="weights" data-i18n="Berat & ongkir">Berat & ongkir</a>
-              <a href="#production" data-settings-menu="production" data-i18n="Produksi & Pre-order">Produksi & Pre-order</a>
-              <span class="wa-settings-group" data-i18n="Data & keamanan">Data & keamanan</span>
-              <a href="#backup" data-settings-menu="backup">Backup</a>
-              <a href="#danger" data-settings-menu="danger" class="wa-danger-link">Danger zone</a>
+              <div class="wa-settings-block">
+                <span class="wa-settings-group" data-i18n="Aplikasi">Aplikasi</span>
+                <a href="#general" data-settings-menu="general" data-i18n="Umum">Umum</a>
+                <a href="#numbers" data-settings-menu="numbers" data-i18n="Nomor WhatsApp">Nomor WhatsApp</a>
+              </div>
+              <div class="wa-settings-block">
+                <span class="wa-settings-group">AI</span>
+                <a href="#ai" data-settings-menu="ai" aria-current="page" data-i18n="Akun & model">Akun & model</a>
+                <a href="#work-hours" data-settings-menu="work-hours" data-i18n="Jam kerja AI">Jam kerja AI</a>
+                <a href="#behavior" data-settings-menu="behavior" data-i18n="Perilaku balasan">Perilaku balasan</a>
+                <a href="#skill" data-settings-menu="skill" data-i18n="Skill">Skill</a>
+                @if(bundle)
+                <a href="#skills" data-settings-menu="skills" data-i18n="Editor skill">Editor skill</a>
+                <a href="#evaluation" data-settings-menu="evaluation" data-i18n="Evaluasi">Evaluasi</a>
+                @end
+                <a href="#quality" data-settings-menu="quality" data-i18n="Kualitas">Kualitas</a>
+                <a href="#usage" data-settings-menu="usage">Usage</a>
+              </div>
+              <div class="wa-settings-block">
+                <span class="wa-settings-group" data-i18n="Toko & pesanan">Toko & pesanan</span>
+                <a href="#business" data-settings-menu="business" data-i18n="Data bisnis">Data bisnis</a>
+                <a href="#payments" data-settings-menu="payments" data-i18n="Pembayaran">Pembayaran</a>
+                <a href="#weights" data-settings-menu="weights" data-i18n="Berat & ongkir">Berat & ongkir</a>
+                <a href="#production" data-settings-menu="production" data-i18n="Produksi & Pre-order">Produksi & Pre-order</a>
+              </div>
+              <div class="wa-settings-block">
+                <span class="wa-settings-group" data-i18n="Data & keamanan">Data & keamanan</span>
+                <a href="#backup" data-settings-menu="backup">Backup</a>
+                <a href="#danger" data-settings-menu="danger" class="wa-danger-link">Danger zone</a>
+              </div>
             </nav>
             <div class="wa-panel wa-settings-panel">
               <form id="settingsForm">
