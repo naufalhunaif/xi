@@ -245,6 +245,7 @@ export async function customerImagesForOrder(order: Record<string, any>, limit =
   const images = rows.filter((row: any) => !proofs.has(String(row.message_id))).slice(0, limit)
   return images.reverse().map((row: any) => ({
     url: String(row.media_url),
-    caption: String(row.body || '').trim() || 'Model seperti ini',
+    // Teks chat pelanggan (mis. "size L masih ada?") bukan keterangan model.
+    caption: 'Model seperti ini',
   }))
 }
