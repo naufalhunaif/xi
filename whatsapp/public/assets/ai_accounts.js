@@ -1,3 +1,5 @@
+// Pengaturan → AI: tabel akun AI. Masalah per akun di ikon ⚠ (klik = keterangan),
+// tambah akun & login lewat dialog.
 ;(() => {
   const card = document.getElementById('aiAccountsCard')
   if (!card) return
@@ -15,8 +17,30 @@
     if (text !== undefined) node.textContent = text
     return node
   }
-  const time = (ms) =>
-    new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+  const ICON = {
+    warn: '<path d="M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5M12 17h.01"/>',
+    test: '<path d="M7 5l12 7-12 7z"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  }
+  const svg = (name) => {
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    for (const [key, value] of Object.entries({
+      viewBox: '0 0 24 24',
+      width: '16',
+      height: '16',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '1.8',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+      'aria-hidden': 'true',
+    }))
+      icon.setAttribute(key, value)
+    icon.innerHTML = ICON[name]
+    return icon
+  }
+  const PROVIDERS = { chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini' }
+  const time = (ms) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 
   async function call(path, method = 'GET', body) {
     const response = await fetch(base + path, {
@@ -38,15 +62,15 @@
   function state(account) {
     if (!account.enabled) return [t('Nonaktif'), '']
     if (account.limitedUntil) return [t('Jeda s/d {0}', time(account.limitedUntil)), 'warn']
-    if (!account.connected)
-      return [account.provider === 'gemini' ? t('Isi API key') : t('Perlu login'), 'err']
+    if (!account.connected) return [account.provider === 'gemini' ? t('Isi API key') : t('Perlu login'), 'err']
     return [t('Siap'), 'ok']
   }
 
   function button(label, action, className = 'button small') {
     const node = el('button', className, label)
     node.type = 'button'
-    node.addEventListener('click', async () => {
+    node.addEventListener('click', async (event) => {
+      event.stopPropagation()
       node.disabled = true
       try {
         await action()
@@ -58,165 +82,223 @@
     })
     return node
   }
-
-  // Login per akun: ChatGPT kode perangkat, Claude tempel kode.
-  let polling
-  async function login(account, holder, restart = false) {
-    clearTimeout(polling)
-    const data = await call(`/api/ai/accounts/${account.id}/login`, 'POST', { restart })
-    showLogin(account, holder, data)
+  function iconButton(icon, label, action, className = 'wa-ai-icon') {
+    const node = button('', action, className)
+    node.append(svg(icon))
+    node.title = label
+    node.setAttribute('aria-label', label)
+    return node
   }
-  function showLogin(account, holder, data) {
-    holder.replaceChildren()
-    if (data.connected) {
-      status(t('{0} terhubung.', account.name))
-      refresh()
+
+  // ---- Keterangan ⚠: satu popover dipakai bersama ----
+  const pop = el('section', 'wa-handling-details wa-info-popover wa-ai-pop')
+  pop.hidden = true
+  pop.setAttribute('role', 'region')
+  document.body.append(pop)
+  let popOwner = null
+  function closePop(focus = false) {
+    if (!popOwner) return
+    pop.hidden = true
+    popOwner.setAttribute('aria-expanded', 'false')
+    if (focus) popOwner.focus({ preventScroll: true })
+    popOwner = null
+  }
+  function openPop(owner, title, lines, actions = []) {
+    if (popOwner === owner) return closePop()
+    closePop()
+    popOwner = owner
+    owner.setAttribute('aria-expanded', 'true')
+    const head = el('header')
+    const close = el('button', '', '×')
+    close.type = 'button'
+    close.setAttribute('aria-label', t('Tutup'))
+    close.addEventListener('click', () => closePop(true))
+    head.append(el('strong', '', title), close)
+    pop.setAttribute('aria-label', title)
+    pop.replaceChildren(head, ...lines.map((line) => el('p', '', line)))
+    if (actions.length) {
+      const row = el('div', 'actions wa-actions-start')
+      row.append(...actions)
+      pop.append(row)
+    }
+    pop.hidden = false
+    const rect = owner.getBoundingClientRect()
+    const width = Math.min(340, innerWidth - 24)
+    pop.style.width = `${width}px`
+    pop.style.left = `${Math.max(12, Math.min(rect.right - width, innerWidth - width - 12))}px`
+    const below = rect.bottom + 8
+    pop.style.top = `${below + pop.offsetHeight <= innerHeight - 12 ? below : Math.max(12, rect.top - pop.offsetHeight - 8)}px`
+  }
+  document.addEventListener('pointerdown', (event) => {
+    if (popOwner && !pop.contains(event.target) && !popOwner.contains(event.target)) closePop()
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && popOwner) closePop(true)
+  })
+  window.addEventListener('scroll', (event) => !pop.contains(event.target) && closePop(), true)
+
+  function problems(account) {
+    const lines = []
+    if (account.lastError) lines.push(account.lastError)
+    if (account.limitedUntil)
+      lines.push(t('Kuota habis atau dibatasi; dipakai lagi otomatis sekitar {0}.', time(account.limitedUntil)))
+    if (account.modelBlocked)
+      lines.push(t('Model {0} tidak tersedia di akun ini, memakai model bawaan', account.modelBlocked))
+    if (account.enabled && !account.connected)
+      lines.push(account.provider === 'gemini' ? t('API key belum diisi atau tidak valid.') : t('Akun perlu login ulang.'))
+    return lines
+  }
+
+  // ---- Tabel ----
+  function render(accounts) {
+    closePop()
+    list.replaceChildren()
+    if (!accounts.length) {
+      const row = el('tr')
+      const cell = el('td', 'wa-note', t('Belum ada akun AI. Klik Tambah akun.'))
+      cell.colSpan = 8
+      row.append(cell)
+      list.append(row)
       return
     }
-    const box = el('div', 'wa-ai-login')
-    if (account.provider === 'chatgpt') {
-      if (data.userCode) {
-        box.append(el('p', 'wa-note', t('Buka link, login ke akun ChatGPT yang ingin ditambahkan, lalu masukkan kode:')))
-        box.append(el('code', 'wa-ai-code', data.userCode))
-      } else box.append(el('p', 'wa-note', t('Menyiapkan kode login…')))
-      if (data.verificationUrl) {
-        const link = el('a', 'button primary small', t('Buka login'))
-        link.href = data.verificationUrl
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-        box.append(link)
-      }
-    } else {
-      box.append(el('p', 'wa-note', t('Buka link, login ke akun Claude yang ingin ditambahkan, lalu tempel kodenya di sini.')))
-      const row = el('div', 'actions wa-actions-start')
-      if (data.verificationUrl) {
-        const link = el('a', 'button primary small', t('Buka login'))
-        link.href = data.verificationUrl
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-        row.append(link)
-      }
-      const input = el('input')
-      input.type = 'password'
-      input.placeholder = t('Tempel kode')
-      input.autocomplete = 'off'
-      input.addEventListener('keydown', (event) => event.key === 'Enter' && event.preventDefault())
-      row.append(
-        input,
-        button(t('Verifikasi'), async () => {
-          await call(`/api/ai/accounts/${account.id}/verify`, 'POST', {
-            loginId: data.loginId,
-            code: input.value,
-          })
-          status(t('Memeriksa login…'))
-        })
-      )
-      box.append(row)
-    }
-    if (data.error) box.append(el('p', 'wa-alert', data.error))
-    box.append(button(t('Mulai ulang'), () => login(account, holder, true)))
-    holder.append(box)
-    const poll = () =>
-      (polling = setTimeout(async () => {
-        if (!holder.isConnected) return
-        try {
-          const next = { ...data, ...(await call(`/api/ai/accounts/${account.id}/login`)) }
-          next.loginId = next.loginId || data.loginId
-          const changed = ['connected', 'userCode', 'verificationUrl', 'error'].some((key) => next[key] !== data[key])
-          if (changed) return showLogin(account, holder, next)
-        } catch {}
-        poll()
-      }, 4000))
-    poll()
-  }
-
-  function render(accounts) {
-    list.replaceChildren()
-    accounts.forEach((account) => {
-      const wrap = el('div', 'wa-ai-item')
-      wrap.dataset.id = String(account.id)
-      const item = el('div', 'wa-kv-row')
-      const name = el('span', 'wa-ai-name')
+    accounts.forEach((account, index) => {
+      const row = el('tr', 'wa-ai-item')
+      row.dataset.id = String(account.id)
+      const order = el('td', 'wa-ai-order')
       const handle = el('button', 'wa-drag-handle', '⠿')
       handle.type = 'button'
       handle.title = t('Seret untuk mengubah urutan')
       handle.setAttribute('aria-label', handle.title)
-      handle.addEventListener('pointerdown', (event) => startDrag(event, wrap))
-      name.append(handle, el('span', '', account.name))
-      const [label, tone] = state(account)
+      handle.addEventListener('pointerdown', (event) => startDrag(event, row))
+      order.append(handle, el('span', '', String(index + 1)))
+
+      const name = el('td', 'wa-ai-acct')
+      name.append(el('strong', '', account.name), el('small', '', PROVIDERS[account.provider] || account.provider))
+
+      const model = el('td')
+      model.append(modelPicker(account))
+      const scope = el('td')
+      scope.append(scopePicker(account))
+
       const tokens = Number(account.tokens5h || 0)
-      const usage = tokens
-        ? t('{0} token / 5 jam', tokens >= 1000 ? `${(tokens / 1000).toFixed(tokens >= 100000 ? 0 : 1)}rb` : String(tokens))
-        : ''
-      // Model per akun: tiap akun boleh memakai model berbeda.
-      const info = el('div', 'wa-ai-info')
-      info.append(modelPicker(account), scopePicker(account))
-      const blocked = account.modelBlocked
-        ? t('Model {0} tidak tersedia di akun ini, memakai model bawaan', account.modelBlocked)
-        : ''
-      const note = [usage, blocked, account.lastError || ''].filter(Boolean).join(' · ')
-      if (note) info.append(el('small', account.lastError ? 'wa-ai-error' : '', note))
-      const side = el('div', 'actions')
-      side.append(el('span', `wa-pill ${tone}`, label))
-      const holder = el('div', 'wa-span-full')
-      if (account.limitedUntil)
-        side.append(button(t('Coba lagi'), async () => {
-          await call(`/api/ai/accounts/${account.id}/update`, 'POST', { resume: true })
+      const usage = el(
+        'td',
+        'wa-order-amount',
+        tokens ? (tokens >= 1000 ? `${(tokens / 1000).toFixed(tokens >= 100000 ? 0 : 1)}rb` : String(tokens)) : '—'
+      )
+
+      const stateCell = el('td')
+      const box = el('div', 'wa-ai-state')
+      const [label, tone] = state(account)
+      // "Perlu login" / "Isi API key" bisa diklik langsung.
+      if (account.enabled && !account.connected) {
+        const pill = el('button', `wa-pill ${tone} wa-ai-pill-action`, label)
+        pill.type = 'button'
+        pill.title = account.provider === 'gemini' ? t('Isi API key') : t('Login')
+        pill.addEventListener('click', () => openLogin(account))
+        box.append(pill)
+      } else box.append(el('span', `wa-pill ${tone}`, label))
+      const issues = problems(account)
+      if (issues.length) {
+        const warn = el('button', `wa-ai-warn ${tone === 'err' || account.lastError ? 'err' : 'warn'}`)
+        warn.type = 'button'
+        warn.append(svg('warn'))
+        warn.title = t('Lihat keterangan')
+        warn.setAttribute('aria-label', t('Keterangan {0}', account.name))
+        warn.setAttribute('aria-expanded', 'false')
+        warn.addEventListener('click', (event) => {
+          event.stopPropagation()
+          const actions = []
+          if (account.limitedUntil)
+            actions.push(
+              button(t('Coba lagi sekarang'), async () => {
+                await call(`/api/ai/accounts/${account.id}/update`, 'POST', { resume: true })
+                closePop()
+                refresh()
+              })
+            )
+          if (!account.connected && account.provider !== 'gemini')
+            actions.push(
+              button(t('Login'), async () => {
+                closePop()
+                openLogin(account)
+              }, 'button primary small')
+            )
+          if (account.provider === 'gemini')
+            actions.push(
+              button(t('Ganti key'), async () => {
+                closePop()
+                openLogin(account)
+              })
+            )
+          openPop(warn, account.name, issues, actions)
+        })
+        box.append(warn)
+      }
+      stateCell.append(box)
+
+      const active = el('td')
+      const toggle = el('button', 'wa-switch')
+      toggle.type = 'button'
+      toggle.setAttribute('role', 'switch')
+      toggle.setAttribute('aria-checked', String(Boolean(account.enabled)))
+      toggle.setAttribute('aria-label', t('Aktifkan {0}', account.name))
+      toggle.addEventListener('click', async () => {
+        toggle.disabled = true
+        try {
+          await call(`/api/ai/accounts/${account.id}/update`, 'POST', { enabled: !account.enabled })
           refresh()
-        }))
-      if (!account.connected && account.provider !== 'gemini')
-        side.append(button(t('Login'), () => login(account, holder)))
-      if (account.provider === 'gemini')
-        side.append(button(t('Ganti key'), async () => {
-          const key = window.prompt(t('API key Gemini baru'))
-          if (!key) return
-          await call(`/api/ai/accounts/${account.id}/update`, 'POST', { apiKey: key, resume: true })
+        } catch (error) {
+          status(error.message)
+          toggle.disabled = false
+        }
+      })
+      active.append(toggle)
+
+      const actions = el('td', 'wa-ai-actions')
+      actions.append(
+        iconButton('test', t('Tes {0}', account.name), async () => {
+          status(t('Menguji {0}…', account.name))
+          const result = await call(`/api/ai/accounts/${account.id}/test`, 'POST')
+          status(
+            result.ok
+              ? t('{0} berhasil ({1} detik, model {2}).', account.name, (result.ms / 1000).toFixed(1), result.model || '-')
+              : t('{0} gagal: {1}', account.name, result.error || result.code || '-')
+          )
           refresh()
-        }))
-      side.append(button(t('Tes'), async () => {
-        status(t('Menguji {0}…', account.name))
-        const result = await call(`/api/ai/accounts/${account.id}/test`, 'POST')
-        status(
-          result.ok
-            ? t('{0} berhasil ({1} detik, model {2}).', account.name, (result.ms / 1000).toFixed(1), result.model || '-')
-            : t('{0} gagal: {1}', account.name, result.error || result.code || '-')
+        }),
+        iconButton(
+          'trash',
+          t('Hapus {0}', account.name),
+          async () => {
+            if (!window.confirm(t('Hapus akun {0}?', account.name))) return
+            await call(`/api/ai/accounts/${account.id}`, 'DELETE')
+            refresh()
+          },
+          'wa-ai-icon danger'
         )
-        refresh()
-      }))
-      side.append(button(account.enabled ? t('Nonaktifkan') : t('Aktifkan'), async () => {
-        await call(`/api/ai/accounts/${account.id}/update`, 'POST', { enabled: !account.enabled })
-        refresh()
-      }))
-      side.append(button(t('Hapus'), async () => {
-          if (!window.confirm(t('Hapus akun {0}?', account.name))) return
-          await call(`/api/ai/accounts/${account.id}`, 'DELETE')
-          refresh()
-        }))
-      item.append(name, info, side)
-      wrap.append(item, holder)
-      list.append(wrap)
+      )
+      row.append(order, name, model, scope, usage, stateCell, active, actions)
+      list.append(row)
     })
   }
 
-  // Seret-lepas urutan (mouse & sentuh): baris dipindah langsung, urutan disimpan saat dilepas.
-  function startDrag(event, wrap) {
+  // Seret-lepas urutan (mouse & sentuh); urutan disimpan saat dilepas.
+  function startDrag(event, row) {
     event.preventDefault()
-    // Listener di window: baris yang dipindah (insertBefore) melepas pointer capture.
-    wrap.classList.add('dragging')
+    row.classList.add('dragging')
     const before = [...list.children].map((node) => node.dataset.id).join(',')
     const move = (next) => {
-      const target = document
-        .elementFromPoint(next.clientX, next.clientY)
-        ?.closest('.wa-ai-item')
-      if (!target || target === wrap || target.parentElement !== list) return
+      const target = document.elementFromPoint(next.clientX, next.clientY)?.closest('.wa-ai-item')
+      if (!target || target === row || target.parentElement !== list) return
       const box = target.getBoundingClientRect()
-      list.insertBefore(wrap, next.clientY < box.top + box.height / 2 ? target : target.nextSibling)
+      list.insertBefore(row, next.clientY < box.top + box.height / 2 ? target : target.nextSibling)
     }
     const end = async () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', end)
       window.removeEventListener('pointercancel', end)
-      wrap.classList.remove('dragging')
+      row.classList.remove('dragging')
       const ids = [...list.children].map((node) => Number(node.dataset.id))
       if (ids.join(',') === before) return
       try {
@@ -242,7 +324,7 @@
     select.setAttribute('aria-label', t('Model {0}', account.name))
     const options = [...(MODELS[account.provider] || [])]
     if (account.model && !options.includes(account.model)) options.push(account.model)
-    select.append(new Option(account.provider === 'gemini' ? t('Otomatis (Flash terbaru)') : t('Model otomatis'), ''))
+    select.append(new Option(t('Otomatis'), ''))
     for (const model of options) select.append(new Option(model, model))
     select.append(new Option(t('Model lainnya…'), '__custom__'))
     select.value = account.model || ''
@@ -270,8 +352,9 @@
   function scopePicker(account) {
     const select = el('select', 'wa-ai-model')
     select.setAttribute('aria-label', t('Tugas {0}', account.name))
-    select.append(new Option(t('Tugas: balas pelanggan + latar'), 'all'))
-    select.append(new Option(t('Tugas: latar saja (katalog, rekap)'), 'background'))
+    select.title = t('Latar saja = katalog & rekap, tidak membalas pelanggan')
+    select.append(new Option(t('Balas + latar'), 'all'))
+    select.append(new Option(t('Latar saja'), 'background'))
     select.value = account.scope === 'background' ? 'background' : 'all'
     select.addEventListener('change', async () => {
       try {
@@ -285,15 +368,15 @@
     return select
   }
 
-  // Berurutan = akun atas dipakai dulu, bawah jadi cadangan. Merata = token 5 jam terakhir paling sedikit didahulukan.
+  // Berurutan = akun atas dipakai dulu. Merata = token 5 jam terakhir paling sedikit didahulukan.
   function showSpread(mode) {
-    card.querySelectorAll('[data-ai-spread]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.aiSpread === mode)))
-    const hint = byId('aiSpreadHint')
-    if (hint)
-      hint.textContent =
-        mode === 'even'
+    card.querySelectorAll('[data-ai-spread]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.aiSpread === mode))
+      b.title =
+        b.dataset.aiSpread === 'even'
           ? t('Akun yang paling sedikit terpakai dalam 5 jam terakhir dipakai lebih dulu, jadi kuota semua akun habis merata.')
           : t('Akun paling atas selalu dipakai dulu; akun di bawahnya jadi cadangan saat habis.')
+    })
   }
   card.querySelectorAll('[data-ai-spread]').forEach((b) =>
     b.addEventListener('click', async () => {
@@ -309,50 +392,254 @@
   let timer
   async function refresh() {
     clearTimeout(timer)
-    if (list.querySelector('.wa-ai-login, .dragging')) return
+    if (list.querySelector('.dragging') || popOwner) {
+      timer = setTimeout(refresh, 15000)
+      return
+    }
     try {
       const data = await call('/api/ai/accounts')
       render(data.accounts || [])
       showSpread(data.spread || 'order')
-      // Panel lama (model/kecepatan akun utama) hanya relevan bila akun utama masih ada.
       const advanced = document.querySelector('.wa-ai-advanced')
       if (advanced) advanced.hidden = !(data.accounts || []).some((a) => a.legacy)
-      if (!(data.accounts || []).length) list.replaceChildren(el('p', 'wa-note', t('Belum ada akun AI. Tambahkan akun di bawah.')))
     } catch (error) {
       status(error.message)
     }
     timer = setTimeout(refresh, 60000)
   }
 
-  const provider = byId('aiAccountProvider')
-  const syncKey = () => (byId('aiAccountKeyField').hidden = provider.value !== 'gemini')
-  provider.addEventListener('change', syncKey)
-  for (const input of [byId('aiAccountLabel'), byId('aiAccountKey')])
-    input.addEventListener('keydown', (event) => event.key === 'Enter' && event.preventDefault())
-  byId('aiAccountAdd').addEventListener('click', async () => {
-    const add = byId('aiAccountAdd')
-    add.disabled = true
-    try {
-      const result = await call('/api/ai/accounts', 'POST', {
-        provider: provider.value,
-        label: byId('aiAccountLabel').value,
-        apiKey: byId('aiAccountKey').value,
-      })
-      byId('aiAccountLabel').value = ''
-      byId('aiAccountKey').value = ''
-      await refresh()
-      if (provider.value !== 'gemini') {
-        const holder = list.querySelector(`.wa-ai-item[data-id="${result.id}"] .wa-span-full`)
-        const data = await call('/api/ai/accounts')
-        const account = (data.accounts || []).find((a) => a.id === result.id)
-        if (account && holder) await login(account, holder)
-      } else status(t('Akun Gemini ditambahkan.'))
-    } catch (error) {
-      status(error.message)
-    } finally {
-      add.disabled = false
+  // ---- Dialog: tambah akun & login ----
+  let dialog = null
+  let polling = null
+  const onDialogKey = (event) => {
+    if (event.key === 'Escape') closeDialog()
+  }
+  function closeDialog() {
+    clearTimeout(polling)
+    dialog?.remove()
+    dialog = null
+    document.removeEventListener('keydown', onDialogKey)
+    byId('aiAccountOpen')?.focus({ preventScroll: true })
+    refresh()
+  }
+  function frame(title) {
+    clearTimeout(polling)
+    dialog?.remove()
+    dialog = el('div', 'wa-correct-overlay')
+    const box = el('div', 'wa-correct-box wa-ai-dialog')
+    box.setAttribute('role', 'dialog')
+    box.setAttribute('aria-modal', 'true')
+    box.setAttribute('aria-label', title)
+    const head = el('div', 'wa-ai-dialog-head')
+    const close = el('button', 'wa-ai-icon', '×')
+    close.type = 'button'
+    close.setAttribute('aria-label', t('Tutup'))
+    close.addEventListener('click', closeDialog)
+    head.append(el('strong', '', title), close)
+    const body = el('div', 'wa-ai-dialog-body')
+    const note = el('small', 'wa-correct-status')
+    note.setAttribute('role', 'status')
+    box.append(head, body, note)
+    dialog.append(box)
+    dialog.addEventListener('pointerdown', (event) => event.target === dialog && closeDialog())
+    document.body.append(dialog)
+    document.removeEventListener('keydown', onDialogKey)
+    document.addEventListener('keydown', onDialogKey)
+    return { body, note: (text) => (note.textContent = text || '') }
+  }
+
+  // Langkah 1: pilih penyedia, nama opsional, (Gemini) API key.
+  function openAdd() {
+    const { body, note } = frame(t('Tambah akun AI'))
+    let provider = 'chatgpt'
+    const hints = {
+      chatgpt: t('Login akun ChatGPT'),
+      claude: t('Login akun Claude'),
+      gemini: t('Pakai API key'),
     }
-  })
-  syncKey()
+    const tiles = el('div', 'wa-ai-tiles')
+    tiles.setAttribute('role', 'radiogroup')
+    tiles.setAttribute('aria-label', t('Penyedia'))
+    const keyField = el('label', 'wa-ai-key')
+    keyField.append(el('span', '', t('API key Gemini')))
+    const key = el('input')
+    key.type = 'password'
+    key.autocomplete = 'off'
+    key.spellcheck = false
+    const keyHelp = el('small', 'wa-note', `${t('Buat API key di')} `)
+    const keyLink = el('a', '', 'aistudio.google.com/apikey')
+    keyLink.href = 'https://aistudio.google.com/apikey'
+    keyLink.target = '_blank'
+    keyLink.rel = 'noopener noreferrer'
+    keyHelp.append(keyLink)
+    keyField.append(key, keyHelp)
+    const pick = (value) => {
+      provider = value
+      tiles.querySelectorAll('button').forEach((tile) => tile.setAttribute('aria-checked', String(tile.dataset.provider === value)))
+      keyField.hidden = value !== 'gemini'
+    }
+    for (const value of ['chatgpt', 'claude', 'gemini']) {
+      const tile = el('button', 'wa-ai-tile')
+      tile.type = 'button'
+      tile.dataset.provider = value
+      tile.setAttribute('role', 'radio')
+      tile.append(el('strong', '', PROVIDERS[value]), el('small', '', hints[value]))
+      tile.addEventListener('click', () => pick(value))
+      tiles.append(tile)
+    }
+    const nameField = el('label')
+    nameField.append(el('span', '', t('Nama (opsional)')))
+    const name = el('input')
+    name.type = 'text'
+    name.maxLength = 80
+    name.placeholder = t('mis. Akun kantor')
+    nameField.append(name)
+    const actions = el('div', 'actions')
+    const next = button(
+      t('Lanjut'),
+      async () => {
+        note(t('Menyimpan…'))
+        try {
+          const result = await call('/api/ai/accounts', 'POST', { provider, label: name.value, apiKey: key.value })
+          if (provider === 'gemini') {
+            status(t('Akun Gemini ditambahkan.'))
+            return closeDialog()
+          }
+          const data = await call('/api/ai/accounts')
+          const account = (data.accounts || []).find((a) => a.id === result.id)
+          if (account) openLogin(account)
+          else closeDialog()
+        } catch (error) {
+          note(error.message)
+        }
+      },
+      'button primary'
+    )
+    actions.append(button(t('Batal'), async () => closeDialog(), 'button'), next)
+    for (const input of [name, key])
+      input.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return
+        event.preventDefault()
+        next.click()
+      })
+    body.append(tiles, nameField, keyField, actions)
+    pick('chatgpt')
+    tiles.querySelector('button')?.focus()
+  }
+
+  // Langkah 2: login akun (ChatGPT kode perangkat, Claude tempel kode) atau ganti key Gemini.
+  function openLogin(account) {
+    const { body, note } = frame(t('Login {0}', account.name))
+    if (account.provider === 'gemini') {
+      const field = el('label')
+      field.append(el('span', '', t('API key Gemini baru')))
+      const key = el('input')
+      key.type = 'password'
+      key.autocomplete = 'off'
+      field.append(key)
+      const actions = el('div', 'actions')
+      actions.append(
+        button(t('Batal'), async () => closeDialog(), 'button'),
+        button(
+          t('Simpan'),
+          async () => {
+            if (!key.value.trim()) return note(t('Isi API key.'))
+            await call(`/api/ai/accounts/${account.id}/update`, 'POST', { apiKey: key.value, resume: true })
+            closeDialog()
+          },
+          'button primary'
+        )
+      )
+      body.append(field, actions)
+      key.focus()
+      return
+    }
+    body.append(el('p', 'wa-note', t('Menyiapkan login…')))
+    const show = (data) => {
+      if (!dialog) return
+      body.replaceChildren()
+      if (data.connected) {
+        body.append(el('p', '', t('{0} terhubung.', account.name)))
+        status(t('{0} terhubung.', account.name))
+        setTimeout(closeDialog, 900)
+        return
+      }
+      const steps = el('ol', 'wa-ai-steps')
+      const link = el('a', 'button primary small', t('Buka halaman login'))
+      if (data.verificationUrl) {
+        link.href = data.verificationUrl
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+      } else link.setAttribute('aria-disabled', 'true')
+      if (account.provider === 'chatgpt') {
+        const one = el('li')
+        one.append(`${t('Salin kode ini:')} `, el('code', 'wa-ai-code', data.userCode || '…'))
+        if (data.userCode)
+          one.append(
+            button(t('Salin'), async () => {
+              await navigator.clipboard?.writeText(data.userCode)
+              note(t('Kode disalin.'))
+            })
+          )
+        const two = el('li')
+        two.append(link, ` ${t('lalu login ke akun ChatGPT yang ingin ditambahkan dan masukkan kodenya.')}`)
+        steps.append(one, two, el('li', '', t('Dialog ini tersambung sendiri setelah login.')))
+      } else {
+        const one = el('li')
+        one.append(link, ` ${t('lalu login ke akun Claude yang ingin ditambahkan.')}`)
+        const two = el('li', '', t('Salin kode yang muncul, tempel di sini:'))
+        const row = el('div', 'wa-ai-paste')
+        const input = el('input')
+        input.type = 'password'
+        input.placeholder = t('Tempel kode')
+        input.autocomplete = 'off'
+        const verify = button(
+          t('Verifikasi'),
+          async () => {
+            if (!input.value.trim()) return note(t('Tempel kodenya dulu.'))
+            await call(`/api/ai/accounts/${account.id}/verify`, 'POST', { loginId: data.loginId, code: input.value })
+            note(t('Memeriksa login…'))
+          },
+          'button primary small'
+        )
+        input.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter') return
+          event.preventDefault()
+          verify.click()
+        })
+        row.append(input, verify)
+        two.append(row)
+        steps.append(one, two)
+      }
+      body.append(steps)
+      if (data.error) body.append(el('p', 'wa-alert', data.error))
+      const actions = el('div', 'actions')
+      actions.append(button(t('Mulai ulang'), () => start(true), 'button'), button(t('Nanti saja'), async () => closeDialog(), 'button'))
+      body.append(actions)
+      clearTimeout(polling)
+      const poll = () =>
+        (polling = setTimeout(async () => {
+          if (!dialog) return
+          try {
+            const next = { ...data, ...(await call(`/api/ai/accounts/${account.id}/login`)) }
+            next.loginId = next.loginId || data.loginId
+            const changed = ['connected', 'userCode', 'verificationUrl', 'error'].some((key) => next[key] !== data[key])
+            if (changed) return show(next)
+          } catch {}
+          poll()
+        }, 4000))
+      poll()
+    }
+    const start = async (restart = false) => {
+      try {
+        show(await call(`/api/ai/accounts/${account.id}/login`, 'POST', { restart }))
+      } catch (error) {
+        note(error.message)
+      }
+    }
+    start()
+  }
+
+  byId('aiAccountOpen').addEventListener('click', openAdd)
   refresh()
 })()
