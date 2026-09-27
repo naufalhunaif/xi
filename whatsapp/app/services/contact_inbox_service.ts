@@ -69,19 +69,23 @@ export async function latestInboxMessages() {
             AND d.status IN ('paid', 'cancelled') AND d.updated_at >= n.updated_at))`
     : PAYMENT_SQL
   // Order = pesanan berjalan: AI sedang menyusun spesifikasi, form masuk, menunggu bayar,
-  // atau lunas tapi belum terkirim ke grup. Selesai = lunas dan sudah terkirim ke grup.
+  // atau lunas tapi belum dikirim ke pelanggan. Selesai = lunas dan toko sudah mengirim
+  // nomor resi di chat (pesan keluar berisi "resi"/"awb" + nomor). Lunas > 45 hari tanpa
+  // resi di chat dianggap selesai agar tab Order tidak menumpuk.
+  const shippedSql = `EXISTS (SELECT 1 FROM whatsapp_messages r WHERE r.jid = m.jid AND r.direction = 'out'
+          AND r.created_at >= b.created_at AND r.body REGEXP 'resi|awb' AND r.body REGEXP '[0-9]{8,}')`
   const orderSql = beta3
     ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
           AND (b.status IN ('pending', 'awaiting_payment')
-            OR (b.status = 'paid' AND b.group_status IN ('pending', 'failed'))))
+            OR (b.status = 'paid' AND b.updated_at >= NOW() - INTERVAL 45 DAY AND NOT ${shippedSql})))
         OR EXISTS (SELECT 1 FROM whatsapp_beta3_specs sp WHERE sp.jid = m.jid AND sp.spec <> ''
           AND sp.updated_at >= NOW() - INTERVAL 14 DAY
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
             AND d.updated_at >= sp.updated_at))`
     : ORDER_SQL
   const doneSql = beta3
-    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
-          AND b.status = 'paid' AND b.group_status NOT IN ('pending', 'failed'))`
+    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'paid'
+          AND (${shippedSql} OR b.updated_at < NOW() - INTERVAL 45 DAY))`
     : `EXISTS (SELECT 1 FROM whatsapp_orders o WHERE o.jid = m.jid AND o.status = 'completed')`
   // Nama: kontak ini, pasangan LID ↔ nomor HP (dua arah), lalu nama WA terakhir dari
   // pesan masuk (pesan keluar tidak membawa nama pelanggan).
