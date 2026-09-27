@@ -48,7 +48,7 @@ import {
   type ShippingRates,
 } from '#beta3/mcp'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
-import { saveAiRefs } from '#beta3/refs_service'
+import { markPaymentProofs, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
@@ -604,6 +604,11 @@ export async function createLeanReply(input: {
     !/transfer|bukti|struk|resi|bayar/i.test(`${input.text} ${decision.tahap}`)
   )
     decision.referensi = input.imageIds.map((_, index) => ({ gambar: index + 1, bagian: 'model' }))
+  // Bukti transfer: gambar giliran ini dicatat sebagai bukti, bukan referensi model.
+  if (input.imageIds?.length && decision.tahap === 'bukti_dikirim') {
+    await markPaymentProofs(jid, input.imageIds).catch(() => {})
+    decision.referensi = []
+  }
   if (decision.referensi?.length && input.imageIds?.length) {
     const saved = await saveAiRefs(jid, decision.referensi, input.imageIds).catch(() => 0)
     if (saved)

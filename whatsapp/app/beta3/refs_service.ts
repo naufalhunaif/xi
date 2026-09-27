@@ -48,17 +48,75 @@ function parseRow(row: Record<string, any>): LeanRef {
   }
 }
 
+// Bukti transfer bukan gambar model. Dikenali dari: tandai AI (tahap bukti_dikirim),
+// caption ("tf", "bukti", "sudah bayar"), atau dikirim ≤48 jam setelah toko mengirim rekening.
+const PROOF_CAPTION = /\b(tf|transfer|trf|bukti|bayar|dibayar|lunas|dp|struk|resi|sudah masuk|pelunasan)\b/i
+const PAY_INFO = /rekening|no\.?\s*rek|transfer ke|atas nama|\ba\.\s?n\.|\b(bca|bri|bni|mandiri|bsi|dana|ovo|gopay|qris|seabank)\b/i
+const PROOF_WINDOW = 48 * 3_600_000
+
+/** Tandai gambar giliran ini sebagai bukti transfer (AI memutuskan tahap bukti_dikirim). */
+export async function markPaymentProofs(jid: string, messageIds: string[]) {
+  if (!messageIds.length) return
+  await ensureLeanTables()
+  for (const id of messageIds.slice(0, 10))
+    await db.rawQuery(
+      'INSERT IGNORE INTO whatsapp_beta3_proofs (message_id, jid, created_at) VALUES (?, ?, ?)',
+      [id, jid, new Date()]
+    )
+}
+
+/** message_id gambar masuk di chat ini yang merupakan bukti transfer. */
+export async function paymentProofIds(jid: string) {
+  await ensureLeanTables()
+  const [marked, images, payInfo] = await Promise.all([
+    db.from('whatsapp_beta3_proofs').where('jid', jid).select('message_id').catch(() => []),
+    db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'in')
+      .where('media_type', 'image')
+      .orderBy('id', 'desc')
+      .limit(60)
+      .select('message_id', 'body', 'created_at'),
+    db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'out')
+      .whereNotNull('body')
+      .orderBy('id', 'desc')
+      .limit(200)
+      .select('body', 'created_at'),
+  ])
+  const ids = new Set<string>(marked.map((row: any) => String(row.message_id)))
+  const payTimes = payInfo
+    .filter((row: any) => PAY_INFO.test(String(row.body || '')))
+    .map((row: any) => new Date(row.created_at).getTime())
+  for (const image of images as any[]) {
+    const at = new Date(image.created_at).getTime()
+    const afterPayInfo = payTimes.some((time) => at >= time && at - time <= PROOF_WINDOW)
+    if (PROOF_CAPTION.test(String(image.body || '')) || afterPayInfo) ids.add(String(image.message_id))
+  }
+  return ids
+}
+
+async function withoutProofs(jid: string, refs: LeanRef[]) {
+  if (!refs.some((ref) => ref.message_id)) return refs
+  const proofs = await paymentProofIds(jid).catch(() => new Set<string>())
+  return refs.filter((ref) => !ref.message_id || !proofs.has(ref.message_id))
+}
+
 /** Referensi pesanan yang sedang berjalan (belum menempel ke order lunas). */
 export async function listActiveRefs(jid: string) {
   await ensureLeanTables()
   const rows = await db.from('whatsapp_beta3_refs').where('jid', jid).whereNull('order_id').orderBy('id', 'asc')
-  return rows.map(parseRow)
+  return withoutProofs(jid, rows.map(parseRow))
 }
 
 export async function refsForOrder(orderId: number) {
   await ensureLeanTables()
   const rows = await db.from('whatsapp_beta3_refs').where('order_id', orderId).orderBy('id', 'asc')
-  return rows.map(parseRow)
+  const refs = rows.map(parseRow)
+  return refs.length ? withoutProofs(refs[0].jid, refs) : refs
 }
 
 export async function addRef(input: {
@@ -105,10 +163,11 @@ export async function saveAiRefs(
 ) {
   if (!refs.length || !imageIds.length) return 0
   await ensureLeanTables()
+  const proofs = await paymentProofIds(jid).catch(() => new Set<string>())
   let saved = 0
   for (const ref of refs.slice(0, 6)) {
     const messageId = imageIds[Math.round(ref.gambar) - 1]
-    if (!messageId) continue
+    if (!messageId || proofs.has(messageId)) continue
     const message = await db
       .from('whatsapp_messages')
       .where('message_id', messageId)
@@ -173,10 +232,12 @@ export async function customerImagesForOrder(order: Record<string, any>, limit =
     .where('created_at', '>=', since)
     .where('created_at', '<=', createdAt)
     .orderBy('id', 'desc')
-    .limit(limit)
-    .select('media_url', 'body')
+    .limit(limit + 6)
+    .select('media_url', 'body', 'message_id')
     .catch(() => [])
-  return rows.reverse().map((row: any) => ({
+  const proofs = await paymentProofIds(jid).catch(() => new Set<string>())
+  const images = rows.filter((row: any) => !proofs.has(String(row.message_id))).slice(0, limit)
+  return images.reverse().map((row: any) => ({
     url: String(row.media_url),
     caption: String(row.body || '').trim() || 'Model seperti ini',
   }))
