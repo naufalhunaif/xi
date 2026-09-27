@@ -763,6 +763,11 @@ export function matchAutoTotal(
       .sort((a, b) => b.name.length - a.name.length)
     chosen = candidates[0]?.row || null
   }
+  // Hanya satu layanan non-kargo di tarif: tidak ada yang perlu dipilih.
+  if (!chosen && !draft.layanan) {
+    const offered = prices.filter((row) => row.price > 0 && !/JTR/i.test(row.service))
+    if (offered.length === 1) chosen = offered[0]
+  }
   if (!chosen)
     return {
       ok: false,

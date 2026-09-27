@@ -514,7 +514,7 @@ export async function createLeanReply(input: {
       'Isi field order (rincian per item dengan nama persis KATALOG + harga, subtotal, layanan ongkir yang dipilih pelanggan). ' +
       'Kalau ada TB/BB dan size yang dipilih terlihat tidak cocok, konfirmasi size dulu (satu pertanyaan). ' +
       (rateText
-        ? 'Kalau pelanggan belum memilih layanan dari bagian ONGKIR, tanyakan (satu pertanyaan) dan kosongkan layanan. Kalau sudah lengkap: balas "siap bos, datanya sudah masuk ya, ini totalnya" — total + rekening menyusul otomatis. tahap = tunggu_cs.'
+        ? 'Kalau bagian ONGKIR punya lebih dari satu layanan dan pelanggan belum memilih, tanyakan (satu pertanyaan) dan kosongkan layanan; bila hanya satu layanan, langsung pakai itu. Kalau sudah lengkap: balas "siap bos, datanya sudah masuk ya, ini totalnya" — total + rekening menyusul otomatis. tahap = tunggu_cs.'
         : 'Ongkir belum bisa dihitung: balas singkat bahwa ongkir dan totalnya dikabari sebentar lagi; kosongkan layanan. tahap = tunggu_cs.')
     onTrace?.({
       key: 'beta3-order',
@@ -565,7 +565,7 @@ export async function createLeanReply(input: {
         ' sudah tercatat, total belum terkirim. Jangan menulis total atau rekening di pesan. ' +
         'Isi field order (rincian per item dengan nama persis KATALOG + harga, subtotal, layanan ongkir pilihan pelanggan) supaya sistem mengirim total + rekening otomatis setelah pesanmu. ' +
         (rateText
-          ? 'Kalau pelanggan belum memilih layanan dari bagian ONGKIR, tanyakan (satu pertanyaan) dan kosongkan layanan. Kalau sudah jelas: balas "siap bos, ini totalnya ya". tahap = tunggu_cs.'
+          ? 'Kalau bagian ONGKIR punya lebih dari satu layanan dan pelanggan belum memilih, tanyakan (satu pertanyaan) dan kosongkan layanan; bila hanya satu layanan, langsung pakai itu. Kalau sudah jelas: balas "siap bos, ini totalnya ya". tahap = tunggu_cs.'
           : 'Ongkir belum bisa dihitung: balas singkat bahwa totalnya dikabari sebentar lagi; kosongkan layanan. tahap = tunggu_cs.')
       onTrace?.({
         key: 'beta3-order',

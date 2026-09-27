@@ -387,15 +387,26 @@ const isCargo = (service: string) => /JTR/i.test(service)
 export const CARGO_MIN_KG = 8
 
 /** Blok ongkir rapi, satu layanan per baris; dipakai AI dan dipasang ulang oleh kode. */
-export function shippingBlock(rates: ShippingRates, weightKg = 1) {
-  const prices = (rates.prices || []).filter(
+/** Layanan yang boleh ditawarkan: JTR (kargo) hanya untuk pesanan ≥ 8 kg. */
+export function offeredServices(rates: ShippingRates, weightKg = 1) {
+  return (rates.prices || []).filter(
     (row) => row.price > 0 && (weightKg >= CARGO_MIN_KG || !isCargo(row.service))
   )
+}
+
+export function shippingBlock(rates: ShippingRates, weightKg = 1) {
+  const prices = offeredServices(rates, weightKg)
   if (!prices.length) return ''
   const where = [rates.destination?.district, rates.destination?.city]
     .filter(Boolean)
     .map((part) => String(part).toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()))
     .join(', ')
+  // Satu layanan saja: bukan pilihan, sebut langsung.
+  if (prices.length === 1) {
+    const only = prices[0]
+    const etd = only.etd ? `, estimasi ${only.etd.replace(/days?/i, 'hari').trim()}` : ''
+    return `Untuk pengiriman ke ${where || 'tujuan'} ongkirnya ${only.price.toLocaleString('id-ID')}${etd}`
+  }
   const lines = prices.map(
     (row) =>
       `${serviceLabel(row.service.replace(/\d+$/, ''))} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${row.etd.replace(/days?/i, 'hari').trim()})` : ''}`
@@ -413,6 +424,11 @@ export function renderShippingRates(rates: ShippingRates, grams = DEFAULT_ITEM_G
   const kg = grams / 1000
   const cargo = prices.find((row) => isCargo(row.service))
   const rule = `Pengiriman hanya via JNE (REG/YES; ekspedisi lain tidak tersedia). JTR adalah kargo JNE minimal ${CARGO_MIN_KG} kg${cargo ? (kg >= CARGO_MIN_KG ? ' — pesanan ini ≥8 kg, JTR boleh ditawarkan' : ' — pesanan ini di bawah 8 kg, JANGAN tawarkan JTR') : ''}.`
+  const offered = offeredServices(rates, kg)
+  if (offered.length === 1) {
+    const only = offered[0]
+    return `${rule}\nONGKIR ke ${where || 'tujuan'} (berat pesanan ${gramsToKgText(grams)}): hanya satu layanan, ${serviceLabel(only.service.replace(/\d+$/, ''))} ${only.price.toLocaleString('id-ID')}. Ini BUKAN pilihan: sebut langsung dengan kalimat di blok ini, JANGAN tanya mau pakai layanan yang mana. Layanan untuk field order otomatis = ${only.service.replace(/\d+$/, '')}; total = harga barang + ongkir ini.\n<<<ONGKIR\n${shippingBlock(rates, kg)}\nONGKIR>>>`
+  }
   return `${rule}\nONGKIR ke ${where || 'tujuan'} (berat pesanan ${gramsToKgText(grams)}): ${prices.map((row) => `${row.service.replace(/\d+$/, '')} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${row.etd.replace('day', 'hari')})` : ''}`).join(', ')}. Kode layanan untuk field order: ${codes}. Tanyakan mau pakai yang mana; total = harga barang + ongkir yang dipilih.\nTulis ongkir ke pelanggan PERSIS dengan blok ini (satu layanan per baris, nama REG/YES/JTR, bukan kode CTC), lalu tanya mau pakai yang mana:\n<<<ONGKIR\n${shippingBlock(rates, kg)}\nONGKIR>>>`
 }
 
