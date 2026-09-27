@@ -1392,4 +1392,9 @@ window.waLocales.en = {
   "Tempel kodenya dulu.": "Paste the code first.",
   "Nanti saja": "Later",
   "Isi API key.": "Enter the API key.",
+  "Tampilan & bahasa": "Appearance & language",
+  "Nomor WhatsApp": "WhatsApp numbers",
+  "Akun & model": "Accounts & models",
+  "Toko & pesanan": "Store & orders",
+  "Data & keamanan": "Data & security",
 }

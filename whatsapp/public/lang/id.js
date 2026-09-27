@@ -1208,4 +1208,8 @@ window.waLocales.id = {
   "Tempel kodenya dulu.": "Tempel kodenya dulu.",
   "Nanti saja": "Nanti saja",
   "Isi API key.": "Isi API key.",
+  "Tampilan & bahasa": "Tampilan & bahasa",
+  "Akun & model": "Akun & model",
+  "Toko & pesanan": "Toko & pesanan",
+  "Data & keamanan": "Data & keamanan",
 }
