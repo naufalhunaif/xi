@@ -82,7 +82,9 @@ export const LEAN_TABLE_STATEMENTS = [
     ADD COLUMN IF NOT EXISTS shipping_options TEXT NULL AFTER shipping_cost,
     ADD COLUMN IF NOT EXISTS auto_total_reason VARCHAR(190) NULL AFTER shipping_options,
     ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'form' AFTER auto_total_reason,
-    ADD COLUMN IF NOT EXISTS paid_amount INT UNSIGNED NULL AFTER total`,
+    ADD COLUMN IF NOT EXISTS paid_amount INT UNSIGNED NULL AFTER total,
+    ADD COLUMN IF NOT EXISTS reported_amount INT UNSIGNED NULL AFTER paid_amount,
+    ADD COLUMN IF NOT EXISTS ready_at DATETIME NULL AFTER group_error`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_chats (
     jid VARCHAR(190) NOT NULL PRIMARY KEY,
     note TEXT NOT NULL,
@@ -102,7 +104,8 @@ export const LEAN_TABLE_STATEMENTS = [
     KEY whatsapp_beta3_proofs_jid (jid)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `ALTER TABLE whatsapp_beta3_proofs
-    ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'bukti' AFTER jid`,
+    ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'bukti' AFTER jid,
+    ADD COLUMN IF NOT EXISTS note VARCHAR(200) NOT NULL DEFAULT '' AFTER kind`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_refs (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     jid VARCHAR(190) NOT NULL,

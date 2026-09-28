@@ -2731,7 +2731,7 @@ export default class WhatsappListen extends BaseCommand {
       if (!aborted && reply.autoTotal && !decision.serah_cs) {
         // Total + rekening dikirim sistem (bukan AI) setelah rincian lolos verifikasi katalog.
         try {
-          const sent = await beta3.sendLeanTotal(reply.autoTotal)
+          const sent = await beta3.sendLeanTotal(reply.autoTotal, 'ai')
           decision.tahap = 'tunggu_bayar'
           decision.catatan = `${decision.catatan.replace(/tahap\s*[:=]\s*\w+/i, 'tahap: tunggu_bayar')}\ntotal ${sent.orderNumber}: ${sent.total} dikirim otomatis (${reply.autoTotal.shippingService})`
           trace?.emit({

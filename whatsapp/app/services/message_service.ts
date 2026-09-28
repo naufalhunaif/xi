@@ -61,6 +61,9 @@ export async function queueOutgoingMessage(input: {
   replyToId?: number
   replyToMessageId?: string
   media?: CsMedia
+  /** 'ai' = template yang dikirim AI/sistem otomatis; 'system' = template tombol CS tanpa
+   *  memindah chat ke mode CS; bawaan 'cs' = pesan CS manual (chat pindah ke mode CS). */
+  sender?: 'cs' | 'ai' | 'system'
 }) {
   if (!isDirectContactJid(input.jid)) throw new Error('Kontak tidak valid.')
   if ((!input.body && !input.media) || input.body.length > (input.media ? 1024 : 4096))
@@ -86,7 +89,7 @@ export async function queueOutgoingMessage(input: {
     jid: input.jid,
     contact_name: null,
     direction: 'out',
-    sender_type: 'cs',
+    sender_type: input.sender === 'ai' ? 'ai' : 'cs',
     body: input.body,
     ...(input.media
       ? {
@@ -103,5 +106,5 @@ export async function queueOutgoingMessage(input: {
     status: 'queued',
     created_at: new Date(),
   })
-  await setHandlingMode(input.jid, 'cs')
+  if (!input.sender || input.sender === 'cs') await setHandlingMode(input.jid, 'cs')
 }

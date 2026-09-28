@@ -502,6 +502,36 @@ export async function markLeanOrderPaid(
   return { ...order, group_jid: groupJid }
 }
 
+/** Pelunasan sisa (order DP): tambah nominal dibayar; lunas bila ≥ total. */
+export async function settleLeanOrder(id: number, amount: number) {
+  await ensureLeanTables()
+  const order = await readLeanOrder(id)
+  if (!order || order.status !== 'paid') throw new Error('Order belum dibayar.')
+  const total = Number(order.total || 0)
+  const paid = Math.round(Number(order.paid_amount || 0) + Math.max(0, amount))
+  const done = !total || paid >= total
+  await db
+    .from('whatsapp_beta3_orders')
+    .where('id', id)
+    .update({
+      paid_amount: total ? Math.min(paid, total) : paid,
+      cs_note: done ? 'Lunas' : `DP ${rupiah(paid)}, sisa ${rupiah(total - paid)}`,
+      updated_at: new Date(),
+    })
+  return { ...order, paid_amount: paid, lunas: done, sisa: Math.max(0, total - paid) }
+}
+
+/** Pesanan selesai diproduksi: catat waktu, kembalikan sisa bayar untuk pesan ke pelanggan. */
+export async function markLeanOrderReady(id: number) {
+  await ensureLeanTables()
+  const order = await readLeanOrder(id)
+  if (!order || order.status !== 'paid') throw new Error('Order belum dibayar.')
+  await db.from('whatsapp_beta3_orders').where('id', id).update({ ready_at: new Date(), updated_at: new Date() })
+  const total = Number(order.total || 0)
+  const paid = Number(order.paid_amount || total)
+  return { ...order, sisa: Math.max(0, total - paid) }
+}
+
 /**
  * Total atau pembayaran yang ditangani CS langsung di chat (bukan lewat tombol) ikut
  * tercatat: AI membaca maksud chat tiap giliran lalu mengisi field `pembayaran`.
@@ -538,6 +568,9 @@ export async function syncOrderFromChat(
       })
     status = 'awaiting_payment'
   }
+  // Nominal transfer yang dibaca AI (dari bukti/chat) → isian awal tombol konfirmasi dana.
+  if (status === 'awaiting_payment' && info.dibayar > 0 && Number(order.reported_amount || 0) !== info.dibayar)
+    await db.from('whatsapp_beta3_orders').where('id', order.id).update({ reported_amount: info.dibayar })
   if (status === 'awaiting_payment' && info.dikonfirmasi && info.dibayar > 0) {
     const total = Number(order.total || info.total || 0)
     const note = total && info.dibayar < total ? `DP ${rupiah(info.dibayar)}, sisa ${rupiah(total - info.dibayar)}` : undefined
@@ -816,7 +849,10 @@ export async function verifyAutoTotal(
 }
 
 /** Setujui order lalu kirim pesan total + rekening — dipakai tombol CS dan total otomatis. */
-export async function sendLeanTotal(input: VerifiedAutoTotal & { csNote?: string }) {
+export async function sendLeanTotal(
+  input: VerifiedAutoTotal & { csNote?: string },
+  sender: 'ai' | 'system' = 'system'
+) {
   const order = await approveLeanOrder({
     id: input.orderId,
     shippingService: input.shippingService,
@@ -826,6 +862,7 @@ export async function sendLeanTotal(input: VerifiedAutoTotal & { csNote?: string
   })
   await queueOutgoingMessage({
     jid: String(order.jid),
+    sender,
     body: renderTotalMessage({
       items: input.items,
       subtotal: input.subtotal,
@@ -843,7 +880,7 @@ export async function sendLeanTotal(input: VerifiedAutoTotal & { csNote?: string
       holder: method.accountName,
     }))
   )
-  if (payment) await queueOutgoingMessage({ jid: String(order.jid), body: payment })
+  if (payment) await queueOutgoingMessage({ jid: String(order.jid), body: payment, sender })
   return { orderNumber: String(order.order_number || `#${order.id}`), total: Number(order.total) }
 }
 

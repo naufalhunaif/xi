@@ -75,11 +75,12 @@ export async function recordImageKinds(
   }
 }
 
-async function saveImageKind(jid: string, id: string, kind: string) {
+async function saveImageKind(jid: string, id: string, kind: string, note = '') {
   await db.rawQuery(
-    `INSERT INTO whatsapp_beta3_proofs (message_id, jid, kind, created_at) VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE kind = IF(kind = 'bukti', kind, VALUES(kind))`,
-    [id, jid, kind, new Date()]
+    `INSERT INTO whatsapp_beta3_proofs (message_id, jid, kind, note, created_at) VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE kind = IF(kind = 'bukti', kind, VALUES(kind)),
+       note = IF(VALUES(note) <> '', VALUES(note), note)`,
+    [id, jid, kind, note.slice(0, 200), new Date()]
   )
 }
 
@@ -92,15 +93,21 @@ const IMAGE_KIND_SCHEMA = {
         'Satu jenis per gambar, urut sesuai lampiran. model = foto/screenshot pakaian sebagai contoh model; ukuran = tabel ukuran/size chart/catatan ukuran; bukti = bukti transfer/pembayaran; lain = selain itu.',
       items: { type: 'string', enum: ['model', 'ukuran', 'bukti', 'lain'] },
     },
+    keterangan: {
+      type: 'array',
+      description:
+        'Satu keterangan per gambar (maks 15 kata), urut sesuai lampiran: tulisan penting di gambar (nama produk, warna, harga) lalu ciri pakaian (warna, kerah, kancing); bukti transfer = nominal dan tujuan; tabel ukuran = "size chart" + label kolomnya.',
+      items: { type: 'string' },
+    },
   },
-  required: ['jenis'],
+  required: ['jenis', 'keterangan'],
   additionalProperties: false,
 }
 
 const classifying = new Set<string>()
-/** AI melihat gambar yang belum jelas jenisnya (maks 4 per panggilan); hasil disimpan. */
+/** AI melihat gambar yang belum jelas jenisnya (maks 4 per panggilan); jenis + keterangan disimpan. */
 export async function classifyImages(jid: string, rows: Array<{ message_id: string; media_url: string }>) {
-  const todo = rows.filter((row) => !classifying.has(row.message_id)).slice(0, 4)
+  const todo = rows.filter((row) => row.media_url && !classifying.has(row.message_id)).slice(0, 4)
   if (!todo.length) return new Map<string, string>()
   todo.forEach((row) => classifying.add(row.message_id))
   try {
@@ -113,25 +120,78 @@ export async function classifyImages(jid: string, rows: Array<{ message_id: stri
     const result = await runLeanProvider(
       { ...raw, aiProvider: raw.aiProvider === 'claude' ? 'claude' : 'chatgpt' } as any,
       {
-        system: 'Kamu memilah gambar yang dikirim pelanggan toko jas untuk tim produksi. Jawab hanya JSON sesuai schema.',
-        user: `Ada ${todo.length} gambar terlampir. Tentukan jenis tiap gambar sesuai urutan.`,
+        system:
+          'Kamu memilah gambar yang dikirim pelanggan toko jas untuk tim produksi. Baca tulisan di gambar dengan teliti (nama produk bisa tertulis di gambar). Jawab hanya JSON sesuai schema.',
+        user: `Ada ${todo.length} gambar terlampir. Tentukan jenis dan keterangan tiap gambar sesuai urutan.`,
       },
       paths,
       'beta3-image',
       IMAGE_KIND_SCHEMA
     )
-    const parsed = JSON.parse(result.text) as { jenis?: string[] }
+    const parsed = JSON.parse(result.text) as { jenis?: string[]; keterangan?: string[] }
     const kinds = new Map<string, string>()
     for (const [index, row] of todo.entries()) {
       const kind = String(parsed.jenis?.[index] || '')
       if (!['model', 'ukuran', 'bukti', 'lain'].includes(kind)) continue
       kinds.set(row.message_id, kind)
-      await saveImageKind(jid, row.message_id, kind)
+      const note = String(parsed.keterangan?.[index] || '').replace(/\s+/g, ' ').trim()
+      await saveImageKind(jid, row.message_id, kind, note)
     }
     return kinds
+  } catch (error) {
+    // Gagal dilihat (AI tidak tersedia): tandai "?" agar balasan berikutnya tidak menunggu lagi.
+    for (const row of todo)
+      await db
+        .rawQuery(
+          `INSERT INTO whatsapp_beta3_proofs (message_id, jid, kind, note, created_at) VALUES (?, ?, 'dilihat', '?', ?)
+           ON DUPLICATE KEY UPDATE note = IF(note = '', '?', note)`,
+          [row.message_id, jid, new Date()]
+        )
+        .catch(() => {})
+    throw error
   } finally {
     todo.forEach((row) => classifying.delete(row.message_id))
   }
+}
+
+/**
+ * Keterangan gambar pelanggan untuk riwayat AI ("[image: Peak Suit Black, harga 450.000]").
+ * Gambar yang belum punya keterangan dilihat AI (maks 4, terbaru), ditunggu sebentar saja;
+ * yang belum selesai tetap diproses di latar untuk giliran berikutnya.
+ */
+export async function imageNotes(
+  jid: string,
+  rows: Array<{ message_id: string; media_url?: string | null; media_type?: string | null; direction?: string }>,
+  skip: Set<string> = new Set(),
+  waitMs = 15_000
+) {
+  await ensureLeanTables()
+  const images = rows.filter((row) => row.direction === 'in' && row.media_type === 'image' && row.message_id)
+  if (!images.length) return new Map<string, string>()
+  const load = async () =>
+    new Map<string, { kind: string; note: string }>(
+      (
+        await db
+          .from('whatsapp_beta3_proofs')
+          .whereIn('message_id', images.map((row) => String(row.message_id)))
+          .select('message_id', 'kind', 'note')
+          .catch(() => [])
+      ).map((row: any) => [String(row.message_id), { kind: String(row.kind), note: String(row.note || '') }])
+    )
+  let known = await load()
+  const missing = images
+    .filter((row) => !skip.has(String(row.message_id)) && row.media_url && !known.get(String(row.message_id))?.note)
+    .slice(-4)
+    .map((row) => ({ message_id: String(row.message_id), media_url: String(row.media_url) }))
+  if (missing.length) {
+    const job = classifyImages(jid, missing).catch(() => null)
+    await Promise.race([job, new Promise((resolve) => setTimeout(resolve, waitMs))])
+    known = await load()
+  }
+  const label = { bukti: 'bukti transfer', ukuran: 'tabel ukuran' } as Record<string, string>
+  return new Map<string, string>(
+    [...known].map(([id, row]) => [id, [label[row.kind] || '', row.note === '?' ? '' : row.note].filter(Boolean).join(': ')])
+  )
 }
 
 /** message_id gambar masuk di chat ini yang merupakan bukti transfer. */

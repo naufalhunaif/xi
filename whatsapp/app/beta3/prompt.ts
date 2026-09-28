@@ -196,6 +196,7 @@ export type LeanHistoryRow = {
   senderType?: string | null
   body?: string | null
   mediaType?: string | null
+  mediaNote?: string
   createdAt: Date | string
   current?: boolean
   /** Isi pesan yang dikutip/dibalas (mis. foto katalog "Tuxedo - Black"). */
@@ -220,7 +221,7 @@ export function renderHistory(rows: LeanHistoryRow[]) {
         : row.senderType === 'cs' || row.senderType === 'owner'
           ? 'CS (manusia)'
           : 'AI'
-    const media = row.mediaType ? `[${row.mediaType}] ` : ''
+    const media = row.mediaType ? `[${row.mediaType}${row.mediaNote ? `: ${row.mediaNote}` : ''}] ` : ''
     const body = (row.body || '')
       .trim()
       .replace(/\s*\n\s*/g, ' / ')

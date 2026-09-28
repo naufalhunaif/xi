@@ -1,6 +1,6 @@
 // Beta 3 — salinan terisolasi dari LeanController; hanya menyentuh #beta3/*.
 import type { HttpContext } from '@adonisjs/core/http'
-import { catalogDigest, importLeanCatalog } from '#beta3/catalog_service'
+import { catalogDigest, importLeanCatalog, rupiah } from '#beta3/catalog_service'
 import {
   addLeanExample,
   listLeanExamples,
@@ -15,6 +15,8 @@ import {
   countLeanOrders,
   latestLeanOrder,
   markLeanOrderPaid,
+  markLeanOrderReady,
+  settleLeanOrder,
   requeueLeanOrderGroup,
   updatePendingOrderSpec,
   renderGroupOrderMessage,
@@ -224,18 +226,65 @@ export default class Beta3Controller {
     }
   }
 
+  /** Dana masuk: nominal diisi CS (awal = nominal dari bukti transfer). Kurang dari total = DP. */
   async paidOrder({ params, request, response }: HttpContext) {
     const body = request.body() as Record<string, unknown>
     try {
+      const current = await readLeanOrder(Number(params.id))
+      const total = Number(current?.total || 0)
+      const amount = Math.round(Number(String(body.amount ?? '').replace(/\D/g, '')) || 0) || total
+      const dp = total > 0 && amount > 0 && amount < total
       const order = await markLeanOrderPaid(
         Number(params.id),
-        body.csNote ? String(body.csNote) : undefined,
-        undefined,
+        dp ? `DP ${rupiah(amount)}, sisa ${rupiah(total - amount)}` : body.csNote ? String(body.csNote) : undefined,
+        amount || undefined,
         body.groupJid ? String(body.groupJid) : null
       )
       if (body.notify !== false)
-        await queueOutgoingMessage({ jid: String(order.jid), body: 'Terimakasih bos, prosess ya' })
-      return response.json({ ok: true, groupQueued: Boolean(order.group_jid) })
+        await queueOutgoingMessage({
+          jid: String(order.jid),
+          sender: 'system',
+          body: dp
+            ? `Terimakasih bos, DP ${rupiah(amount)} sudah kami terima, pesanan langsung kami proses ya. Sisa ${rupiah(total - amount)} dilunasi saat pesanan siap kirim.`
+            : 'Terimakasih bos, pembayaran sudah kami terima, prosess ya',
+        })
+      return response.json({ ok: true, dp, groupQueued: Boolean(order.group_jid) })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
+  }
+
+  /** Pelunasan sisa pembayaran order DP. */
+  async settleOrder({ params, request, response }: HttpContext) {
+    try {
+      const amount = Math.round(Number(String(request.input('amount', '')).replace(/\D/g, '')) || 0)
+      if (amount <= 0) return response.badRequest({ error: 'Isi nominal pelunasan.' })
+      const order = await settleLeanOrder(Number(params.id), amount)
+      await queueOutgoingMessage({
+        jid: String(order.jid),
+        sender: 'system',
+        body: order.lunas
+          ? 'Terimakasih bos, pelunasan sudah kami terima. Pesanan kami kirim secepatnya ya, nomor resi kami kabari setelah dikirim.'
+          : `Terimakasih bos, ${rupiah(amount)} sudah kami terima. Sisa ${rupiah(order.sisa)} ya bos.`,
+      })
+      return response.json({ ok: true, lunas: order.lunas })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
+  }
+
+  /** Pesanan selesai diproduksi: kabari pelanggan (minta pelunasan bila masih DP). */
+  async readyOrder({ params, response }: HttpContext) {
+    try {
+      const order = await markLeanOrderReady(Number(params.id))
+      await queueOutgoingMessage({
+        jid: String(order.jid),
+        sender: 'system',
+        body: order.sisa > 0
+          ? `Pesanannya sudah selesai bos. Sisa pembayaran ${rupiah(order.sisa)}, silakan dilunasi ke rekening yang sama ya, agar pesanan bisa kami kirim hari ini.`
+          : 'Pesanannya sudah selesai bos, hari ini kami kirim ya. Nomor resi kami kabari setelah dikirim.',
+      })
+      return response.json({ ok: true, sisa: order.sisa })
     } catch (error) {
       return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
     }

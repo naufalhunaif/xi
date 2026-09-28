@@ -503,3 +503,9 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
   .workspace-ui .wa-settings-menu .wa-settings-group { display: none; }
 }
 .workspace-ui .wa-settings-menu a.wa-danger-link { color: var(--wa-err); }
+/* Order Beta 3: dana masuk (DP/Lunas), pelunasan, pesanan selesai. */
+.workspace-ui .wa-b3-pay { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.workspace-ui .wa-b3-pay input { flex: 1 1 140px; min-width: 0; }
+.workspace-ui .wa-b3-pay .wa-pill:empty { display: none; }
+.workspace-ui .wa-b3-after { display: grid; justify-items: start; gap: 8px; margin-top: 4px; }
+.workspace-ui .wa-b3-after .wa-b3-pay { justify-self: stretch; }

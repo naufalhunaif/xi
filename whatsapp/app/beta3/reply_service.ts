@@ -53,7 +53,7 @@ import {
 import { DEFAULT_ITEM_GRAMS, orderWeightGrams } from '#beta3/weights'
 import { detectAwb } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
-import { recordImageKinds, saveAiRefs } from '#beta3/refs_service'
+import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
@@ -107,7 +107,7 @@ function stageFromNote(note: string) {
 async function history(jid: string, currentIds: Set<string>): Promise<LeanHistoryRow[]> {
   const rows = await db
     .from('whatsapp_messages')
-    .select('message_id', 'direction', 'sender_type', 'body', 'media_type', 'created_at', 'reply_to_message_id')
+    .select('message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at', 'reply_to_message_id')
     .where('jid', jid)
     .whereNotIn('status', ['failed', 'queued'])
     .orderBy('created_at', 'desc')
@@ -126,12 +126,16 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
       quoted.set(String(item.message_id), text || (item.media_type ? `[${item.media_type}]` : ''))
     }
   }
+  // Gambar lama yang tidak dilihat AI (mis. dikirim saat CS membalas) diberi keterangan
+  // singkat, supaya "yang hitam itu" merujuk produk di gambar, bukan tebakan.
+  const notes = await imageNotes(jid, rows as any[], currentIds).catch(() => new Map<string, string>())
   return rows.reverse().map((row) => ({
     replyTo: row.reply_to_message_id ? quoted.get(String(row.reply_to_message_id)) || null : null,
     direction: row.direction === 'in' ? 'in' : 'out',
     senderType: row.sender_type,
     body: row.body,
     mediaType: row.media_type,
+    mediaNote: notes.get(String(row.message_id)) || '',
     createdAt: row.created_at,
     current: currentIds.has(String(row.message_id)),
   }))
