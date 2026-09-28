@@ -524,3 +524,13 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-b3-amount:hover { background: var(--wa-subtle); }
 .workspace-ui .wa-b3-amount-input { width: 120px; height: 28px; padding: 0 6px; font: inherit; font-weight: 600; }
 .workspace-ui .wa-b3-paid .wa-pill:empty { display: none; }
+/* Baris Dana masuk / Dibayar di rincian biaya: readonly, klik untuk mengubah. */
+.workspace-ui .wa-b3-dp-row dd { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.workspace-ui input.wa-b3-dp {
+  width: 110px; height: 26px; padding: 0 6px; box-sizing: border-box; text-align: right;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--wa-surface); color: var(--text); font: inherit;
+}
+.workspace-ui input.wa-b3-dp[readonly] { border-color: transparent; background: transparent; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.workspace-ui .wa-b3-dp-row .wa-pill:empty { display: none; }
+.workspace-ui .wa-cart-summary input.wa-b3-dp { width: 110px !important; min-height: 0 !important; height: 26px !important; padding: 0 6px !important; font-size: inherit !important; }
+.workspace-ui .wa-cart-summary input.wa-b3-dp[readonly] { border-color: transparent !important; background: transparent !important; box-shadow: none !important; }

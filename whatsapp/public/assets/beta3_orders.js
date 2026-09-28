@@ -321,6 +321,14 @@
     } else delivery.append(el('p', t('Alamat belum ada.'), 'wa-note'))
     box.append(delivery)
 
+    const pay = window.waBeta3Pay?.create(order, {
+      post: (path, body) => api(path, 'POST', body),
+      notice,
+      reload: load,
+      groupJid: ['awaiting_payment', 'paid'].includes(order.status) ? () => pickerValue() : undefined,
+      confirmGroup: () => confirm(t('Kirim pesanan ini ke {0}?', groupName(pickerValue()) || t('grup produksi bawaan'))),
+    })
+    let pickerValue = () => ''
     if (order.total) {
       const costs = section(t('Rincian biaya'))
       const summary = el('dl', undefined, 'wa-cart-summary')
@@ -334,12 +342,14 @@
         row.append(el('dt', label), el('dd', money(amount)))
         summary.append(row)
       }
+      if (pay) summary.append(pay.row)
       costs.append(summary)
       box.append(costs)
     }
     const actions = el('div', undefined, 'actions wa-b3-actions')
     const picker = ['awaiting_payment', 'paid'].includes(order.status) ? groupPicker(order) : null
     if (picker) box.append(picker.wrap)
+    if (picker) pickerValue = () => picker.value()
     const act = (label, path, done, primary = true) =>
       button(label, async () => {
         if (path.endsWith('/cancel') && !confirm(t('Batalkan order ini?'))) return
@@ -394,24 +404,10 @@
       box.append(form)
       actions.append(act(t('Batalkan'), `/api/beta3/orders/${order.id}/cancel`, t('Order dibatalkan.'), false))
     } else if (order.status === 'awaiting_payment') {
-      const pay = window.waBeta3Pay?.render(order, {
-        post: (path, body) => api(path, 'POST', body),
-        notice,
-        reload: load,
-        groupJid: picker ? () => picker.value() : undefined,
-        confirmGroup: picker ? () => confirm(t('Kirim pesanan ini ke {0}?', groupName(picker.value()) || t('grup produksi bawaan'))) : undefined,
-      })
-      if (pay) box.append(pay)
+      if (pay) actions.append(...pay.buttons)
       actions.append(act(t('Batalkan'), `/api/beta3/orders/${order.id}/cancel`, t('Order dibatalkan.'), false))
     } else if (order.status === 'paid') {
-      const pay = window.waBeta3Pay?.render(order, {
-        post: (path, body) => api(path, 'POST', body),
-        notice,
-        reload: load,
-        groupJid: picker ? () => picker.value() : undefined,
-        confirmGroup: picker ? () => confirm(t('Kirim pesanan ini ke {0}?', groupName(picker.value()) || t('grup produksi bawaan'))) : undefined,
-      })
-      if (pay) box.append(pay)
+      if (pay) actions.append(...pay.buttons)
       actions.append(
         act(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), `/api/beta3/orders/${order.id}/resend-group`, t('Diantrekan ke grup produksi.'), order.group_status !== 'sent')
       )

@@ -109,6 +109,7 @@
       .join(' · ')
     const to = [order.customer_name, order.phone, order.address].filter(Boolean).join(' · ')
     if (to) box.append(el('p', `${t('Kirim ke')}: ${to}`, 'wa-muted wa-b3-to'))
+    const pay = window.waBeta3Pay?.create(order, { post: (path, body) => api(path, body), notice, reload: load })
     if (order.total) {
       const sum = el('dl', undefined, 'wa-cart-summary')
       for (const [label, amount, cls] of [
@@ -121,6 +122,7 @@
         row.append(el('dt', label), el('dd', money(amount)))
         sum.append(row)
       }
+      if (pay) sum.append(pay.row)
       box.append(sum)
     }
     const actions = el('div', undefined, 'actions')
@@ -168,11 +170,9 @@
         for (const proof of proofsCache) proofs.append(thumb(proof.media_url, t('Bukti transfer')))
         box.append(proofs)
       }
-      const pay = window.waBeta3Pay?.render(order, { post: (path, body) => api(path, body), notice, reload: load })
-      if (pay) box.append(pay)
+      if (pay) actions.append(...pay.buttons)
     } else if (order.status === 'paid') {
-      const pay = window.waBeta3Pay?.render(order, { post: (path, body) => api(path, body), notice, reload: load })
-      if (pay) box.append(pay)
+      if (pay) actions.append(...pay.buttons)
 
       actions.append(
         button(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), async () => {
