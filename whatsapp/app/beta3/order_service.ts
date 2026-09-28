@@ -566,7 +566,19 @@ export async function syncOrderFromChat(
     .whereIn('status', ['pending', 'awaiting_payment'])
     .orderBy('id', 'desc')
     .first()
-  if (!order) return null
+  if (!order) {
+    // Order DP: pelunasan yang sudah dikonfirmasi toko di chat ikut tercatat.
+    const dp = await db
+      .from('whatsapp_beta3_orders')
+      .where('jid', jid)
+      .where('status', 'paid')
+      .whereRaw('paid_amount < total')
+      .orderBy('id', 'desc')
+      .first()
+    if (dp && info.dikonfirmasi && info.dibayar > Number(dp.paid_amount || 0))
+      await setLeanPaidAmount(Number(dp.id), info.dibayar)
+    return null
+  }
   let status = String(order.status)
   if (status === 'pending' && info.total > 0) {
     const shipping = info.ongkir > 0 && info.ongkir < info.total ? info.ongkir : null

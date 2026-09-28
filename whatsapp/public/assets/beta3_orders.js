@@ -334,13 +334,6 @@
         row.append(el('dt', label), el('dd', money(amount)))
         summary.append(row)
       }
-      if (dp) {
-        for (const [label, amount] of [[t('Dibayar (DP)'), order.paid_amount], [t('Sisa'), Number(order.total) - Number(order.paid_amount)]]) {
-          const row = el('div')
-          row.append(el('dt', label), el('dd', money(amount)))
-          summary.append(row)
-        }
-      }
       costs.append(summary)
       box.append(costs)
     }

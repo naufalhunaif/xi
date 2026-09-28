@@ -104,7 +104,7 @@ export const LEAN_OUTPUT_SCHEMA = {
             dibayar: {
               type: 'integer',
               description:
-                'Nominal yang sudah ditransfer pelanggan (DP atau lunas), 0 bila belum/tidak jelas.',
+                'Total nominal yang sudah ditransfer pelanggan sejauh ini (DP + pelunasan dijumlah), 0 bila belum/tidak jelas.',
             },
             dikonfirmasi: {
               type: 'boolean',
