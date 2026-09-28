@@ -429,3 +429,53 @@ export async function customerImagesForOrder(
     caption: 'Model seperti ini',
   }))
 }
+
+
+/** Nominal di keterangan bukti transfer ("transfer Rp250.000 ke …") — angka ribuan terbesar. */
+export function proofAmount(note: string) {
+  const values = (String(note || '').match(/\d{1,3}(?:[.,]\d{3})+/g) || []).map((part) => Number(part.replace(/[.,]/g, '')))
+  return values.length ? Math.max(...values) : 0
+}
+
+/**
+ * Jumlah nominal bukti transfer pelanggan sejak `since` (dibaca AI dari gambarnya).
+ * Gambar bukti yang belum punya keterangan dilihat dulu (maks 4). 0 = tidak terbaca.
+ */
+export async function proofTotalSince(jid: string, since: Date) {
+  await ensureLeanTables()
+  const images = await db
+    .from('whatsapp_messages')
+    .where('jid', jid)
+    .where('direction', 'in')
+    .where('media_type', 'image')
+    .whereNotNull('media_url')
+    .where('created_at', '>=', since)
+    .orderBy('id', 'asc')
+    .limit(12)
+    .select('message_id', 'media_url')
+  if (!images.length) return 0
+  const ids = images.map((row: any) => String(row.message_id))
+  const known = async () =>
+    new Map<string, { kind: string; note: string }>(
+      (await db.from('whatsapp_beta3_proofs').whereIn('message_id', ids).select('message_id', 'kind', 'note')).map(
+        (row: any) => [String(row.message_id), { kind: String(row.kind), note: String(row.note || '') }]
+      )
+    )
+  let rows = await known()
+  const proofs = await paymentProofIds(jid).catch(() => new Set<string>())
+  // Belum dinilai, atau bukti tanpa nominal: dilihat AI (jenis + keterangan).
+  const unclear = images.filter((row: any) => {
+    const item = rows.get(String(row.message_id))
+    return !item || item.kind === 'dilihat' || (item.kind === 'bukti' && !proofAmount(item.note)) || (!item && proofs.has(String(row.message_id)))
+  })
+  if (unclear.length) {
+    await classifyImages(jid, unclear.slice(0, 4).map((row: any) => ({ message_id: String(row.message_id), media_url: String(row.media_url) }))).catch(() => null)
+    rows = await known()
+  }
+  let total = 0
+  for (const id of ids) {
+    const item = rows.get(id)
+    if (item?.kind === 'bukti') total += proofAmount(item.note)
+  }
+  return total
+}

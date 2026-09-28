@@ -10,7 +10,7 @@ import {
   writeOrderSpec,
 } from '#beta3/customer_service'
 import { rupiah } from '#beta3/catalog_service'
-import { attachRefsToOrder } from '#beta3/refs_service'
+import { attachRefsToOrder, proofTotalSince } from '#beta3/refs_service'
 
 /**
  * Jalur 2 (event): form order dari pelanggan dibaca KODE, disimpan sebagai order
@@ -489,6 +489,7 @@ export async function markLeanOrderPaid(
     .where('id', id)
     .update({
       status: 'paid',
+      paid_checked_at: paidAmount && paidAmount > 0 ? new Date() : null,
       paid_amount: paidAmount && paidAmount > 0 ? Math.round(paidAmount) : order.total || null,
       cs_note: csNote || order.cs_note,
       order_number: order.order_number || (await nextOrderNumber()),
@@ -533,9 +534,47 @@ export async function setLeanPaidAmount(id: number, amount: number) {
     .where('id', id)
     .update({
       paid_amount: paid,
+      paid_checked_at: new Date(),
       cs_note: total && paid < total ? `DP ${rupiah(paid)}, sisa ${rupiah(total - paid)}` : 'Lunas',
       updated_at: new Date(),
     })
+}
+
+let rechecking = false
+/**
+ * Order lunas lama (dikonfirmasi sebelum ada deteksi DP): baca nominal bukti transfer di chat.
+ * Bila jumlahnya kurang dari total → tercatat DP. Sekali per order, bertahap (maks 3 per panggilan).
+ */
+export async function recheckPaidOrders(limit = 3) {
+  if (rechecking) return
+  rechecking = true
+  try {
+    await ensureLeanTables()
+    const orders = await db
+      .from('whatsapp_beta3_orders')
+      .where('status', 'paid')
+      .whereNull('paid_checked_at')
+      .where('created_at', '>=', new Date(Date.now() - 30 * 86_400_000))
+      .whereRaw('COALESCE(paid_amount, total) >= total')
+      .whereNotNull('total')
+      .orderBy('id', 'desc')
+      .limit(limit)
+    for (const order of orders as any[]) {
+      const paid = await proofTotalSince(String(order.jid), new Date(order.created_at)).catch(() => 0)
+      const total = Number(order.total || 0)
+      await db
+        .from('whatsapp_beta3_orders')
+        .where('id', order.id)
+        .update({
+          paid_checked_at: new Date(),
+          ...(paid > 0 && paid < total
+            ? { paid_amount: paid, cs_note: `DP ${rupiah(paid)}, sisa ${rupiah(total - paid)}` }
+            : {}),
+        })
+    }
+  } finally {
+    rechecking = false
+  }
 }
 
 /** Pesanan selesai diproduksi: catat waktu, kembalikan sisa bayar untuk pesan ke pelanggan. */

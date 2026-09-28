@@ -17,6 +17,7 @@ import {
   markLeanOrderPaid,
   markLeanOrderReady,
   settleLeanOrder,
+  recheckPaidOrders,
   setLeanPaidAmount,
   requeueLeanOrderGroup,
   updatePendingOrderSpec,
@@ -157,6 +158,8 @@ export default class Beta3Controller {
   }
 
   async orders({ request, response }: HttpContext) {
+    // Order lunas lama: cek nominal bukti transfer di latar (DP terdeteksi pada muat berikutnya).
+    void recheckPaidOrders().catch(() => {})
     const status = String(request.qs().status || '')
     const q = String(request.qs().q || '')
     response.header('cache-control', 'no-store')
@@ -319,6 +322,7 @@ export default class Beta3Controller {
 
   /** Panel ruang chat (pengganti cart): detail pesanan, order terakhir, catatan pelanggan. */
   async room({ request, response }: HttpContext) {
+    void recheckPaidOrders().catch(() => {})
     const jid = String(request.qs().jid || '')
     if (!jid) return response.badRequest({ error: 'jid wajib.' })
     const [spec, order, contact, chatNote] = await Promise.all([
