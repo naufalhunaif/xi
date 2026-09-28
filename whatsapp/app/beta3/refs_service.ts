@@ -96,7 +96,7 @@ const IMAGE_KIND_SCHEMA = {
     keterangan: {
       type: 'array',
       description:
-        'Satu keterangan per gambar (maks 15 kata), urut sesuai lampiran: tulisan penting di gambar (nama produk, warna, harga) lalu ciri pakaian (warna, kerah, kancing); bukti transfer = nominal dan tujuan; tabel ukuran = "size chart" + label kolomnya.',
+        'Satu keterangan per gambar (maks 15 kata), urut sesuai lampiran: nama produk yang tertulis di gambar lalu ciri pakaian (warna, kerah, kancing). JANGAN tulis harga dari gambar (bisa kedaluwarsa; harga selalu dari katalog). Bukti transfer = nominal dan tujuan; tabel ukuran = "size chart" + label kolomnya.',
       items: { type: 'string' },
     },
   },
@@ -134,7 +134,15 @@ export async function classifyImages(jid: string, rows: Array<{ message_id: stri
       const kind = String(parsed.jenis?.[index] || '')
       if (!['model', 'ukuran', 'bukti', 'lain'].includes(kind)) continue
       kinds.set(row.message_id, kind)
-      const note = String(parsed.keterangan?.[index] || '').replace(/\s+/g, ' ').trim()
+      // Harga di gambar (poster lama) tidak dipakai; bukti transfer tetap menyimpan nominal.
+      let note = String(parsed.keterangan?.[index] || '').replace(/\s+/g, ' ').trim()
+      if (kind !== 'bukti')
+        note = note
+          .replace(/\b(?:harga|idr|rp\.?)\s*:?\s*\d[\d.,]*(?:\s*(?:rb|ribu|k)\b)?/gi, '')
+          .replace(/\b\d{1,3}(?:[.,]\d{3})+\b/g, '')
+          .replace(/\s*,\s*(,|$)/g, '$1')
+          .replace(/\s+/g, ' ')
+          .trim()
       await saveImageKind(jid, row.message_id, kind, note)
     }
     return kinds

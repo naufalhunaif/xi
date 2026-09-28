@@ -244,9 +244,7 @@ export default class Beta3Controller {
         await queueOutgoingMessage({
           jid: String(order.jid),
           sender: 'system',
-          body: dp
-            ? `Terimakasih bos, DP ${rupiah(amount)} sudah kami terima, pesanan langsung kami proses ya. Sisa ${rupiah(total - amount)} dilunasi saat pesanan siap kirim.`
-            : 'Terimakasih bos, pembayaran sudah kami terima, prosess ya',
+          body: 'Terimakasih bos, prosess ya',
         })
       return response.json({ ok: true, dp, groupQueued: Boolean(order.group_jid) })
     } catch (error) {

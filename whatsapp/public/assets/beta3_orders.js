@@ -409,6 +409,16 @@
       amount.required = true
       amount.setAttribute('aria-label', t('Nominal dana masuk'))
       amount.value = String(Number(order.reported_amount || 0) || total || '')
+      // Nominal dari bukti transfer; diubah hanya bila perlu (klik Edit).
+      amount.readOnly = true
+      const edit = el('button', t('Edit'), 'button small')
+      edit.type = 'button'
+      edit.addEventListener('click', () => {
+        amount.readOnly = false
+        edit.hidden = true
+        amount.focus()
+        amount.select()
+      })
       const hint = el('small', '', '')
       const update = () => {
         const value = Number(amount.value.replace(/\D/g, '')) || 0
@@ -419,7 +429,7 @@
       update()
       const submit = el('button', t('Konfirmasi dana masuk'), 'button primary')
       submit.type = 'submit'
-      form.append(amount, hint, submit)
+      form.append(amount, edit, hint, submit)
       form.addEventListener('submit', async (event) => {
         event.preventDefault()
         const target = picker ? groupName(picker.value()) || t('grup produksi bawaan') : ''
@@ -451,10 +461,19 @@
         amount.inputMode = 'numeric'
         amount.required = true
         amount.value = String(sisa)
+        amount.readOnly = true
         amount.setAttribute('aria-label', t('Nominal pelunasan'))
+        const edit = el('button', t('Edit'), 'button small')
+        edit.type = 'button'
+        edit.addEventListener('click', () => {
+          amount.readOnly = false
+          edit.hidden = true
+          amount.focus()
+          amount.select()
+        })
         const submit = el('button', t('Pelunasan masuk'), 'button primary')
         submit.type = 'submit'
-        form.append(amount, submit)
+        form.append(amount, edit, submit)
         form.addEventListener('submit', async (event) => {
           event.preventDefault()
           submit.disabled = true
