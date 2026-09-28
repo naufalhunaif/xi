@@ -175,14 +175,12 @@
         for (const proof of proofsCache) proofs.append(thumb(proof.media_url, t('Bukti transfer')))
         box.append(proofs)
       }
-      actions.append(
-        button(t('Dana masuk · Lunas'), async () => {
-          const result = await api(`/api/beta3/orders/${order.id}/paid`, {})
-          notice(result.groupQueued ? t('Lunas. Pesanan dikirim ke grup produksi.') : t('Lunas. Grup produksi belum diatur.'))
-          await load()
-        }, true)
-      )
+      const pay = window.waBeta3Pay?.render(order, { post: (path, body) => api(path, body), notice, reload: load })
+      if (pay) box.append(pay)
     } else if (order.status === 'paid') {
+      const pay = window.waBeta3Pay?.render(order, { post: (path, body) => api(path, body), notice, reload: load })
+      if (pay) box.append(pay)
+
       actions.append(
         button(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), async () => {
           await api(`/api/beta3/orders/${order.id}/resend-group`, {})

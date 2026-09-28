@@ -401,112 +401,24 @@
       box.append(form)
       actions.append(act(t('Batalkan'), `/api/beta3/orders/${order.id}/cancel`, t('Order dibatalkan.'), false))
     } else if (order.status === 'awaiting_payment') {
-      // Dana masuk: nominal awal dari bukti transfer (dibaca AI); kurang dari total = DP.
-      const total = Number(order.total || 0)
-      const form = el('form', undefined, 'wa-cart-form wa-b3-pay')
-      const amount = el('input')
-      amount.inputMode = 'numeric'
-      amount.required = true
-      amount.setAttribute('aria-label', t('Nominal dana masuk'))
-      amount.value = String(Number(order.reported_amount || 0) || total || '')
-      // Nominal dari bukti transfer; diubah hanya bila perlu (klik Edit).
-      amount.readOnly = true
-      const edit = el('button', t('Edit'), 'button small')
-      edit.type = 'button'
-      edit.addEventListener('click', () => {
-        amount.readOnly = false
-        edit.hidden = true
-        amount.focus()
-        amount.select()
+      const pay = window.waBeta3Pay?.render(order, {
+        post: (path, body) => api(path, 'POST', body),
+        notice,
+        reload: load,
+        groupJid: picker ? () => picker.value() : undefined,
+        confirmGroup: picker ? () => confirm(t('Kirim pesanan ini ke {0}?', groupName(picker.value()) || t('grup produksi bawaan'))) : undefined,
       })
-      const hint = el('small', '', '')
-      const update = () => {
-        const value = Number(amount.value.replace(/\D/g, '')) || 0
-        hint.textContent = !total || !value ? '' : value < total ? `${t('DP')} · ${t('Sisa')} ${money(total - value)}` : t('Lunas')
-        hint.className = value && total && value < total ? 'wa-pill warn' : 'wa-pill ok'
-      }
-      amount.addEventListener('input', update)
-      update()
-      const submit = el('button', t('Konfirmasi dana masuk'), 'button primary')
-      submit.type = 'submit'
-      form.append(amount, edit, hint, submit)
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault()
-        const target = picker ? groupName(picker.value()) || t('grup produksi bawaan') : ''
-        if (picker && !confirm(t('Kirim pesanan ini ke {0}?', target))) return
-        submit.disabled = true
-        try {
-          const result = await api(`/api/beta3/orders/${order.id}/paid`, 'POST', {
-            amount: amount.value,
-            ...(picker ? { groupJid: picker.value() || null } : {}),
-          })
-          notice(result.dp ? t('DP tercatat. Pesanan dikirim ke grup produksi.') : t('Lunas. Pesanan dikirim ke grup produksi.'))
-          await load()
-        } catch (error) {
-          notice(error.message, true)
-        } finally {
-          submit.disabled = false
-        }
-      })
-      box.append(form)
+      if (pay) box.append(pay)
       actions.append(act(t('Batalkan'), `/api/beta3/orders/${order.id}/cancel`, t('Order dibatalkan.'), false))
     } else if (order.status === 'paid') {
-      // Setelah bayar: pelunasan (bila DP) dan kabar "pesanan selesai" ke pelanggan.
-      const total = Number(order.total || 0)
-      const sisa = Math.max(0, total - Number(order.paid_amount || total))
-      const after = el('div', undefined, 'wa-b3-after')
-      if (sisa > 0) {
-        const form = el('form', undefined, 'wa-cart-form wa-b3-pay')
-        const amount = el('input')
-        amount.inputMode = 'numeric'
-        amount.required = true
-        amount.value = String(sisa)
-        amount.readOnly = true
-        amount.setAttribute('aria-label', t('Nominal pelunasan'))
-        const edit = el('button', t('Edit'), 'button small')
-        edit.type = 'button'
-        edit.addEventListener('click', () => {
-          amount.readOnly = false
-          edit.hidden = true
-          amount.focus()
-          amount.select()
-        })
-        const submit = el('button', t('Pelunasan masuk'), 'button primary')
-        submit.type = 'submit'
-        form.append(amount, edit, submit)
-        form.addEventListener('submit', async (event) => {
-          event.preventDefault()
-          submit.disabled = true
-          try {
-            const result = await api(`/api/beta3/orders/${order.id}/settle`, 'POST', { amount: amount.value })
-            notice(result.lunas ? t('Lunas.') : t('Pembayaran tercatat.'))
-            await load()
-          } catch (error) {
-            notice(error.message, true)
-          } finally {
-            submit.disabled = false
-          }
-        })
-        after.append(form)
-      }
-      const ready = button(
-        sisa > 0 ? t('Pesanan selesai · minta pelunasan') : t('Pesanan selesai · kabari pelanggan'),
-        async () => {
-          if (!confirm(sisa > 0 ? t('Kabari pelanggan pesanan selesai dan minta pelunasan {0}?', money(sisa)) : t('Kabari pelanggan pesanan selesai?'))) return
-          try {
-            await api(`/api/beta3/orders/${order.id}/ready`, 'POST', {})
-            notice(t('Pelanggan sudah dikabari.'))
-            await load()
-          } catch (error) {
-            notice(error.message, true)
-          }
-        },
-        !order.ready_at
-      )
-      after.append(ready)
-      if (order.ready_at)
-        after.append(el('small', `${t('Sudah dikabari')} ${new Date(order.ready_at).toLocaleString(window.waI18n?.locale || 'id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`, 'wa-note'))
-      box.append(after)
+      const pay = window.waBeta3Pay?.render(order, {
+        post: (path, body) => api(path, 'POST', body),
+        notice,
+        reload: load,
+        groupJid: picker ? () => picker.value() : undefined,
+        confirmGroup: picker ? () => confirm(t('Kirim pesanan ini ke {0}?', groupName(picker.value()) || t('grup produksi bawaan'))) : undefined,
+      })
+      if (pay) box.append(pay)
       actions.append(
         act(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), `/api/beta3/orders/${order.id}/resend-group`, t('Diantrekan ke grup produksi.'), order.group_status !== 'sent')
       )

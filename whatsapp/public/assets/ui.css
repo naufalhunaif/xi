@@ -511,3 +511,6 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-b3-after .wa-b3-pay { justify-self: stretch; }
 .workspace-ui .wa-b3-pay input[readonly] { background: var(--wa-subtle); color: var(--text); }
 .workspace-ui .wa-b3-pay .button[hidden] { display: none; }
+.workspace-ui .wa-b3-paid { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.workspace-ui .wa-b3-pay[hidden], .workspace-ui .wa-b3-paid .button[hidden] { display: none; }
+.workspace-ui .wa-b3-pay input[readonly] { background: var(--wa-subtle); }

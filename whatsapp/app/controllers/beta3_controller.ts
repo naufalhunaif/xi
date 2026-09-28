@@ -17,6 +17,7 @@ import {
   markLeanOrderPaid,
   markLeanOrderReady,
   settleLeanOrder,
+  setLeanPaidAmount,
   requeueLeanOrderGroup,
   updatePendingOrderSpec,
   renderGroupOrderMessage,
@@ -266,6 +267,18 @@ export default class Beta3Controller {
           : `Terimakasih bos, ${rupiah(amount)} sudah kami terima. Sisa ${rupiah(order.sisa)} ya bos.`,
       })
       return response.json({ ok: true, lunas: order.lunas })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
+  }
+
+  /** Koreksi nominal dibayar tanpa pesan ke pelanggan. */
+  async paidAmount({ params, request, response }: HttpContext) {
+    try {
+      const amount = Math.round(Number(String(request.input('amount', '')).replace(/\D/g, '')) || 0)
+      if (amount <= 0) return response.badRequest({ error: 'Isi nominal dibayar.' })
+      await setLeanPaidAmount(Number(params.id), amount)
+      return response.json({ ok: true })
     } catch (error) {
       return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
     }

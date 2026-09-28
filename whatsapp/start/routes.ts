@@ -70,6 +70,7 @@ router
     router.post('/api/beta3/orders/:id/approve', [Beta3Controller, 'approveOrder'])
     router.post('/api/beta3/orders/:id/paid', [Beta3Controller, 'paidOrder'])
     router.post('/api/beta3/orders/:id/settle', [Beta3Controller, 'settleOrder'])
+    router.post('/api/beta3/orders/:id/paid-amount', [Beta3Controller, 'paidAmount'])
     router.post('/api/beta3/orders/:id/ready', [Beta3Controller, 'readyOrder'])
     router.post('/api/beta3/orders/:id/cancel', [Beta3Controller, 'cancelOrder'])
     router.post('/api/beta3/orders/:id/resend-group', [Beta3Controller, 'resendGroup'])

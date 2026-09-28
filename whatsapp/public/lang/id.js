@@ -1224,4 +1224,8 @@ window.waLocales.id = {
   "Kabari pelanggan pesanan selesai?": "Kabari pelanggan pesanan selesai?",
   "Pelanggan sudah dikabari.": "Pelanggan sudah dikabari.",
   "Sudah dikabari": "Sudah dikabari",
+  "Nominal dibayar": "Nominal dibayar",
+  "Nominal dibayar disimpan.": "Nominal dibayar disimpan.",
+  "Edit": "Edit",
+  "Ubah": "Ubah",
 }

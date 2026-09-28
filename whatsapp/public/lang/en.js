@@ -1409,4 +1409,8 @@ window.waLocales.en = {
   "Kabari pelanggan pesanan selesai?": "Tell the customer the order is ready?",
   "Pelanggan sudah dikabari.": "Customer notified.",
   "Sudah dikabari": "Notified",
+  "Nominal dibayar": "Amount paid",
+  "Nominal dibayar disimpan.": "Paid amount saved.",
+  "Edit": "Edit",
+  "Ubah": "Change",
 }

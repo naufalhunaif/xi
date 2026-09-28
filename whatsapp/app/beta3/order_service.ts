@@ -521,6 +521,23 @@ export async function settleLeanOrder(id: number, amount: number) {
   return { ...order, paid_amount: paid, lunas: done, sisa: Math.max(0, total - paid) }
 }
 
+/** Koreksi nominal dibayar (mis. tercatat lunas padahal DP). Tidak mengirim pesan. */
+export async function setLeanPaidAmount(id: number, amount: number) {
+  await ensureLeanTables()
+  const order = await readLeanOrder(id)
+  if (!order || order.status !== 'paid') throw new Error('Order belum dibayar.')
+  const total = Number(order.total || 0)
+  const paid = Math.max(0, Math.round(total ? Math.min(amount, total) : amount))
+  await db
+    .from('whatsapp_beta3_orders')
+    .where('id', id)
+    .update({
+      paid_amount: paid,
+      cs_note: total && paid < total ? `DP ${rupiah(paid)}, sisa ${rupiah(total - paid)}` : 'Lunas',
+      updated_at: new Date(),
+    })
+}
+
 /** Pesanan selesai diproduksi: catat waktu, kembalikan sisa bayar untuk pesan ke pelanggan. */
 export async function markLeanOrderReady(id: number) {
   await ensureLeanTables()
