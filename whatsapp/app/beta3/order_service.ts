@@ -844,6 +844,19 @@ export function matchAutoTotal(
   const key = (text: string) => text.toLowerCase().replace(/[^a-z]/g, '')
   // Pelanggan melihat nama REG/YES/JTR; kode ekspedisi CTC/CTCYES/CTCJTR setara.
   const alias = (text: string) => key(text).replace(/^ctc/, '') || 'reg'
+  // Layanan harus dipilih PELANGGAN (hints = pesan pelanggan) bila pilihannya lebih dari satu;
+  // AI tidak boleh memilihkan yang termurah. Satu layanan saja = otomatis.
+  const offered = prices.filter((row) => row.price > 0 && !/JTR/i.test(row.service))
+  const saidByCustomer = (service: string) => {
+    const hay = ` ${hints.join(' ')} `.toLowerCase()
+    const base = alias(service.replace(/\d+$/, ''))
+    const words: Record<string, string> = {
+      reg: 'reg|reguler|regular|biasa|standar',
+      yes: 'yes|kilat|express|ekspres|besok sampai|sehari sampai',
+      jtr: 'jtr|kargo|cargo',
+    }
+    return new RegExp(`[^a-z](${words[base] || base})[^a-z]`).test(hay)
+  }
   let chosen = draft.layanan
     ? prices.find(
         (row) =>
@@ -851,7 +864,12 @@ export function matchAutoTotal(
           row.price > 0
       )
     : null
-  if (!chosen && !draft.layanan) {
+  if (chosen && offered.length > 1 && !saidByCustomer(chosen.service)) chosen = null
+  if (!chosen && offered.length > 1) {
+    const picked = offered.filter((row) => saidByCustomer(row.service))
+    if (picked.length === 1) chosen = picked[0]
+  }
+  if (!chosen && !draft.layanan && offered.length <= 1) {
     // Nama layanan (tanpa angka) sebagai kata utuh di teks petunjuk; terpanjang menang (CTCYES sebelum CTC).
     const hay = ` ${hints.join(' ')} `.toLowerCase()
     const candidates = prices
@@ -865,16 +883,11 @@ export function matchAutoTotal(
     chosen = candidates[0]?.row || null
   }
   // Hanya satu layanan non-kargo di tarif: tidak ada yang perlu dipilih.
-  if (!chosen && !draft.layanan) {
-    const offered = prices.filter((row) => row.price > 0 && !/JTR/i.test(row.service))
-    if (offered.length === 1) chosen = offered[0]
-  }
+  if (!chosen && offered.length === 1) chosen = offered[0]
   if (!chosen)
     return {
       ok: false,
-      reason: draft.layanan
-        ? `layanan ${draft.layanan} tidak ada di tarif`
-        : 'layanan belum dipilih',
+      reason: offered.length > 1 ? 'layanan belum dipilih' : draft.layanan ? `layanan ${draft.layanan} tidak ada di tarif` : 'layanan belum dipilih',
     }
   return {
     ok: true,

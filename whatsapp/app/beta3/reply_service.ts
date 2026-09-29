@@ -708,15 +708,31 @@ export async function createLeanReply(input: {
     const statedPrices = rows
       .filter((row) => row.direction === 'out' && row.body)
       .flatMap((row) => parsePrices(String(row.body)))
-    const verdict = await verifyAutoTotal(
-      totalOrderId,
-      draft,
-      digest.rows,
-      [decision.catatan, specNow, chatNote, input.text],
-      statedPrices
-    )
+    // Pilihan layanan hanya dari pesan PELANGGAN (bukan catatan AI yang memuat daftar ongkir).
+    const lastOngkir = rows.map((row, index) => (row.direction === 'out' && /ongkir/i.test(String(row.body || '')) ? index : -1)).reduce((a, b) => Math.max(a, b), -1)
+    const customerText = [
+      ...rows.slice(lastOngkir + 1).filter((row) => row.direction === 'in').map((row) => String(row.body || '')),
+      input.text,
+    ]
+    const verdict = await verifyAutoTotal(totalOrderId, draft, digest.rows, customerText, statedPrices)
     if (verdict.ok) autoTotal = verdict.total
     await noteAutoTotalReason(totalOrderId, verdict.ok ? '' : verdict.reason)
+    // Ongkir lebih dari satu dan pelanggan belum memilih: tanyakan, jangan dipilihkan.
+    if (!verdict.ok && verdict.reason === 'layanan belum dipilih' && !decision.serah_cs) {
+      const block = toolNotes
+        .map((note) => note.match(/<<<ONGKIR\n([\s\S]+?)\nONGKIR>>>/)?.[1])
+        .filter(Boolean)
+        .pop()
+      const asks = decision.pesan.some((bubble) => /\?/.test(bubble) && /(mana|pilih|layanan|reg|yes)/i.test(bubble))
+      decision.pesan = decision.pesan
+        .map((bubble) => bubble.replace(/,?\s*(ini|berikut)\s+totalnya.*$/i, '').trim())
+        .filter((bubble) => bubble && !/\b(ini|berikut)\b[^.?!]*\btotal/i.test(bubble))
+      if (!asks) {
+        const address = style?.address || 'bos'
+        decision.pesan.push(block ? `${block}\n\nMau pakai yang mana ${address}?` : `Pengirimannya mau pakai yang mana ${address}?`)
+      }
+      if (!decision.pesan.length) decision.pesan.push(`Siap ${style?.address || 'bos'}, datanya sudah masuk ya`)
+    }
     // Total belum bisa dikirim: jangan menjanjikan "ini totalnya" yang tidak pernah datang.
     if (!verdict.ok && !decision.serah_cs) {
       const promise = /\b(ini|berikut|kami kirim|menyusul)\b[^.?!]*\btotal/i
