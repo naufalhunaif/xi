@@ -1228,4 +1228,5 @@ window.waLocales.id = {
   "Nominal dibayar disimpan.": "Nominal dibayar disimpan.",
   "Edit": "Edit",
   "Ubah": "Ubah",
+  "Dikirim sebelum": "Dikirim sebelum",
 }

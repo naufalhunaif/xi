@@ -109,6 +109,8 @@
       .join(' · ')
     const to = [order.customer_name, order.phone, order.address].filter(Boolean).join(' · ')
     if (to) box.append(el('p', `${t('Kirim ke')}: ${to}`, 'wa-muted wa-b3-to'))
+    if (order.ship_by)
+      box.append(el('p', `${t('Dikirim sebelum')}: ${new Date(order.ship_by).toLocaleDateString(window.waI18n?.locale || 'id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`, 'wa-muted wa-b3-to'))
     const pay = window.waBeta3Pay?.create(order, { post: (path, body) => api(path, body), notice, reload: load })
     if (order.total) {
       const sum = el('dl', undefined, 'wa-cart-summary')

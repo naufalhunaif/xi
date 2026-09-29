@@ -1413,4 +1413,5 @@ window.waLocales.en = {
   "Nominal dibayar disimpan.": "Paid amount saved.",
   "Edit": "Edit",
   "Ubah": "Change",
+  "Dikirim sebelum": "Ship by",
 }

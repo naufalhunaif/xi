@@ -11,6 +11,9 @@ import {
 } from '#beta3/customer_service'
 import { rupiah } from '#beta3/catalog_service'
 import { attachRefsToOrder, proofTotalSince } from '#beta3/refs_service'
+import { addProductionDays, closedDaysFromStore } from '#beta3/prompt'
+import { readProductionPolicy } from '#services/production_service'
+import { readLeanState } from '#beta3/tables'
 
 /**
  * Jalur 2 (event): form order dari pelanggan dibaca KODE, disimpan sebagai order
@@ -473,6 +476,63 @@ async function chooseGroup(chosen?: string | null) {
   return routing?.group_jid ? String(routing.group_jid) : null
 }
 
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'agu', 'sep', 'okt', 'nov', 'des']
+const wibToday = () => {
+  const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date()).split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d))
+}
+
+/** Tanggal dari teks: "1 Oktober", "1 Okt 2026", "tgl 1", "1/10". Selalu ke depan dari hari ini. */
+export function parseShipDate(text: string, today = wibToday()) {
+  const source = String(text || '').toLowerCase()
+  let day = 0
+  let month = -1
+  let year = 0
+  const named = source.match(/(\d{1,2})\s*(jan|feb|mar|apr|mei|may|jun|jul|agu|aug|agt|sep|okt|oct|nov|des|dec)[a-z]*\.?\s*(\d{4})?/)
+  const slash = source.match(/(\d{1,2})\s*[/.-]\s*(\d{1,2})(?:\s*[/.-]\s*(\d{2,4}))?/)
+  const only = source.match(/(?:tgl|tanggal)\.?\s*(\d{1,2})\b/) || source.match(/^\s*(\d{1,2})\s*$/)
+  if (named) {
+    day = Number(named[1])
+    const key = named[2].replace('may', 'mei').replace('aug', 'agu').replace('agt', 'agu').replace('oct', 'okt').replace('dec', 'des')
+    month = MONTHS.indexOf(key.slice(0, 3))
+    year = Number(named[3] || 0)
+  } else if (slash) {
+    day = Number(slash[1])
+    month = Number(slash[2]) - 1
+    year = Number(slash[3] || 0)
+    if (year && year < 100) year += 2000
+  } else if (only) day = Number(only[1])
+  if (!day || day > 31) return null
+  let date = new Date(Date.UTC(year || today.getUTCFullYear(), month >= 0 ? month : today.getUTCMonth(), day))
+  if (!year && date < today) date = month >= 0 ? new Date(Date.UTC(date.getUTCFullYear() + 1, month, day)) : new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, day))
+  return date
+}
+
+/**
+ * "Dikirim sebelum" untuk data pesanan: permintaan pelanggan yang disanggupi (baris
+ * "Dikirim sebelum: …" di spesifikasi), atau estimasi produksi yang dijanjikan
+ * (Pengaturan → Produksi, batas atas) dihitung dari tanggal bayar. Ready stock: kosong.
+ */
+export async function computeShipBy(order: Record<string, any>, paidAt = new Date()) {
+  const spec = String(order.spec || order.items || '')
+  const line = spec.match(/(?:dikirim|kirim)\s+(?:sebelum|paling lambat|maks(?:imal)?)\s*:?\s*(.+)/i)
+  if (line) {
+    const date = parseShipDate(line[1])
+    if (date) return date
+  }
+  const policy = await readProductionPolicy().catch(() => null)
+  const custom = /custom|sesuai gambar|seperti gambar|ukuran badan|ukuran sesuai/i.test(spec)
+  const kind = custom ? 'custom' : isPreorder(`${spec}\n${order.note || ''}\n${order.cs_note || ''}`) ? 'preorder' : ''
+  const rule = kind ? (policy as any)?.rules?.[kind] || (custom ? (policy as any)?.rules?.preorder : null) : null
+  const days = rule?.enabled ? Number(rule.maxDays ?? rule.estimateDays ?? rule.minDays ?? 0) : 0
+  if (!days) return null
+  const store = String((await readLeanState('store_profile').catch(() => '')) || '')
+  return addProductionDays(paidAt, days, rule.dayType === 'working', closedDaysFromStore(store))
+}
+
+export const shipByText = (value: unknown) =>
+  value ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value as string)) : ''
+
 export async function markLeanOrderPaid(
   id: number,
   csNote?: string,
@@ -489,6 +549,7 @@ export async function markLeanOrderPaid(
     .where('id', id)
     .update({
       status: 'paid',
+      ship_by: order.ship_by || (await computeShipBy(order).catch(() => null)),
       paid_checked_at: paidAmount && paidAmount > 0 ? new Date() : null,
       paid_amount: paidAmount && paidAmount > 0 ? Math.round(paidAmount) : order.total || null,
       cs_note: csNote || order.cs_note,
@@ -689,6 +750,8 @@ export function renderGroupOrderMessage(order: Record<string, any>) {
   while (lines.length && lines[lines.length - 1] === '') lines.pop()
   const extra = [order.note, order.cs_note].map((value) => String(value || '').trim()).filter(Boolean)
   for (const value of extra) if (!lines.some((line) => line.includes(value))) lines.push(value)
+  if (order.ship_by && !lines.some((line) => /dikirim sebelum|kirim sebelum/i.test(line)))
+    lines.push(`Dikirim sebelum: ${shipByText(order.ship_by)}`)
   // Penutup: nama pelanggan (dari order, atau nama kontak WhatsApp) + nomor order untuk dilacak.
   const name = String(order.customer_name || order.contact_name || '').trim()
   const number = String(order.order_number || '').trim()

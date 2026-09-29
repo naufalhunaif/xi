@@ -308,6 +308,7 @@
       [t('Nomor'), phoneOf(order)],
       [t('Alamat'), address],
       [t('Pengiriman'), serviceName(order.shipping_service)],
+      [t('Dikirim sebelum'), order.ship_by ? new Date(order.ship_by).toLocaleDateString(window.waI18n?.locale || 'id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''],
       [t('Berat'), order.weight_grams ? `${(Math.round(order.weight_grams / 100) / 10).toLocaleString(window.waI18n?.locale || 'id-ID')} kg` : ''],
     ].filter(([, value]) => value)
     if (fields.length) {
