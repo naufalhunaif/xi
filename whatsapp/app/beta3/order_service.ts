@@ -323,44 +323,62 @@ export async function nextOrderNumber() {
   return `${prefix}${String(sequence).padStart(3, '0')}`
 }
 
+/**
+ * Order lunas/DP yang sudah dikirim: ada resi di chat setelah order dibuat (order rekap: resi kapan pun),
+ * atau order lama (>45 hari) — sama dengan tab Selesai di chat.
+ */
+const SHIPPED_SQL = `(o.status = 'paid' AND (EXISTS (SELECT 1 FROM whatsapp_beta3_shipments s2 WHERE s2.jid = o.jid
+    AND (s2.created_at >= o.created_at OR o.source = 'rekap')) OR o.updated_at < NOW() - INTERVAL 45 DAY))`
+const SHIPPED_AWB_SQL = `(SELECT s.awb FROM whatsapp_beta3_shipments s WHERE s.jid = o.jid
+    AND (s.created_at >= o.created_at OR o.source = 'rekap')
+    ORDER BY CASE WHEN o.source = 'rekap' THEN -UNIX_TIMESTAMP(s.created_at) ELSE UNIX_TIMESTAMP(s.created_at) END LIMIT 1)`
+
 export async function listLeanOrders(status?: string, q?: string) {
   await ensureLeanTables()
-  const query = db.from('whatsapp_beta3_orders').orderBy('id', 'desc').limit(300)
+  const query = db
+    .from('whatsapp_beta3_orders as o')
+    .select('o.*', db.raw(`${SHIPPED_SQL} AS shipped`), db.raw(`${SHIPPED_AWB_SQL} AS shipped_awb`))
+    .orderBy('o.id', 'desc')
+    .limit(300)
   if (status && status !== 'all') {
-    if (status === 'active') query.whereIn('status', ['pending', 'awaiting_payment'])
-    else query.where('status', status)
+    if (status === 'active') query.whereIn('o.status', ['pending', 'awaiting_payment'])
+    else if (status === 'process') query.where('o.status', 'paid').whereRaw(`NOT ${SHIPPED_SQL}`)
+    else if (status === 'done') query.whereRaw(SHIPPED_SQL)
+    else query.where('o.status', status)
   }
   const term = String(q || '').trim()
   if (term) {
     const like = `%${term.replace(/[%_]/g, '')}%`
     query.where((inner) =>
       inner
-        .where('order_number', 'like', like)
-        .orWhere('customer_name', 'like', like)
-        .orWhere('phone', 'like', like)
-        .orWhere('jid', 'like', like)
-        .orWhere('items', 'like', like)
-        .orWhere('spec', 'like', like)
-        .orWhere('district', 'like', like)
-        .orWhere('regency', 'like', like)
+        .where('o.order_number', 'like', like)
+        .orWhere('o.customer_name', 'like', like)
+        .orWhere('o.phone', 'like', like)
+        .orWhere('o.jid', 'like', like)
+        .orWhere('o.items', 'like', like)
+        .orWhere('o.spec', 'like', like)
+        .orWhere('o.district', 'like', like)
+        .orWhere('o.regency', 'like', like)
     )
   }
-  return query
+  const rows = await query
+  return rows.map((row: Record<string, any>) => ({ ...row, shipped: Boolean(Number(row.shipped)) }))
 }
 
-/** Jumlah order per status untuk tab halaman Order. */
+/** Jumlah order per tab halaman Order (Diproses = lunas/DP belum dikirim, Selesai = sudah ada resi). */
 export async function countLeanOrders() {
   await ensureLeanTables()
-  const rows = await db
-    .from('whatsapp_beta3_orders')
-    .select('status')
-    .count('* as total')
-    .groupBy('status')
-  const counts: Record<string, number> = { all: 0 }
-  for (const row of rows) {
-    counts[String(row.status)] = Number(row.total)
-    counts.all += Number(row.total)
-  }
+  const [rows] = await db.rawQuery(`SELECT COUNT(*) AS \`all\`,
+      SUM(o.status = 'pending') AS pending,
+      SUM(o.status = 'awaiting_payment') AS awaiting_payment,
+      SUM(o.status = 'paid' AND NOT ${SHIPPED_SQL}) AS process,
+      SUM(${SHIPPED_SQL}) AS done,
+      SUM(o.status = 'cancelled') AS cancelled
+    FROM whatsapp_beta3_orders o`)
+  const row = (rows?.[0] || {}) as Record<string, unknown>
+  const counts: Record<string, number> = {}
+  for (const key of ['all', 'pending', 'awaiting_payment', 'process', 'done', 'cancelled'])
+    counts[key] = Number(row[key] || 0)
   return counts
 }
 

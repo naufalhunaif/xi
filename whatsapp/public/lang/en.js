@@ -1203,6 +1203,7 @@ window.waLocales.en = {
   "Komentar": "Comments",
   "Antre": "Queued",
   "Diproses": "Processing",
+  "Menunggu bayar": "Awaiting payment",
   "Dibalas": "Replied",
   "Disembunyikan": "Hidden",
   "Spam": "Spam",

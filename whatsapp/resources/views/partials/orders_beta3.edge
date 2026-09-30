@@ -2,11 +2,12 @@
   <div class="wa-orders-title"><h1 data-i18n="Order">Order</h1><div class="wa-orders-title-actions"><span id="beta3OrdersCount" class="wa-muted"></span><select id="beta3RecapDays" aria-label="Rentang rekap" data-i18n-aria-label="Rentang rekap"><option value="7">7 hari</option><option value="30" selected>30 hari</option><option value="90">90 hari</option></select><button id="beta3RecapStart" class="button" type="button" title="AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan." data-i18n="Rekap dari chat" data-i18n-title="AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan.">Rekap dari chat</button><button id="beta3OrdersRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button></div></div>
   <div class="wa-lean-toolbar">
     <div id="beta3OrdersTabs" class="wa-order-tabs" role="group" aria-label="Filter order" data-i18n-aria-label="Filter order">
-      <button type="button" data-status="all" aria-pressed="true"><span data-i18n="Semua">Semua</span> <b class="wa-tab-count" data-count="all">0</b></button>
-      <button type="button" data-status="pending" aria-pressed="false"><span data-i18n="Menunggu total">Menunggu total</span> <b class="wa-tab-count" data-count="pending">0</b></button>
-      <button type="button" data-status="awaiting_payment" aria-pressed="false"><span data-i18n="Menunggu pembayaran">Menunggu pembayaran</span> <b class="wa-tab-count" data-count="awaiting_payment">0</b></button>
-      <button type="button" data-status="paid" aria-pressed="false"><span data-i18n="Lunas">Lunas</span> <b class="wa-tab-count" data-count="paid">0</b></button>
-      <button type="button" data-status="cancelled" aria-pressed="false"><span data-i18n="Dibatalkan">Dibatalkan</span> <b class="wa-tab-count" data-count="cancelled">0</b></button>
+      <button type="button" data-status="all" aria-pressed="true"><span data-i18n="Semua">Semua</span> <b class="wa-tab-count" data-count="all"></b></button>
+      <button type="button" data-status="pending" aria-pressed="false"><span data-i18n="Menunggu total">Menunggu total</span> <b class="wa-tab-count" data-count="pending"></b></button>
+      <button type="button" data-status="awaiting_payment" aria-pressed="false"><span data-i18n="Menunggu bayar">Menunggu bayar</span> <b class="wa-tab-count" data-count="awaiting_payment"></b></button>
+      <button type="button" data-status="process" aria-pressed="false"><span data-i18n="Diproses">Diproses</span> <b class="wa-tab-count" data-count="process"></b></button>
+      <button type="button" data-status="done" aria-pressed="false"><span data-i18n="Selesai">Selesai</span> <b class="wa-tab-count" data-count="done"></b></button>
+      <button type="button" data-status="cancelled" aria-pressed="false"><span data-i18n="Dibatalkan">Dibatalkan</span> <b class="wa-tab-count" data-count="cancelled"></b></button>
     </div>
     <div class="wa-order-filters"><input id="beta3OrdersSearch" type="search" placeholder="Cari nomor order / nama / telepon / produk" data-i18n-placeholder="Cari nomor order / nama / telepon / produk" aria-label="Cari order" data-i18n-aria-label="Cari order"></div>
   </div>

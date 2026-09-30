@@ -110,7 +110,7 @@
       orders = result.orders || []
       for (const [key, value] of Object.entries(result.counts || {})) {
         const badge = root.querySelector(`[data-count="${key}"]`)
-        if (badge) badge.textContent = String(value)
+        if (badge) badge.textContent = Number(value) ? String(value) : ''
       }
       render()
       if (selected) {
@@ -154,9 +154,10 @@
       const total = el('td', order.total ? money(order.total) : '—', 'wa-order-amount')
       const state = el('td')
       const dp = order.status === 'paid' && order.paid_amount && order.total && Number(order.paid_amount) < Number(order.total)
-      const badge = el('span', dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, 'wa-order-badge')
-      badge.dataset.tone = statusTone[order.status] || ''
+      const badge = el('span', order.shipped ? t('Selesai') : dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, 'wa-order-badge')
+      badge.dataset.tone = order.shipped ? 'success' : statusTone[order.status] || ''
       state.append(badge)
+      if (order.shipped_awb) state.append(el('br'), el('small', `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
       if (order.status === 'pending' && order.auto_total_reason) state.append(el('br'), el('small', order.auto_total_reason, 'wa-muted'))
       if (groupLabel[order.group_status])
         state.append(
@@ -268,9 +269,10 @@
     const head = el('div', undefined, 'wa-b3-detail-head')
     const dp = order.status === 'paid' && order.paid_amount && order.total && Number(order.paid_amount) < Number(order.total)
     head.append(
-      el('span', dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, `wa-pill ${dp ? 'warn' : statusPillTone[order.status] || ''}`),
+      el('span', order.shipped ? t('Selesai') : dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, `wa-pill ${order.shipped ? 'ok' : dp ? 'warn' : statusPillTone[order.status] || ''}`),
       el('small', when(order.created_at), 'wa-muted')
     )
+    if (order.shipped_awb) head.append(el('small', `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
     if (order.source === 'rekap') head.append(el('small', t('Rekap dari chat'), 'wa-muted'))
     box.append(head)
 

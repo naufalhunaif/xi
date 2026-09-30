@@ -408,12 +408,12 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
    Order hijau, Selesai netral. Tab aktif: angka berwarna penuh. */
 .workspace-ui [data-inbox-filter="unanswered"] span { background: var(--wa-warn-bg); color: var(--wa-warn); }
 .workspace-ui [data-inbox-filter="cs"] span { background: var(--wa-err-bg); color: var(--wa-err); }
-.workspace-ui [data-inbox-filter="payment"] span { background: var(--wa-blue-bg); color: var(--wa-blue); }
+.workspace-ui [data-inbox-filter="payment"] span { background: var(--wa-blue-bg, #eaf0fb); color: var(--wa-blue, #2d5da8); }
 .workspace-ui [data-inbox-filter="order"] span { background: var(--wa-ok-bg); color: var(--wa-ok); }
 .workspace-ui .wa-inbox-tabs > button[aria-pressed="true"] span { background: var(--text, #1d1f1d); color: var(--wa-surface, #fff); }
 .workspace-ui [data-inbox-filter="unanswered"][aria-pressed="true"] span { background: var(--wa-warn); color: var(--wa-surface, #fff); }
 .workspace-ui [data-inbox-filter="cs"][aria-pressed="true"] span { background: var(--wa-err); color: var(--wa-surface, #fff); }
-.workspace-ui [data-inbox-filter="payment"][aria-pressed="true"] span { background: var(--wa-blue); color: var(--wa-surface, #fff); }
+.workspace-ui [data-inbox-filter="payment"][aria-pressed="true"] span { background: var(--wa-blue, #2d5da8); color: var(--wa-surface, #fff); }
 .workspace-ui [data-inbox-filter="order"][aria-pressed="true"] span { background: var(--wa-ok); color: var(--wa-surface, #fff); }
 .workspace-ui .wa-inbox-tabs > button span:empty { display: none; }
 /* Petunjuk ada chip lain di kanan (scroll-state query; browser lain cukup tanpa petunjuk). */
@@ -453,3 +453,13 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 /* Media belum termuat: tombol "Muat ulang" di atas pratinjau. */
 .workspace-ui button.message-media-state { border: 0; cursor: pointer; font: inherit; font-size: 11px; }
 .workspace-ui button.message-media-state:disabled { cursor: default; opacity: .8; }
+
+/* Tab halaman Order: warna angka per tahap seperti tab chat; angka 0 tidak tampil. */
+.workspace-ui .wa-order-tabs .wa-tab-count:empty { display: none; }
+.workspace-ui .wa-order-tabs [data-status="pending"] .wa-tab-count { background: var(--wa-warn-bg); color: var(--wa-warn); }
+.workspace-ui .wa-order-tabs [data-status="awaiting_payment"] .wa-tab-count { background: var(--wa-blue-bg, #eaf0fb); color: var(--wa-blue, #2d5da8); }
+.workspace-ui .wa-order-tabs [data-status="process"] .wa-tab-count { background: var(--wa-ok-bg); color: var(--wa-ok); }
+.workspace-ui .wa-order-tabs button[aria-pressed="true"] .wa-tab-count { background: var(--text, #1d1f1d); color: var(--wa-surface, #fff); }
+.workspace-ui .wa-order-tabs [data-status="pending"][aria-pressed="true"] .wa-tab-count { background: var(--wa-warn); color: var(--wa-surface, #fff); }
+.workspace-ui .wa-order-tabs [data-status="awaiting_payment"][aria-pressed="true"] .wa-tab-count { background: var(--wa-blue, #2d5da8); color: var(--wa-surface, #fff); }
+.workspace-ui .wa-order-tabs [data-status="process"][aria-pressed="true"] .wa-tab-count { background: var(--wa-ok); color: var(--wa-surface, #fff); }
