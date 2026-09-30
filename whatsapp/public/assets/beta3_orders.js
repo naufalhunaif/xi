@@ -133,8 +133,23 @@
       list.append(row)
       return
     }
-    for (const order of orders) {
+    // Tab Semua: order berjalan di atas, lalu Selesai dan Dibatalkan dalam kelompok sendiri.
+    const groupOf = (order) => (order.shipped ? 'done' : order.status === 'cancelled' ? 'cancelled' : 'active')
+    const sorted = status === 'all' ? ['active', 'done', 'cancelled'].flatMap((key) => orders.filter((order) => groupOf(order) === key)) : orders
+    let lastGroup = 'active'
+    for (const order of sorted) {
+      if (status === 'all' && groupOf(order) !== lastGroup) {
+        lastGroup = groupOf(order)
+        const count = orders.filter((item) => groupOf(item) === lastGroup).length
+        const divider = el('tr', undefined, 'wa-order-group')
+        const cell = el('th', `${lastGroup === 'done' ? t('Selesai') : t('Dibatalkan')} · ${count}`)
+        cell.colSpan = 5
+        cell.scope = 'rowgroup'
+        divider.append(cell)
+        list.append(divider)
+      }
       const row = el('tr')
+      if (status === 'all' && lastGroup !== 'active') row.classList.add('wa-order-past')
       row.dataset.orderId = order.id
       row.dataset.selected = String(order.id === selected)
       row.tabIndex = 0

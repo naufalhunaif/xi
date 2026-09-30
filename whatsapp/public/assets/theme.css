@@ -463,3 +463,12 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 .workspace-ui .wa-order-tabs [data-status="pending"][aria-pressed="true"] .wa-tab-count { background: var(--wa-warn); color: var(--wa-surface, #fff); }
 .workspace-ui .wa-order-tabs [data-status="awaiting_payment"][aria-pressed="true"] .wa-tab-count { background: var(--wa-blue, #2d5da8); color: var(--wa-surface, #fff); }
 .workspace-ui .wa-order-tabs [data-status="process"][aria-pressed="true"] .wa-tab-count { background: var(--wa-ok); color: var(--wa-surface, #fff); }
+
+/* Tab Semua: pemisah kelompok Selesai / Dibatalkan; baris yang sudah lewat sedikit redup. */
+.workspace-ui .wa-order-table tr.wa-order-group th {
+  padding: 14px 12px 6px; text-align: left; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .6px; color: var(--muted);
+  background: var(--wa-raised, #f3f4f2); border-top: 1px solid var(--line);
+}
+.workspace-ui .wa-order-table tr.wa-order-past > td { opacity: .72; }
+.workspace-ui .wa-order-table tr.wa-order-past:is(:hover, :focus-within) > td { opacity: 1; }
