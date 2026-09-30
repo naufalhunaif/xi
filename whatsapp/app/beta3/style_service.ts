@@ -83,6 +83,12 @@ export function normalizeStyle(bubbles: string[], profile: StyleProfile) {
         .replace(/!{2,}/g, '!')
         .replace(/\?{2,}/g, '?')
       if (!profile.emoji) out = out.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️‍]/gu, '')
+      // AI adalah CS-nya: jangan menyebut CS/admin sebagai orang lain ("nanti CS konfirmasi" → "nanti saya konfirmasi").
+      out = out
+        .replace(/\b(?:tim\s+)?(?:cs|admin)(?:\s+kami)?(\s+(?:akan\s+)?(?:konfirmasi|konfirmasikan|kabari|kabarin|cek|info|infokan|hubungi|bantu|hitung|kirim|kirimkan|jawab|balas)\b)/gi, (_match, rest: string, offset: number, whole: string) =>
+          `${offset === 0 || /[.!?\n]\s*$/.test(whole.slice(0, offset)) ? 'Saya' : 'saya'}${rest}`
+        )
+        .replace(/\b(?:di)?tunggu\s+(?:tim\s+)?(?:cs|admin)(?:\s+kami)?\b/gi, (match: string) => (/^[TD]/.test(match) ? 'Ditunggu sebentar' : 'ditunggu sebentar'))
       if (profile.address && profile.samples >= 8) {
         const others = ADDRESS_WORDS.filter((word) => word !== profile.address && !(profile.address === 'kak' && word === 'kakak'))
         const pattern = new RegExp(`\\b(${[...others, 'anda'].join('|')})\\b`, 'gi')

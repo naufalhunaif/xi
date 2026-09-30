@@ -255,7 +255,7 @@ export function buildLeanPrompt(input: {
 }) {
   const payment = input.paymentMethods.length
     ? `REKENING RESMI (satu-satunya sumber rekening; sebut hanya saat pelanggan tanya transfer kemana atau total sudah disepakati):\n${input.paymentMethods.map((method) => `${method.name} ${method.destination}${method.accountName ? ` an ${method.accountName}` : ''}`).join('\n')}`
-    : 'REKENING RESMI: belum diatur. Jangan menyebut rekening; arahkan tunggu CS.'
+    : 'REKENING RESMI: belum diatur. Jangan menyebut rekening; bilang "nanti saya kirimkan rekeningnya ya bos" dan serah_cs = true.'
   const sections: Array<[string, string]> = [
     [
       'toko',
