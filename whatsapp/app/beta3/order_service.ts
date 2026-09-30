@@ -1,5 +1,6 @@
 // Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
 import db from '#services/workspace_database'
+import { workspaceSql } from '#services/workspace_context'
 import { queueOutgoingMessage } from '#services/message_service'
 import { listPaymentMethods } from '#services/payment_method_service'
 import { ensureLeanTables } from '#beta3/tables'
@@ -343,11 +344,12 @@ export async function listLeanOrders(status?: string, q?: string) {
     .orderBy('o.id', 'desc')
     .limit(300)
   if (status && status !== 'all') {
-    if (status === 'done') query.whereRaw(SHIPPED_SQL)
+    // whereRaw tidak ikut prefix workspace otomatis (db.raw/rawQuery ikut): nama tabel di-scope manual.
+    if (status === 'done') query.whereRaw(workspaceSql(SHIPPED_SQL))
     else if (status === 'cancelled') query.where('o.status', 'cancelled')
     else {
       // Tab tahap (menunggu total/bayar, diproses) hanya berisi order yang belum dikirim.
-      query.whereRaw(`NOT ${SHIPPED_SQL}`)
+      query.whereRaw(workspaceSql(`NOT ${SHIPPED_SQL}`))
       if (status === 'active') query.whereIn('o.status', ['pending', 'awaiting_payment'])
       else query.where('o.status', status === 'process' ? 'paid' : status)
     }
