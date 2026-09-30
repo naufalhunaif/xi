@@ -324,11 +324,13 @@ export async function nextOrderNumber() {
 }
 
 /**
- * Order lunas/DP yang sudah dikirim: ada resi di chat setelah order dibuat (order rekap: resi kapan pun),
- * atau order lama (>45 hari) — sama dengan tab Selesai di chat.
+ * Order yang sudah dikirim = tab Selesai (sama dengan tab Selesai di chat): ada resi di chat setelah
+ * order dibuat (order rekap: resi kapan pun), apa pun status yang tercatat — pesanan yang ditangani CS
+ * sering tidak lewat tombol konfirmasi. Order lunas lama (>45 hari) juga dianggap selesai.
  */
-const SHIPPED_SQL = `(o.status = 'paid' AND (EXISTS (SELECT 1 FROM whatsapp_beta3_shipments s2 WHERE s2.jid = o.jid
-    AND (s2.created_at >= o.created_at OR o.source = 'rekap')) OR o.updated_at < NOW() - INTERVAL 45 DAY))`
+const SHIPPED_SQL = `(o.status <> 'cancelled' AND (EXISTS (SELECT 1 FROM whatsapp_beta3_shipments s2 WHERE s2.jid = o.jid
+    AND (s2.created_at >= o.created_at OR o.source = 'rekap'))
+    OR (o.status = 'paid' AND o.updated_at < NOW() - INTERVAL 45 DAY)))`
 const SHIPPED_AWB_SQL = `(SELECT s.awb FROM whatsapp_beta3_shipments s WHERE s.jid = o.jid
     AND (s.created_at >= o.created_at OR o.source = 'rekap')
     ORDER BY CASE WHEN o.source = 'rekap' THEN -UNIX_TIMESTAMP(s.created_at) ELSE UNIX_TIMESTAMP(s.created_at) END LIMIT 1)`
@@ -341,10 +343,14 @@ export async function listLeanOrders(status?: string, q?: string) {
     .orderBy('o.id', 'desc')
     .limit(300)
   if (status && status !== 'all') {
-    if (status === 'active') query.whereIn('o.status', ['pending', 'awaiting_payment'])
-    else if (status === 'process') query.where('o.status', 'paid').whereRaw(`NOT ${SHIPPED_SQL}`)
-    else if (status === 'done') query.whereRaw(SHIPPED_SQL)
-    else query.where('o.status', status)
+    if (status === 'done') query.whereRaw(SHIPPED_SQL)
+    else if (status === 'cancelled') query.where('o.status', 'cancelled')
+    else {
+      // Tab tahap (menunggu total/bayar, diproses) hanya berisi order yang belum dikirim.
+      query.whereRaw(`NOT ${SHIPPED_SQL}`)
+      if (status === 'active') query.whereIn('o.status', ['pending', 'awaiting_payment'])
+      else query.where('o.status', status === 'process' ? 'paid' : status)
+    }
   }
   const term = String(q || '').trim()
   if (term) {
@@ -365,12 +371,12 @@ export async function listLeanOrders(status?: string, q?: string) {
   return rows.map((row: Record<string, any>) => ({ ...row, shipped: Boolean(Number(row.shipped)) }))
 }
 
-/** Jumlah order per tab halaman Order (Diproses = lunas/DP belum dikirim, Selesai = sudah ada resi). */
+/** Jumlah order per tab halaman Order (tahap = belum dikirim; Selesai = sudah ada resi). */
 export async function countLeanOrders() {
   await ensureLeanTables()
   const [rows] = await db.rawQuery(`SELECT COUNT(*) AS \`all\`,
-      SUM(o.status = 'pending') AS pending,
-      SUM(o.status = 'awaiting_payment') AS awaiting_payment,
+      SUM(o.status = 'pending' AND NOT ${SHIPPED_SQL}) AS pending,
+      SUM(o.status = 'awaiting_payment' AND NOT ${SHIPPED_SQL}) AS awaiting_payment,
       SUM(o.status = 'paid' AND NOT ${SHIPPED_SQL}) AS process,
       SUM(${SHIPPED_SQL}) AS done,
       SUM(o.status = 'cancelled') AS cancelled

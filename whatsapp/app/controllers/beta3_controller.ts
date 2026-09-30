@@ -1,4 +1,5 @@
 // Beta 3 — salinan terisolasi dari LeanController; hanya menyentuh #beta3/*.
+import { scanShipments } from '#beta3/shipments'
 import type { HttpContext } from '@adonisjs/core/http'
 import { catalogDigest, importLeanCatalog, rupiah } from '#beta3/catalog_service'
 import {
@@ -163,6 +164,8 @@ export default class Beta3Controller {
     const status = String(request.qs().status || '')
     const q = String(request.qs().q || '')
     response.header('cache-control', 'no-store')
+    // Resi terbaru dari chat supaya tab Selesai ikut terbarui walau kotak masuk belum dibuka.
+    await scanShipments().catch(() => {})
     const [orders, counts] = await Promise.all([
       listLeanOrders(status || undefined, q || undefined),
       countLeanOrders(),
