@@ -102,11 +102,17 @@
   let searchTimer
   const drawer = byId('beta3OrderDrawer')
 
+  let loadSeq = 0
   async function load() {
+    // Hanya jawaban permintaan terakhir yang dipakai: jawaban tab lama (mis. Semua, lebih lambat)
+    // yang datang belakangan tidak boleh menimpa isi tab yang sedang dibuka.
+    const seq = ++loadSeq
     if (!groups.length) await loadGroups()
     const q = byId('beta3OrdersSearch').value.trim()
+    const wanted = status
     try {
-      const result = await api(`/api/beta3/orders?status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}`)
+      const result = await api(`/api/beta3/orders?status=${encodeURIComponent(wanted)}&q=${encodeURIComponent(q)}`)
+      if (seq !== loadSeq || wanted !== status) return
       orders = result.orders || []
       for (const [key, value] of Object.entries(result.counts || {})) {
         const badge = root.querySelector(`[data-count="${key}"]`)
@@ -118,7 +124,7 @@
         if (fresh) renderDetail(fresh)
       }
     } catch (error) {
-      notice(error.message, true)
+      if (seq === loadSeq) notice(error.message, true)
     }
   }
   function render() {
@@ -444,6 +450,10 @@
       status = tab.dataset.status
       for (const other of byId('beta3OrdersTabs').querySelectorAll('[data-status]'))
         other.setAttribute('aria-pressed', String(other === tab))
+      // Kosongkan dulu supaya isi tab sebelumnya tidak terlihat seperti hasil tab ini.
+      orders = []
+      byId('beta3OrdersList').replaceChildren()
+      byId('beta3OrdersCount').textContent = t('Memuat…')
       load()
     })
   }
