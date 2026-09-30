@@ -4,7 +4,7 @@
 #    wa            menu interaktif
 #    wa status | restart | stop | start | logs [web|worker]
 #    wa update [VERSI] | rollback | version
-#    wa domain DOMAIN | domain --lepas | port NOMOR | ssl | user [EMAIL] | backup | restore FILE | db
+#    wa domain DOMAIN | domain --lepas | port NOMOR | ssl | password [EMAIL] | user [EMAIL] | backup | restore FILE | db
 #    wa mode | uninstall
 # =============================================================================
 set -euo pipefail
@@ -296,6 +296,22 @@ user_reset() {
   [[ -d "$APP/whatsapp/current" ]] || die 'Build belum ada. Jalankan: wa update'
   (cd -P "$APP/whatsapp/current" && as_app env NODE_ENV=production node ace.js auth:reset "$email")
 }
+user_password() { # ganti password (diketik sendiri, tidak tampil di layar)
+  local email="${1:-}" list p1 p2
+  [[ -d "$APP/whatsapp/current" ]] || die 'Build belum ada. Jalankan: wa update'
+  if [[ -z "$email" ]]; then
+    list="$(MYSQL_PWD="$WA_DB_PASS" mysql -N -u"$WA_DB_USER" "$WA_DB_NAME" -e 'SELECT email FROM wa_users ORDER BY id' 2>/dev/null || true)"
+    [[ -n "$list" ]] && { echo 'Akun:'; nl -w3 -s') ' <<<"$list"; }
+    read -r -p 'Nomor atau email akun: ' email < /dev/tty
+    [[ "$email" =~ ^[0-9]+$ && -n "$list" ]] && email="$(sed -n "${email}p" <<<"$list")"
+  fi
+  [[ -n "$email" ]] || die 'Akun tidak ditemukan.'
+  read -r -s -p 'Password baru (min. 8 karakter): ' p1 < /dev/tty; echo
+  [[ ${#p1} -ge 8 ]] || die 'Password minimal 8 karakter.'
+  read -r -s -p 'Ulangi password baru: ' p2 < /dev/tty; echo
+  [[ "$p1" == "$p2" ]] || die 'Password tidak sama.'
+  printf '%s' "$p1" | (cd -P "$APP/whatsapp/current" && as_app env NODE_ENV=production node ace.js auth:reset "$email" --stdin)
+}
 app_url() { sed -n 's/^APP_URL=//p' "$APP/whatsapp/.env" | head -n1; }
 server_ip() { curl -fsS --max-time 6 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}'; }
 set_env() { # set_env KEY VALUE (di whatsapp/.env)
@@ -369,7 +385,7 @@ menu() {
    2) Update ke versi terbaru
    3) Restart              7) Lepas domain (pakai IP:port)
    4) Log WEB              8) Ganti port
-   5) Log WORKER           9) Reset password user
+   5) Log WORKER           9) Ganti password
                           10) Backup     11) Restore
                           12) Rollback   13) Shell database
                            0) Keluar
@@ -380,7 +396,7 @@ M
       4) tail -n 100 -f /var/log/wa/web.log ;; 5) tail -n 100 -f /var/log/wa/worker.log ;;
       6) read -r -p '  Domain (mis. wa.contoh.com): ' d < /dev/tty; set_domain "$d" ;;
       7) unset_domain ;; 8) read -r -p '  Port baru (mis. 3343): ' p < /dev/tty; set_port "$p" ;;
-      9) user_reset ;; 10) backup ;; 11) read -r -p '  File backup: ' f < /dev/tty; restore "$f" ;;
+      9) user_password ;; 10) backup ;; 11) read -r -p '  File backup: ' f < /dev/tty; restore "$f" ;;
       12) rollback ;; 13) MYSQL_PWD="$WA_DB_PASS" mysql -u"$WA_DB_USER" "$WA_DB_NAME" ;;
       0|q|'') return 0 ;; *) echo '  Pilihan tidak dikenal.' ;;
     esac
@@ -400,6 +416,7 @@ case "${1:-menu}" in
   domain) [[ -n "${2:-}" ]] || die 'wa domain DOMAIN'; set_domain "$2" ;;
   port) [[ -n "${2:-}" ]] || die 'wa port NOMOR'; set_port "$2" ;;
   ssl) ssl_issue ;;
+  password|passwd) user_password "${2:-}" ;;
   user) user_reset "${2:-}" ;;
   backup) backup "${2:-}" ;;
   restore) [[ -n "${2:-}" ]] || die 'wa restore FILE.tar.gz'; restore "$2" ;;
