@@ -175,6 +175,33 @@ function replyContext(rows: LeanHistoryRow[]) {
 }
 
 /**
+ * Pelanggan menyetujui tawaran terakhir toko ("kalau mau saya kirimkan daftar modelnya" → "boleh"),
+ * walau setelahnya menulis pertanyaan lain. Tawaran itu harus langsung dikerjakan, bukan ditunggu.
+ */
+export function acceptedOffer(rows: LeanHistoryRow[]) {
+  const current = rows.filter((row) => row.current && row.direction === 'in')
+  if (!current.length) return ''
+  const firstCurrent = rows.indexOf(current[0])
+  const lastOut = rows
+    .slice(0, firstCurrent)
+    .reverse()
+    .find((row) => row.direction === 'out' && row.body)
+  const isOffer = (text: string) =>
+    /\b(kalau|kalo|klo|bila|jika)\s+(mau|berkenan)|\bmau\s+(saya|sy|aku)\b|\bsaya\s+(kirim|kirimkan|kirimin|buatkan|cekkan|carikan)\b/i.test(text)
+  const isYes = (text: string) =>
+    /^(boleh|oke|ok|okk|okay|iya|iyaa|ya|yaa|mau|siap|gas|bisa|silakan|silahkan|monggo|lanjut|kirim|kirimin|kirimkan)\b[^?]{0,24}$/i.test(text.trim()) ||
+    /^(bisa|tolong|minta)\s+(di\s*)?kirim/i.test(text.trim())
+  // Setuju sambil membalas (kutip) tawarannya, atau setuju setelah tawaran di pesan keluar terakhir.
+  const quoted = current.find((row) => row.replyTo && isOffer(String(row.replyTo)) && isYes(String(row.body || '')))
+  const offer = String(quoted?.replyTo || lastOut?.body || '').trim()
+  if (!isOffer(offer)) return ''
+  const agree = Boolean(quoted) || current.some((row) => isYes(String(row.body || '')))
+  return agree
+    ? `(Pelanggan sudah SETUJU tawaranmu: "${offer.slice(0, 160)}". Kerjakan sekarang di balasan ini (mis. kirim daftar/foto dari KATALOG), sekaligus jawab pertanyaan lain di pesannya. Jangan bertanya ulang atau menunggu.)\n`
+    : ''
+}
+
+/**
  * Buang bubble pertanyaan yang sudah ditanyakan di balasan keluar terakhir
  * ("biasanya pakai size apa bos?" dua kali berturut-turut). Bubble lain tetap;
  * kalau semua bubble adalah ulangan, balasan dibiarkan apa adanya.
@@ -598,7 +625,7 @@ export async function createLeanReply(input: {
     spec,
     history: rows,
     context: collectContext({ history: rows, catalog: digest.rows, text: input.text }),
-    message: `${replyContext(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
+    message: `${replyContext(rows)}${acceptedOffer(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
     production: settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : '',
     imageCount: input.imagePaths?.length || 0,
