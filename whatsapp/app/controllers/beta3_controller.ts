@@ -294,12 +294,18 @@ export default class Beta3Controller {
   async readyOrder({ params, response }: HttpContext) {
     try {
       const order = await markLeanOrderReady(Number(params.id))
+      // Sapaan sesuai jam WIB; malam hari pengiriman dijanjikan besok.
+      const hour = Number(
+        new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', hourCycle: 'h23' }).format(new Date())
+      )
+      const greet = hour >= 4 && hour < 11 ? 'pagi' : hour < 15 && hour >= 11 ? 'siang' : hour >= 15 && hour < 18 ? 'sore' : 'malam'
+      const when = greet === 'malam' ? 'besok' : 'hari ini'
       await queueOutgoingMessage({
         jid: String(order.jid),
         sender: 'system',
         body: order.sisa > 0
-          ? `Pesanannya sudah selesai bos. Sisa pembayaran ${rupiah(order.sisa)}, silakan dilunasi ke rekening yang sama ya, agar pesanan bisa kami kirim hari ini.`
-          : 'Pesanannya sudah selesai bos, hari ini kami kirim ya. Nomor resi kami kabari setelah dikirim.',
+          ? `Selamat ${greet} bos, pesanannya sudah selesai ya. Untuk sisa pembayarannya Rp${rupiah(order.sisa)}, bisa dilunasi ke rekening yang sama bos, biar ${when} langsung kami kirim. Terimakasih`
+          : `Selamat ${greet} bos, pesanannya sudah selesai ya. ${when === 'besok' ? 'Besok' : 'Hari ini'} kami kirim, nomor resinya nanti kami kabari. Terimakasih`,
       })
       return response.json({ ok: true, sisa: order.sisa })
     } catch (error) {
