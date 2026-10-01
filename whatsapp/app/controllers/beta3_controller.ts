@@ -24,6 +24,7 @@ import {
   updatePendingOrderSpec,
   renderGroupOrderMessage,
   pendingSettlement,
+  isOrderShipped,
 } from '#beta3/order_service'
 import {
   readCustomerNote,
@@ -365,7 +366,10 @@ export default class Beta3Controller {
     const text = shown ? renderGroupOrderMessage(shown) : spec
     const refs = shown && shown.status === 'paid' ? await refsForOrder(Number(shown.id)) : await listActiveRefs(jid)
     const [withPhotos] = await attachOrderPhotos([{ spec: text, items: '', chat_note: '' }])
-    if (order) (order as Record<string, any>).settlement = await pendingSettlement(order).catch(() => null)
+    if (order) {
+      ;(order as Record<string, any>).shipped = await isOrderShipped(order).catch(() => false)
+      ;(order as Record<string, any>).settlement = await pendingSettlement(order).catch(() => null)
+    }
     response.header('cache-control', 'no-store')
     return response.json({
       jid,

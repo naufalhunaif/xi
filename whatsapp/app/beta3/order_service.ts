@@ -611,6 +611,22 @@ export async function settleLeanOrder(id: number, amount: number) {
   return { ...order, paid_amount: paid, lunas: done, sisa: Math.max(0, total - paid) }
 }
 
+/** Order sudah dikirim: ada resi di chat setelah order dibuat (order rekap: resi kapan pun). */
+export async function isOrderShipped(order: Record<string, any> | null | undefined) {
+  if (!order || order.status === 'cancelled') return false
+  if (order.shipped === true || Number(order.shipped) === 1) return true
+  if (order.shipped === false) return false
+  const row = await db
+    .from('whatsapp_beta3_shipments')
+    .where('jid', String(order.jid))
+    .where((inner) => {
+      inner.where('created_at', '>=', order.created_at)
+      if (order.source === 'rekap') inner.orWhereNotNull('created_at')
+    })
+    .first()
+  return Boolean(row)
+}
+
 /**
  * Order DP yang pelanggannya sudah mengirim bukti pelunasan tapi belum dikonfirmasi:
  * gambar dari pelanggan setelah DP dicatat (bukan foto model/ukuran). Nominal dari bukti
@@ -622,16 +638,7 @@ export async function pendingSettlement(order: Record<string, any> | null | unde
   const paid = Number(order.paid_amount || 0)
   if (!total || paid >= total) return null
   // Sudah dikirim (ada resi): toko hanya mengirim setelah lunas, foto sesudahnya bukan pelunasan.
-  if (order.shipped === true || Number(order.shipped) === 1) return null
-  const shipped = await db
-    .from('whatsapp_beta3_shipments')
-    .where('jid', String(order.jid))
-    .where((inner) => {
-      inner.where('created_at', '>=', order.created_at)
-      if (order.source === 'rekap') inner.orWhereNotNull('created_at')
-    })
-    .first()
-  if (shipped) return null
+  if (await isOrderShipped(order)) return null
   const since = order.paid_checked_at || order.updated_at
   const images = await db
     .from('whatsapp_messages')

@@ -25,6 +25,7 @@
     // Menunggu bayar: nominal dari bukti transfer (dibaca AI), belum ada = total.
     let value = waiting ? Number(order.reported_amount || 0) || total : Number(order.paid_amount || total)
     let saved = value
+    let ready = null
 
     const row = el('div', undefined, 'wa-b3-dp-row')
     const input = el('input', undefined, 'wa-b3-dp')
@@ -59,7 +60,7 @@
         try {
           await ctx.post(`/api/beta3/orders/${order.id}/paid-amount`, { amount: value })
           saved = value
-          ready.textContent = readyLabel()
+          if (ready) ready.textContent = readyLabel()
           ctx.notice(t('Tersimpan'))
         } catch (error) {
           ctx.notice(error.message, true)
@@ -138,7 +139,9 @@
     }
 
     const readyLabel = () => (total && saved < total ? t('Selesai · minta pelunasan') : t('Selesai · kabari pelanggan'))
-    const ready = el('button', readyLabel(), 'button')
+    // Sudah dikirim (ada resi): tidak perlu kabari pesanan selesai lagi.
+    if (order.shipped) return { row, buttons }
+    ready = el('button', readyLabel(), 'button')
     ready.type = 'button'
     if (order.ready_at)
       ready.title = `${t('Sudah dikabari')} ${new Date(order.ready_at).toLocaleString(window.waI18n?.locale || 'id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
