@@ -621,6 +621,17 @@ export async function pendingSettlement(order: Record<string, any> | null | unde
   const total = Number(order.total || 0)
   const paid = Number(order.paid_amount || 0)
   if (!total || paid >= total) return null
+  // Sudah dikirim (ada resi): toko hanya mengirim setelah lunas, foto sesudahnya bukan pelunasan.
+  if (order.shipped === true || Number(order.shipped) === 1) return null
+  const shipped = await db
+    .from('whatsapp_beta3_shipments')
+    .where('jid', String(order.jid))
+    .where((inner) => {
+      inner.where('created_at', '>=', order.created_at)
+      if (order.source === 'rekap') inner.orWhereNotNull('created_at')
+    })
+    .first()
+  if (shipped) return null
   const since = order.paid_checked_at || order.updated_at
   const images = await db
     .from('whatsapp_messages')
