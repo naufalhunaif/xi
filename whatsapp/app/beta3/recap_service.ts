@@ -10,6 +10,7 @@ import {
   writeBeta3ChatNote,
 } from '#beta3/tables'
 import { nextOrderNumber, tidyLooseAddress } from '#beta3/order_service'
+import { rupiah } from '#beta3/catalog_service'
 import { writeOrderSpec } from '#beta3/customer_service'
 
 export const RECAP_SCHEMA = {
@@ -32,6 +33,11 @@ export const RECAP_SCHEMA = {
     alamat: { type: 'string', description: 'Alamat pengiriman lengkap persis dari chat; kosong bila tidak ada.' },
     total: { type: 'integer', description: 'Total yang disepakati/ditransfer (rupiah), 0 bila tidak jelas.' },
     ongkir: { type: 'integer', description: 'Ongkir (rupiah), 0 bila tidak jelas.' },
+    dibayar: {
+      type: 'integer',
+      description:
+        'Dana yang SUDAH dikonfirmasi toko (rupiah), dijumlah bila DP lalu pelunasan. DP 250.000 dari total 525.000 = 250000. 0 bila belum ada konfirmasi atau tidak jelas.',
+    },
     layanan: { type: 'string', description: 'Layanan kirim (REG/YES/JTR/…); kosong bila tidak jelas.' },
     catatan: {
       type: 'string',
@@ -39,7 +45,7 @@ export const RECAP_SCHEMA = {
         'Catatan chat maksimal 6 baris "kunci: isi": produk, size, alamat, tahap, menunggu apa.',
     },
   },
-  required: ['status', 'rincian', 'nama', 'hp', 'alamat', 'total', 'ongkir', 'layanan', 'catatan'],
+  required: ['status', 'rincian', 'nama', 'hp', 'alamat', 'total', 'ongkir', 'dibayar', 'layanan', 'catatan'],
 } as const
 
 export type ChatRecap = {
@@ -50,6 +56,7 @@ export type ChatRecap = {
   alamat: string
   total: number
   ongkir: number
+  dibayar: number
   layanan: string
   catatan: string
 }
@@ -60,7 +67,7 @@ Aturan:
 - Semua isi harus berasal dari chat. Jangan mengarang produk, harga, alamat, atau status.
 - Pesan "CS (manusia)" dan "AI" sama-sama dari pihak toko.
 - Bila ada beberapa pesanan dalam riwayat, rangkum pesanan TERAKHIR saja.
-- status lunas hanya bila ada bukti transfer/pernyataan sudah bayar DAN toko mengonfirmasi dananya.
+- status lunas hanya bila ada bukti transfer/pernyataan sudah bayar DAN toko mengonfirmasi dananya (termasuk DP yang sudah dikonfirmasi; isi nominalnya di dibayar).
 - Bila ragu soal angka, isi 0 atau kosong.`
 
 function parseRecap(text: string): ChatRecap | null {
@@ -81,6 +88,7 @@ function parseRecap(text: string): ChatRecap | null {
       alamat: str(raw.alamat, 600),
       total: Math.max(0, Math.round(Number(raw.total) || 0)),
       ongkir: Math.max(0, Math.round(Number(raw.ongkir) || 0)),
+      dibayar: Math.max(0, Math.round(Number(raw.dibayar) || 0)),
       layanan: str(raw.layanan, 40),
       catatan: str(raw.catatan, 1500),
     }
@@ -150,6 +158,13 @@ export async function saveRecap(jid: string, recap: ChatRecap) {
     subtotal: recap.total && recap.ongkir && recap.total > recap.ongkir ? recap.total - recap.ongkir : null,
     total: recap.total || null,
     updated_at: now,
+  }
+  // DP: catat nominal yang sudah dikonfirmasi; tanpa angka = dianggap penuh (dicek ulang dari bukti transfer).
+  if (paid && recap.dibayar > 0) {
+    const dp = recap.total && recap.dibayar < recap.total
+    values.paid_amount = dp ? recap.dibayar : recap.total || recap.dibayar
+    values.paid_checked_at = now
+    values.cs_note = dp ? `DP ${rupiah(recap.dibayar)}, sisa ${rupiah(recap.total - recap.dibayar)}` : 'Lunas'
   }
   const active = await db
     .from('whatsapp_beta3_orders')

@@ -343,6 +343,22 @@
       reactions.append(emoji)
     }
     footer.append(reactions)
+    // Jam kirim (WIB); pesan bukan hari ini ikut tanggalnya.
+    const sentAt = message.created_at ? new Date(message.created_at) : null
+    if (sentAt && !Number.isNaN(sentAt.getTime())) {
+      const time = document.createElement('time')
+      time.className = 'message-time'
+      time.dateTime = sentAt.toISOString()
+      const zone = { timeZone: 'Asia/Jakarta' }
+      const day = (date) => date.toLocaleDateString('en-CA', zone)
+      const clock = sentAt.toLocaleTimeString('id-ID', { ...zone, hour: '2-digit', minute: '2-digit' })
+      time.textContent =
+        day(sentAt) === day(new Date())
+          ? clock
+          : `${sentAt.toLocaleDateString(window.waI18n?.locale || 'id-ID', { ...zone, day: 'numeric', month: 'short' })} ${clock}`
+      time.title = sentAt.toLocaleString(window.waI18n?.locale || 'id-ID', { ...zone, dateStyle: 'full', timeStyle: 'short' })
+      footer.append(time)
+    }
     if (message.direction === 'out') {
       const status = document.createElement('span')
       status.className = `message-status ${message.status}`

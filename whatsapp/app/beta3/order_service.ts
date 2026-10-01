@@ -14,7 +14,7 @@ import { rupiah } from '#beta3/catalog_service'
 import { attachRefsToOrder, proofTotalSince } from '#beta3/refs_service'
 import { addProductionDays, closedDaysFromStore } from '#beta3/prompt'
 import { readProductionPolicy } from '#services/production_service'
-import { readLeanState } from '#beta3/tables'
+import { readLeanState, writeLeanState } from '#beta3/tables'
 
 /**
  * Jalur 2 (event): form order dari pelanggan dibaca KODE, disimpan sebagai order
@@ -704,6 +704,16 @@ export async function recheckPaidOrders(limit = 3) {
   rechecking = true
   try {
     await ensureLeanTables()
+    // Sekali jalan: order rekap lama dicek ulang (dulu bukti DP sebelum tanggal rekap terlewat).
+    if (!(await readLeanState('rekap_paid_recheck_v1'))) {
+      await db
+        .from('whatsapp_beta3_orders')
+        .where('status', 'paid')
+        .where('source', 'rekap')
+        .whereNull('paid_amount')
+        .update({ paid_checked_at: null })
+      await writeLeanState('rekap_paid_recheck_v1', '1')
+    }
     const orders = await db
       .from('whatsapp_beta3_orders')
       .where('status', 'paid')
@@ -714,7 +724,14 @@ export async function recheckPaidOrders(limit = 3) {
       .orderBy('id', 'desc')
       .limit(limit)
     for (const order of orders as any[]) {
-      const paid = await proofTotalSince(String(order.jid), new Date(order.created_at)).catch(() => 0)
+      // Sudah dikirim = sudah lunas (toko mengirim setelah lunas): tidak perlu dibaca ulang.
+      if (await isOrderShipped(order).catch(() => false)) {
+        await db.from('whatsapp_beta3_orders').where('id', order.id).update({ paid_checked_at: new Date() })
+        continue
+      }
+      // Order rekap dibuat setelah chat-nya: bukti transfer ada sebelum tanggal order.
+      const since = new Date(new Date(order.created_at).getTime() - (order.source === 'rekap' ? 14 * 86_400_000 : 0))
+      const paid = await proofTotalSince(String(order.jid), since).catch(() => 0)
       const total = Number(order.total || 0)
       await db
         .from('whatsapp_beta3_orders')
