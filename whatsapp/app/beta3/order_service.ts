@@ -603,10 +603,59 @@ export async function settleLeanOrder(id: number, amount: number) {
     .where('id', id)
     .update({
       paid_amount: total ? Math.min(paid, total) : paid,
+      paid_checked_at: new Date(),
+      reported_amount: null,
       cs_note: done ? 'Lunas' : `DP ${rupiah(paid)}, sisa ${rupiah(total - paid)}`,
       updated_at: new Date(),
     })
   return { ...order, paid_amount: paid, lunas: done, sisa: Math.max(0, total - paid) }
+}
+
+/**
+ * Order DP yang pelanggannya sudah mengirim bukti pelunasan tapi belum dikonfirmasi:
+ * gambar dari pelanggan setelah DP dicatat (bukan foto model/ukuran). Nominal dari bukti
+ * yang dibaca AI; tidak terbaca = sisa tagihan.
+ */
+export async function pendingSettlement(order: Record<string, any> | null | undefined) {
+  if (!order || order.status !== 'paid') return null
+  const total = Number(order.total || 0)
+  const paid = Number(order.paid_amount || 0)
+  if (!total || paid >= total) return null
+  const since = order.paid_checked_at || order.updated_at
+  const images = await db
+    .from('whatsapp_messages')
+    .where('jid', String(order.jid))
+    .where('direction', 'in')
+    .where('media_type', 'image')
+    .where('created_at', '>', since)
+    .orderBy('id', 'desc')
+    .limit(6)
+    .select('message_id', 'media_url')
+  if (!images.length) return null
+  const kinds = new Map(
+    (
+      await db
+        .from('whatsapp_beta3_proofs')
+        .whereIn('message_id', images.map((row: any) => String(row.message_id)))
+        .select('message_id', 'kind', 'note')
+    ).map((row: any) => [String(row.message_id), { kind: String(row.kind), note: String(row.note || '') }])
+  )
+  const proofs = images.filter((row: any) => !['model', 'ukuran', 'lain'].includes(kinds.get(String(row.message_id))?.kind || ''))
+  if (!proofs.length) return null
+  const sisa = total - paid
+  const fromNote = Math.max(0, ...proofs.map((row: any) => proofAmountOf(kinds.get(String(row.message_id))?.note || '')))
+  const reported = Number(order.reported_amount || 0) > paid ? Number(order.reported_amount) - paid : 0
+  const read = fromNote || reported
+  return {
+    amount: read > 0 && read <= sisa ? read : sisa,
+    sisa,
+    images: proofs.map((row: any) => String(row.media_url || '')).filter(Boolean).slice(0, 3),
+  }
+}
+
+const proofAmountOf = (note: string) => {
+  const values = (String(note || '').match(/\d{1,3}(?:[.,]\d{3})+/g) || []).map((part) => Number(part.replace(/[.,]/g, '')))
+  return values.length ? Math.max(...values) : 0
 }
 
 /** Koreksi nominal dibayar (mis. tercatat lunas padahal DP). Tidak mengirim pesan. */
@@ -703,6 +752,9 @@ export async function syncOrderFromChat(
       .first()
     if (dp && info.dikonfirmasi && info.dibayar > Number(dp.paid_amount || 0))
       await setLeanPaidAmount(Number(dp.id), info.dibayar)
+    // Pelanggan mengirim pelunasan (belum dikonfirmasi): nominal dari bukti jadi isian tombol konfirmasi.
+    else if (dp && !info.dikonfirmasi && info.dibayar > Number(dp.paid_amount || 0) && Number(dp.reported_amount || 0) !== info.dibayar)
+      await db.from('whatsapp_beta3_orders').where('id', dp.id).update({ reported_amount: info.dibayar })
     return null
   }
   let status = String(order.status)

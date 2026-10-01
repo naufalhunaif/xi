@@ -65,9 +65,11 @@ export async function latestInboxMessages() {
           AND EXISTS (SELECT 1 FROM whatsapp_messages p WHERE p.jid = m.jid AND p.direction = 'in'
             AND p.media_type = 'image' AND p.created_at > b.updated_at))
         OR EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'paid'
-          AND b.paid_amount < b.total AND b.ready_at IS NOT NULL
+          AND b.paid_amount < b.total
           AND EXISTS (SELECT 1 FROM whatsapp_messages p WHERE p.jid = m.jid AND p.direction = 'in'
-            AND p.media_type = 'image' AND p.created_at > b.ready_at))
+            AND p.media_type = 'image' AND p.created_at > COALESCE(b.paid_checked_at, b.updated_at)
+            AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_proofs k WHERE k.message_id = p.message_id
+              AND k.kind IN ('model', 'ukuran', 'lain'))))
         OR EXISTS (SELECT 1 FROM whatsapp_beta3_chats n WHERE n.jid = m.jid
           AND n.note REGEXP 'tahap[[:space:]]*[:=][[:space:]]*bukti_dikirim'
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid

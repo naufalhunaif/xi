@@ -75,6 +75,24 @@
     const cell = el('dd')
     cell.append(input, pill)
     row.append(el('dt', waiting ? t('Dana masuk') : t('Dibayar')), cell)
+    // Bukti pelunasan dari pelanggan (DP) tampil kecil di bawah nominal.
+    if (!waiting && order.settlement?.images?.length) {
+      const shots = el('div', undefined, 'wa-beta3-proofs')
+      shots.append(el('small', t('Ada bukti pelunasan')))
+      for (const url of order.settlement.images) {
+        const link = el('a')
+        link.href = url
+        link.target = '_blank'
+        link.rel = 'noopener'
+        const img = el('img')
+        img.src = url
+        img.alt = t('Ada bukti pelunasan')
+        img.loading = 'lazy'
+        link.append(img)
+        shots.append(link)
+      }
+      cell.append(shots)
+    }
 
     const buttons = []
     if (waiting) {
@@ -97,6 +115,26 @@
       })
       buttons.push(confirm)
       return { row, buttons }
+    }
+
+    // DP: pelanggan sudah mengirim bukti pelunasan → konfirmasi seperti pembayaran awal.
+    const settle = order.settlement
+    if (settle && settle.amount > 0) {
+      const confirmSettle = el('button', `${t('Konfirmasi pelunasan')} ${money(settle.amount)}`, 'button primary')
+      confirmSettle.type = 'button'
+      confirmSettle.addEventListener('click', async () => {
+        if (!window.confirm(t('Pelunasan {0} sudah masuk? Pelanggan akan dikabari.', money(settle.amount)))) return
+        confirmSettle.disabled = true
+        try {
+          const result = await ctx.post(`/api/beta3/orders/${order.id}/settle`, { amount: settle.amount })
+          ctx.notice(result.lunas ? t('Lunas. Pelanggan sudah dikabari.') : t('Pelunasan tercatat. Pelanggan sudah dikabari.'))
+          await ctx.reload()
+        } catch (error) {
+          ctx.notice(error.message, true)
+          confirmSettle.disabled = false
+        }
+      })
+      buttons.push(confirmSettle)
     }
 
     const readyLabel = () => (total && saved < total ? t('Selesai · minta pelunasan') : t('Selesai · kabari pelanggan'))

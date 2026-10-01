@@ -23,6 +23,7 @@ import {
   requeueLeanOrderGroup,
   updatePendingOrderSpec,
   renderGroupOrderMessage,
+  pendingSettlement,
 } from '#beta3/order_service'
 import {
   readCustomerNote,
@@ -206,6 +207,9 @@ export default class Beta3Controller {
     // Berat pesanan (dasar ongkir) tampil di detail order.
     for (const order of withPhotos as Array<Record<string, any>>)
       order.weight_grams = await orderWeightGrams(String(order.spec || order.items || '')).catch(() => null)
+    // DP: bukti pelunasan yang menunggu konfirmasi → tombol "Konfirmasi pelunasan".
+    for (const order of withPhotos as Array<Record<string, any>>)
+      order.settlement = await pendingSettlement(order).catch(() => null)
     return response.json({ orders: withPhotos, counts })
   }
 
@@ -361,6 +365,7 @@ export default class Beta3Controller {
     const text = shown ? renderGroupOrderMessage(shown) : spec
     const refs = shown && shown.status === 'paid' ? await refsForOrder(Number(shown.id)) : await listActiveRefs(jid)
     const [withPhotos] = await attachOrderPhotos([{ spec: text, items: '', chat_note: '' }])
+    if (order) (order as Record<string, any>).settlement = await pendingSettlement(order).catch(() => null)
     response.header('cache-control', 'no-store')
     return response.json({
       jid,
