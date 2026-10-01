@@ -351,7 +351,7 @@
       time.dateTime = sentAt.toISOString()
       const zone = { timeZone: 'Asia/Jakarta' }
       const day = (date) => date.toLocaleDateString('en-CA', zone)
-      const clock = sentAt.toLocaleTimeString('id-ID', { ...zone, hour: '2-digit', minute: '2-digit' })
+      const clock = sentAt.toLocaleTimeString('en-US', { ...zone, hour: 'numeric', minute: '2-digit', hour12: true })
       time.textContent =
         day(sentAt) === day(new Date())
           ? clock
