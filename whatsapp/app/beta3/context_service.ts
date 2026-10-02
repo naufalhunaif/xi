@@ -249,11 +249,9 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
     }
     let found = false
     for (const part of BODY_PARTS) {
-      // Rentang ("86-88") → pakai angka terbesar supaya tidak kesempitan.
-      const hit = text.match(new RegExp(`${part}\\D{0,12}(\\d{2,3}(?:[.,]\\d)?)(?:\\s*(?:-|–|s\\/?d|sampai)\\s*(\\d{2,3}(?:[.,]\\d)?))?`))
+      const hit = text.match(new RegExp(`${part}\\D{0,12}(\\d{2,3}(?:[.,]\\d)?)`))
       if (hit) {
-        const values = [hit[1], hit[2]].filter(Boolean).map((v) => Number(String(v).replace(',', '.')))
-        body.set(part === 'pinggul' ? 'panggul' : part, Math.max(...values))
+        body.set(part === 'pinggul' ? 'panggul' : part, Number(hit[1].replace(',', '.')))
         found = true
       }
     }
@@ -271,15 +269,10 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
       const sized = group.rows.filter((row) => row.values.has(part))
       if (!sized.length) continue
       // Ukuran jadi yang PALING DEKAT dengan ukuran badan; bila sama dekat, pilih yang lebih besar.
-      // Dada/bahu atasan: ukuran jadi harus lebih besar dari badan (ruang gerak ±4 cm), kalau
-      // tidak jas akan ngepress → size terkecil yang ukuran jadinya ≥ badan + 4.
       const sorted = [...sized].sort((a, b) => a.values.get(part)! - b.values.get(part)!)
       const largest = sorted[sorted.length - 1].values.get(part)!
-      const ease = part === 'dada' ? 4 : 0
-      const roomy = ease ? sorted.find((row) => row.values.get(part)! >= value + ease) : undefined
-      const fit = ease
-        ? roomy
-        : value > largest + 2
+      const fit =
+        value > largest + 2
           ? undefined
           : sorted.reduce((best, row) => {
               const diff = Math.abs(row.values.get(part)! - value)
@@ -290,9 +283,7 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
       const around = sorted.slice(Math.max(0, index - 1), index + 2)
       lines.push(
         `${group.name}: ${part} badan ${value} cm → ${around.map((row) => `${row.size} = ${row.values.get(part)} cm`).join(', ')}. ` +
-          (fit && ease
-            ? `Pakai ${fit.size} (ukuran jadi ${fit.values.get(part)} cm, longgar ${Math.round((fit.values.get(part)! - value) * 10) / 10} cm dari badan, tidak ngepress). Size dengan ukuran jadi sama/lebih kecil dari badan akan ngepress.`
-            : fit
+          (fit
             ? `Paling dekat: ${fit.size} (${fit.values.get(part)} cm, selisih ${Math.abs(Math.round((fit.values.get(part)! - value) * 10) / 10)} cm). Sebut nomor ini; jangan menaikkan nomor tanpa alasan.`
             : 'Lebih besar dari size terbesar: sarankan custom/tanya CS.')
       )
