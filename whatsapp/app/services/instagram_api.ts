@@ -19,12 +19,21 @@ export class IgApiError extends Error {
 }
 
 async function call(url: string, init: RequestInit = {}) {
-  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(20_000) })
+  // Token dikirim sebagai access_token di query (cara yang didukung semua endpoint graph.instagram.com).
+  const headers = new Headers(init.headers)
+  const auth = headers.get('Authorization') || ''
+  const target = new URL(url)
+  if (auth.startsWith('Bearer ')) {
+    target.searchParams.set('access_token', auth.slice(7))
+    headers.delete('Authorization')
+  }
+  const response = await fetch(target, { ...init, headers, signal: AbortSignal.timeout(20_000) })
   const data = (await response.json().catch(() => ({}))) as any
   if (!response.ok || data?.error) {
     const error = data?.error || {}
+    const where = target.pathname.replace(/^\/v[\d.]+/, '')
     throw new IgApiError(
-      String(error.error_user_msg || error.message || `Instagram API ${response.status}`),
+      `${String(error.error_user_msg || error.message || error.error_message || data?.error_message || `Instagram API ${response.status}`)} (${where})`,
       Number(error.code || 0),
       response.status
     )
@@ -62,34 +71,46 @@ export async function exchangeCode(input: { appId: string; appSecret: string; re
   })
   const shortToken = String(short.access_token || short.data?.[0]?.access_token || '')
   if (!shortToken) throw new IgApiError('Token Instagram tidak diterima.')
-  const long = await call(
-    `https://graph.instagram.com/access_token?${new URLSearchParams({
-      grant_type: 'ig_exchange_token',
-      client_secret: input.appSecret,
-      access_token: shortToken,
-    })}`
-  )
+  const query = new URLSearchParams({
+    grant_type: 'ig_exchange_token',
+    client_secret: input.appSecret,
+    access_token: shortToken,
+  })
+  const long = await firstOk([
+    `https://graph.instagram.com/access_token?${query}`,
+    `${IG_GRAPH}/access_token?${query}`,
+  ])
   return { token: String(long.access_token), expiresIn: Number(long.expires_in || 0) }
 }
 
+/** Coba beberapa bentuk URL yang setara; lempar error pertama bila semua gagal. */
+async function firstOk(urls: string[]) {
+  let first: unknown
+  for (const url of urls) {
+    try {
+      return await call(url)
+    } catch (error) {
+      first ??= error
+    }
+  }
+  throw first
+}
+
 export async function refreshToken(token: string) {
-  const data = await call(
-    `https://graph.instagram.com/refresh_access_token?${new URLSearchParams({
-      grant_type: 'ig_refresh_token',
-      access_token: token,
-    })}`
-  )
+  const query = new URLSearchParams({ grant_type: 'ig_refresh_token', access_token: token })
+  const data = await firstOk([
+    `https://graph.instagram.com/refresh_access_token?${query}`,
+    `${IG_GRAPH}/refresh_access_token?${query}`,
+  ])
   return { token: String(data.access_token), expiresIn: Number(data.expires_in || 0) }
 }
 
 export async function me(token: string) {
-  const data = await call(`${IG_GRAPH}/me?fields=user_id,username,name,profile_picture_url`, {
-    headers: bearer(token),
-  })
+  const data = await call(`${IG_GRAPH}/me?fields=user_id,username`, { headers: bearer(token) })
   return {
     userId: String(data.user_id || data.id || ''),
     username: String(data.username || ''),
-    name: String(data.name || ''),
+    name: String(data.name || data.username || ''),
   }
 }
 
