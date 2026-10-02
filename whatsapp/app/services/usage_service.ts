@@ -151,21 +151,7 @@ export async function readUsage(options: { days?: number; date?: string } = {}) 
       cacheWrite: Number(row.cacheWrite || 0),
       durationMs: Math.round(Number(row.duration || 0)),
     })),
-    recent: recent.map((row) => ({
-      id: Number(row.id),
-      provider: row.provider,
-      phase: row.phase || '',
-      model: row.model || 'bawaan akun',
-      status: row.status,
-      tokens:
-        row.input_tokens === null ? null : Number(row.input_tokens) + Number(row.output_tokens),
-      input: row.input_tokens === null ? null : Number(row.input_tokens),
-      output: row.output_tokens === null ? null : Number(row.output_tokens),
-      cached: row.cached_tokens === null ? null : Number(row.cached_tokens),
-      cacheWrite: row.cache_write_tokens === null ? null : Number(row.cache_write_tokens),
-      durationMs: Number(row.duration_ms),
-      createdAt: new Date(row.created_at).toISOString(),
-    })),
+    recent: recent.map(mapRun),
   }
 }
 
@@ -197,4 +183,42 @@ export async function usageCalendar() {
   const data = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
   calendarCache.set(key, { at: Date.now(), data })
   return data
+}
+
+const mapRun = (row: any) => ({
+  id: Number(row.id),
+  provider: row.provider,
+  phase: row.phase || '',
+  model: row.model || 'bawaan akun',
+  status: row.status,
+  tokens: row.input_tokens === null ? null : Number(row.input_tokens) + Number(row.output_tokens),
+  input: row.input_tokens === null ? null : Number(row.input_tokens),
+  output: row.output_tokens === null ? null : Number(row.output_tokens),
+  cached: row.cached_tokens === null ? null : Number(row.cached_tokens),
+  cacheWrite: row.cache_write_tokens === null ? null : Number(row.cache_write_tokens),
+  durationMs: Number(row.duration_ms),
+  createdAt: new Date(row.created_at).toISOString(),
+})
+
+/** Riwayat proses (Pengaturan → Usage → Proses terbaru): per halaman, bisa difilter model/fase. */
+export async function readRuns(options: { days?: number; date?: string; before?: number; model?: string; phase?: string; provider?: string; limit?: number } = {}) {
+  await initializeDatabase()
+  const days = USAGE_RANGES.includes(Number(options.days)) ? Number(options.days) : 30
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(options.date || '')) ? DateTime.fromISO(String(options.date), { zone: ZONE }) : null
+  const since = (day?.isValid ? day : DateTime.now().setZone(ZONE).minus({ days: days - 1 })).startOf('day').toJSDate()
+  const limit = Math.min(100, Math.max(1, Number(options.limit) || 20))
+  const filtered = () => {
+    const query = db.from('whatsapp_ai_usage').where('created_at', '>=', since)
+    if (day?.isValid) query.where('created_at', '<=', day.endOf('day').toJSDate())
+    if (options.provider) query.where('provider', options.provider)
+    if (options.model) options.model === 'bawaan akun' ? query.whereNull('model') : query.where('model', options.model)
+    if (options.phase) options.phase === 'lainnya' ? query.whereNull('phase') : query.where('phase', options.phase)
+    return query
+  }
+  const page = filtered().orderBy('id', 'desc').limit(limit + 1)
+  if (Number(options.before) > 0) page.where('id', '<', Number(options.before))
+  const [rows, total] = await Promise.all([page, filtered().count('* as total').first()])
+  const more = rows.length > limit
+  const runs = rows.slice(0, limit).map(mapRun)
+  return { runs, total: Number((total as any)?.total || 0), next: more ? runs[runs.length - 1].id : 0 }
 }

@@ -11,6 +11,7 @@
   let evaluationLoading = false
   // Usage: rentang/tanggal terpilih & cache kalender (dipakai selectPanel saat halaman dibuka).
   const usageState = { days: 30, date: '' }
+  const runsState = { filter: null, next: 0, total: 0, shown: 0, extended: false, busy: false }
   let calendarKey = ''
   let lastCalendar = []
   function refreshRelativeTimes() {
@@ -169,10 +170,12 @@
     const cell = event.target.closest('[data-date]')
     if (!cell) return
     usageState.date = usageState.date === cell.dataset.date ? '' : cell.dataset.date
+    runsState.extended = false
     updateUsage()
   })
   byId('usageDay')?.addEventListener('click', () => {
     usageState.date = ''
+    runsState.extended = false
     updateUsage()
   })
   byId('usageRange')?.addEventListener('click', (event) => {
@@ -180,13 +183,13 @@
     if (!button) return
     usageState.days = Number(button.dataset.days)
     usageState.date = ''
+    runsState.extended = false
     updateUsage()
   })
   byId('usageTabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-usage-show]')
     if (!button) return
-    for (const item of byId('usageTabs').querySelectorAll('button')) item.setAttribute('aria-pressed', String(item === button))
-    for (const panel of document.querySelectorAll('[data-usage-tab]')) panel.hidden = panel.dataset.usageTab !== button.dataset.usageShow
+    showUsageTab(button.dataset.usageShow)
   })
   function renderSummary(data) {
     const sum = (key) => data.providers.reduce((total, row) => total + Number(row[key] || 0), 0)
@@ -221,6 +224,118 @@
     chip.textContent = usageState.date ? `${dayLabel(usageState.date)} ×` : ''
     chip.title = t('Kembali ke rentang')
   }
+  /* Proses terbaru: 20 per halaman, "Muat lebih banyak", filter dari klik baris model/fase. */
+  function runRow(run) {
+    const row = document.createElement('tr')
+    const date = new Intl.DateTimeFormat(locale(), {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(run.createdAt))
+    for (const value of [
+      date,
+      run.phase || '—',
+      `${({ claude: 'Claude', gemini: 'Gemini' })[run.provider] || 'ChatGPT'} / ${String(run.model).replace(' (otomatis)', ` (${t('otomatis')})`)}`,
+      run.tokens === null ? '—' : number(run.tokens),
+      t("{0} dtk", number(Math.round(run.durationMs / 1000))),
+      run.status === 'completed' ? t('Selesai') : t('Gagal'),
+    ])
+      row.append(textElement('td', value))
+    if (run.input !== null)
+      row.title = t(
+        'Input {0} · output {1} · cache dibaca {2} · cache ditulis {3}',
+        number(run.input),
+        number(run.output),
+        number(run.cached),
+        number(run.cacheWrite || 0)
+      )
+    return row
+  }
+  function runsQuery(before = 0) {
+    const params = new URLSearchParams(usageState.date ? { date: usageState.date } : { days: String(usageState.days) })
+    const filter = runsState.filter
+    if (filter?.model) params.set('model', filter.model)
+    if (filter?.provider) params.set('provider', filter.provider)
+    if (filter?.phase) params.set('phase', filter.phase)
+    if (before) params.set('before', String(before))
+    return params
+  }
+  async function loadRuns(append, fallback = []) {
+    const recent = byId('usageRecent')
+    if (!recent || runsState.busy) return
+    runsState.busy = true
+    const more = byId('usageRunsMore')
+    if (more) more.disabled = true
+    let data
+    try {
+      const response = await fetch(`${base}/api/ai/usage/runs?${runsQuery(append ? runsState.next : 0)}`, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      })
+      if (!response.ok || response.redirected) throw new Error('runs')
+      data = await response.json()
+    } catch {
+      data = append ? null : { runs: runsState.filter ? [] : fallback, total: runsState.filter ? 0 : fallback.length, next: 0 }
+    }
+    runsState.busy = false
+    if (!data) {
+      if (more) more.disabled = false
+      return
+    }
+    if (!append) {
+      recent.replaceChildren()
+      runsState.shown = 0
+    }
+    for (const run of data.runs) recent.append(runRow(run))
+    runsState.shown += data.runs.length
+    runsState.next = data.next
+    runsState.total = data.total
+    if (!runsState.shown) {
+      const row = document.createElement('tr')
+      const cell = textElement('td', t('Belum ada penggunaan tercatat'))
+      cell.colSpan = 6
+      row.append(cell)
+      recent.append(row)
+    }
+    const info = byId('usageRunsInfo')
+    if (info) info.textContent = runsState.total ? t('Menampilkan {0} dari {1} proses', number(runsState.shown), number(runsState.total)) : ''
+    if (more) {
+      more.hidden = !runsState.next
+      more.disabled = false
+    }
+    const chip = byId('usageRunsFilter')
+    if (chip) {
+      const f = runsState.filter
+      chip.hidden = !f
+      chip.textContent = f ? `${f.phase ? t('Fase: {0}', f.phase) : t('Model: {0}', f.model.replace(' (otomatis)', ` (${t('otomatis')})`))} ×` : ''
+    }
+  }
+  function showUsageTab(name) {
+    for (const item of byId('usageTabs').querySelectorAll('button')) item.setAttribute('aria-pressed', String(item.dataset.usageShow === name))
+    for (const panel of document.querySelectorAll('[data-usage-tab]')) panel.hidden = panel.dataset.usageTab !== name
+  }
+  byId('usageRunsMore')?.addEventListener('click', () => {
+    runsState.extended = true
+    loadRuns(true)
+  })
+  byId('usageRunsFilter')?.addEventListener('click', () => {
+    runsState.filter = null
+    runsState.extended = false
+    loadRuns(false)
+  })
+  for (const id of ['usageModels', 'usagePhases'])
+    byId(id)?.addEventListener('click', (event) => {
+      const row = event.target.closest('tr[data-filter-model], tr[data-filter-phase]')
+      if (!row) return
+      runsState.filter = row.dataset.filterPhase
+        ? { phase: row.dataset.filterPhase }
+        : { model: row.dataset.filterModel, provider: row.dataset.filterProvider }
+      runsState.extended = true
+      showUsageTab('recent')
+      loadRuns(false)
+    })
   async function updateUsage() {
     if (loading || document.hidden) return
     loading = true
@@ -253,7 +368,8 @@
             [`${Math.round((spent[index] / largest) * 100)}%`, 'wa-usage-number'],
           ])
             line.append(textElement('td', value, className))
-          line.title = t("Rata-rata {0} dtk per proses", number(Math.round(row.durationMs / 1000)))
+          line.title = `${t("Rata-rata {0} dtk per proses", number(Math.round(row.durationMs / 1000)))} · ${t('Klik untuk melihat prosesnya')}`
+          line.dataset.filterPhase = row.phase
           phases.append(line)
         })
         if (!(data.phases || []).length) {
@@ -277,6 +393,9 @@
             [number(row.output), 'wa-usage-number'],
           ])
             line.append(textElement('td', value, className))
+          line.dataset.filterModel = row.model
+          line.dataset.filterProvider = row.provider
+          line.title = t('Klik untuk melihat prosesnya')
           models.append(line)
         }
         if (!(data.models || []).length) {
@@ -287,43 +406,8 @@
           models.append(line)
         }
       }
-      const recent = byId('usageRecent')
-      recent.replaceChildren()
-      for (const run of data.recent) {
-        const row = document.createElement('tr')
-        const date = new Intl.DateTimeFormat((window.waI18n?.locale || 'id-ID'), {
-          timeZone: 'Asia/Jakarta',
-          day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit',
-        }).format(new Date(run.createdAt))
-        for (const value of [
-          date,
-          run.phase || '—',
-          `${({ claude: 'Claude', gemini: 'Gemini' })[run.provider] || 'ChatGPT'} / ${String(run.model).replace(' (otomatis)', ` (${t('otomatis')})`)}`,
-          run.tokens === null ? '—' : number(run.tokens),
-          t("{0} dtk", number(Math.round(run.durationMs / 1000))),
-          run.status === 'completed' ? t('Selesai') : t('Gagal'),
-        ])
-          row.append(textElement('td', value))
-        if (run.input !== null)
-          row.title = t(
-            'Input {0} · output {1} · cache dibaca {2} · cache ditulis {3}',
-            number(run.input),
-            number(run.output),
-            number(run.cached),
-            number(run.cacheWrite || 0)
-          )
-        recent.append(row)
-      }
-      if (!data.recent.length) {
-        const row = document.createElement('tr')
-        const cell = textElement('td', t('Belum ada penggunaan tercatat'))
-        cell.colSpan = 6
-        row.append(cell)
-        recent.append(row)
-      }
+      // Proses terbaru: halaman pertama dari /runs (bisa difilter & dimuat lagi); cadangan data.recent.
+      if (!runsState.extended) await loadRuns(false, data.recent)
       byId('usageStatus').textContent = ''
     } catch (error) {
       byId('usageStatus').textContent = error.message

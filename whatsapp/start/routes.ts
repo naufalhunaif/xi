@@ -141,6 +141,7 @@ router
     router.get('/api/cart', [CartsController, 'index'])
     router.post('/api/cart/:action', [CartsController, 'mutate'])
     router.get('/api/ai/usage', [DashboardController, 'usage'])
+    router.get('/api/ai/usage/runs', [DashboardController, 'usageRuns'])
     router.get('/api/ai/quotas', [DashboardController, 'quotas'])
     router.get('/api/ai/trace', [DashboardController, 'trace'])
     router.get('/api/contacts', [DashboardController, 'contactsList'])

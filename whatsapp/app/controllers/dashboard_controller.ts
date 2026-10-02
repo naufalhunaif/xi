@@ -12,7 +12,7 @@ import env from '#start/env'
 import { appVersion, appChannel, appVersionLabel } from '#services/app_version'
 import { readAccess, setDomain, unsetDomain } from '#services/access_service'
 import { pendingOrderCount } from '#services/pending_orders'
-import { readUsage } from '#services/usage_service'
+import { readRuns, readUsage } from '#services/usage_service'
 import { evaluationOverview } from '#services/conversation_evaluation_service'
 import { readTrace } from '#services/trace_service'
 import {
@@ -305,6 +305,20 @@ export default class DashboardController {
   async usage({ request, response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
     return response.json(await readUsage({ days: Number(request.qs().days || 30), date: String(request.qs().date || '') }))
+  }
+  async usageRuns({ request, response }: HttpContext) {
+    response.header('Cache-Control', 'no-store')
+    const qs = request.qs()
+    return response.json(
+      await readRuns({
+        days: Number(qs.days || 30),
+        date: String(qs.date || ''),
+        before: Number(qs.before || 0),
+        model: String(qs.model || '').slice(0, 120),
+        phase: String(qs.phase || '').slice(0, 40),
+        provider: ['chatgpt', 'claude', 'gemini'].includes(String(qs.provider)) ? String(qs.provider) : '',
+      })
+    )
   }
   async quotas({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')

@@ -1665,4 +1665,8 @@ window.waLocales.en = {
   "per proses": "per run",
   "proses": "runs",
   "Kembali ke rentang": "Back to range",
+  "Klik untuk melihat prosesnya": "Click to see its runs",
+  "Menampilkan {0} dari {1} proses": "Showing {0} of {1} runs",
+  "Fase: {0}": "Phase: {0}",
+  "Model: {0}": "Model: {0}",
 }

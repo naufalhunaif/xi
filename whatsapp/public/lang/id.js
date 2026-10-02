@@ -1481,4 +1481,8 @@ window.waLocales.id = {
   "per proses": "per proses",
   "proses": "proses",
   "Kembali ke rentang": "Kembali ke rentang",
+  "Klik untuk melihat prosesnya": "Klik untuk melihat prosesnya",
+  "Menampilkan {0} dari {1} proses": "Menampilkan {0} dari {1} proses",
+  "Fase: {0}": "Fase: {0}",
+  "Model: {0}": "Model: {0}",
 }

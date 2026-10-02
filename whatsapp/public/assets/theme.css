@@ -816,3 +816,8 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui .wa-usage-tabs { margin: 14px 0 6px; }
 .workspace-ui [data-usage-tab][hidden] { display: none; }
 @media (max-width: 640px) { .workspace-ui .wa-usage-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.workspace-ui .wa-usage-runs-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.workspace-ui .wa-usage-runs-foot .wa-usage-caption { margin: 0; }
+.workspace-ui #usageRunsFilter { margin-bottom: 8px; }
+.workspace-ui :is(#usageModels, #usagePhases) tr[data-filter-model], .workspace-ui #usagePhases tr[data-filter-phase] { cursor: pointer; }
+.workspace-ui :is(#usageModels, #usagePhases) tr:is([data-filter-model], [data-filter-phase]):hover { background: var(--wa-green-bg, #f1f8f4); }
