@@ -126,6 +126,10 @@ async function advance(config: IgConfig, post: any) {
     item.type === 'video' ? { video_url: publicMediaUrl(item.file) } : { image_url: publicMediaUrl(item.file) }
 
   if (post.step === 'create') {
+    // Media bisa sedang disimpan di Google Drive (hemat server) → ambil dulu ke server.
+    const { ensureLocal } = await import('#services/instagram_media_store')
+    for (const item of items)
+      if (!(await ensureLocal(item))) return fail(post.id, 'File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.')
     if (kind === 'carousel') {
       const children: string[] = []
       for (const item of items)

@@ -23,6 +23,9 @@ type GoogleState = {
   folderId?: string
   auto?: boolean
   includeMedia?: boolean
+  /** Media postingan Instagram terjadwal disimpan di Drive (hemat server). Bawaan: mati. */
+  igOffload?: boolean
+  igFolderId?: string
   lastBackup?: { at: number; name: string; size: number; ok: boolean; error?: string }
   oauthState?: string
 }
@@ -48,6 +51,7 @@ export async function backupStatus() {
     email: state.email || '',
     auto: state.auto !== false,
     includeMedia: state.includeMedia !== false,
+    igOffload: state.igOffload === true,
     lastBackup: state.lastBackup || null,
     running,
     redirectUri: redirectUri(),
@@ -60,6 +64,7 @@ export async function saveBackupSettings(input: Record<string, unknown>) {
     state.clientSecret = input.clientSecret.trim().slice(0, 300)
   if (typeof input.auto === 'boolean') state.auto = input.auto
   if (typeof input.includeMedia === 'boolean') state.includeMedia = input.includeMedia
+  if (typeof input.igOffload === 'boolean') state.igOffload = input.igOffload
   await writeGoogle(state)
   return backupStatus()
 }
@@ -226,13 +231,13 @@ async function buildArchive(includeMedia: boolean) {
   return { archive, name, size: (await stat(archive)).size }
 }
 
-async function upload(token: string, parent: string, file: string, name: string, size: number) {
+async function upload(token: string, parent: string, file: string, name: string, size: number, mime = 'application/gzip') {
   const start = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json; charset=UTF-8',
-      'X-Upload-Content-Type': 'application/gzip',
+      'X-Upload-Content-Type': mime,
       'X-Upload-Content-Length': String(size),
     },
     body: JSON.stringify({ name, parents: [parent] }),
@@ -255,7 +260,61 @@ async function upload(token: string, parent: string, file: string, name: string,
       body,
     })
     if (![200, 201, 308].includes(response.status)) throw new Error(`Google Drive: upload gagal (${response.status}).`)
+    if (response.status !== 308) {
+      const done = (await response.json().catch(() => ({}))) as Record<string, any>
+      if (done.id) return String(done.id)
+    }
   }
+  return ''
+}
+
+/* ---------------- File satuan (media Instagram terjadwal) ---------------- */
+const IG_FOLDER = 'Instagram terjadwal'
+/** Drive terhubung + pilihan "simpan media jadwal di Drive". */
+export async function driveMediaState() {
+  const state = await readGoogle()
+  return { connected: Boolean(state.refreshToken), offload: state.igOffload === true }
+}
+async function igFolder(state: GoogleState, token: string) {
+  if (state.igFolderId) {
+    const check = await fetch(`https://www.googleapis.com/drive/v3/files/${state.igFolderId}?fields=id,trashed`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = (await check.json().catch(() => ({}))) as Record<string, any>
+    if (check.ok && !data.trashed) return state.igFolderId
+  }
+  const parent = await folderId(state, token)
+  const created = (await (
+    await drive(token, 'files?fields=id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: IG_FOLDER, mimeType: 'application/vnd.google-apps.folder', parents: [parent] }),
+    })
+  ).json()) as any
+  await writeGoogle({ ...(await readGoogle()), igFolderId: String(created.id) })
+  return String(created.id)
+}
+/** Unggah satu file ke folder "WA Backup/Instagram terjadwal"; hasilnya id file di Drive. */
+export async function driveUploadFile(file: string, name: string, mime: string) {
+  const state = await readGoogle()
+  const token = await accessToken(state)
+  const parent = await igFolder(state, token)
+  const id = await upload(token, parent, file, name, (await stat(file)).size, mime)
+  if (!id) throw new Error('Google Drive: id file tidak diterima.')
+  return id
+}
+/** Ambil isi satu file dari Drive (untuk dialirkan atau disimpan). */
+export async function driveFetchFile(id: string) {
+  const state = await readGoogle()
+  const token = await accessToken(state)
+  return drive(token, `files/${encodeURIComponent(id)}?alt=media`)
+}
+export async function driveDownloadFile(id: string, dest: string) {
+  const response = await driveFetchFile(id)
+  const temp = `${dest}.part`
+  await pipeline(Readable.fromWeb(response.body as any), createWriteStream(temp))
+  const { rename } = await import('node:fs/promises')
+  await rename(temp, dest)
 }
 
 let running = ''

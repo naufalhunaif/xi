@@ -1,5 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { createReadStream } from 'node:fs'
+import { Readable } from 'node:stream'
 import { stat } from 'node:fs/promises'
 import env from '#start/env'
 import db from '#services/workspace_database'
@@ -16,6 +17,8 @@ import {
 } from '#services/instagram_publish'
 import { accountOverview, audience, mediaPerformance } from '#services/instagram_insights'
 import { mediaChildren as igChildren } from '#services/instagram_api'
+import { driveIdFor, mediaExists, type StoredItem } from '#services/instagram_media_store'
+import { driveFetchFile } from '#services/backup_service'
 import { generateCaption, postSignals, readAnalysis, startAnalysis } from '#services/instagram_ai'
 
 const NEEDED = ['instagram_business_content_publish', 'instagram_business_manage_insights']
@@ -35,12 +38,24 @@ export default class InstagramContentController {
   async media({ params, response }: HttpContext) {
     const name = String(params.name || '')
     if (!isMediaFile(name)) return response.notFound()
+    const type = name.endsWith('.jpg') ? 'image/jpeg' : name.endsWith('.mov') ? 'video/quicktime' : 'video/mp4'
     try {
       const info = await stat(mediaPath(name))
-      response.header('content-type', name.endsWith('.jpg') ? 'image/jpeg' : name.endsWith('.mov') ? 'video/quicktime' : 'video/mp4')
+      response.header('content-type', type)
       response.header('content-length', String(info.size))
       response.header('cache-control', 'public, max-age=86400')
       return response.stream(createReadStream(mediaPath(name)))
+    } catch {}
+    // Media jadwal yang sedang disimpan di Google Drive: dialirkan langsung untuk pratinjau.
+    const driveId = await driveIdFor(name)
+    if (!driveId) return response.notFound()
+    try {
+      const file = await driveFetchFile(driveId)
+      response.header('content-type', type)
+      const length = file.headers.get('content-length')
+      if (length) response.header('content-length', length)
+      response.header('cache-control', 'private, max-age=3600')
+      return response.stream(Readable.fromWeb(file.body as any))
     } catch {
       return response.notFound()
     }
@@ -106,6 +121,17 @@ export default class InstagramContentController {
     const when = raw && raw !== 'now' ? new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(raw) ? raw : `${raw}+07:00`) : new Date()
     if (Number.isNaN(when.getTime())) return response.badRequest({ error: 'Tanggal/jam tidak valid.' })
     const id = request.input('id') ? Number(request.input('id')) : 0
+    // Saat diubah: pertahankan penanda Google Drive per file, lalu pastikan semua file masih ada.
+    if (id) {
+      const current = await db.from('whatsapp_ig_posts').where('id', id).first()
+      const known = new Map(
+        (JSON.parse(current?.items || '[]') as StoredItem[]).map((item) => [item.file, item.drive || ''])
+      )
+      for (const item of items as StoredItem[]) if (known.get(item.file)) item.drive = known.get(item.file)
+    }
+    for (const item of items as StoredItem[])
+      if (!item.drive && !(await mediaExists(item.file)) && !(await driveIdFor(item.file)))
+        return response.badRequest({ error: 'File sudah kedaluwarsa, unggah ulang fotonya.' })
     const values = {
       kind,
       caption: kind === 'story' ? null : String(request.input('caption') || '').slice(0, 2200),

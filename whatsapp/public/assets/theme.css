@@ -716,3 +716,6 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui .wa-igp-analysis-lead { font-size: 13px; line-height: 1.5; }
 .workspace-ui .wa-igp-analysis-group h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; }
 .workspace-ui .wa-igp-analysis-group ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; line-height: 1.45; }
+/* Gambar yang sudah tidak ada (mis. file dibersihkan): tampil kotak polos, bukan ikon rusak. */
+.workspace-ui img.is-missing { color: transparent; font-size: 0; }
+.workspace-ui .wa-toggle-row > span > .wa-note { display: block; margin-top: 2px; font-weight: 400; }

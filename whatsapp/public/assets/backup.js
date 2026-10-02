@@ -50,6 +50,8 @@
     byId('backupClientSecret').placeholder = state.hasSecret ? t('Tersimpan (isi untuk mengganti)') : ''
     setSwitch(byId('backupAuto'), state.auto)
     setSwitch(byId('backupMedia'), state.includeMedia)
+    setSwitch(byId('backupIgMedia'), state.igOffload)
+    byId('backupIgMedia').disabled = !state.connected
     const last = state.lastBackup
     byId('backupLast').textContent =
       state.running === 'backup'
@@ -105,7 +107,7 @@
       alert(e.message)
     }
   })
-  for (const [id, key] of [['backupAuto', 'auto'], ['backupMedia', 'includeMedia']]) {
+  for (const [id, key] of [['backupAuto', 'auto'], ['backupMedia', 'includeMedia'], ['backupIgMedia', 'igOffload']]) {
     byId(id).addEventListener('click', async (event) => {
       event.stopPropagation()
       const on = byId(id).getAttribute('aria-checked') !== 'true'

@@ -1414,4 +1414,8 @@ window.waLocales.id = {
   "Analisis terlalu lama. Coba lagi.": "Analisis terlalu lama. Coba lagi.",
   "AI belum berhasil membuat analisis. Coba lagi.": "AI belum berhasil membuat analisis. Coba lagi.",
   "Jenis postingan tidak valid.": "Jenis postingan tidak valid.",
+  "Simpan media jadwal Instagram di Google Drive": "Simpan media jadwal Instagram di Google Drive",
+  "Jadwal lebih dari 1 hari ke depan disimpan di Drive, diambil kembali 2 jam sebelum terbit. Hemat ruang server.": "Jadwal lebih dari 1 hari ke depan disimpan di Drive, diambil kembali 2 jam sebelum terbit. Hemat ruang server.",
+  "File sudah kedaluwarsa, unggah ulang fotonya.": "File sudah kedaluwarsa, unggah ulang fotonya.",
+  "File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.": "File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.",
 }

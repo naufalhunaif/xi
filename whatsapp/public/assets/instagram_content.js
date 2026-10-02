@@ -71,6 +71,7 @@
   let media = []
   let stories = []
   let mediaError = ''
+  let nextCursor = ''
   let profileTotal = 0
   let postsLoaded = false
   let mediaLoaded = false
@@ -97,14 +98,14 @@
         count: post?.items.length || 0,
         thumb: item.thumbnail_url || item.media_url || post?.items[0]?.url || '',
         video: false,
+        // Selalu dari Instagram (file di server dihapus 1 hari setelah terbit).
         // Video/Reels bisa diputar; carousel diambil isinya saat detail dibuka.
-        pictures: post
-          ? post.items
-          : item.media_type === 'VIDEO' && item.media_url
+        pictures:
+          item.media_type === 'VIDEO' && item.media_url
             ? [{ url: item.media_url, poster: item.thumbnail_url || '', type: 'video' }]
             : [{ url: item.media_url || item.thumbnail_url || '', type: 'image' }],
         mediaId: String(item.id),
-        carousel: item.media_type === 'CAROUSEL_ALBUM' && !post,
+        carousel: item.media_type === 'CAROUSEL_ALBUM',
         caption: item.caption || post?.caption || '',
         time: item.timestamp || post?.publishedAt,
         status: 'published',
@@ -116,6 +117,8 @@
     }
     for (const post of posts) {
       if (used.has(post.id)) continue
+      // Sudah terbit tapi halamannya belum dimuat: muncul nanti saat menggulir (dari data Instagram).
+      if (post.status === 'published' && nextCursor && !mediaError) continue
       const first = post.items[0]
       rows.push({
         key: `p${post.id}`,
@@ -159,6 +162,7 @@
   }
   function thumbOf(row, className) {
     const node = el(row.video ? 'video' : 'img', undefined, className)
+    node.addEventListener('error', () => node.classList.add('is-missing'), { once: true })
     if (row.thumb) node.src = row.thumb
     if (row.video) {
       node.muted = true
@@ -292,7 +296,6 @@
       notice(error.message, true)
     }
   }
-  let nextCursor = ''
   let moreLoading = false
   async function loadMedia() {
     try {

@@ -13,7 +13,7 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 | Lokasi | Isi |
 |---|---|
 | `app/beta3/` | **AI CS yang aktif** (Beta 3): `reply_service` (keputusan & balasan), `order_service`, `recap_service`, `catalog_*`, `style_service`, `tables` (state & catatan). Alias `#beta3/*`. |
-| `app/services/` | Layanan umum. Instagram: `instagram_api` (Graph API), `instagram_store` (config/token/tabel), `instagram_inbox` (webhook), `instagram_worker` (DM, komentar, tick), `instagram_publish` (jadwal posting), `instagram_insights` (insights), `instagram_ai` (caption AI, analisis konten, sinyal minat beli per postingan). |
+| `app/services/` | Layanan umum. Instagram: `instagram_api` (Graph API), `instagram_store` (config/token/tabel), `instagram_inbox` (webhook), `instagram_worker` (DM, komentar, tick), `instagram_publish` (jadwal posting), `instagram_insights` (insights), `instagram_ai` (caption AI, analisis konten, sinyal minat beli per postingan), `instagram_media_store` (bersih otomatis media & opsi simpan media jadwal di Google Drive). |
 | `app/controllers/` | HTTP. Satu controller per area (`instagram_controller` = koneksi & komentar, `instagram_content_controller` = posting & insights). |
 | `commands/whatsapp_listen.ts` | Worker Baileys: terima/kirim pesan, sinkron riwayat, timer, sapuan. File besar — ubah seperlunya saja. |
 | `skills-beta3/` | Skill/prompt AI Beta 3 (`beta3-cs-inti/SKILL.md` = aturan bicara CS). Ikut rilis. |
