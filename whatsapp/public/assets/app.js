@@ -206,7 +206,7 @@
     const article = document.createElement('article')
     const senderType = message.sender_type || (message.direction === 'out' ? 'cs' : 'customer')
     const comment = igComment(message)
-    const hasMedia = Boolean(message.media_type) && !comment
+    const hasMedia = Boolean(message.media_type)
     article.className = `message ${message.direction === 'out' ? 'out' : 'in'} source-${senderType} ${hasMedia ? 'has-media' : ''} ${comment ? 'ig-comment' : ''}`
     article.dataset.id = String(message.id)
     article.dataset.messageId = message.message_id
@@ -242,28 +242,6 @@
       reply.className = 'message-reply-preview'
       reply.textContent = message.reply.body || message.reply.media_type || 'Media'
       article.append(reply)
-    }
-    if (comment) {
-      // Postingan yang dikomentari: kotak abu-abu kecil (foto + caption), lalu isi komentarnya.
-      const post = document.createElement('div')
-      post.className = 'message-ig-post'
-      const source = message.media_url || message.thumbnail_url
-      if (source) {
-        const image = document.createElement('img')
-        image.src = source
-        image.alt = t('Foto postingan')
-        image.loading = 'lazy'
-        image.dataset.mediaView = ''
-        post.append(image)
-      }
-      const info = document.createElement('div')
-      const label = document.createElement('small')
-      label.textContent = t('Komentar di postingan')
-      const caption = document.createElement('span')
-      caption.textContent = comment.caption || t('Postingan')
-      info.append(label, caption)
-      post.append(info)
-      article.append(post)
     }
     if (hasMedia) {
       const mediaWrap = document.createElement('div')
@@ -345,6 +323,17 @@
         mediaWrap.append(state)
       }
       article.append(mediaWrap)
+    }
+    if (comment) {
+      // Komentar Instagram: foto postingan tetap besar di atas, keterangan postingan (abu-abu) di bawahnya.
+      const post = document.createElement('div')
+      post.className = 'message-ig-caption'
+      const label = document.createElement('small')
+      label.textContent = t('Komentar di postingan')
+      const caption = document.createElement('span')
+      caption.textContent = comment.caption || t('Postingan')
+      post.append(label, caption)
+      article.append(post)
     }
     const meta = document.createElement('div')
     meta.className = 'message-meta'

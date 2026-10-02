@@ -64,7 +64,7 @@
   })
 
   // Foto di bubble: kerangka berkilau sampai gambarnya selesai dimuat.
-  const SELECTOR = 'img.message-media, .message-ig-post img, .wa-igc-thumb'
+  const SELECTOR = 'img.message-media, .wa-igc-thumb'
   const done = (image) => image.classList.add('loaded')
   const watch = (image) => {
     if (image.classList.contains('loaded')) return
