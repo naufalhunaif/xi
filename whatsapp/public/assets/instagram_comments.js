@@ -81,9 +81,15 @@
       if (item.image) {
         const thumb = el('img', undefined, 'wa-igc-thumb')
         thumb.src = item.image
-        thumb.alt = ''
+        thumb.alt = 'Foto postingan'
         thumb.loading = 'lazy'
-        post.append(thumb)
+        const open = el('a', undefined, 'wa-igc-thumb-link')
+        open.href = item.image
+        open.target = '_blank'
+        open.rel = 'noopener'
+        open.title = 'Lihat foto postingan'
+        open.append(thumb)
+        post.append(open)
       }
       post.append(el('span', item.caption ? `Postingan: ${item.caption.replace(/\s+/g, ' ').slice(0, 90)}` : 'Postingan'))
       if (item.permalink) {

@@ -43,6 +43,7 @@ export async function instagramTick() {
     await flushOutbox(config)
     await runDueTurns(config)
     await runComments(config)
+    await backfillPosts(config)
   } catch (error) {
     await noteIgError(error instanceof Error ? error.message : String(error)).catch(() => {})
   } finally {
@@ -385,6 +386,26 @@ export async function ensureCommentRoom(config: IgConfig, source: any) {
       created_at: new Date(row.created_at),
     })
   return { jid, anchor }
+}
+
+/** Komentar lama (sebelum foto postingan disimpan): lengkapi foto & caption, juga di room chat. */
+async function backfillPosts(config: IgConfig) {
+  const rows = await db
+    .from('whatsapp_ig_comments')
+    .where('media_checked', 0)
+    .whereNotNull('media_id')
+    .whereNot('status', 'pending')
+    .orderBy('created_at', 'desc')
+    .limit(3)
+  for (const source of rows as any[]) {
+    const row = await ensurePostInfo(config, source).catch(() => null)
+    if (!row?.media_image) continue
+    await db
+      .from('whatsapp_messages')
+      .where('message_id', `igc-${row.comment_id}`)
+      .whereNull('media_url')
+      .update({ media_type: 'image', media_url: row.media_image, thumbnail_url: row.media_image, media_status: 'ready' })
+  }
 }
 
 async function runComments(config: IgConfig) {
