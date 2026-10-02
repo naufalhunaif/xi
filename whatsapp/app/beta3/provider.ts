@@ -152,7 +152,8 @@ export async function runLeanProvider(
           ? {
               ...settings,
               chatgptReasoning: !settings.chatgptReasoning || settings.chatgptReasoning === 'auto' ? 'low' : settings.chatgptReasoning,
-              claudeReasoning: !settings.claudeReasoning || settings.claudeReasoning === 'auto' ? 'low' : settings.claudeReasoning,
+              // Haiku tidak mendukung pengaturan effort; biarkan bawaan agar tidak gagal.
+              claudeReasoning: settings.claudeReasoning,
             }
           : settings
       const attempt = (useDefault: boolean) =>

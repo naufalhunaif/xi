@@ -1492,4 +1492,9 @@ window.waLocales.id = {
   "{0} menunggu backup berikutnya": "{0} menunggu backup berikutnya",
   "Media chat sedang diunduh bertahap dari Google Drive…": "Media chat sedang diunduh bertahap dari Google Drive…",
   "Hanya file baru yang diunggah tiap backup (tidak disalin ulang), jadi tetap ringan walau data makin banyak.": "Hanya file baru yang diunggah tiap backup (tidak disalin ulang), jadi tetap ringan walau data makin banyak.",
+  "batas pemakaian dari layanan": "batas pemakaian dari layanan",
+  "perlu login ulang": "perlu login ulang",
+  "akses ditolak layanan": "akses ditolak layanan",
+  "gangguan sementara, dicoba lagi otomatis": "gangguan sementara, dicoba lagi otomatis",
+  "Alasan: {0}": "Alasan: {0}",
 }

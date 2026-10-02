@@ -93,7 +93,18 @@
       row.append(bars)
       if (account.limitedUntil > Date.now()) {
         const until = new Date(account.limitedUntil).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
-        row.append(el('span', t('Jeda s/d {0}', until), 'wa-pill warn'))
+        const pill = el('span', t('Jeda s/d {0}', until), 'wa-pill warn')
+        // Alasan jeda: kuota pada kartu bisa masih banyak, jadi jelaskan penyebabnya.
+        const REASON = {
+          USAGE_LIMIT: t('batas pemakaian dari layanan'),
+          AI_AUTH_REQUIRED: t('perlu login ulang'),
+          ACCESS_DENIED: t('akses ditolak layanan'),
+        }
+        const reason = REASON[account.limitedCode] || t('gangguan sementara, dicoba lagi otomatis')
+        pill.title = account.lastError || reason
+        const detail = account.lastError ? ` — ${account.lastError.replace(/^[A-Z_]+:\s*/, '').slice(0, 90)}` : ''
+        row.append(pill, el('span', `${t('Alasan: {0}', reason)}${detail}`, 'wa-usage-caption wa-quota-reason'))
+        if (account.lastError) row.lastChild.title = account.lastError
       }
       root.append(row)
     }

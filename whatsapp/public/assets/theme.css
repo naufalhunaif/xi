@@ -821,3 +821,4 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui #usageRunsFilter { margin-bottom: 8px; }
 .workspace-ui :is(#usageModels, #usagePhases) tr[data-filter-model], .workspace-ui #usagePhases tr[data-filter-phase] { cursor: pointer; }
 .workspace-ui :is(#usageModels, #usagePhases) tr:is([data-filter-model], [data-filter-phase]):hover { background: var(--wa-green-bg, #f1f8f4); }
+.workspace-ui .wa-quota-reason { display: block; width: 100%; margin: 2px 0 0; font-size: 11px; }

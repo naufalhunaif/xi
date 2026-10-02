@@ -1676,4 +1676,9 @@ window.waLocales.en = {
   "{0} menunggu backup berikutnya": "{0} waiting for next backup",
   "Media chat sedang diunduh bertahap dari Google Drive…": "Chat media is being downloaded gradually from Google Drive…",
   "Hanya file baru yang diunggah tiap backup (tidak disalin ulang), jadi tetap ringan walau data makin banyak.": "Only new files are uploaded each backup (no re-copying), so it stays light as data grows.",
+  "batas pemakaian dari layanan": "usage limit from the provider",
+  "perlu login ulang": "needs to sign in again",
+  "akses ditolak layanan": "access denied by the provider",
+  "gangguan sementara, dicoba lagi otomatis": "temporary error, retried automatically",
+  "Alasan: {0}": "Reason: {0}",
 }

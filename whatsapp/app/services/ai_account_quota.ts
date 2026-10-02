@@ -50,6 +50,8 @@ export async function readAiAccountQuotas() {
         name: account.label || `${NAMES[account.provider]}${account.legacy ? ' utama' : ` #${account.id}`}`,
         enabled: account.enabled,
         limitedUntil: account.limitedUntil > now ? account.limitedUntil : 0,
+        limitedCode: account.limitedUntil > now ? account.limitedCode : '',
+        lastError: account.limitedUntil > now ? account.lastError.replace(/[A-Za-z0-9+/_-]{32,}/g, '…').slice(0, 200) : '',
         tokens5h: used.get(account.id) || 0,
         observedAt: quota.at,
         windows: quotaPresentation(quota.windows as any),
