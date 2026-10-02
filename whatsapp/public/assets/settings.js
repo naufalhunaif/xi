@@ -139,6 +139,29 @@
           phases.append(line)
         }
       }
+      const models = byId('usageModels')
+      if (models) {
+        models.replaceChildren()
+        for (const row of data.models || []) {
+          const line = document.createElement('tr')
+          for (const [value, className] of [
+            [`${({ claude: 'Claude', gemini: 'Gemini' })[row.provider] || 'ChatGPT'} / ${row.model.replace(' (otomatis)', ` (${t('otomatis')})`)}`, ''],
+            [number(row.runs), 'wa-usage-number'],
+            [number(row.input), 'wa-usage-number'],
+            [number(row.cached), 'wa-usage-number'],
+            [number(row.output), 'wa-usage-number'],
+          ])
+            line.append(textElement('td', value, className))
+          models.append(line)
+        }
+        if (!(data.models || []).length) {
+          const line = document.createElement('tr')
+          const cell = textElement('td', t('Belum ada penggunaan tercatat'))
+          cell.colSpan = 5
+          line.append(cell)
+          models.append(line)
+        }
+      }
       const recent = byId('usageRecent')
       recent.replaceChildren()
       for (const run of data.recent) {
@@ -153,7 +176,7 @@
         for (const value of [
           date,
           run.phase || '—',
-          `${({ claude: 'Claude', gemini: 'Gemini' })[run.provider] || 'ChatGPT'} / ${run.model}`,
+          `${({ claude: 'Claude', gemini: 'Gemini' })[run.provider] || 'ChatGPT'} / ${String(run.model).replace(' (otomatis)', ` (${t('otomatis')})`)}`,
           run.tokens === null ? '—' : number(run.tokens),
           t("{0} dtk", number(Math.round(run.durationMs / 1000))),
           run.status === 'completed' ? t('Selesai') : t('Gagal'),

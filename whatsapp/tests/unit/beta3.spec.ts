@@ -589,3 +589,21 @@ test.group('Beta 3 · pelajaran chat CS', () => {
     assert.notInclude(other, '😊')
   })
 })
+
+test.group('Beta 3 · model otomatis', () => {
+  test('model dipilih per tugas', async ({ assert }) => {
+    const { autoTier, autoModels } = await import('#beta3/provider')
+    const reply = (message: string) => ({ system: 'x', user: `RIWAYAT...\n\nSEKARANG: 10.00 WIB\nPESAN PELANGGAN SEKARANG:\n${message}\n\nCustom (gambar/model/ukuran dari pelanggan): ...` })
+    assert.equal(autoTier('beta3-reply', reply('Assalamualaikum kak'), 0), 'light')
+    assert.equal(autoTier('beta3-reply', reply('makasih bos'), 0), 'light')
+    assert.equal(autoTier('beta3-reply', reply('ready size L warna navy?'), 0), 'standard')
+    assert.equal(autoTier('beta3-reply', reply('oke'), 0), 'standard')
+    assert.equal(autoTier('beta3-reply', reply('halo'), 1), 'heavy')
+    assert.equal(autoTier('beta3-reply', reply('sudah tf ya kak'), 0), 'heavy')
+    assert.equal(autoTier('beta3-reply', reply('Nama : Budi\n\nCATATAN SISTEM: form order #3 sudah tercatat'), 0), 'heavy')
+    assert.equal(autoTier('ig-analysis', { system: '', user: '' }, 0), 'heavy')
+    assert.equal(autoTier('beta3-recap', { system: '', user: '' }, 0), 'standard')
+    assert.equal(autoModels('claude').light, 'haiku')
+    assert.equal(autoModels('chatgpt').heavy, 'gpt-5.6-sol')
+  })
+})

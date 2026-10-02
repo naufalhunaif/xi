@@ -95,8 +95,28 @@ export async function readUsage() {
     .groupBy('phase')
     .orderByRaw('SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)) DESC')
     .limit(12)
+  // Model yang benar-benar dipakai (mode Otomatis memilih model per tugas).
+  const models = await db
+    .from('whatsapp_ai_usage')
+    .where('created_at', '>=', since)
+    .select('provider', 'model')
+    .count('* as runs')
+    .sum('input_tokens as input')
+    .sum('output_tokens as output')
+    .sum('cached_tokens as cached')
+    .groupBy('provider', 'model')
+    .orderByRaw('COUNT(*) DESC')
+    .limit(12)
   return {
     days: 30,
+    models: models.map((row) => ({
+      provider: row.provider,
+      model: row.model || 'bawaan akun',
+      runs: Number(row.runs || 0),
+      input: Number(row.input || 0),
+      output: Number(row.output || 0),
+      cached: Number(row.cached || 0),
+    })),
     providers: ['chatgpt', 'claude', 'gemini'].map((provider) => {
       const row = rows.find((item) => item.provider === provider)
       return {
@@ -124,7 +144,7 @@ export async function readUsage() {
       id: Number(row.id),
       provider: row.provider,
       phase: row.phase || '',
-      model: row.model || 'Otomatis',
+      model: row.model || 'bawaan akun',
       status: row.status,
       tokens:
         row.input_tokens === null ? null : Number(row.input_tokens) + Number(row.output_tokens),

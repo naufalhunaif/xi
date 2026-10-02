@@ -57,3 +57,15 @@ Prompt utama menaruh aturan stabil sebelum indeks level/state giliran, supaya pe
 Pengujian offline membuktikan argumen CLI, guard dan urutan naik profil. Ini bukan bukti bahwa Luna/Terra telah menyamai kualitas model utama pada seluruh percakapan pelanggan. Evaluasi internal/audit masih memakai model utama dan kebijakan evaluasinya; perubahan ini tidak mengompakkan prompt evaluasi. Pantau keputusan, inisiatif dan akurasi bukti pada percakapan sesudah deploy, tanpa menurunkan validasi untuk mengejar angka token.
 
 Referensi: [OpenAI model guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.5), [prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching), [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
+
+## Beta 3: model "Otomatis (hemat)"
+
+Akun AI dengan model **Otomatis (hemat)** (dan model global juga Otomatis) memilih model per panggilan di `app/beta3/provider.ts` (`autoTier`), lokal tanpa panggilan tambahan:
+
+| Tingkat | Kapan | Claude | ChatGPT |
+|---|---|---|---|
+| Ringan | Salam/terima kasih saja (tanpa pertanyaan, foto, atau konteks sistem); penilai kasus uji | haiku (penalaran rendah) | gpt-5.6-luna (low) |
+| Menengah | Balasan biasa, rekap, caption, pemilahan gambar | sonnet | gpt-5.6-terra |
+| Utama | Foto pelanggan, form order/ongkir/resi, pembayaran, custom/ukuran, komplain/retur, nego/grosir, analisis konten | opus | gpt-5.6-sol |
+
+Ubah lewat `.env`: `AI_CLAUDE_LIGHT_MODEL`, `AI_CLAUDE_STANDARD_MODEL`, `AI_CLAUDE_MAIN_MODEL`, `AI_CHATGPT_LIGHT_MODEL`, `AI_CHATGPT_STANDARD_MODEL`, `AI_CHATGPT_MAIN_MODEL`. Model yang ditolak akun dicatat (maks 4) dan diganti model bawaan akun. Usage mencatat nama model sebenarnya (dari laporan CLI) dengan tanda "(otomatis)"; tabel "Token per model" di Pengaturan → Usage.

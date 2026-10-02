@@ -57,6 +57,47 @@ const GEMINI_FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'
 
 /** Kegagalan yang berarti akun ini tidak bisa melayani sekarang → coba akun berikutnya. */
 const SWITCHABLE = new Set(['USAGE_LIMIT', 'ACCESS_DENIED', 'AI_AUTH_REQUIRED'])
+/**
+ * Model "Otomatis": dipilih per tugas supaya hemat. Pesan ringan (salam, terima kasih) cukup
+ * model ringan, balasan biasa model menengah, dan yang butuh ketelitian (foto, order, pembayaran,
+ * komplain, analisis) model utama. Bisa diubah lewat .env (AI_CHATGPT_LIGHT_MODEL, dst).
+ */
+export type AutoTier = 'light' | 'standard' | 'heavy'
+export function autoModels(provider: 'chatgpt' | 'claude'): Record<AutoTier, string> {
+  const pick = (key: string, fallback: string) => String(process.env[key] || '').trim() || fallback
+  return provider === 'claude'
+    ? {
+        light: pick('AI_CLAUDE_LIGHT_MODEL', 'haiku'),
+        standard: pick('AI_CLAUDE_STANDARD_MODEL', 'sonnet'),
+        heavy: pick('AI_CLAUDE_MAIN_MODEL', 'opus'),
+      }
+    : {
+        light: pick('AI_CHATGPT_LIGHT_MODEL', 'gpt-5.6-luna'),
+        standard: pick('AI_CHATGPT_STANDARD_MODEL', 'gpt-5.6-terra'),
+        heavy: pick('AI_CHATGPT_MAIN_MODEL', 'gpt-5.6-sol'),
+      }
+}
+const HEAVY_PHASES = new Set(['ig-analysis'])
+const LIGHT_PHASES = new Set(['beta3-test-judge'])
+const HEAVY_TEXT =
+  /CATATAN SISTEM|<<<ONGKIR|LACAK RESI|form order|bukti|transfer|\btf\b|rekening|\bdp\b|lunas|custom|ukuran|lingkar|komplain|rusak|cacat|salah kirim|refund|retur|tukar|batal|kecewa|nego|diskon|grosir|seragam/i
+const LIGHT_TEXT =
+  /^(p|ping|halo+|hai+|hallo+|pagi|siang|sore|malam|assalamu.?alaikum\S*|wa.?alaikum\S*|mantap|makasih|terima ?kasih|trims|thanks|thx|tq|ditunggu|sebentar|bentar)( (ya|yaa|kak|ka|bos|min|gan|mas|mbak|bang|kakak|sis))*[.!\s]*$/i
+/** Tingkat model untuk satu panggilan "Otomatis" (lokal, tanpa panggilan AI tambahan). */
+export function autoTier(phase: string, prompt: { system: string; user: string }, imageCount: number): AutoTier {
+  if (HEAVY_PHASES.has(phase)) return 'heavy'
+  if (LIGHT_PHASES.has(phase)) return 'light'
+  if (!/reply|test/.test(phase)) return 'standard'
+  // Balasan pelanggan: lihat pesan sekarang (bagian terakhir prompt) dan konteks sistemnya.
+  const message = prompt.user.split('PESAN PELANGGAN SEKARANG:').pop() || prompt.user
+  const now = message.split(/\n\n(?=Custom \(gambar|Inisiatif|Pengiriman hanya)/)[0]
+  if (imageCount || HEAVY_TEXT.test(now)) return 'heavy'
+  const text = now.replace(/\[[^\]]*\]/g, ' ').replace(/[^\p{L}\p{N}\s.!?]/gu, ' ').replace(/\s+/g, ' ').trim()
+  if (text.length <= 40 && !text.includes('?') && LIGHT_TEXT.test(text)) return 'light'
+  return 'standard'
+}
+const blockedList = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean)
+
 /** Kegagalan yang akan terulang di akun mana pun (isi/skema) → tidak perlu pindah akun. */
 const STOP_CODES = new Set(['AI_CONTEXT_LIMIT', 'AI_SCHEMA_INVALID', 'DATABASE_UNAVAILABLE'])
 
@@ -98,12 +139,28 @@ export async function runLeanProvider(
     const saveQuota = () =>
       quota.size ? saveAiAccountQuota(account.id, [...quota.values()]).catch(() => {}) : undefined
     try {
+      // Model tetap (akun atau Pengaturan) dihormati; kosong = "Otomatis" → dipilih per tugas.
+      const fixed =
+        account.model ||
+        (account.provider === 'claude' ? settings.claudeModel : account.provider === 'chatgpt' ? settings.chatgptModel : '') ||
+        ''
+      const tier = !fixed && account.provider !== 'gemini' ? autoTier(phase, prompt, imagePaths.length) : null
+      const wanted = fixed || (tier ? autoModels(account.provider === 'claude' ? 'claude' : 'chatgpt')[tier] : '')
+      // Tugas ringan pada mode otomatis: penalaran rendah (kecuali pemilik mengatur sendiri).
+      const tuned =
+        tier === 'light'
+          ? {
+              ...settings,
+              chatgptReasoning: !settings.chatgptReasoning || settings.chatgptReasoning === 'auto' ? 'low' : settings.chatgptReasoning,
+              claudeReasoning: !settings.claudeReasoning || settings.claudeReasoning === 'auto' ? 'low' : settings.claudeReasoning,
+            }
+          : settings
       const attempt = (useDefault: boolean) =>
         withAiAccount(aiAccountRef(account), () =>
           runLeanOnce(
-            useDefault ? { ...settings, chatgptModel: '', claudeModel: '' } : settings,
+            useDefault ? { ...tuned, chatgptModel: '', claudeModel: '' } : tuned,
             account.provider,
-            { model: useDefault ? '' : account.model, apiKey: account.apiKey },
+            { model: useDefault ? '' : wanted, apiKey: account.apiKey, auto: Boolean(tier) },
             prompt,
             imagePaths,
             phase,
@@ -113,10 +170,8 @@ export async function runLeanProvider(
         )
       // Model yang tidak tersedia untuk langganan akun ini (mis. akun ChatGPT lain paketnya
       // berbeda) → pakai model bawaan akun tersebut, bukan pindah/menjeda akun.
-      const wanted =
-        account.model || (account.provider === 'claude' ? settings.claudeModel : settings.chatgptModel) || ''
       let result: LeanProviderResult
-      if (account.provider !== 'gemini' && wanted && account.modelBlocked === wanted)
+      if (account.provider !== 'gemini' && wanted && blockedList(account.modelBlocked).includes(wanted))
         result = await attempt(true)
       else {
         try {
@@ -124,7 +179,7 @@ export async function runLeanProvider(
         } catch (error) {
           if (account.provider === 'gemini' || !wanted || !modelUnavailable(error)) throw error
           result = await attempt(true)
-          await blockAiModel(account.id, wanted).catch(() => {})
+          await blockAiModel(account.id, [...blockedList(account.modelBlocked), wanted].slice(-4).join(',')).catch(() => {})
         }
       }
       await saveQuota()
@@ -214,7 +269,7 @@ export async function testAiAccount(
 async function runLeanOnce(
   settings: LeanProviderSettings,
   providerName: AiProviderName,
-  account: { model?: string; apiKey?: string },
+  account: { model?: string; apiKey?: string; auto?: boolean },
   prompt: { system: string; user: string },
   imagePaths: string[],
   phase: string,
@@ -240,12 +295,16 @@ async function runLeanOnce(
   const started = Date.now()
   let usage: TokenUsage | null = null
   let status: 'completed' | 'failed' = 'failed'
+  // Nama model sebenarnya dari laporan CLI (mis. alias "opus" → claude-opus-…); tidak ada → yang diminta.
+  let actual = ''
   try {
     const schemaPath = join(workingDirectory, 'lean.schema.json')
     await writeFile(schemaPath, JSON.stringify(schema), { mode: 0o600 })
     const observe = (event: Record<string, any>) => {
       if (quotaSink && provider === 'claude')
         for (const window of claudeQuotaWindows(event)) quotaSink.set(window.key, window)
+      const reported = event?.model || event?.message?.model || event?.item?.model || event?.session?.model
+      if (typeof reported === 'string' && reported && !/synthetic/i.test(reported)) actual = reported
       const next = usageFromEvent(provider, event)
       if (next)
         usage = {
@@ -262,12 +321,13 @@ async function runLeanOnce(
           ? await runGeminiLean(model, account.apiKey || '', prompt, schema, imagePaths, observe)
           : await runCodexLean(tuned, prompt, workingDirectory, schemaPath, imagePaths, observe)
     status = 'completed'
-    return { text, usage, durationMs: Date.now() - started, provider, model }
+    return { text, usage, durationMs: Date.now() - started, provider, model: actual || model || 'bawaan' }
   } finally {
+    const label = actual || model || 'bawaan akun'
     await recordUsage({
       provider,
       phase,
-      model,
+      model: account.auto ? `${label} (otomatis)` : label,
       status,
       usage,
       durationMs: Date.now() - started,

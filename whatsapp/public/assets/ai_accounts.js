@@ -324,7 +324,8 @@
     select.setAttribute('aria-label', t('Model {0}', account.name))
     const options = [...(MODELS[account.provider] || [])]
     if (account.model && !options.includes(account.model)) options.push(account.model)
-    select.append(new Option(t('Otomatis'), ''))
+    select.append(new Option(t('Otomatis (hemat)'), ''))
+    select.title = t('Otomatis: model ringan/menengah/utama dipilih per tugas supaya hemat.')
     for (const model of options) select.append(new Option(model, model))
     select.append(new Option(t('Model lainnya…'), '__custom__'))
     select.value = account.model || ''

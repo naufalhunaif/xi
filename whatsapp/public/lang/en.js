@@ -1644,4 +1644,8 @@ window.waLocales.en = {
   "{0}% dari jangkauan": "{0}% of reach",
   "Rincian interaksi": "Interaction breakdown",
   "Profil & lainnya": "Profile & more",
+  "Token per model": "Tokens per model",
+  "Model Otomatis dipilih per tugas: ringan untuk salam/terima kasih, menengah untuk balasan biasa, utama untuk foto, order, pembayaran, komplain dan analisis.": "Automatic picks a model per task: light for greetings/thanks, mid for regular replies, main for photos, orders, payments, complaints and analysis.",
+  "Otomatis (hemat)": "Automatic (saver)",
+  "Otomatis: model ringan/menengah/utama dipilih per tugas supaya hemat.": "Automatic: a light, mid or main model is picked per task to save usage.",
 }

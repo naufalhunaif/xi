@@ -1459,4 +1459,9 @@ window.waLocales.id = {
   "{0}% dari jangkauan": "{0}% dari jangkauan",
   "Rincian interaksi": "Rincian interaksi",
   "Profil & lainnya": "Profil & lainnya",
+  "Token per model": "Token per model",
+  "Model Otomatis dipilih per tugas: ringan untuk salam/terima kasih, menengah untuk balasan biasa, utama untuk foto, order, pembayaran, komplain dan analisis.": "Model Otomatis dipilih per tugas: ringan untuk salam/terima kasih, menengah untuk balasan biasa, utama untuk foto, order, pembayaran, komplain dan analisis.",
+  "Otomatis (hemat)": "Otomatis (hemat)",
+  "Otomatis: model ringan/menengah/utama dipilih per tugas supaya hemat.": "Otomatis: model ringan/menengah/utama dipilih per tugas supaya hemat.",
+  "otomatis": "otomatis",
 }
