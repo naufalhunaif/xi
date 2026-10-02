@@ -1,0 +1,68 @@
+<section id="igContentPage" class="wa-orders-page wa-igp-page">
+  <div class="wa-orders-title">
+    <h1 data-i18n="Konten Instagram">Konten Instagram</h1>
+    <div class="wa-orders-title-actions"><span id="igpAccount" class="wa-muted"></span></div>
+  </div>
+  <p id="igpReconnect" class="wa-alert warn" hidden>
+    <span data-i18n="Untuk posting & insights, klik Hubungkan ulang di Pengaturan → Instagram (sekali saja).">Untuk posting & insights, klik Hubungkan ulang di Pengaturan → Instagram (sekali saja).</span>
+    <a href="{{ appUrl }}/settings#instagram" data-i18n="Buka Pengaturan">Buka Pengaturan</a>
+  </p>
+  <div id="igpTabs" class="wa-order-tabs" role="tablist">
+    <button type="button" data-tab="schedule" aria-pressed="true" data-i18n="Jadwal">Jadwal</button>
+    <button type="button" data-tab="posts" aria-pressed="false" data-i18n="Postingan">Postingan</button>
+    <button type="button" data-tab="summary" aria-pressed="false" data-i18n="Ringkasan">Ringkasan</button>
+  </div>
+  <p id="igpNotice" role="status" aria-live="polite"></p>
+
+  <div data-panel="schedule">
+    <button id="igpNew" class="button primary" type="button" data-i18n="+ Buat postingan">+ Buat postingan</button>
+    <form id="igpForm" class="wa-igp-form" hidden>
+      <div class="wa-igp-kinds" role="group">
+        <button type="button" data-kind="feed" aria-pressed="true" data-i18n="Feed">Feed</button>
+        <button type="button" data-kind="carousel" aria-pressed="false" data-i18n="Carousel">Carousel</button>
+        <button type="button" data-kind="reels" aria-pressed="false" data-i18n="Reels">Reels</button>
+        <button type="button" data-kind="story" aria-pressed="false" data-i18n="Story">Story</button>
+      </div>
+      <div id="igpMedia" class="wa-igp-media"></div>
+      <label id="igpPick" class="wa-igp-pick button">
+        <span id="igpPickLabel" data-i18n="Pilih foto/video">Pilih foto/video</span>
+        <input id="igpFile" type="file" accept="image/*,video/mp4,video/quicktime" hidden />
+      </label>
+      <small id="igpHint" class="wa-muted"></small>
+      <label id="igpCaptionWrap" class="wa-igp-caption">
+        <span data-i18n="Caption">Caption</span>
+        <textarea id="igpCaption" rows="4" maxlength="2200"></textarea>
+        <small id="igpCount" class="wa-muted">0/2200</small>
+      </label>
+      <label id="igpFeedWrap" class="wa-check" hidden>
+        <input id="igpShareFeed" type="checkbox" checked />
+        <span data-i18n="Tampilkan juga di feed">Tampilkan juga di feed</span>
+      </label>
+      <div class="wa-igp-when">
+        <label class="wa-check"><input type="radio" name="igpWhen" value="later" checked /> <span data-i18n="Jadwalkan">Jadwalkan</span></label>
+        <input id="igpAt" type="datetime-local" />
+        <small class="wa-muted">WIB</small>
+        <label class="wa-check"><input type="radio" name="igpWhen" value="now" /> <span data-i18n="Posting sekarang">Posting sekarang</span></label>
+      </div>
+      <div class="wa-igp-actions">
+        <button id="igpSave" class="button primary" type="submit" data-i18n="Simpan jadwal">Simpan jadwal</button>
+        <button id="igpCancel" class="button" type="button" data-i18n="Batal">Batal</button>
+      </div>
+    </form>
+    <div id="igpList" class="wa-igp-list"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+  </div>
+
+  <div data-panel="posts" hidden>
+    <div id="igpPosts" class="wa-igp-grid"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+    <h2 class="wa-igp-sub" data-i18n="Story (tersimpan)">Story (tersimpan)</h2>
+    <div id="igpStories" class="wa-igp-grid"></div>
+  </div>
+
+  <div data-panel="summary" hidden>
+    <div id="igpDays" class="wa-igp-kinds" role="group">
+      <button type="button" data-days="7" aria-pressed="true" data-i18n="7 hari">7 hari</button>
+      <button type="button" data-days="30" aria-pressed="false" data-i18n="30 hari">30 hari</button>
+    </div>
+    <div id="igpSummary"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+  </div>
+</section>

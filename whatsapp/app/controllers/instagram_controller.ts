@@ -121,7 +121,13 @@ export default class InstagramController {
         code: String(qs.code),
       })
       const account = await ig.me(token.token)
-      await saveIgAccount({ token: token.token, expiresIn: token.expiresIn, userId: account.userId, username: account.username })
+      await saveIgAccount({
+        token: token.token,
+        expiresIn: token.expiresIn,
+        userId: account.userId,
+        username: account.username,
+        permissions: token.permissions,
+      })
       await noteIgError('').catch(() => {})
       try {
         await ig.subscribe(token.token)

@@ -16,6 +16,7 @@ const LinesController = () => import('#controllers/lines_controller')
 const AiAccountsController = () => import('#controllers/ai_accounts_controller')
 const BackupController = () => import('#controllers/backup_controller')
 const InstagramController = () => import('#controllers/instagram_controller')
+const InstagramContentController = () => import('#controllers/instagram_content_controller')
 
 router.get('/login', [AccountController, 'login']).as('account.login')
 // Halaman publik untuk Google (Branding): kebijakan privasi & syarat layanan.
@@ -32,6 +33,8 @@ router
 // Webhook Instagram (DM & komentar): publik, diverifikasi dengan tanda tangan Meta.
 router.get('/webhooks/instagram', [InstagramController, 'verify'])
 router.post('/webhooks/instagram', [InstagramController, 'receive'])
+// Media postingan terjadwal yang diambil Instagram saat terbit (nama file acak).
+router.get('/ig-media/:name', [InstagramContentController, 'media'])
 router.post('/login', [AccountController, 'loginPost'])
 router.get('/setup', [AccountController, 'setup']).as('account.setup')
 router.post('/setup', [AccountController, 'setupPost'])
@@ -200,6 +203,16 @@ router
     router.get('/instagram/connect', [InstagramController, 'connect'])
     router.get('/instagram/callback', [InstagramController, 'callback'])
     router.get('/comments', [InstagramController, 'page'])
+    router.get('/instagram', [InstagramContentController, 'page'])
+    router.get('/api/instagram/content', [InstagramContentController, 'state'])
+    router.post('/api/instagram/uploads', [InstagramContentController, 'upload'])
+    router.get('/api/instagram/posts', [InstagramContentController, 'posts'])
+    router.post('/api/instagram/posts', [InstagramContentController, 'create'])
+    router.post('/api/instagram/posts/:id/cancel', [InstagramContentController, 'cancel'])
+    router.post('/api/instagram/posts/:id/retry', [InstagramContentController, 'retry'])
+    router.post('/api/instagram/posts/:id/delete', [InstagramContentController, 'remove'])
+    router.get('/api/instagram/insights', [InstagramContentController, 'insights'])
+    router.get('/api/instagram/performance', [InstagramContentController, 'performance'])
     router.get('/api/instagram/comments', [InstagramController, 'comments'])
     router.get('/api/instagram/comments/count', [InstagramController, 'commentsCount'])
     router.post('/api/instagram/comments/:id/reply', [InstagramController, 'replyComment'])

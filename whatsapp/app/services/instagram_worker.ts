@@ -22,6 +22,8 @@ import {
 } from '#services/instagram_store'
 import * as ig from '#services/instagram_api'
 import { saveRemoteImage } from '#services/instagram_inbox'
+import { publishTick } from '#services/instagram_publish'
+import { captureStories } from '#services/instagram_insights'
 
 /**
  * Worker Instagram (dipanggil berkala oleh worker WhatsApp, terlepas dari koneksi nomor):
@@ -44,6 +46,8 @@ export async function instagramTick() {
     await runDueTurns(config)
     await runComments(config)
     await backfillPosts(config)
+    await publishTick(config).catch((error) => noteIgError(`Posting: ${error instanceof Error ? error.message : String(error)}`))
+    await captureStories(config).catch(() => {})
   } catch (error) {
     await noteIgError(error instanceof Error ? error.message : String(error)).catch(() => {})
   } finally {

@@ -27,6 +27,10 @@
         <span class="nav-text" data-i18n="Komentar">Komentar</span>
         <span class="nav-badge" id="commentsBadge" hidden title="Komentar perlu dibalas" data-i18n-title="Komentar perlu dibalas"></span>
       </a>
+      <a id="contentNav" class="nav-item {{ page === 'content' ? 'active' : '' }}" href="{{ appUrl }}/instagram" aria-label="Konten" title="Konten Instagram" data-i18n-aria-label="Konten" data-i18n-title="Konten Instagram" aria-current="{{ page === 'content' ? 'page' : 'false' }}" {{ page === 'content' ? '' : 'hidden' }}>
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".6" fill="currentColor"/></svg></span>
+        <span class="nav-text" data-i18n="Konten">Konten</span>
+      </a>
       @if(bundle)
       <a class="nav-item {{ page === 'lean' ? 'active' : '' }}" href="{{ appUrl }}/lean" aria-label="Beta 2" title="Beta 2" aria-current="{{ page === 'lean' ? 'page' : 'false' }}">
         <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M4 6h16M4 18h10"/></svg></span>
@@ -620,6 +624,8 @@
         @endif
       @elseif(page === 'comments')
         @include('partials/instagram_comments')
+      @elseif(page === 'content')
+        @include('partials/instagram_content')
       @elseif(page === 'lean')
         @include('partials/lean')
       @elseif(page === 'beta3')

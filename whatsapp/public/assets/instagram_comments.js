@@ -25,6 +25,8 @@
     try {
       const state = await api('/api/instagram/comments/count')
       if (state.connected) nav.hidden = false
+      const content = byId('contentNav')
+      if (content && state.connected) content.hidden = false
       const pill = byId('commentsBadge')
       if (pill) {
         pill.textContent = state.open ? String(state.open) : ''

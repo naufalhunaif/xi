@@ -18,7 +18,7 @@ export const igsidOf = (jid: string) => String(jid).replace(/@ig$/, '')
 const PURPOSE = 'instagram'
 const secretKeys = new Set(['ig_app_secret', 'ig_token'])
 
-async function readKey(name: string) {
+export async function readKey(name: string) {
   const value = await readLeanState(name)
   if (!value || !secretKeys.has(name)) return value
   try {
@@ -27,7 +27,7 @@ async function readKey(name: string) {
     return ''
   }
 }
-async function writeKey(name: string, value: string) {
+export async function writeKey(name: string, value: string) {
   await writeLeanState(name, value && secretKeys.has(name) ? encryption.encrypt(value, undefined, PURPOSE) : value)
 }
 
@@ -71,8 +71,15 @@ export async function saveIgConfig(values: Partial<Record<'appId' | 'appSecret' 
   if (values.comments !== undefined) await writeKey('ig_comments', values.comments === '0' ? '0' : '1')
 }
 
-export async function saveIgAccount(input: { token: string; expiresIn: number; userId: string; username: string }) {
+export async function saveIgAccount(input: {
+  token: string
+  expiresIn: number
+  userId: string
+  username: string
+  permissions?: string[]
+}) {
   await writeKey('ig_token', input.token)
+  if (input.permissions?.length) await writeKey('ig_scopes', input.permissions.join(','))
   await writeKey('ig_token_expires', String(Date.now() + Math.max(0, input.expiresIn) * 1000))
   await writeKey('ig_user_id', input.userId)
   await writeKey('ig_username', input.username)
@@ -127,5 +134,36 @@ export async function ensureIgTables() {
     'media_checked TINYINT(1) NOT NULL DEFAULT 0',
   ])
     await db.rawQuery(`ALTER TABLE whatsapp_ig_comments ADD COLUMN IF NOT EXISTS ${column}`)
+  // Postingan terjadwal (feed, carousel, reels, story) dan proses terbitnya.
+  await db.rawQuery(`CREATE TABLE IF NOT EXISTS whatsapp_ig_posts (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    kind VARCHAR(20) NOT NULL,
+    caption TEXT NULL,
+    items TEXT NOT NULL,
+    share_to_feed TINYINT(1) NOT NULL DEFAULT 1,
+    scheduled_at DATETIME NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+    step VARCHAR(20) NULL,
+    containers TEXT NULL,
+    media_id VARCHAR(80) NULL,
+    permalink VARCHAR(500) NULL,
+    error VARCHAR(500) NULL,
+    started_at DATETIME NULL,
+    checked_at DATETIME NULL,
+    published_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    KEY whatsapp_ig_posts_due (status, scheduled_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  // Performa postingan (cache) + story yang disimpan sebelum hilang 24 jam.
+  await db.rawQuery(`CREATE TABLE IF NOT EXISTS whatsapp_ig_media_stats (
+    media_id VARCHAR(80) NOT NULL PRIMARY KEY,
+    product VARCHAR(20) NOT NULL,
+    meta TEXT NULL,
+    stats TEXT NULL,
+    posted_at DATETIME NULL,
+    fetched_at DATETIME NOT NULL,
+    KEY whatsapp_ig_media_stats_product (product, posted_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
   ready.add(key)
 }
