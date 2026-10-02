@@ -742,3 +742,23 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui .wa-policy-box .wa-loading[hidden] { display: none; }
 .workspace-ui .wa-policy-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .workspace-ui .wa-policy-foot small { margin-right: auto; }
+/* Halaman Instagram bertab: Konten · Komentar · Ringkasan */
+.workspace-ui .wa-ig-page:not([data-ig-tab="content"]) [data-ig-panel="content"],
+.workspace-ui .wa-ig-page:not([data-ig-tab="comments"]) [data-ig-panel="comments"],
+.workspace-ui .wa-ig-page:not([data-ig-tab="summary"]) [data-ig-panel="summary"],
+.workspace-ui .wa-ig-page:not([data-ig-tab="content"]) [data-ig-for="content"],
+.workspace-ui .wa-ig-page:not([data-ig-tab="comments"]) [data-ig-for="comments"],
+.workspace-ui .wa-ig-page:not([data-ig-tab="summary"]) [data-ig-for="summary"] { display: none; }
+.workspace-ui .wa-ig-tabs { display: flex; gap: 4px; margin: 12px 0 4px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.workspace-ui .wa-ig-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.workspace-ui .wa-ig-tabs button:hover { color: var(--text); }
+.workspace-ui .wa-ig-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: #18865b; }
+.workspace-ui .wa-ig-tab-badge { min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; line-height: 18px; text-align: center; background: #d64545; color: #fff; }
+.workspace-ui .wa-ig-tab-badge[hidden] { display: none; }
+.workspace-ui .wa-igp-summary-panel { display: grid; gap: 16px; align-content: start; max-width: 980px; padding-top: 12px; font-size: 12px; }
+.workspace-ui .wa-igp-comments { display: grid; gap: 8px; justify-items: start; }
+.workspace-ui .wa-igp-comment { display: grid; gap: 1px; margin: 0; font-size: 12px; line-height: 17px; }
+.workspace-ui .wa-igp-comment span { overflow-wrap: anywhere; }
+.workspace-ui .wa-igp-comment small.wa-muted { margin-left: 0; }
+.workspace-ui .wa-igc-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 760px; box-sizing: border-box; margin: 12px 0 10px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+.workspace-ui .wa-igc-filter[hidden] { display: none; }

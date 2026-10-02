@@ -18,17 +18,15 @@
     return result
   }
 
-  // Menu "Komentar" muncul bila Instagram terhubung; badge = komentar yang perlu dibalas.
+  // Menu "Instagram" muncul bila terhubung; badge (menu & tab Komentar) = komentar yang perlu dibalas.
   async function badge() {
-    const nav = byId('commentsNav')
+    const nav = byId('igNav')
     if (!nav) return
     try {
       const state = await api('/api/instagram/comments/count')
       if (state.connected) nav.hidden = false
-      const content = byId('contentNav')
-      if (content && state.connected) content.hidden = false
-      const pill = byId('commentsBadge')
-      if (pill) {
+      for (const pill of [byId('commentsBadge'), byId('igTabBadge')]) {
+        if (!pill) continue
         pill.textContent = state.open ? String(state.open) : ''
         pill.hidden = !state.open
       }
@@ -39,6 +37,10 @@
 
   const root = byId('igCommentsPage')
   if (!root) return
+  // Halaman Instagram bertab: cek otomatis hanya saat tab Komentar terbuka.
+  const page = byId('igPage')
+  const active = () => !page || page.dataset.igTab === 'comments'
+  let media = null
   const el = (tag, text, className) => {
     const node = document.createElement(tag)
     if (text !== undefined && text !== null) node.textContent = text
@@ -201,6 +203,13 @@
     const meta = el('span', t('{0} komentar', group.items.length), 'wa-igc-post-meta')
     const waiting = group.items.filter((entry) => NEEDS_REPLY.includes(entry.status)).length
     if (waiting) meta.append(' · ', el('b', t('{0} perlu dibalas', waiting), 'wa-igc-open'))
+    if (first.mediaId || first.permalink)
+      meta.append(
+        ' · ',
+        link(t('Lihat detail'), () =>
+          document.dispatchEvent(new CustomEvent('ig:open-post', { detail: { mediaId: first.mediaId, permalink: first.permalink } }))
+        )
+      )
     info.append(meta)
     head.append(info)
 
@@ -246,12 +255,15 @@
     const mine = ++seq
     const q = byId('igcSearch').value.trim()
     try {
-      const data = await api(`/api/instagram/comments?status=${status}&q=${encodeURIComponent(q)}`)
+      const data = await api(
+        `/api/instagram/comments?status=${status}&q=${encodeURIComponent(q)}${media ? `&media=${encodeURIComponent(media.mediaId)}` : ''}`
+      )
       if (mine !== seq) return
       const snapshot = JSON.stringify(data)
       if (auto && (snapshot === lastData || busy())) return
       lastData = snapshot
-      byId('igcAccount').textContent = data.connected ? `@${data.username}` : t('Instagram belum terhubung')
+      const account = byId('igcAccount')
+      if (account) account.textContent = data.connected ? `@${data.username}` : t('Instagram belum terhubung')
       for (const [key, value] of Object.entries(data.counts || {})) {
         const slot = root.querySelector(`[data-count="${key}"]`)
         if (slot) slot.textContent = value ? String(value) : ''
@@ -287,8 +299,30 @@
     lastData = ''
     load()
   })
+  // Filter "komentar untuk postingan ini" (dari detail postingan di tab Konten).
+  function showFilter() {
+    const box = byId('igcMediaFilter')
+    if (!box) return
+    box.hidden = !media
+    if (!media) return box.replaceChildren()
+    const caption = (media.caption || '').replace(/\s+/g, ' ').trim()
+    box.replaceChildren(
+      el('span', t('Komentar untuk: {0}', caption ? (caption.length > 60 ? `${caption.slice(0, 60)}…` : caption) : t('Postingan'))),
+      link(t('Tampilkan semua'), () => {
+        media = null
+        showFilter()
+        load()
+      })
+    )
+  }
+  document.addEventListener('ig:comments-for', (event) => {
+    media = event.detail?.mediaId ? event.detail : null
+    showFilter()
+    load()
+  })
+  document.addEventListener('ig:tab', (event) => event.detail?.tab === 'comments' && load())
   load()
-  // Komentar baru muncul sendiri (cek tiap 8 detik saat halaman terbuka).
-  setInterval(() => document.visibilityState === 'visible' && load(true), 8_000)
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && load(true))
+  // Komentar baru muncul sendiri (cek tiap 8 detik saat tab Komentar terbuka).
+  setInterval(() => document.visibilityState === 'visible' && active() && load(true), 8_000)
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && active() && load(true))
 })()

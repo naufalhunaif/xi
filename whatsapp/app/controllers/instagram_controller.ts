@@ -14,7 +14,7 @@ import {
 } from '#services/instagram_store'
 import { ingestInstagramWebhook } from '#services/instagram_inbox'
 import { ensureCommentRoom } from '#services/instagram_worker'
-import { ensureDefaults } from '#services/settings_service'
+import { publicAppUrl } from '#services/public_url'
 import { resumeAiAfterHumanReply } from '#services/message_service'
 import db from '#services/workspace_database'
 import * as ig from '#services/instagram_api'
@@ -147,13 +147,9 @@ export default class InstagramController {
   }
 
   /** Halaman Komentar Instagram. */
-  async page({ view, session }: HttpContext) {
-    await ensureDefaults()
-    return view.render('pages/dashboard', {
-      page: 'comments',
-      account: session.get('account'),
-      bundle: (env.get('ACCOUNT_URL') || '').replace(/\/$/, '').replace(/\/account$/, ''),
-    })
+  /** Halaman lama /comments → halaman Instagram, tab Komentar. */
+  async page({ request, response }: HttpContext) {
+    return response.redirect().withQs(false).toPath(`${(publicAppUrl(request) || '').replace(/\/$/, '')}/instagram?tab=comments`)
   }
 
   async comments({ request, response }: HttpContext) {
@@ -165,6 +161,8 @@ export default class InstagramController {
     const query = db.from('whatsapp_ig_comments').orderBy('created_at', 'desc').limit(200)
     if (COMMENT_TABS[tab]) query.whereIn('status', COMMENT_TABS[tab])
     if (q) query.where((sub) => sub.where('body', 'like', `%${q}%`).orWhere('username', 'like', `%${q}%`))
+    const media = String(request.qs().media || '').trim()
+    if (media) query.where('media_id', media)
     const [rows, totals] = await Promise.all([
       query,
       db.from('whatsapp_ig_comments').select('status').count('* as total').groupBy('status'),

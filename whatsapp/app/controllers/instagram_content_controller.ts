@@ -25,10 +25,13 @@ const NEEDED = ['instagram_business_content_publish', 'instagram_business_manage
 
 /** Halaman Konten Instagram: jadwal posting + performa + ringkasan akun. */
 export default class InstagramContentController {
-  async page({ view, session }: HttpContext) {
+  /** Satu halaman Instagram: tab Konten · Komentar · Ringkasan. */
+  async page({ view, session, request }: HttpContext) {
     await ensureDefaults()
+    const tab = String(request.qs().tab || '')
     return view.render('pages/dashboard', {
-      page: 'content',
+      page: 'instagram',
+      igTab: ['comments', 'summary'].includes(tab) ? tab : 'content',
       account: session.get('account'),
       bundle: (env.get('ACCOUNT_URL') || '').replace(/\/$/, '').replace(/\/account$/, ''),
     })

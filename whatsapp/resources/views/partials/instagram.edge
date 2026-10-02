@@ -1,0 +1,24 @@
+{{-- Satu halaman Instagram: tab Konten · Komentar · Ringkasan (tab aktif dari ?tab=). --}}
+<section id="igPage" class="wa-orders-page wa-ig-page wa-igp-page wa-igc-page" data-ig-tab="{{ igTab || 'content' }}">
+  <div class="wa-orders-title">
+    <h1 data-i18n="Instagram">Instagram</h1>
+    <div class="wa-orders-title-actions">
+      <span id="igpAccount" class="wa-muted"></span>
+      <button id="igpRefresh" class="button" type="button" data-ig-for="content" data-i18n="Perbarui">Perbarui</button>
+      <button id="igcRefresh" class="button" type="button" data-ig-for="comments" data-i18n="Perbarui">Perbarui</button>
+      <button id="igpSummaryRefresh" class="button" type="button" data-ig-for="summary" data-i18n="Perbarui data">Perbarui data</button>
+      <button id="igpNew" class="button primary" type="button" data-i18n="+ Buat postingan">+ Buat postingan</button>
+    </div>
+  </div>
+  <p id="igpReconnect" class="wa-alert warn" hidden>
+    <span data-i18n="Untuk posting & insights, klik Hubungkan ulang di Pengaturan → Instagram (sekali saja).">Untuk posting & insights, klik Hubungkan ulang di Pengaturan → Instagram (sekali saja).</span>
+    <a href="{{ appUrl }}/settings#instagram" data-i18n="Buka Pengaturan">Buka Pengaturan</a>
+  </p>
+  <div id="igTabs" class="wa-ig-tabs" role="tablist" aria-label="Instagram">
+    <button type="button" role="tab" data-ig-tab="content" aria-selected="{{ (igTab || 'content') === 'content' ? 'true' : 'false' }}" data-i18n="Konten">Konten</button>
+    <button type="button" role="tab" data-ig-tab="comments" aria-selected="{{ igTab === 'comments' ? 'true' : 'false' }}"><span data-i18n="Komentar">Komentar</span> <b id="igTabBadge" class="wa-ig-tab-badge" hidden title="Komentar perlu dibalas" data-i18n-title="Komentar perlu dibalas"></b></button>
+    <button type="button" role="tab" data-ig-tab="summary" aria-selected="{{ igTab === 'summary' ? 'true' : 'false' }}" data-i18n="Ringkasan">Ringkasan</button>
+  </div>
+  @include('partials/instagram_content')
+  @include('partials/instagram_comments')
+</section>

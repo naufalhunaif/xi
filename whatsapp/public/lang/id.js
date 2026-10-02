@@ -1444,4 +1444,11 @@ window.waLocales.id = {
   "Tersimpan.": "Tersimpan.",
   "Kosong: AI akan menyerahkan pertanyaan tukar size ke CS.": "Kosong: AI akan menyerahkan pertanyaan tukar size ke CS.",
   "Disalin.": "Disalin.",
+  "Instagram": "Instagram",
+  "Postingan ini belum dimuat. Gulir ke bawah untuk memuat lebih banyak.": "Postingan ini belum dimuat. Gulir ke bawah untuk memuat lebih banyak.",
+  "Belum ada komentar tercatat.": "Belum ada komentar tercatat.",
+  "Lihat semua komentar ({0})": "Lihat semua komentar ({0})",
+  "Komentar belum bisa dimuat.": "Komentar belum bisa dimuat.",
+  "Komentar untuk: {0}": "Komentar untuk: {0}",
+  "Tampilkan semua": "Tampilkan semua",
 }

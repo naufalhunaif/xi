@@ -2,6 +2,8 @@
   const root = document.getElementById('igContentPage')
   if (!root) return
   const byId = (id) => document.getElementById(id)
+  const page = byId('igPage')
+  const activeTab = () => page?.dataset.igTab || 'content'
   const t = (value, ...args) =>
     window.waI18n?.t(value, ...args) ?? value.replace(/\{(\d+)\}/g, (match, index) => args[index] ?? match)
   const base = (document.querySelector('meta[name="app-url"]')?.content || '').replace(/\/$/, '')
@@ -401,7 +403,6 @@
     byId('igpDrawerTitle').textContent = title
     byId('igpDetail').hidden = next !== 'detail'
     byId('igpForm').hidden = next !== 'form'
-    byId('igpSummaryBox').hidden = next !== 'summary'
     if (!drawer.open) {
       returnFocus = document.activeElement
       if (window.waMotion) window.waMotion.showDialog(drawer)
@@ -475,6 +476,49 @@
       loading.remove()
     }
   }
+  /** Komentar postingan ini (terbaru), dengan tautan ke tab Komentar. */
+  const COMMENT_STATUS = () => ({
+    replied: t('Dibalas lewat DM'),
+    cs: t('Perlu CS'),
+    skipped: t('Belum dibalas'),
+    failed: t('Gagal'),
+    pending: t('Diproses AI'),
+    processing: t('Diproses AI'),
+    ignored: t('Bukan pertanyaan'),
+  })
+  function commentsSection(row) {
+    const box = section(t('Komentar'))
+    const list = el('div', undefined, 'wa-igp-comments')
+    list.append(el('div', t('Memuat…'), 'wa-loading inline'))
+    box.append(list)
+    api(`/api/instagram/comments?status=all&media=${encodeURIComponent(row.mediaId)}`)
+      .then((data) => {
+        if (selectedKey !== row.key) return
+        const comments = data.comments || []
+        list.replaceChildren()
+        if (!comments.length) return list.append(el('p', t('Belum ada komentar tercatat.'), 'wa-muted'))
+        for (const entry of comments.slice(0, 3)) {
+          const line = el('p', undefined, 'wa-igp-comment')
+          line.append(
+            el('b', entry.username ? `@${entry.username}` : 'Instagram'),
+            el('span', entry.body),
+            el('small', COMMENT_STATUS()[entry.status] || entry.status, 'wa-muted')
+          )
+          list.append(line)
+        }
+        const all = el('button', t('Lihat semua komentar ({0})', comments.length), 'button small')
+        all.type = 'button'
+        all.addEventListener('click', () => {
+          closeDrawer(true)
+          setTab('comments')
+          document.dispatchEvent(new CustomEvent('ig:comments-for', { detail: { mediaId: row.mediaId, caption: row.caption } }))
+        })
+        list.append(all)
+      })
+      .catch(() => list.replaceChildren(el('p', t('Komentar belum bisa dimuat.'), 'wa-muted')))
+    return box
+  }
+
   function openDetail(row) {
     selectedKey = row.key
     byId('igpList').querySelectorAll('[data-order-id]').forEach((tr) => (tr.dataset.selected = String(tr.dataset.orderId === row.key)))
@@ -561,6 +605,8 @@
       interest.append(list)
       box.append(interest)
     }
+
+    if (row.mediaId) box.append(commentsSection(row))
 
     const actions = el('div', undefined, 'wa-b3-actions')
     const post = row.post
@@ -1040,7 +1086,7 @@
     const parts = []
     if (data.status === 'running') {
       parts.push(el('div', t('AI sedang menganalisis…'), 'wa-loading'))
-      if (mode === 'summary') analysisTimer = setTimeout(loadAnalysis, 4000)
+      if (activeTab() === 'summary') analysisTimer = setTimeout(loadAnalysis, 4000)
     } else if (data.status === 'failed') parts.push(el('p', t(data.error || 'Analisis gagal. Coba lagi.'), 'wa-alert'))
     if (data.result && data.status !== 'running') {
       const r = data.result
@@ -1086,12 +1132,47 @@
       byId('igpAnalysisBody').replaceChildren(el('p', error.message, 'wa-alert'))
     }
   })
-  function openSummary() {
-    showDrawer('summary', t('Ringkasan akun'))
-    loadAnalysis()
-    loadSummary()
+  /* ───── Tab halaman: Konten · Komentar · Ringkasan ───── */
+  function setTab(tab) {
+    if (!page) return
+    page.dataset.igTab = tab
+    byId('igTabs')
+      .querySelectorAll('[data-ig-tab]')
+      .forEach((button) => button.setAttribute('aria-selected', String(button.dataset.igTab === tab)))
+    try {
+      const url = new URL(location.href)
+      if (tab === 'content') url.searchParams.delete('tab')
+      else url.searchParams.set('tab', tab)
+      url.hash = ''
+      history.replaceState(history.state, '', url)
+    } catch {}
+    document.dispatchEvent(new CustomEvent('ig:tab', { detail: { tab } }))
+    if (tab === 'summary') {
+      loadAnalysis()
+      loadSummary()
+    }
   }
-  byId('igpSummaryOpen').addEventListener('click', openSummary)
+  byId('igTabs')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-ig-tab]')
+    if (button && button.dataset.igTab !== activeTab()) setTab(button.dataset.igTab)
+  })
+  byId('igTabs')?.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    const buttons = [...byId('igTabs').querySelectorAll('[data-ig-tab]')]
+    const index = buttons.findIndex((button) => button.dataset.igTab === activeTab())
+    const next = buttons[(index + (event.key === 'ArrowRight' ? 1 : buttons.length - 1)) % buttons.length]
+    setTab(next.dataset.igTab)
+    next.focus()
+  })
+  // Dari tab Komentar: buka detail postingan di tab Konten.
+  document.addEventListener('ig:open-post', (event) => {
+    const { mediaId, permalink } = event.detail || {}
+    setTab('content')
+    const row = buildRows().find((item) => item.mediaId && item.mediaId === String(mediaId))
+    if (row) openDetail(row)
+    else if (permalink) window.open(permalink, '_blank', 'noopener')
+    else notice(t('Postingan ini belum dimuat. Gulir ke bawah untuk memuat lebih banyak.'))
+  })
   byId('igpSummaryRefresh').addEventListener('click', () => loadSummary(true))
   byId('igpDays').addEventListener('click', (event) => {
     const button = event.target.closest('button[data-days]')
@@ -1106,12 +1187,16 @@
     render()
     // Label ringkasan ikut bahasa: bangun ulang kerangkanya.
     skeleton = null
-    if (mode === 'summary') loadSummary()
+    if (activeTab() === 'summary') loadSummary()
   })
 
   loadState()
   setKind('feed')
   loadPosts()
   loadMedia()
-  if (location.hash === '#summary') openSummary()
+  if (location.hash === '#summary') setTab('summary')
+  else if (activeTab() === 'summary') {
+    loadAnalysis()
+    loadSummary()
+  }
 })()

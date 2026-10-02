@@ -1629,4 +1629,11 @@ window.waLocales.en = {
   "Teks bawaan dari chat CS. Ubah lalu Simpan bila perlu.": "Default text from CS chats. Edit and Save if needed.",
   "Kosong: AI akan menyerahkan pertanyaan tukar size ke CS.": "Empty: the AI will hand size exchange questions to CS.",
   "Disalin.": "Copied.",
+  "Instagram": "Instagram",
+  "Postingan ini belum dimuat. Gulir ke bawah untuk memuat lebih banyak.": "This post isn't loaded yet. Scroll down to load more.",
+  "Belum ada komentar tercatat.": "No comments recorded yet.",
+  "Lihat semua komentar ({0})": "View all comments ({0})",
+  "Komentar belum bisa dimuat.": "Comments could not be loaded.",
+  "Komentar untuk: {0}": "Comments on: {0}",
+  "Tampilkan semua": "Show all",
 }

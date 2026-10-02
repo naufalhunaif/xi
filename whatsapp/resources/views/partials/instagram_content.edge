@@ -1,17 +1,4 @@
-<section id="igContentPage" class="wa-orders-page wa-igp-page">
-  <div class="wa-orders-title">
-    <h1 data-i18n="Konten Instagram">Konten Instagram</h1>
-    <div class="wa-orders-title-actions">
-      <span id="igpAccount" class="wa-muted"></span>
-      <button id="igpSummaryOpen" class="button" type="button" data-i18n="Ringkasan">Ringkasan</button>
-      <button id="igpRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button>
-      <button id="igpNew" class="button primary" type="button" data-i18n="+ Buat postingan">+ Buat postingan</button>
-    </div>
-  </div>
-  <p id="igpReconnect" class="wa-alert warn" hidden>
-    <span data-i18n="Untuk posting & insights, klik Hubungkan ulang di Pengaturan → Instagram (sekali saja).">Untuk posting & insights, klik Hubungkan ulang di Pengaturan → Instagram (sekali saja).</span>
-    <a href="{{ appUrl }}/settings#instagram" data-i18n="Buka Pengaturan">Buka Pengaturan</a>
-  </p>
+<div id="igContentPage" class="wa-ig-panel" data-ig-panel="content">
   <div class="wa-lean-toolbar">
     <div id="igpTabs" class="wa-order-tabs" role="group" aria-label="Filter postingan" data-i18n-aria-label="Filter postingan">
       <button type="button" data-filter="all" aria-pressed="true"><span data-i18n="Semua">Semua</span> <b class="wa-tab-count" data-count="all"></b></button>
@@ -42,6 +29,24 @@
     <div id="igpMore" class="wa-igp-more"><button id="igpMoreButton" class="button" type="button" hidden data-i18n="Muat lebih banyak">Muat lebih banyak</button></div>
   </div>
 
+</div>
+  <div id="igpSummaryBox" class="wa-ig-panel wa-igp-detail wa-igp-summary-panel" data-ig-panel="summary">
+    <section class="wa-b3-section wa-igp-analysis">
+      <div class="wa-igp-head-row">
+        <h3 data-i18n="Analisis AI">Analisis AI</h3>
+        <button id="igpAnalyze" class="button small" type="button" data-i18n="Analisis sekarang">Analisis sekarang</button>
+      </div>
+      <div id="igpAnalysisBody"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+    </section>
+    <div class="wa-igp-summary-head">
+      <div id="igpDays" class="wa-segmented" role="group" aria-label="Rentang" data-i18n-aria-label="Rentang">
+        <button type="button" data-days="7" aria-pressed="true" data-i18n="7 hari">7 hari</button>
+        <button type="button" data-days="14" aria-pressed="false" data-i18n="14 hari">14 hari</button>
+        <button type="button" data-days="30" aria-pressed="false" data-i18n="30 hari">30 hari</button>
+      </div>
+    </div>
+    <div id="igpSummary"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+  </div>
   <dialog id="igpDrawer" class="wa-order-drawer" data-motion="sheet" aria-labelledby="igpDrawerTitle">
     <header class="wa-order-drawer-header"><strong id="igpDrawerTitle"></strong><button id="igpDrawerClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
     <section id="igpDetail" class="wa-order-editor wa-igp-detail"></section>
@@ -97,24 +102,4 @@
         <button id="igpSave" class="button primary" type="submit" data-i18n="Simpan jadwal">Simpan jadwal</button>
       </div>
     </form>
-
-    <section id="igpSummaryBox" class="wa-order-editor wa-igp-detail" hidden>
-      <section class="wa-b3-section wa-igp-analysis">
-        <div class="wa-igp-head-row">
-          <h3 data-i18n="Analisis AI">Analisis AI</h3>
-          <button id="igpAnalyze" class="button small" type="button" data-i18n="Analisis sekarang">Analisis sekarang</button>
-        </div>
-        <div id="igpAnalysisBody"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
-      </section>
-      <div class="wa-igp-summary-head">
-        <div id="igpDays" class="wa-segmented" role="group" aria-label="Rentang" data-i18n-aria-label="Rentang">
-          <button type="button" data-days="7" aria-pressed="true" data-i18n="7 hari">7 hari</button>
-          <button type="button" data-days="14" aria-pressed="false" data-i18n="14 hari">14 hari</button>
-          <button type="button" data-days="30" aria-pressed="false" data-i18n="30 hari">30 hari</button>
-        </div>
-        <button id="igpSummaryRefresh" class="button small" type="button" data-i18n="Perbarui data">Perbarui data</button>
-      </div>
-      <div id="igpSummary"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
-    </section>
   </dialog>
-</section>
