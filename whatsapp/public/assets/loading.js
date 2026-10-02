@@ -22,34 +22,30 @@
     document.querySelector('.wa-progress')?.remove()
     el('wa-progress', document.body)
   }
-  function bubbles(parent) {
-    const wrap = el('wa-skel-chat', parent)
-    for (const [side, width] of [['in', 52], ['in', 34], ['out', 46], ['in', 60], ['out', 30], ['out', 55]]) {
-      const bubble = el(`wa-skel wa-skel-bubble ${side}`, wrap)
-      bubble.style.width = `${width}%`
-    }
-    return wrap
+  // Penanda memuat yang sederhana: putaran kecil + "Memuat…".
+  const t = (value) => window.waI18n?.t(value) ?? value
+  function spinner(parent) {
+    const node = el('wa-loading', parent)
+    node.textContent = t('Memuat…')
+    return node
   }
   function openingRoom(link) {
     document.querySelectorAll('.wa-contact.active').forEach((row) => row.classList.remove('active'))
     link.classList.add('active')
+    const name = link.querySelector('.wa-contact-content strong')?.textContent?.trim() || ''
     const messages = document.getElementById('messageList')
-    const visible = messages && messages.offsetParent !== null
-    if (visible) {
-      // Komputer: panel chat tetap, isinya diganti kerangka sampai room baru tampil.
+    if (messages && messages.offsetParent !== null) {
+      // Komputer: panel chat tetap, isinya diganti penanda memuat sampai room baru tampil.
       messages.replaceChildren()
-      bubbles(messages)
-      const name = link.querySelector('.wa-contact-content strong')?.textContent?.trim()
+      spinner(messages)
       const title = document.getElementById('roomName')
       if (name && title) title.textContent = name
     } else {
-      // HP: tampilan room sementara (kerangka) di atas daftar chat.
+      // HP: layar room sementara (nama + penanda memuat).
       const overlay = el('wa-skel-overlay', document.body)
       const head = el('wa-skel-overlay-head', overlay)
-      el('wa-skel wa-skel-avatar', head)
-      const title = el('wa-skel-overlay-title', head)
-      title.textContent = link.querySelector('.wa-contact-content strong')?.textContent?.trim() || ''
-      bubbles(overlay)
+      el('wa-skel-overlay-title', head).textContent = name
+      spinner(overlay)
     }
   }
   document.addEventListener('click', (event) => {
