@@ -1672,4 +1672,8 @@ window.waLocales.en = {
   "opus (selalu terbaru)": "opus (always latest)",
   "sonnet (selalu terbaru)": "sonnet (always latest)",
   "haiku (selalu terbaru)": "haiku (always latest)",
+  "media: {0} file baru, total {1}": "media: {0} new files, {1} total",
+  "{0} menunggu backup berikutnya": "{0} waiting for next backup",
+  "Media chat sedang diunduh bertahap dari Google Drive…": "Chat media is being downloaded gradually from Google Drive…",
+  "Hanya file baru yang diunggah tiap backup (tidak disalin ulang), jadi tetap ringan walau data makin banyak.": "Only new files are uploaded each backup (no re-copying), so it stays light as data grows.",
 }

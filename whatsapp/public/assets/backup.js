@@ -58,12 +58,16 @@
         ? t('Sedang membuat backup…')
         : last
           ? last.ok
-            ? t('Terakhir: {0} · {1}', when(last.at), size(last.size))
+            ? t('Terakhir: {0} · {1}', when(last.at), size(last.size)) +
+              (last.media
+                ? ` · ${t('media: {0} file baru, total {1}', last.media.uploaded, last.media.total)}${last.media.pending ? ` · ${t('{0} menunggu backup berikutnya', last.media.pending)}` : ''}`
+                : '')
             : t('Gagal {0}: {1}', when(last.at), last.error || '')
           : t('Belum pernah backup.')
     byId('backupNow').disabled = !state.connected || Boolean(state.running)
     byId('backupList').disabled = !state.connected || Boolean(state.running)
     if (state.running === 'restore' || (state.restore && !state.restore.ok && !state.restore.error)) status(t('Memulihkan data… jangan tutup halaman.'))
+    else if (state.mediaRestoring) status(t('Media chat sedang diunduh bertahap dari Google Drive…'))
     else if (state.restore?.ok) status(t('Pemulihan selesai. Aplikasi dimulai ulang; muat ulang halaman lalu login dengan akun dari backup.'))
     else if (state.restore?.error) status(t('Pemulihan gagal: {0}', state.restore.error))
     clearTimeout(poll)

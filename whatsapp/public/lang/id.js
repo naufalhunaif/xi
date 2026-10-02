@@ -1488,4 +1488,8 @@ window.waLocales.id = {
   "opus (selalu terbaru)": "opus (selalu terbaru)",
   "sonnet (selalu terbaru)": "sonnet (selalu terbaru)",
   "haiku (selalu terbaru)": "haiku (selalu terbaru)",
+  "media: {0} file baru, total {1}": "media: {0} file baru, total {1}",
+  "{0} menunggu backup berikutnya": "{0} menunggu backup berikutnya",
+  "Media chat sedang diunduh bertahap dari Google Drive…": "Media chat sedang diunduh bertahap dari Google Drive…",
+  "Hanya file baru yang diunggah tiap backup (tidak disalin ulang), jadi tetap ringan walau data makin banyak.": "Hanya file baru yang diunggah tiap backup (tidak disalin ulang), jadi tetap ringan walau data makin banyak.",
 }

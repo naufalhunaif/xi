@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process'
 import { createReadStream, createWriteStream, existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, utimes, writeFile, cp, readdir } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import app from '@adonisjs/core/services/app'
@@ -26,7 +26,8 @@ type GoogleState = {
   /** Media postingan Instagram terjadwal disimpan di Drive (hemat server). Bawaan: mati. */
   igOffload?: boolean
   igFolderId?: string
-  lastBackup?: { at: number; name: string; size: number; ok: boolean; error?: string }
+  lastBackup?: { at: number; name: string; size: number; ok: boolean; error?: string; media?: { uploaded: number; pending: number; total: number } }
+  mediaFolderId?: string
   oauthState?: string
 }
 
@@ -53,6 +54,7 @@ export async function backupStatus() {
     includeMedia: state.includeMedia !== false,
     igOffload: state.igOffload === true,
     lastBackup: state.lastBackup || null,
+    mediaRestoring: existsSync(app.makePath('storage', 'backup', 'media-restore-pending')),
     running,
     redirectUri: redirectUri(),
   }
@@ -176,7 +178,11 @@ async function folderId(state: GoogleState, token: string) {
 }
 
 /* ---------------- Arsip ---------------- */
-function run(command: string, args: string[], options: { env?: NodeJS.ProcessEnv; stdin?: NodeJS.ReadableStream; stdout?: NodeJS.WritableStream } = {}) {
+function run(
+  command: string,
+  args: string[],
+  options: { env?: NodeJS.ProcessEnv; stdin?: NodeJS.ReadableStream; stdout?: NodeJS.WritableStream; okCodes?: number[] } = {}
+) {
   return new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, { env: { ...process.env, ...options.env }, stdio: ['pipe', options.stdout ? 'pipe' : 'ignore', 'pipe'] })
     let error = ''
@@ -185,7 +191,9 @@ function run(command: string, args: string[], options: { env?: NodeJS.ProcessEnv
     else child.stdin?.end()
     if (options.stdout && child.stdout) child.stdout.pipe(options.stdout)
     child.on('error', reject)
-    child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`${command}: ${error.trim() || `kode ${code}`}`))))
+    child.on('close', (code) =>
+      (options.okCodes || [0]).includes(Number(code)) ? resolve() : reject(new Error(`${command}: ${error.trim() || `kode ${code}`}`))
+    )
   })
 }
 const binary = (name: string) =>
@@ -198,6 +206,10 @@ const dbArgs = () => [
   `-P${env.get('DB_PORT')}`,
   `-u${env.get('DB_USER')}`,
 ]
+
+/** Folder sementara/log login AI: tidak perlu dicadangkan dan sering berubah/hilang saat backup berjalan. */
+const VOLATILE_DIRS = ['tmp', 'log', 'logs', 'cache', 'shell-snapshots', 'arg0']
+const volatile = (path: string) => VOLATILE_DIRS.includes(basename(path))
 
 async function buildArchive(includeMedia: boolean) {
   const work = await mkdtemp(join(tmpdir(), 'wa-backup-'))
@@ -218,15 +230,32 @@ async function buildArchive(includeMedia: boolean) {
     [join(homedir(), '.codex'), 'home-codex'],
     [join(homedir(), '.claude'), 'home-claude'],
   ]) {
-    if (existsSync(dir)) await cp(dir, join(work, target), { recursive: true }).catch(() => {})
+    if (existsSync(dir))
+      await cp(dir, join(work, target), { recursive: true, filter: (source) => !volatile(source) }).catch(() => {})
   }
   const archive = join(tmpdir(), name)
   const parts = ['-C', work, 'db.sql', 'meta.json']
   for (const extra of ['home-codex', 'home-claude']) if (existsSync(join(work, extra))) parts.push(extra)
-  const storageArgs = ['-C', app.makePath(), '--exclude=storage/backup/*.tmp', '--exclude=storage/diagnostics', 'storage']
-  const mediaArgs = includeMedia && existsSync(app.makePath('public', 'media')) ? ['-C', app.makePath(), 'public/media'] : []
+  const storageArgs = [
+    '-C',
+    app.makePath(),
+    '--exclude=storage/backup/*.tmp',
+    '--exclude=storage/diagnostics',
+    ...VOLATILE_DIRS.map((dir) => `--exclude=*/${dir}`),
+    // Media dicadangkan terpisah & bertahap (hanya file baru), bukan disalin utuh tiap hari.
+    '--exclude=storage/cs-media',
+    '--exclude=storage/ig-media',
+    'storage',
+  ]
+  void includeMedia
+  const mediaArgs: string[] = []
   // -h: storage & media di rilis berupa symlink ke folder bersama; arsipkan isinya.
-  await run('tar', ['-czhf', archive, ...parts, ...storageArgs, ...mediaArgs])
+  // File sementara AI (codex/claude) bisa hilang saat dibaca → abaikan; kode 1 tar = ada file berubah, arsip tetap utuh.
+  await run(
+    'tar',
+    ['--ignore-failed-read', '--warning=no-file-removed', '--warning=no-file-changed', '--warning=no-file-shrank', '-czhf', archive, ...parts, ...storageArgs, ...mediaArgs],
+    { okCodes: [0, 1] }
+  )
   await rm(work, { recursive: true, force: true })
   return { archive, name, size: (await stat(archive)).size }
 }
@@ -329,11 +358,14 @@ export async function runBackup(reason: 'manual' | 'auto' = 'manual') {
     const built = await buildArchive(state.includeMedia !== false)
     archive = built.archive
     await upload(token, parent, built.archive, built.name, built.size)
+    await rm(built.archive, { force: true }).catch(() => {})
     // Simpan 14 backup terbaru.
     const list = await listBackups()
     for (const old of list.slice(KEEP)) await drive(token, `files/${old.id}`, { method: 'DELETE' }).catch(() => {})
-    await writeGoogle({ ...(await readGoogle()), lastBackup: { at: Date.now(), name: built.name, size: built.size, ok: true } })
-    return { ok: true, name: built.name, size: built.size, reason }
+    // Media: hanya file baru yang diunggah (sisanya dilanjutkan backup berikutnya bila waktunya habis).
+    const media = state.includeMedia !== false ? await syncMedia(state).catch(() => undefined) : undefined
+    await writeGoogle({ ...(await readGoogle()), lastBackup: { at: Date.now(), name: built.name, size: built.size, ok: true, media } })
+    return { ok: true, name: built.name, size: built.size, reason, media }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     await writeGoogle({ ...(await readGoogle()), lastBackup: { at: Date.now(), name: '', size: 0, ok: false, error: message.slice(0, 300) } })
@@ -408,6 +440,8 @@ export async function restoreBackup(fileId: string) {
         const text = await readFile(file, 'utf8')
         if (/^APP_KEY=/m.test(text)) await writeFile(file, text.replace(/^APP_KEY=.*$/m, `APP_KEY=${meta.appKey}`))
       }
+    // Media chat diunduh bertahap dari Drive setelah aplikasi menyala (lihat restoreMediaTick).
+    await writeFile(app.makePath('storage', 'backup', 'media-restore-pending'), String(Date.now())).catch(() => {})
     // 4) Minta worker & web mulai ulang.
     await writeFile(restartFlag(), String(Date.now()))
     const now = new Date()
@@ -422,11 +456,228 @@ export async function restoreBackup(fileId: string) {
 /** Backup otomatis harian sekitar 03.00 WIB (dipanggil berkala dari proses web). */
 export async function autoBackupTick() {
   const state = await readGoogle()
-  if (!state.refreshToken || state.auto === false || running) return
+  if (!state.refreshToken || running) return
+  await restoreMediaTick(state).catch(() => {})
+  if (state.auto === false || running) return
   const wibHour = (new Date().getUTCHours() + 7) % 24
   const last = state.lastBackup?.at || 0
   if (wibHour >= 3 && Date.now() - last > 20 * 3_600_000) await runBackup('auto').catch(() => {})
 }
 export async function listStorageRoot() {
   return readdir(app.makePath('storage')).catch(() => [])
+}
+
+/* ---------------- Media bertahap (hanya file baru) ----------------
+ * Foto & media chat tidak lagi masuk arsip harian (14 salinan penuh = boros Drive & disk server).
+ * Setiap file diunggah sekali ke "WA Backup/Media"; indeks (path → id Drive) disimpan di server
+ * dan di Drive, dipakai saat pemulihan. File yang dihapus di server dihapus dari Drive setelah 14 hari.
+ */
+type MediaEntry = { id: string; size: number; mtime: number; gone?: number }
+const MEDIA_FOLDER = 'Media'
+const MEDIA_BUDGET_MS = 25 * 60_000
+const mediaIndexFile = () => app.makePath('storage', 'backup', 'media-index.json')
+async function readMediaIndex(): Promise<Record<string, MediaEntry>> {
+  try {
+    return JSON.parse(await readFile(mediaIndexFile(), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+async function writeMediaIndex(index: Record<string, MediaEntry>) {
+  await mkdir(app.makePath('storage', 'backup'), { recursive: true, mode: 0o700 })
+  await writeFile(`${mediaIndexFile()}.tmp`, JSON.stringify(index))
+  const { rename } = await import('node:fs/promises')
+  await rename(`${mediaIndexFile()}.tmp`, mediaIndexFile())
+}
+/** Folder media yang dicadangkan bertahap: key = path relatif aplikasi. */
+async function mediaRoots() {
+  const roots: Array<{ key: string; dir: string }> = []
+  for (const key of ['public/media', 'storage/cs-media']) {
+    const dir = await realpath(app.makePath(...key.split('/'))).catch(() => '')
+    if (dir && existsSync(dir)) roots.push({ key, dir })
+  }
+  return roots
+}
+async function walk(dir: string, prefix: string, out: Array<{ key: string; path: string }>) {
+  for (const entry of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+    if (entry.name.startsWith('.') || entry.name.endsWith('.part') || entry.name.endsWith('.tmp')) continue
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) await walk(path, `${prefix}/${entry.name}`, out)
+    else if (entry.isFile()) out.push({ key: `${prefix}/${entry.name}`, path })
+  }
+}
+async function mediaFolder(state: GoogleState, token: string) {
+  if (state.mediaFolderId) {
+    const check = await fetch(`https://www.googleapis.com/drive/v3/files/${state.mediaFolderId}?fields=id,trashed`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = (await check.json().catch(() => ({}))) as Record<string, any>
+    if (check.ok && !data.trashed) return state.mediaFolderId
+  }
+  const parent = await folderId(state, token)
+  const created = (await (
+    await drive(token, 'files?fields=id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: MEDIA_FOLDER, mimeType: 'application/vnd.google-apps.folder', parents: [parent] }),
+    })
+  ).json()) as any
+  await writeGoogle({ ...(await readGoogle()), mediaFolderId: String(created.id) })
+  return String(created.id)
+}
+/** Unggah file kecil dalam satu permintaan (multipart); besar → resumable. */
+async function uploadAny(token: string, parent: string, file: string, name: string, size: number) {
+  if (size > 5 * 1024 * 1024) return upload(token, parent, file, name, size, 'application/octet-stream')
+  const boundary = `wa${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
+  const head = Buffer.from(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, parents: [parent] })}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`
+  )
+  const body = Buffer.concat([head, await readFile(file), Buffer.from(`\r\n--${boundary}--`)])
+  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  })
+  const data = (await response.json().catch(() => ({}))) as Record<string, any>
+  if (!response.ok || !data.id) throw new Error(`Google Drive: upload media gagal (${response.status}).`)
+  return String(data.id)
+}
+/** Token akses diperbarui tiap 40 menit selama proses panjang. */
+function tokenSource(state: GoogleState) {
+  let token = ''
+  let at = 0
+  return async () => {
+    if (!token || Date.now() - at > 40 * 60_000) {
+      token = await accessToken(state)
+      at = Date.now()
+    }
+    return token
+  }
+}
+async function saveIndexToDrive(token: string, folder: string, index: Record<string, MediaEntry>, state: GoogleState) {
+  const q = encodeURIComponent(`'${folder}' in parents and trashed=false and name='media-index.json'`)
+  const found = (await (await drive(token, `files?q=${q}&fields=files(id)`)).json()) as any
+  const id = found.files?.[0]?.id
+  const body = JSON.stringify(index)
+  if (id)
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body,
+    })
+  else {
+    const temp = join(tmpdir(), `media-index-${Date.now()}.json`)
+    await writeFile(temp, body)
+    await uploadAny(token, folder, temp, 'media-index.json', Buffer.byteLength(body)).finally(() => rm(temp, { force: true }))
+  }
+  void state
+}
+
+export async function syncMedia(state: GoogleState, budgetMs = MEDIA_BUDGET_MS) {
+  const started = Date.now()
+  const getToken = tokenSource(state)
+  const folder = await mediaFolder(state, await getToken())
+  const index = await readMediaIndex()
+  const files: Array<{ key: string; path: string }> = []
+  for (const root of await mediaRoots()) await walk(root.dir, root.key, files)
+  const present = new Set(files.map((file) => file.key))
+  const todo: Array<{ key: string; path: string; size: number; mtime: number }> = []
+  for (const file of files) {
+    const info = await stat(file.path).catch(() => null)
+    if (!info) continue
+    const known = index[file.key]
+    if (known && known.size === info.size && !known.gone) continue
+    if (known?.gone && known.size === info.size) {
+      delete known.gone
+      continue
+    }
+    todo.push({ ...file, size: info.size, mtime: Math.round(info.mtimeMs) })
+  }
+  let uploaded = 0
+  let changed = false
+  // 4 unggahan bersamaan; berhenti saat jatah waktu habis (dilanjutkan backup berikutnya).
+  const queue = [...todo]
+  const worker = async () => {
+    while (queue.length && Date.now() - started < budgetMs) {
+      const item = queue.shift()!
+      try {
+        const token = await getToken()
+        const id = await uploadAny(token, folder, item.path, item.key, item.size)
+        const old = index[item.key]
+        if (old?.id && old.id !== id) await drive(token, `files/${old.id}`, { method: 'DELETE' }).catch(() => {})
+        index[item.key] = { id, size: item.size, mtime: item.mtime }
+        uploaded++
+        changed = true
+        if (uploaded % 50 === 0) await writeMediaIndex(index)
+      } catch {
+        // Dicoba lagi pada backup berikutnya.
+      }
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()])
+  // File yang sudah dihapus di server: hapus dari Drive setelah 14 hari.
+  for (const [key, entry] of Object.entries(index)) {
+    if (present.has(key)) continue
+    if (!entry.gone) {
+      entry.gone = Date.now()
+      changed = true
+    } else if (Date.now() - entry.gone > 14 * 86_400_000) {
+      await drive(await getToken(), `files/${entry.id}`, { method: 'DELETE' }).catch(() => {})
+      delete index[key]
+      changed = true
+    }
+  }
+  if (changed) {
+    await writeMediaIndex(index)
+    await saveIndexToDrive(await getToken(), folder, index, state).catch(() => {})
+  }
+  return { uploaded, pending: queue.length, total: Object.keys(index).length }
+}
+
+/** Setelah pemulihan: unduh media yang belum ada di server, bertahap (maks ±2 menit per putaran). */
+async function restoreMediaTick(state: GoogleState) {
+  const flag = app.makePath('storage', 'backup', 'media-restore-pending')
+  if (!existsSync(flag) || running) return
+  running = 'media'
+  try {
+    const getToken = tokenSource(state)
+    const token = await getToken()
+    let index = await readMediaIndex()
+    // Indeks terbaru di Drive (lebih baru dari yang ada di arsip).
+    try {
+      const folder = await mediaFolder(state, token)
+      const q = encodeURIComponent(`'${folder}' in parents and trashed=false and name='media-index.json'`)
+      const found = (await (await drive(token, `files?q=${q}&fields=files(id)`)).json()) as any
+      if (found.files?.[0]?.id) {
+        const remote = (await (await drive(token, `files/${found.files[0].id}?alt=media`)).json()) as Record<string, MediaEntry>
+        index = { ...index, ...remote }
+        await writeMediaIndex(index)
+      }
+    } catch {}
+    const roots = await mediaRoots()
+    const started = Date.now()
+    let missing = 0
+    for (const [key, entry] of Object.entries(index)) {
+      if (entry.gone) continue
+      const root = roots.find((item) => key.startsWith(`${item.key}/`)) || { key: key.split('/').slice(0, 2).join('/'), dir: app.makePath(...key.split('/').slice(0, 2)) }
+      const dest = join(root.dir, key.slice(root.key.length + 1))
+      if (existsSync(dest)) continue
+      if (Date.now() - started > 2 * 60_000) {
+        missing++
+        continue
+      }
+      try {
+        await mkdir(join(dest, '..'), { recursive: true })
+        const response = await drive(await getToken(), `files/${encodeURIComponent(entry.id)}?alt=media`)
+        await pipeline(Readable.fromWeb(response.body as any), createWriteStream(`${dest}.part`))
+        const { rename } = await import('node:fs/promises')
+        await rename(`${dest}.part`, dest)
+      } catch {
+        missing++
+      }
+    }
+    if (!missing) await rm(flag, { force: true })
+  } finally {
+    running = ''
+  }
 }
