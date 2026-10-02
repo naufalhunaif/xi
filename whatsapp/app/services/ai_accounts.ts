@@ -132,6 +132,9 @@ async function ensureTable() {
   )
   if (!Number(blockedCol?.[0]?.n || 0))
     await db.rawQuery("ALTER TABLE whatsapp_ai_accounts ADD COLUMN IF NOT EXISTS model_blocked VARCHAR(80) NOT NULL DEFAULT ''")
+  // Perbaikan data: pilihan "Otomatis" dulu tersimpan sebagai teks "null".
+  await db.from('whatsapp_ai_accounts').where('model', 'null').update({ model: '', model_blocked: '' })
+  await db.from('whatsapp_ai_accounts').where('label', 'null').update({ label: '' })
   ready = true
 }
 
@@ -168,7 +171,7 @@ const map = (row: any): AiAccount => ({
   position: Number(row.position || 0),
   enabled: Boolean(row.enabled),
   legacy: Boolean(row.legacy),
-  model: String(row.model || ''),
+  model: row.model && row.model !== 'null' ? String(row.model) : '',
   apiKey: String(row.api_key || ''),
   limitedUntil: Number(row.limited_until || 0),
   limitedCode: String(row.limited_code || ''),

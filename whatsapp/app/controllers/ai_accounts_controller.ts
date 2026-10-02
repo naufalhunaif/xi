@@ -189,11 +189,14 @@ export default class AiAccountsController {
       values.enabled = request.input('enabled') ? 1 : 0
       values.user_set = 1
     }
-    if (request.input('label') !== undefined) values.label = String(request.input('label')).trim().slice(0, 80)
-    if (request.input('model') !== undefined)
-      values.model = String(request.input('model')).trim().replace(/[^a-zA-Z0-9._:-]/g, '').slice(0, 80)
+    // Teks kosong diubah body parser jadi null → simpan sebagai kosong (Otomatis), bukan "null".
+    if (request.input('label') !== undefined) values.label = String(request.input('label') ?? '').trim().slice(0, 80)
+    if (request.input('model') !== undefined) {
+      values.model = String(request.input('model') ?? '').trim().replace(/[^a-zA-Z0-9._:-]/g, '').slice(0, 80)
+      values.model_blocked = ''
+    }
     if (request.input('apiKey') !== undefined && account.provider === 'gemini') {
-      const key = String(request.input('apiKey')).trim()
+      const key = String(request.input('apiKey') ?? '').trim()
       if (key) values.api_key = key
     }
     // Diubah manual → jeda lama dihapus supaya langsung dicoba lagi.
