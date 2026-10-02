@@ -78,17 +78,32 @@
     return node
   }
 
-  /** Satu komentar dalam utas postingan. */
+  const NEEDS_REPLY = ['failed', 'skipped', 'cs']
+  const TONE = { replied: 'ok', pending: 'busy', processing: 'busy', failed: 'open', skipped: 'open', cs: 'open', ignored: 'muted' }
+
+  /** Satu komentar: titik status, nama, isi, waktu; balasan satu baris; aksi muncul saat dibutuhkan. */
   function item(entry) {
-    const node = el('li', undefined, 'wa-igc-item')
-    const head = el('div', undefined, 'wa-igc-head')
-    head.append(el('strong', entry.username ? `@${entry.username}` : 'Instagram'), el('span', when(entry.createdAt), 'wa-muted'))
-    const [label, tone] = STATUS()[entry.status] || [entry.status, '']
-    head.append(el('span', label, `wa-pill ${tone}`))
-    node.append(head, el('p', entry.body, 'wa-igc-body'))
-    if (entry.reply) node.append(el('p', `↳ ${t('DM: {0}', entry.reply)}`, 'wa-igc-reply'))
-    if (entry.publicReply) node.append(el('p', `↳ ${t('Balasan di komentar: {0}', entry.publicReply)}`, 'wa-igc-reply'))
-    if (entry.error && entry.status === 'failed') node.append(el('p', entry.error, 'wa-igc-error'))
+    const open = NEEDS_REPLY.includes(entry.status)
+    const node = el('li', undefined, `wa-igc-item${open ? ' needs' : ''}`)
+    const [label] = STATUS()[entry.status] || [entry.status]
+    const line = el('div', undefined, 'wa-igc-line')
+    const dot = el('span', undefined, `wa-igc-dot ${TONE[entry.status] || 'muted'}`)
+    dot.title = entry.error && entry.status === 'failed' ? `${label}: ${entry.error}` : label
+    dot.setAttribute('aria-label', label)
+    const name = entry.username ? `@${entry.username}` : 'Instagram'
+    let who
+    if (['replied', 'cs'].includes(entry.status)) {
+      who = el('a', name, 'wa-igc-name')
+      who.href = `${base}/?jid=${encodeURIComponent(entry.jid)}`
+      who.title = t('Buka chat')
+    } else who = el('strong', name, 'wa-igc-name')
+    line.append(dot, who, el('span', entry.body, 'wa-igc-text'), el('time', when(entry.createdAt), 'wa-igc-time'))
+    node.append(line)
+    if (entry.reply) {
+      const reply = el('p', `↳ ${entry.reply}`, 'wa-igc-reply')
+      reply.title = entry.reply
+      node.append(reply)
+    }
 
     const form = el('div', undefined, 'wa-igc-form')
     form.hidden = true
@@ -143,65 +158,66 @@
       })
       actions.append(ai)
     }
-    if (entry.status === 'replied' || entry.status === 'cs') {
-      const open = el('a', t('Buka chat'), 'wa-igc-link')
-      open.href = `${base}/?jid=${encodeURIComponent(entry.jid)}`
-      actions.append(open)
-    }
+    // HP: ketuk komentar untuk memunculkan tombol.
+    line.addEventListener('click', (event) => {
+      if (event.target.closest('a')) return
+      node.classList.toggle('show-actions')
+    })
     node.append(actions, form)
     return node
   }
 
-  // Utas per postingan: postingan sekali di atas, komentar berjejer di bawahnya.
+  // Utas per postingan: postingan sekali di atas, komentar bercabang di bawahnya.
   const SHOWN = 3
   const expanded = new Set()
   function post(group) {
     const first = group.items[0]
     const node = el('article', undefined, 'wa-igc-card')
     const head = el('header', undefined, 'wa-igc-post-head')
+    const target = first.permalink || first.image
+    const media = el(target ? 'a' : 'span', undefined, 'wa-igc-thumb-link')
+    if (target) {
+      media.href = target
+      media.target = '_blank'
+      media.rel = 'noopener'
+      media.title = first.permalink ? t('Lihat postingan') : t('Lihat foto postingan')
+    }
     if (first.image) {
       const thumb = el('img', undefined, 'wa-igc-thumb')
       thumb.src = first.image
       thumb.alt = t('Foto postingan')
       thumb.loading = 'lazy'
-      const open = el('a', undefined, 'wa-igc-thumb-link')
-      open.href = first.image
-      open.target = '_blank'
-      open.rel = 'noopener'
-      open.title = t('Lihat foto postingan')
-      open.append(thumb)
-      head.append(open)
-    }
+      media.append(thumb)
+    } else media.append(el('span', 'IG', 'wa-igc-thumb empty'))
+    head.append(media)
     const info = el('div', undefined, 'wa-igc-post-info')
     info.append(el('p', first.caption ? first.caption.replace(/\s+/g, ' ') : t('Postingan'), 'wa-igc-caption'))
-    const meta = el('div', undefined, 'wa-igc-post-meta')
-    meta.append(el('span', t('{0} komentar', group.items.length)))
-    const open = group.items.filter((entry) => ['failed', 'skipped', 'cs'].includes(entry.status)).length
-    if (open) meta.append(el('span', t('{0} perlu dibalas', open), 'wa-igc-open'))
-    if (first.permalink) {
-      const view = el('a', t('Lihat postingan'))
-      view.href = first.permalink
-      view.target = '_blank'
-      view.rel = 'noopener'
-      meta.append(view)
-    }
+    const meta = el('span', t('{0} komentar', group.items.length), 'wa-igc-post-meta')
+    const waiting = group.items.filter((entry) => NEEDS_REPLY.includes(entry.status)).length
+    if (waiting) meta.append(' · ', el('b', t('{0} perlu dibalas', waiting), 'wa-igc-open'))
     info.append(meta)
     head.append(info)
-    const thread = el('ol', undefined, 'wa-igc-thread')
+
+    const main = group.items.filter((entry) => entry.status !== 'ignored')
+    const others = group.items.filter((entry) => entry.status === 'ignored')
     const all = expanded.has(group.key)
-    const visible = all ? group.items : group.items.slice(0, SHOWN)
+    const visible = all ? [...main, ...others] : main.slice(0, SHOWN)
+    const hidden = group.items.length - visible.length
+    const thread = el('ol', undefined, 'wa-igc-thread')
     thread.append(...visible.map(item))
-    node.append(head, thread)
-    if (group.items.length > SHOWN) {
-      node.append(
-        link(all ? t('Sembunyikan') : t('Lihat {0} komentar lainnya', group.items.length - SHOWN), () => {
+    if (hidden > 0 || all) {
+      const more = el('li', undefined, 'wa-igc-item wa-igc-more')
+      more.append(
+        link(all ? t('Sembunyikan') : t('+{0} komentar lain', hidden), () => {
           if (all) expanded.delete(group.key)
           else expanded.add(group.key)
           render()
         })
       )
-      node.lastChild.classList.add('wa-igc-more')
+      if (all && group.items.length <= SHOWN && !others.length) more.remove()
+      else thread.append(more)
     }
+    node.append(head, thread)
     return node
   }
 

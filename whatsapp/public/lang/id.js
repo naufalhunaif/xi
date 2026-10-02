@@ -1286,4 +1286,5 @@ window.waLocales.id = {
   "{0} perlu dibalas": "{0} perlu dibalas",
   "Lihat {0} komentar lainnya": "Lihat {0} komentar lainnya",
   "Sembunyikan": "Sembunyikan",
+  "+{0} komentar lain": "+{0} komentar lain",
 }

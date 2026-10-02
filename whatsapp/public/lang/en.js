@@ -1472,4 +1472,5 @@ window.waLocales.en = {
   "{0} perlu dibalas": "{0} need a reply",
   "Lihat {0} komentar lainnya": "View {0} more comments",
   "Sembunyikan": "Hide",
+  "+{0} komentar lain": "+{0} more comments",
 }
