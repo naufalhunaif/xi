@@ -1474,4 +1474,5 @@ window.waLocales.en = {
   "Sembunyikan": "Hide",
   "+{0} komentar lain": "+{0} more comments",
   "Komentar di postingan": "Comment on post",
+  "Balasan DM": "DM reply",
 }

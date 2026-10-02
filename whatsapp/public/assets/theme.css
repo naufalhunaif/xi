@@ -512,7 +512,11 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 .workspace-ui a.wa-igc-name:hover { text-decoration: underline; }
 .workspace-ui .wa-igc-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .workspace-ui .wa-igc-time { flex: none; font-size: 11px; color: var(--muted); }
-.workspace-ui .wa-igc-reply { margin: 0 0 0 14px; font-size: 12px; line-height: 17px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.workspace-ui .wa-igc-subthread { list-style: none; margin: 0 0 0 3px; padding: 0; }
+.workspace-ui .wa-igc-subitem { position: relative; padding: 4px 0 0 20px; display: flex; gap: 6px; align-items: baseline; min-width: 0; font-size: 12px; line-height: 17px; color: var(--muted); }
+.workspace-ui .wa-igc-subitem::before { content: ''; position: absolute; left: 0; top: -2px; width: 13px; height: 14px; border-left: 1.5px solid var(--line-strong, #c9d1cc); border-bottom: 1.5px solid var(--line-strong, #c9d1cc); border-bottom-left-radius: 10px; }
+.workspace-ui .wa-igc-subname { flex: none; font-weight: 600; color: var(--wa-ok, #1f7a55); }
+.workspace-ui .wa-igc-subtext { min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .workspace-ui .wa-igc-actions { display: none; gap: 14px; margin-left: 14px; }
 .workspace-ui .wa-igc-item.needs .wa-igc-actions,
 .workspace-ui .wa-igc-item.show-actions .wa-igc-actions,

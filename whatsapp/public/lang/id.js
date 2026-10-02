@@ -1288,4 +1288,5 @@ window.waLocales.id = {
   "Sembunyikan": "Sembunyikan",
   "+{0} komentar lain": "+{0} komentar lain",
   "Komentar di postingan": "Komentar di postingan",
+  "Balasan DM": "Balasan DM",
 }

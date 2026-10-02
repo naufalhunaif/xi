@@ -100,9 +100,13 @@
     line.append(dot, who, el('span', entry.body, 'wa-igc-text'), el('time', when(entry.createdAt), 'wa-igc-time'))
     node.append(line)
     if (entry.reply) {
-      const reply = el('p', `↳ ${entry.reply}`, 'wa-igc-reply')
+      // Balasan DM turun dari komentarnya sebagai cabang kecil.
+      const sub = el('ol', undefined, 'wa-igc-subthread')
+      const reply = el('li', undefined, 'wa-igc-subitem')
       reply.title = entry.reply
-      node.append(reply)
+      reply.append(el('b', t('Balasan DM'), 'wa-igc-subname'), el('span', entry.reply, 'wa-igc-subtext'))
+      sub.append(reply)
+      node.append(sub)
     }
 
     const form = el('div', undefined, 'wa-igc-form')
