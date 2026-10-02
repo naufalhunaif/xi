@@ -544,3 +544,10 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 .workspace-ui .message.has-media .message-media-wrap > video.message-media,
 .workspace-ui .message.has-media .message-media-wrap > .message-media-placeholder { width: 100%; height: auto; max-height: 360px; object-fit: cover; }
 .workspace-ui .message.has-media .message-media-wrap > video.message-media { object-fit: contain; background: #000; }
+/* Komentar Instagram di room chat: kotak postingan abu-abu, lalu isi komentar. */
+.workspace-ui .message-ig-post { display: flex; gap: 8px; align-items: center; max-width: 280px; margin-bottom: 6px; padding: 5px; border-radius: 6px; background: rgba(0, 0, 0, 0.05); color: var(--muted, #6b6b67); }
+.workspace-ui .message-ig-post img { flex: none; width: 38px; height: 38px; object-fit: cover; border-radius: 4px; cursor: zoom-in; }
+.workspace-ui .message-ig-post div { min-width: 0; display: grid; gap: 1px; }
+.workspace-ui .message-ig-post small { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+.workspace-ui .message-ig-post span { font-size: 11px; line-height: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+html[data-theme="dark"] .workspace-ui .message-ig-post { background: rgba(255, 255, 255, 0.07); }

@@ -1473,4 +1473,5 @@ window.waLocales.en = {
   "Lihat {0} komentar lainnya": "View {0} more comments",
   "Sembunyikan": "Hide",
   "+{0} komentar lain": "+{0} more comments",
+  "Komentar di postingan": "Comment on post",
 }

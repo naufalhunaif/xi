@@ -194,10 +194,20 @@
       if (adjustingMessageScroll === adjustment) adjustingMessageScroll = 0
     }))
   }
+  // Komentar Instagram: "[Komentar di postingan …: "caption"; foto postingan terlampir] isi" → kotak postingan + isi komentar.
+  const IG_COMMENT = /^\[Komentar di postingan(?: Instagram)?(?:: "([\s\S]*?)")?(?:; foto postingan terlampir)?\]\s*([\s\S]*)$/
+  function igComment(message) {
+    if (!String(message.jid || '').endsWith('@ig') && !String(message.message_id || '').startsWith('igc-')) return null
+    const match = String(message.body || '').match(IG_COMMENT)
+    return match ? { caption: (match[1] || '').trim(), text: (match[2] || '').trim() } : null
+  }
+  const cleanPreview = (text) => String(text || '').replace(IG_COMMENT, (_, caption, rest) => `💬 ${rest}`.trim())
   function messageElement(message) {
     const article = document.createElement('article')
     const senderType = message.sender_type || (message.direction === 'out' ? 'cs' : 'customer')
-    article.className = `message ${message.direction === 'out' ? 'out' : 'in'} source-${senderType} ${message.media_type ? 'has-media' : ''}`
+    const comment = igComment(message)
+    const hasMedia = Boolean(message.media_type) && !comment
+    article.className = `message ${message.direction === 'out' ? 'out' : 'in'} source-${senderType} ${hasMedia ? 'has-media' : ''} ${comment ? 'ig-comment' : ''}`
     article.dataset.id = String(message.id)
     article.dataset.messageId = message.message_id
     article.dataset.body = message.body || message.media_type || 'Media'
@@ -233,7 +243,29 @@
       reply.textContent = message.reply.body || message.reply.media_type || 'Media'
       article.append(reply)
     }
-    if (message.media_type) {
+    if (comment) {
+      // Postingan yang dikomentari: kotak abu-abu kecil (foto + caption), lalu isi komentarnya.
+      const post = document.createElement('div')
+      post.className = 'message-ig-post'
+      const source = message.media_url || message.thumbnail_url
+      if (source) {
+        const image = document.createElement('img')
+        image.src = source
+        image.alt = t('Foto postingan')
+        image.loading = 'lazy'
+        image.dataset.mediaView = ''
+        post.append(image)
+      }
+      const info = document.createElement('div')
+      const label = document.createElement('small')
+      label.textContent = t('Komentar di postingan')
+      const caption = document.createElement('span')
+      caption.textContent = comment.caption || t('Postingan')
+      info.append(label, caption)
+      post.append(info)
+      article.append(post)
+    }
+    if (hasMedia) {
       const mediaWrap = document.createElement('div')
       mediaWrap.className = 'message-media-wrap'
       const source = message.media_url || message.thumbnail_url
@@ -327,10 +359,10 @@
       meta.textContent = message.contact_name || roomTitle || fallbackName(message.jid)
     }
     article.append(meta)
-    if (message.body) {
+    if (comment ? comment.text : message.body) {
       const body = document.createElement('div')
       body.className = 'message-body'
-      body.textContent = message.body
+      body.textContent = comment ? comment.text : message.body
       article.append(body)
     }
     const footer = document.createElement('div')
@@ -774,7 +806,7 @@
       link.dataset.order = String(Boolean(contact.has_order))
       link.dataset.done = String(Boolean(contact.done_order))
       link.dataset.unanswered = String(Number(contact.unanswered_count) || 0)
-      link.dataset.preview = contact.activity || contact.body || ''
+      link.dataset.preview = contact.activity || cleanPreview(contact.body)
       link.dataset.search = normalizeSearch(`${name} ${contact.contact_name || ''} ${contact.body || ''}`)
       link.dataset.digits = `${searchDigits(contact.jid)} ${searchDigits(contact.phone_jid)}`
       const avatar = contact.profile_picture_url
@@ -817,7 +849,7 @@
         title.append(chip)
       }
       const preview = document.createElement('small')
-      preview.textContent = contact.activity || contact.body || ''
+      preview.textContent = contact.activity || cleanPreview(contact.body)
       preview.classList.toggle('active', Boolean(contact.activity))
       content.append(title, preview)
       // AI adalah bawaan: badge hanya untuk CS. Koin kuning = pembayaran perlu dikonfirmasi.
