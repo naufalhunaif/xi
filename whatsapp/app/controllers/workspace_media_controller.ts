@@ -9,7 +9,10 @@ const media = new StaticMiddleware(app.publicPath(), {
   lastModified: false,
   dotFiles: 'deny',
   maxAge: 0,
-  headers: () => ({ 'Cache-Control': 'private, no-store' }),
+  // Nama file media unik per pesan dan tidak berubah → boleh disimpan browser (khusus pengguna ini).
+  headers: (path: string) => ({
+    'Cache-Control': path.includes('/profiles/') ? 'private, max-age=3600' : 'private, max-age=604800',
+  }),
 })
 export default class WorkspaceMediaController {
   async show(ctx: HttpContext) {

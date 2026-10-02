@@ -586,3 +586,27 @@ html[data-theme="dark"] .workspace-ui .message-ig-post { background: rgba(255, 2
   html body.workspace-ui:has(#main.wa-main-chat[data-room='open']) .sidebar { display: none; }
   html body.workspace-ui:has(#main.wa-main-chat[data-room='open']) .shell { padding-bottom: 0; }
 }
+/* Kerangka (skeleton) saat memuat. */
+@keyframes wa-skel-shine { to { background-position: -200% 0; } }
+.workspace-ui .wa-skel, .workspace-ui img.message-media:not(.loaded):not(.sticker), .workspace-ui .message-ig-post img:not(.loaded), .workspace-ui .wa-igc-thumb:not(.loaded) {
+  background: linear-gradient(90deg, #ececea 0%, #f6f6f4 40%, #ececea 80%) 0 0 / 200% 100%;
+  animation: wa-skel-shine 1.2s linear infinite;
+}
+html[data-theme="dark"] .workspace-ui :is(.wa-skel, img.message-media:not(.loaded):not(.sticker), .message-ig-post img:not(.loaded), .wa-igc-thumb:not(.loaded)) {
+  background-image: linear-gradient(90deg, #232826 0%, #2d3330 40%, #232826 80%);
+}
+.workspace-ui img.message-media:not(.loaded):not(.sticker) { min-height: 180px; }
+.workspace-ui .wa-skel-chat { display: flex; flex-direction: column; gap: 10px; padding: 8px 0; }
+.workspace-ui .wa-skel-bubble { height: 38px; border-radius: 8px; max-width: 76%; }
+.workspace-ui .wa-skel-bubble.out { align-self: flex-end; }
+.workspace-ui .wa-skel-bubble:nth-child(3n) { height: 56px; }
+.workspace-ui .wa-skel-overlay { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; gap: 12px; padding: 0 12px; background: var(--bg, #fff); }
+.workspace-ui .wa-skel-overlay-head { display: flex; align-items: center; gap: 10px; height: 56px; border-bottom: 1px solid var(--line); margin: 0 -12px; padding: 0 14px; }
+.workspace-ui .wa-skel-avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; }
+.workspace-ui .wa-skel-overlay-title { font-weight: 600; font-size: 14px; }
+.workspace-ui .wa-progress { position: fixed; top: 0; left: 0; z-index: 100; height: 2px; width: 100%; background: #18865b; transform-origin: left; animation: wa-progress 2.5s cubic-bezier(.1,.7,.2,1) forwards; }
+@keyframes wa-progress { from { transform: scaleX(0); } to { transform: scaleX(.92); } }
+.workspace-ui .wa-skel-card { height: 92px; border-radius: 12px; }
+.workspace-ui .wa-skel-row td { padding: 14px 12px; }
+.workspace-ui .wa-skel-line { height: 12px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { .workspace-ui .wa-skel, .workspace-ui .wa-progress { animation: none; } }
