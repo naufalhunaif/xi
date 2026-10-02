@@ -537,3 +537,10 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 .workspace-ui .wa-inbox-channels button { border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .workspace-ui .wa-inbox-channels button[aria-pressed='true'] { background: #29946a20; color: var(--wa-ok, #1f7a55); font-weight: 600; }
 .workspace-ui .wa-inbox-channels button:hover { background: #88888820; }
+/* Bubble bermedia (foto/video): lebar bubble tetap selebar media, teks panjang membungkus di bawahnya — tanpa celah. */
+.workspace-ui .wa-messages .message.has-media:has(> .message-media-wrap > :is(img.message-media:not(.sticker), video.message-media, .message-media-placeholder)) { width: 300px; }
+.workspace-ui .message.has-media:has(> .message-media-wrap > :is(img.message-media:not(.sticker), video.message-media, .message-media-placeholder)) .message-media-wrap { width: 100%; }
+.workspace-ui .message.has-media .message-media-wrap > img.message-media:not(.sticker),
+.workspace-ui .message.has-media .message-media-wrap > video.message-media,
+.workspace-ui .message.has-media .message-media-wrap > .message-media-placeholder { width: 100%; height: auto; max-height: 360px; object-fit: cover; }
+.workspace-ui .message.has-media .message-media-wrap > video.message-media { object-fit: contain; background: #000; }
