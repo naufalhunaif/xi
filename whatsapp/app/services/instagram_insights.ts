@@ -108,12 +108,21 @@ async function saveStats(media: any, product: string, stats: Record<string, numb
   )
 }
 
+/** Umur data performa sebelum diambil ulang: postingan baru angkanya masih naik cepat. */
+function statsTtl(timestamp: unknown) {
+  const age = Date.now() - new Date(String(timestamp || 0)).getTime()
+  if (age < 2 * 86_400_000) return 5 * 60_000
+  if (age < 7 * 86_400_000) return 15 * 60_000
+  return TTL_MS
+}
+
 /**
- * Postingan profil + performanya, per halaman 24 (cache 30 menit).
- * Halaman pertama: maks 8 diambil ulang per permintaan. Halaman lama (`after`): semua yang belum ada diambil,
- * 6 sekaligus, karena halaman itu hanya dibuka sesekali.
+ * Postingan profil + performanya, per halaman 24.
+ * Data disimpan sementara: postingan < 2 hari 5 menit, < 7 hari 15 menit, lebih lama 30 menit.
+ * Halaman pertama: maks 8 diambil ulang per permintaan (semua bila `fresh`, dari tombol Perbarui).
+ * Halaman lama (`after`): semua yang perlu diambil, 6 sekaligus.
  */
-export async function mediaPerformance(config: IgConfig, after = '') {
+export async function mediaPerformance(config: IgConfig, after = '', fresh = false) {
   // Halaman pertama juga mengambil jumlah total postingan di profil (untuk hitungan tab).
   const [page, profile] = await Promise.all([
     ig.mediaPage(config.token, 24, after),
@@ -128,9 +137,9 @@ export async function mediaPerformance(config: IgConfig, after = '') {
   for (const item of media) {
     const row = known.get(String(item.id))
     if (row) statsOf.set(String(item.id), JSON.parse(row.stats || '{}'))
-    if (!row || Date.now() - new Date(row.fetched_at).getTime() > TTL_MS) stale.push(item)
+    if (fresh || !row || Date.now() - new Date(row.fetched_at).getTime() > statsTtl(item.timestamp)) stale.push(item)
   }
-  const refresh = after ? stale : stale.slice(0, 8)
+  const refresh = after || fresh ? stale : stale.slice(0, 8)
   for (let index = 0; index < refresh.length; index += 6) {
     await Promise.all(
       refresh.slice(index, index + 6).map(async (item) => {

@@ -205,7 +205,7 @@ export default class InstagramContentController {
     if (!config.token) return response.json({ connected: false, posts: [], stories: [], next: '' })
     const after = String(request.input('after') || '').slice(0, 500)
     try {
-      const data = await mediaPerformance(config, after)
+      const data = await mediaPerformance(config, after, !after && request.input('fresh') === '1')
       // Minat beli per postingan: komentar yang bertanya & penanya yang order.
       const signals = await postSignals(data.posts.map((post: any) => String(post.id))).catch(() => new Map())
       const posts = data.posts.map((post: any) => ({

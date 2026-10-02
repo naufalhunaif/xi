@@ -71,6 +71,7 @@
   let media = []
   let stories = []
   let mediaError = ''
+  let refreshing = false
   let nextCursor = ''
   let profileTotal = 0
   let postsLoaded = false
@@ -157,6 +158,14 @@
   /* ───── Tabel ───── */
   const COLUMNS = 8
   const statCell = (row, key) => {
+    // Tombol Perbarui: angka postingan Instagram diambil ulang → tampil memuat di tempatnya.
+    if (refreshing && row.key.startsWith('m')) {
+      const cell = el('td', undefined, 'wa-order-amount')
+      const spin = el('span', '', 'wa-loading inline')
+      spin.setAttribute('aria-label', t('Memuat…'))
+      cell.append(spin)
+      return cell
+    }
     const value = row.stats?.[key]
     return el('td', value === undefined || value === null ? '—' : num(value), 'wa-order-amount')
   }
@@ -297,9 +306,13 @@
     }
   }
   let moreLoading = false
-  async function loadMedia() {
+  async function loadMedia(fresh = false) {
+    if (fresh) {
+      refreshing = true
+      render()
+    }
     try {
-      const data = await api('/api/instagram/performance')
+      const data = await api(`/api/instagram/performance${fresh ? '?fresh=1' : ''}`)
       media = data.posts || []
       stories = data.stories || []
       mediaError = data.error || ''
@@ -309,6 +322,7 @@
       notice(error.message, true)
     } finally {
       mediaLoaded = true
+      refreshing = false
       render()
       continueMore()
     }
@@ -354,7 +368,7 @@
   byId('igpRefresh').addEventListener('click', () => {
     notice('')
     loadPosts()
-    loadMedia()
+    loadMedia(true)
   })
 
   /* ───── Dialog kanan: detail, form, ringkasan ───── */
