@@ -98,8 +98,11 @@
       root.append(row)
     }
   }
+  let loaded = false
   function render() {
     if (accounts.length) return renderAccounts()
+    // Belum ada data dari server: tetap tampilkan penanda memuat, bukan "kuota belum tersedia".
+    if (!loaded) return
     root.classList.remove('wa-quota-accounts')
     root.replaceChildren()
     for (const provider of ['chatgpt', 'claude']) {
@@ -182,6 +185,7 @@
       status.textContent = t('Pembaruan kuota belum tersedia. Data terakhir mungkin sudah berubah.')
     } finally {
       loading = false
+      loaded = true
       root.setAttribute('aria-busy', 'false')
       render()
     }

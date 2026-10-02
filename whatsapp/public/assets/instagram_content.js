@@ -71,6 +71,8 @@
   let media = []
   let stories = []
   let mediaError = ''
+  let postsLoaded = false
+  let mediaLoaded = false
   let filter = 'all'
   let selectedKey = ''
   const kindOfMedia = (item) =>
@@ -169,6 +171,19 @@
     const rows = sorted(all.filter(FILTERS[filter]).filter((row) => !query || row.caption.toLowerCase().includes(query)))
     const list = byId('igpList')
     list.replaceChildren()
+    const loadingRow = () => {
+      const tr = el('tr')
+      const cell = el('td')
+      cell.colSpan = COLUMNS
+      cell.append(el('div', t('Memuat…'), 'wa-loading'))
+      tr.append(cell)
+      return tr
+    }
+    // Data belum lengkap: tampilkan penanda memuat, bukan "tidak ada postingan".
+    if (!rows.length && !(postsLoaded && mediaLoaded)) {
+      list.append(loadingRow())
+      return
+    }
     if (!rows.length) {
       const tr = el('tr')
       const cell = el('td', mediaError ? t(mediaError) : t('Tidak ada postingan.'), 'wa-order-empty')
@@ -219,6 +234,7 @@
       })
       list.append(tr)
     }
+    if (!mediaLoaded) list.append(loadingRow())
   }
   byId('igpTabs').addEventListener('click', (event) => {
     const button = event.target.closest('button[data-filter]')
@@ -236,6 +252,7 @@
     clearTimeout(postsTimer)
     try {
       posts = (await api('/api/instagram/posts')).posts || []
+      postsLoaded = true
       render()
       const statuses = posts.map((post) => `${post.id}:${post.status}`).join(',')
       if (lastStatuses && statuses !== lastStatuses && posts.some((post) => post.status === 'published')) loadMedia()
@@ -247,6 +264,8 @@
       )
       if (soon) postsTimer = setTimeout(loadPosts, 8000)
     } catch (error) {
+      postsLoaded = true
+      render()
       notice(error.message, true)
     }
   }
@@ -256,9 +275,11 @@
       media = data.posts || []
       stories = data.stories || []
       mediaError = data.error || ''
-      render()
     } catch (error) {
       notice(error.message, true)
+    } finally {
+      mediaLoaded = true
+      render()
     }
   }
   async function loadState() {

@@ -667,3 +667,12 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
   .workspace-ui .wa-igp-page #igpAccount { display: none; }
   .workspace-ui .wa-igp-page #igpNew { flex: 1; }
 }
+/* Penanda memuat di dalam teks/pill (mis. status yang belum diketahui). */
+.workspace-ui .wa-loading.inline { display: inline-flex; padding: 0; gap: 6px; font-size: inherit; vertical-align: middle; }
+.workspace-ui .wa-loading.inline::before { width: 9px; height: 9px; border-width: 1.5px; }
+.workspace-ui .wa-pill:has(> .wa-loading)::before { display: none; }
+.workspace-ui li > .wa-loading { padding: 16px 12px; }
+/* Room chat: isi awal dari server disembunyikan sampai tampilan lengkap siap. */
+.workspace-ui .wa-message-list.wa-ssr-pending > .message { display: none; }
+.workspace-ui .wa-messages:has(> .wa-ssr-pending) { display: flex; flex-direction: column; }
+.workspace-ui .wa-message-list.wa-ssr-pending { flex: 1; justify-content: center; }

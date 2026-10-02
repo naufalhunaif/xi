@@ -50,6 +50,7 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 - Setiap aset yang diubah: naikkan `?v=` di `resources/views/components/layout.edge` (aset ber-versi di-cache browser 1 tahun).
 - Cek di 1440 px dan 390 px, light & dark. HP: menu di bawah (disembunyikan saat room chat terbuka).
 - Penanda memuat cukup `wa-loading` ("Memuat…") + bar tipis dari `loading.js`; jangan skeleton yang ramai.
+- Data belum siap: kerangka halaman tetap tampil dan bagian datanya berisi `wa-loading` (tabel: satu baris `wa-loading`; teks/pill: `wa-loading inline`). Pesan kosong ("Belum ada …") hanya setelah data benar-benar selesai dimuat.
 - Daftar panjang: ringkas (satu baris per item, aksi muncul saat dibutuhkan), seperti halaman Komentar.
 
 ## Pengujian sebelum rilis

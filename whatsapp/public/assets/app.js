@@ -444,6 +444,7 @@
     // Ignore scroll clamping caused by replacing a long list with an empty one.
     setMessageScroll(messages.scrollTop)
     messageList.replaceChildren()
+    messageList.classList.remove('wa-ssr-pending')
     if (!items.length) {
       const empty = document.createElement('div')
       empty.className = 'wa-empty'
@@ -504,6 +505,11 @@
         window.setTimeout(() => void loadOlderMessages(), 150)
       }
     } catch {
+      // Gagal memuat: tampilkan isi awal dari server daripada memuat terus.
+      if (messageList?.classList.contains('wa-ssr-pending')) {
+        messageList.querySelector(':scope > .wa-loading')?.remove()
+        messageList.classList.remove('wa-ssr-pending')
+      }
     } finally {
       updatingMessages = false
       if (catchUp) window.setTimeout(() => void updateMessages(), 150)

@@ -2,14 +2,14 @@
   <strong data-i18n="Sisa kuota akun">Sisa kuota akun</strong>
   <span class="wa-quota-help" tabindex="0" role="note" aria-label="Info" data-i18n-title="Kuota akun dari layanan AI, bukan token aplikasi atau kapasitas konteks." title="Kuota akun dari layanan AI, bukan token aplikasi atau kapasitas konteks.">ⓘ</span>
 </div>
-<div id="quotaCards" class="wa-usage-cards" aria-busy="true"></div>
-<p id="quotaStatus" class="wa-usage-caption" role="status" data-i18n="Memuat kuota…">Memuat kuota…</p>
+<div id="quotaCards" class="wa-usage-cards" aria-busy="true"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+<p id="quotaStatus" class="wa-usage-caption" role="status"></p>
 <div class="wa-usage-toolbar">
   <span data-i18n="30 hari terakhir · WIB">30 hari terakhir · WIB</span>
   <button id="usageRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button>
 </div>
-<div id="usageStatus" class="wa-usage-caption" role="status" data-i18n="Memuat penggunaan…">Memuat penggunaan…</div>
-<div id="usageCards" class="wa-usage-cards"></div>
+<div id="usageStatus" class="wa-usage-caption" role="status"></div>
+<div id="usageCards" class="wa-usage-cards"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
 <div class="wa-usage-table-wrap">
   <table class="wa-usage-table">
     <caption data-i18n="Token per fase proses">Token per fase proses</caption>
@@ -24,7 +24,7 @@
         <th data-i18n="Porsi">Porsi</th>
       </tr>
     </thead>
-    <tbody id="usagePhases"></tbody>
+    <tbody id="usagePhases"><tr><td colspan="7"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
   </table>
 </div>
 <p class="wa-usage-caption" data-i18n="Satu pesan pelanggan dapat memicu beberapa fase; tiap fase adalah satu panggilan penuh ke layanan AI.">
@@ -43,7 +43,7 @@
         <th>Status</th>
       </tr>
     </thead>
-    <tbody id="usageRecent"></tbody>
+    <tbody id="usageRecent"><tr><td colspan="6"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
   </table>
 </div>
 <p class="wa-usage-caption" data-i18n="Statistik token hanya mencakup penggunaan aplikasi ini.">

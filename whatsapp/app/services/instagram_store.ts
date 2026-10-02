@@ -18,6 +18,15 @@ export const igsidOf = (jid: string) => String(jid).replace(/@ig$/, '')
 const PURPOSE = 'instagram'
 const secretKeys = new Set(['ig_app_secret', 'ig_token'])
 
+/** Cek cepat untuk menu (tanpa dekripsi): Instagram sudah terhubung? */
+export async function igConnectedQuick() {
+  try {
+    return Boolean((await readLeanState('ig_user_id')) && (await readLeanState('ig_token')))
+  } catch {
+    return false
+  }
+}
+
 export async function readKey(name: string) {
   const value = await readLeanState(name)
   if (!value || !secretKeys.has(name)) return value

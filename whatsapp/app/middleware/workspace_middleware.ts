@@ -7,6 +7,7 @@ import { ensureDefaults } from '#services/settings_service'
 import { appVersionLabel } from '#services/app_version'
 import { publicAppUrl } from '#services/public_url'
 import { pendingOrderCount } from '#services/pending_orders'
+import { igConnectedQuick } from '#services/instagram_store'
 
 export default class WorkspaceMiddleware {
   async handle(ctx: HttpContext, next: NextFn) {
@@ -44,7 +45,7 @@ export default class WorkspaceMiddleware {
     return inWorkspace(scope, async () => {
       await ensureDefaults()
       if (!ctx.request.url().startsWith('/api/') && ctx.request.method() === 'GET')
-        ctx.view.share({ pendingOrders: await pendingOrderCount() })
+        ctx.view.share({ pendingOrders: await pendingOrderCount(), igConnected: await igConnectedQuick() })
       if (!mutation || !scope.id) return next()
       try {
         return await withChatMutationLock(async () => {

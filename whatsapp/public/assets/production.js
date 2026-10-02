@@ -249,7 +249,7 @@
     timer = null
     pending = false
     busy = true
-    status(t('Memuat…'))
+    if (loaded) status(t('Memuat…'))
     try {
       const data = await request()
       policy = data.policy
