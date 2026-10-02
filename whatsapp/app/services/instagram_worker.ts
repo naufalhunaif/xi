@@ -176,7 +176,7 @@ async function runTurn(
   config: IgConfig,
   jid: string,
   anchor: string,
-  comment?: { id: string; publicReply: boolean }
+  comment?: CommentTurn
 ): Promise<boolean> {
   const allowed = await aiAllowed(jid)
   if (!allowed.ok) return false
@@ -260,8 +260,11 @@ async function runTurn(
       const body = bubbles.join('\n')
       if (body) {
         const sent = await record(body, null, () => ig.privateReply(config.token, comment.id, body))
-        if (sent && comment.publicReply)
-          await ig.replyComment(config.token, comment.id, 'Sudah kami balas lewat DM ya bos').catch(() => {})
+        if (sent) comment.sent = body
+        if (sent && comment.publicReply) {
+          const note = 'Sudah kami balas lewat DM ya bos'
+          if (await ig.replyComment(config.token, comment.id, note).catch(() => '')) comment.publicSent = note
+        }
       }
     } else {
       const sendPhotos = async () => {
@@ -286,8 +289,10 @@ async function runTurn(
     }
     if (decision.catatan) await writeBeta3ChatNote(jid, decision.catatan)
     const goal = await finishLeanGoal(run, decision)
-    if (decision.serah_cs)
+    if (decision.serah_cs) {
+      if (comment) comment.handoff = true
       await setHandlingMode(jid, 'cs', decision.alasan || 'Diserahkan ke CS oleh AI (Instagram).')
+    }
     await trace?.finish(
       'completed',
       {
@@ -320,6 +325,43 @@ export function isQuestionComment(text: string) {
   )
 }
 
+type CommentTurn = { id: string; publicReply: boolean; sent?: string; publicSent?: string; handoff?: boolean }
+
+/** Room DM pengomentar + pesan masuk "[Komentar di postingan …]" sebagai konteks chat. */
+export async function ensureCommentRoom(config: IgConfig, row: any) {
+  const jid = igJid(String(row.from_id))
+  const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
+  if (!contact)
+    await db.table('whatsapp_contacts').insert({
+      jid,
+      name: row.username ? `@${row.username}` : 'Instagram',
+      handling_mode: 'ai',
+      updated_at: new Date(),
+    })
+  let caption = String(row.media_caption || '')
+  if (!caption && !row.permalink && row.media_id) {
+    const info = await ig.mediaInfo(config.token, String(row.media_id))
+    caption = info.caption
+    await db
+      .from('whatsapp_ig_comments')
+      .where('comment_id', row.comment_id)
+      .update({ media_caption: info.caption || null, permalink: info.permalink || null })
+  }
+  const anchor = `igc-${row.comment_id}`
+  if (!(await db.from('whatsapp_messages').where('message_id', anchor).first()))
+    await db.table('whatsapp_messages').insert({
+      message_id: anchor,
+      jid,
+      contact_name: row.username ? `@${row.username}` : null,
+      direction: 'in',
+      sender_type: 'customer',
+      body: `[Komentar di postingan${caption ? `: "${caption.replace(/\s+/g, ' ').slice(0, 120)}"` : ''}] ${row.body}`,
+      status: 'received',
+      created_at: new Date(row.created_at),
+    })
+  return { jid, anchor }
+}
+
 async function runComments(config: IgConfig) {
   const pending = await db
     .from('whatsapp_ig_comments')
@@ -332,41 +374,26 @@ async function runComments(config: IgConfig) {
       db
         .from('whatsapp_ig_comments')
         .where('comment_id', row.comment_id)
-        .update({ status, processed_at: new Date(), ...extra })
-    if (!config.comments) {
+        .update({ status, processed_at: new Date(), force_ai: 0, ...extra })
+    const forced = Boolean(Number(row.force_ai || 0))
+    if (!config.comments && !forced) {
       await done('skipped')
       continue
     }
-    if (!isQuestionComment(String(row.body || ''))) {
+    if (!forced && !isQuestionComment(String(row.body || ''))) {
       await done('ignored')
       continue
     }
-    const jid = igJid(String(row.from_id))
-    const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
-    if (!contact)
-      await db.table('whatsapp_contacts').insert({
-        jid,
-        name: row.username ? `@${row.username}` : 'Instagram',
-        handling_mode: 'ai',
-        updated_at: new Date(),
-      })
-    const caption = row.media_id ? await ig.mediaCaption(config.token, String(row.media_id)) : ''
-    const anchor = `igc-${row.comment_id}`
-    if (!(await db.from('whatsapp_messages').where('message_id', anchor).first()))
-      await db.table('whatsapp_messages').insert({
-        message_id: anchor,
-        jid,
-        contact_name: row.username ? `@${row.username}` : null,
-        direction: 'in',
-        sender_type: 'customer',
-        body: `[Komentar di postingan${caption ? `: "${caption.replace(/\s+/g, ' ').slice(0, 120)}"` : ''}] ${row.body}`,
-        status: 'received',
-        created_at: new Date(row.created_at),
-      })
     await done('processing')
     try {
-      const replied = await runTurn(config, jid, anchor, { id: String(row.comment_id), publicReply: true })
-      await done(replied ? 'replied' : 'skipped')
+      const { jid, anchor } = await ensureCommentRoom(config, row)
+      const turn: CommentTurn = { id: String(row.comment_id), publicReply: true }
+      const replied = await runTurn(config, jid, anchor, turn)
+      await done(turn.sent ? 'replied' : turn.handoff ? 'cs' : replied ? 'replied' : 'skipped', {
+        error: null,
+        ...(turn.sent ? { reply: turn.sent } : {}),
+        ...(turn.publicSent ? { public_reply: turn.publicSent } : {}),
+      })
     } catch (error) {
       await done('failed', { error: (error instanceof Error ? error.message : String(error)).slice(0, 300) })
     }

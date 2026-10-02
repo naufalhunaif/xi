@@ -117,5 +117,13 @@ export async function ensureIgTables() {
     processed_at DATETIME NULL,
     KEY whatsapp_ig_comments_status (status, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  // Halaman Komentar: info postingan, balasan publik, dan permintaan balas ulang oleh AI.
+  for (const column of [
+    'media_caption TEXT NULL',
+    'permalink VARCHAR(500) NULL',
+    'public_reply TEXT NULL',
+    'force_ai TINYINT(1) NOT NULL DEFAULT 0',
+  ])
+    await db.rawQuery(`ALTER TABLE whatsapp_ig_comments ADD COLUMN IF NOT EXISTS ${column}`)
   ready.add(key)
 }

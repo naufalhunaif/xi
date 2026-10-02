@@ -165,16 +165,18 @@ export async function replyComment(token: string, commentId: string, text: strin
   return String(data.id || '')
 }
 
-export async function mediaCaption(token: string, mediaId: string) {
+export async function mediaInfo(token: string, mediaId: string) {
   try {
     const data = await call(`${IG_GRAPH}/${encodeURIComponent(mediaId)}?fields=caption,permalink`, {
       headers: bearer(token),
     })
-    return String(data.caption || '')
+    return { caption: String(data.caption || ''), permalink: String(data.permalink || '') }
   } catch {
-    return ''
+    return { caption: '', permalink: '' }
   }
 }
+
+export const mediaCaption = async (token: string, mediaId: string) => (await mediaInfo(token, mediaId)).caption
 
 /** X-Hub-Signature-256 = HMAC-SHA256(Instagram app secret, body mentah). */
 export function validSignature(secret: string, raw: string, header: string) {
