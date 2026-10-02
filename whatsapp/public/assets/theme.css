@@ -734,3 +734,11 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui .wa-igp-val { font-size: 10px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .workspace-ui .wa-igp-day { min-height: 9px; font-size: 9px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
 .workspace-ui .wa-igp-bars.is-dense .wa-igp-val { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 9px; }
+/* Kebijakan tukar size (Pengaturan → Data bisnis) */
+.workspace-ui .wa-policy-card { margin-top: 16px; }
+.workspace-ui .wa-policy-box { position: relative; }
+.workspace-ui .wa-policy-box textarea { width: 100%; min-height: 220px; resize: vertical; font: inherit; font-size: 13px; line-height: 1.5; box-sizing: border-box; }
+.workspace-ui .wa-policy-box .wa-loading { position: absolute; inset: 0; padding: 0; background: color-mix(in srgb, var(--wa-surface, #fff) 70%, transparent); }
+.workspace-ui .wa-policy-box .wa-loading[hidden] { display: none; }
+.workspace-ui .wa-policy-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.workspace-ui .wa-policy-foot small { margin-right: auto; }

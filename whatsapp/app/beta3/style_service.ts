@@ -72,9 +72,18 @@ const capitalize = (word: string, like: string) =>
   like[0] === like[0].toUpperCase() ? word[0].toUpperCase() + word.slice(1) : word
 
 /** Rapikan keluaran AI agar formatnya sama apa pun modelnya. */
-export function normalizeStyle(bubbles: string[], profile: StyleProfile) {
+export function normalizeStyle(bubbles: string[], profile: StyleProfile, verbatim: string[] = []) {
+  // Teks resmi toko (mis. kebijakan tukar size) dikirim apa adanya, tanpa diubah sapaan/emoji.
+  const squash = (value: string) =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  const fixed = verbatim.map(squash).filter((value) => value.length >= 40)
   const clean = bubbles
     .map((text) => {
+      if (fixed.length && fixed.some((value) => squash(text).includes(value))) return String(text || '').trim()
       let out = String(text || '')
         .replace(/\*\*(.+?)\*\*/g, '*$1*')
         .replace(/__(.+?)__/g, '_$1_')

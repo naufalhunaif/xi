@@ -25,6 +25,7 @@ import {
   renderGroupOrderMessage,
   pendingSettlement,
   isOrderShipped,
+  paidThanksMessage,
 } from '#beta3/order_service'
 import {
   readCustomerNote,
@@ -36,6 +37,7 @@ import db from '#services/workspace_database'
 import { queueOutgoingMessage } from '#services/message_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
+import { readExchangePolicy, saveExchangePolicy } from '#beta3/store_policy'
 import { customerImagesForOrder, listActiveRefs, refCaption, refsForOrder } from '#beta3/refs_service'
 import { readRecapProgress, requestRecap } from '#beta3/recap_service'
 import { skillStatus, syncRemoteSkills } from '#beta3/skill_sync'
@@ -256,7 +258,7 @@ export default class Beta3Controller {
         await queueOutgoingMessage({
           jid: String(order.jid),
           sender: 'system',
-          body: 'Terimakasih bos, prosess ya',
+          body: await paidThanksMessage(current || order, dp),
         })
       return response.json({ ok: true, dp, groupQueued: Boolean(order.group_jid) })
     } catch (error) {
@@ -485,6 +487,19 @@ export default class Beta3Controller {
   async saveWeights({ request, response }: HttpContext) {
     const weights = await saveItemWeights((request.input('weights') || {}) as Record<string, unknown>)
     return response.json({ types: ITEM_TYPES.map((type) => ({ key: type.key, label: type.label, grams: weights[type.key] })) })
+  }
+
+  /** Kebijakan tukar size (Pengaturan → Data bisnis): satu teks untuk AI & CS. */
+  async policy({ response }: HttpContext) {
+    return response.json(await readExchangePolicy())
+  }
+
+  async savePolicy({ request, response }: HttpContext) {
+    try {
+      return response.json(await saveExchangePolicy(request.input('text', '')))
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal.' })
+    }
   }
 
   // ---- Kualitas: Aturan Toko, Koreksi, Kasus uji ----

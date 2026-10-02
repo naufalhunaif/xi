@@ -1624,4 +1624,9 @@ window.waLocales.en = {
   "Hapus jadwal ini? Postingan tidak akan diposting.": "Delete this schedule? The post will not be published.",
   "Hanya jadwal yang belum terbit yang bisa dihapus.": "Only unpublished schedules can be deleted.",
   "Total {0} · rata-rata {1}/hari · tertinggi {2} ({3})": "Total {0} · avg {1}/day · peak {2} ({3})",
+  "Kebijakan tukar size": "Size exchange policy",
+  "Dipakai AI apa adanya saat pelanggan bertanya. CS bisa menyalin teks yang sama.": "The AI sends this as-is when customers ask. CS can copy the same text.",
+  "Teks bawaan dari chat CS. Ubah lalu Simpan bila perlu.": "Default text from CS chats. Edit and Save if needed.",
+  "Kosong: AI akan menyerahkan pertanyaan tukar size ke CS.": "Empty: the AI will hand size exchange questions to CS.",
+  "Disalin.": "Copied.",
 }

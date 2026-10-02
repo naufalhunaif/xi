@@ -1,6 +1,7 @@
 // Kualitas balasan tanpa lapor manual: Aturan Toko, Koreksi dari room, Kasus uji (manual),
 // dan pemeriksa harga sebelum kirim. Semua berlaku sama untuk model AI mana pun.
 import db from '#services/workspace_database'
+import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { ensureLeanTables, readLeanState, writeLeanState } from '#beta3/tables'
 import { addLeanExample, listLeanExamples, pickExamples } from '#beta3/examples_service'
 import { catalogDigest, type LeanCatalogRow } from '#beta3/catalog_service'
@@ -190,6 +191,7 @@ async function runOne(test: Record<string, any>, settings: LeanSettings) {
   const prompt = buildLeanPrompt({
     skill: skill.content,
     store: await readLeanState('store_profile'),
+    policy: renderExchangePolicy((await readExchangePolicy()).text),
     fabrics: await readLeanState('fabrics'),
     sizeCharts: await readLeanState('size_charts'),
     catalog: digest.text,

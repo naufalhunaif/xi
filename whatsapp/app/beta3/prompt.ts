@@ -252,6 +252,8 @@ export function buildLeanPrompt(input: {
   context?: string
   rules?: string
   corrections?: LeanExample[]
+  policy?: string
+  activeOrder?: string
 }) {
   const payment = input.paymentMethods.length
     ? `REKENING RESMI (satu-satunya sumber rekening; sebut hanya saat pelanggan tanya transfer kemana atau total sudah disepakati):\n${input.paymentMethods.map((method) => `${method.name} ${method.destination}${method.accountName ? ` an ${method.accountName}` : ''}`).join('\n')}`
@@ -262,6 +264,7 @@ export function buildLeanPrompt(input: {
       input.store ||
         'TOKO: lokasi dan jam belum diatur pemilik. Kalau ditanya lokasi/jam: "saya tanyakan dulu ke tim ya bos" dan serah_cs = true.',
     ],
+    ['kebijakan', input.policy || ''],
     ['katalog', input.catalog],
     ['sizechart', input.sizeCharts || ''],
     ['bahan', input.fabrics || ''],
@@ -274,6 +277,7 @@ export function buildLeanPrompt(input: {
         ? `PELANGGAN INI (dari order sebelumnya; pakai bila pelanggan menyebut "yang dulu/kemarin"):\n${input.customerNote}`
         : 'PELANGGAN INI: belum pernah order tercatat.',
     ],
+    ['order', input.activeOrder || ''],
     [
       'catatan',
       input.chatNote

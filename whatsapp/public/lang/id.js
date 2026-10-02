@@ -1438,4 +1438,10 @@ window.waLocales.id = {
   "Hapus jadwal ini? Postingan tidak akan diposting.": "Hapus jadwal ini? Postingan tidak akan diposting.",
   "Hanya jadwal yang belum terbit yang bisa dihapus.": "Hanya jadwal yang belum terbit yang bisa dihapus.",
   "Total {0} · rata-rata {1}/hari · tertinggi {2} ({3})": "Total {0} · rata-rata {1}/hari · tertinggi {2} ({3})",
+  "Kebijakan tukar size": "Kebijakan tukar size",
+  "Dipakai AI apa adanya saat pelanggan bertanya. CS bisa menyalin teks yang sama.": "Dipakai AI apa adanya saat pelanggan bertanya. CS bisa menyalin teks yang sama.",
+  "Teks bawaan dari chat CS. Ubah lalu Simpan bila perlu.": "Teks bawaan dari chat CS. Ubah lalu Simpan bila perlu.",
+  "Tersimpan.": "Tersimpan.",
+  "Kosong: AI akan menyerahkan pertanyaan tukar size ke CS.": "Kosong: AI akan menyerahkan pertanyaan tukar size ke CS.",
+  "Disalin.": "Disalin.",
 }

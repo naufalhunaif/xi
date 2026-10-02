@@ -552,3 +552,40 @@ test.group('beta3 · total otomatis', () => {
     )
   })
 })
+
+test.group('Beta 3 · pelajaran chat CS', () => {
+  test('total ditahan bila nomor celana setelan belum diketahui', async ({ assert }) => {
+    const { pantsNumberMissing } = await import('#beta3/order_service')
+    assert.isTrue(pantsNumberMissing('Basic Suit - Black\nJas, Celana\nSize XL', 'Basic Suit Black XL 485.000'))
+    assert.isTrue(pantsNumberMissing('Jas, Celana\nSize L\nTinggi 168/50', ''))
+    assert.isFalse(pantsNumberMissing('Jas, Celana\nSize M/31', ''))
+    assert.isFalse(pantsNumberMissing('Jas, Celana, Rompi\nSize XL, celana menyesuaikan', ''))
+    assert.isFalse(pantsNumberMissing('Jas, Celana\nSize L\nCelana no 32', ''))
+    assert.isFalse(pantsNumberMissing('Celana Bahan - Black\nSize 31', ''))
+    assert.isFalse(pantsNumberMissing('Tuxedo - Black\nJas\nSize M', 'Tuxedo Black M 485.000'))
+  })
+  test('kebijakan tukar size masuk prompt & dikirim apa adanya', async ({ assert }) => {
+    const { DEFAULT_EXCHANGE_POLICY, renderExchangePolicy } = await import('#beta3/store_policy')
+    const { normalizeStyle } = await import('#beta3/style_service')
+    const section = renderExchangePolicy(DEFAULT_EXCHANGE_POLICY)
+    assert.include(section, 'Pengembalian maksimal 3 hari')
+    assert.include(renderExchangePolicy(''), 'serah_cs = true')
+    const prompt = buildLeanPrompt({
+      skill: 'x',
+      catalog: '',
+      examples: [],
+      customerNote: '',
+      chatNote: '',
+      history: [],
+      message: 'kalau kekecilan bisa tukar?',
+      paymentMethods: [],
+      policy: section,
+    })
+    assert.include(prompt.user, 'KEBIJAKAN TUKAR SIZE')
+    const profile = { emoji: false, address: 'bos', samples: 20 } as any
+    const [kept] = normalizeStyle([DEFAULT_EXCHANGE_POLICY], profile, [DEFAULT_EXCHANGE_POLICY])
+    assert.equal(kept, DEFAULT_EXCHANGE_POLICY)
+    const [other] = normalizeStyle(['Kamu bisa pakai size M 😊'], profile, [DEFAULT_EXCHANGE_POLICY])
+    assert.notInclude(other, '😊')
+  })
+})

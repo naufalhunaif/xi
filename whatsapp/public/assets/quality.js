@@ -174,6 +174,61 @@
     refresh()
   }
 
+  /* ---------- Kebijakan tukar size (Data bisnis) ---------- */
+  const policyText = byId('policyText')
+  if (policyText) {
+    const policyStatus = (text) => (byId('policyStatus').textContent = text || '')
+    let policyLoaded = false
+    let saved = ''
+    const sync = () => (byId('policySave').disabled = !policyLoaded || policyText.value.trim() === saved.trim())
+    async function loadPolicy() {
+      try {
+        const data = await call('/api/beta3/policy')
+        saved = data.text || ''
+        policyText.value = saved
+        policyLoaded = true
+        policyText.disabled = false
+        byId('policyLoading').hidden = true
+        policyStatus(data.isDefault ? t('Teks bawaan dari chat CS. Ubah lalu Simpan bila perlu.') : '')
+        sync()
+      } catch (error) {
+        byId('policyLoading').hidden = true
+        policyStatus(error.message)
+      }
+    }
+    policyText.addEventListener('input', () => {
+      policyStatus('')
+      sync()
+    })
+    byId('policySave').addEventListener('click', async () => {
+      byId('policySave').disabled = true
+      policyStatus(t('Menyimpan…'))
+      try {
+        const data = await call('/api/beta3/policy', 'POST', { text: policyText.value })
+        saved = data.text || ''
+        policyText.value = saved
+        policyStatus(saved ? t('Tersimpan.') : t('Kosong: AI akan menyerahkan pertanyaan tukar size ke CS.'))
+      } catch (error) {
+        policyStatus(error.message)
+      }
+      sync()
+    })
+    byId('policyCopy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(policyText.value)
+        policyStatus(t('Disalin.'))
+      } catch {
+        policyText.select()
+        document.execCommand('copy')
+        policyStatus(t('Disalin.'))
+      }
+    })
+    const businessPanel = byId('settings-business')
+    const refreshPolicy = () => businessPanel && !businessPanel.hidden && !policyLoaded && loadPolicy()
+    if (businessPanel) new MutationObserver(refreshPolicy).observe(businessPanel, { attributes: true, attributeFilter: ['hidden'] })
+    refreshPolicy()
+  }
+
   /* ---------- Koreksi dari room ---------- */
   let dialog = null
   function openCorrection(messageId, aiText, trigger) {

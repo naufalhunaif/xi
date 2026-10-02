@@ -14,7 +14,7 @@ import { rupiah } from '#beta3/catalog_service'
 import { attachRefsToOrder, proofTotalSince } from '#beta3/refs_service'
 import { addProductionDays, closedDaysFromStore } from '#beta3/prompt'
 import { readProductionPolicy } from '#services/production_service'
-import { readLeanState, writeLeanState } from '#beta3/tables'
+import { readBeta3ChatNote, readLeanState, writeLeanState } from '#beta3/tables'
 
 /**
  * Jalur 2 (event): form order dari pelanggan dibaca KODE, disimpan sebagai order
@@ -398,6 +398,69 @@ export async function latestLeanOrder(jid: string) {
 export async function readLeanOrder(id: number) {
   await ensureLeanTables()
   return db.from('whatsapp_beta3_orders').where('id', id).first()
+}
+
+/**
+ * Order yang sudah dibayar & belum lama: status untuk menjawab "sudah jadi?" / "sudah dikirim?".
+ * Kosong bila tidak ada order berjalan.
+ */
+export async function renderActiveOrder(jid: string) {
+  const order = await latestLeanOrder(jid).catch(() => null)
+  if (!order || order.status !== 'paid') return ''
+  const age = Date.now() - new Date(order.created_at).getTime()
+  if (!(age < 90 * 86_400_000)) return ''
+  const shipment = await db
+    .from('whatsapp_beta3_shipments')
+    .where('jid', jid)
+    .where('created_at', '>=', order.created_at)
+    .orderBy('created_at', 'desc')
+    .first()
+    .catch(() => null)
+  const total = Number(order.total || 0)
+  const paid = Number(order.paid_amount || total)
+  const items = String(order.items || '').split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 3).join('; ')
+  const parts = [
+    `ORDER BERJALAN ${order.order_number ? `#${order.order_number}` : `#${order.id}`}${items ? ` (${items})` : ''}: ${total && paid < total ? `DP, sisa ${rupiah(total - paid)}` : 'lunas'}`,
+    shipment
+      ? `sudah dikirim, resi ${shipment.awb} (JNE)`
+      : order.ready_at
+        ? 'produksi selesai, siap dikirim'
+        : `sedang diproses${order.ship_by ? `, target siap kirim ${shipByText(order.ship_by)}` : ''}`,
+  ]
+  return (
+    `${parts.join('; ')}.\n` +
+    'Ditanya "sudah jadi?/sampai mana?" → jawab dari status ini: "iya sedang proses bos, insyaallah …" (target siap kirim bila ada; jangan mengarang tahap). ' +
+    'Ditanya "sudah dikirim?" → ada resi: "Pesanan sudah di kirim bos dengan No. Resi {resi} (JNE)"; belum: status + perkiraan siap kirim.'
+  )
+}
+
+/** Pesan otomatis saat toko menekan konfirmasi dana: barang ready "siap kirim", pre-order/custom "prosess". */
+export async function paidThanksMessage(order: Record<string, any>, dp: boolean, now = new Date()) {
+  const chatNote = order.jid ? await readBeta3ChatNote(String(order.jid)).catch(() => '') : ''
+  const text = `${order.spec || ''}\n${order.items || ''}\n${order.note || ''}\n${order.cs_note || ''}\n${chatNote || ''}`
+  const custom = /custom|sesuai gambar|seperti gambar|ukuran badan|ukuran sesuai|disesuaikan/i.test(text)
+  if (dp || custom || isPreorder(text)) return 'Terimakasih bos, prosess ya'
+  const store = String((await readLeanState('store_profile').catch(() => '')) || '')
+  const closed = closedDaysFromStore(store)
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: 'numeric', hourCycle: 'h23', weekday: 'short' }).formatToParts(now)
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0)
+  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(String(parts.find((part) => part.type === 'weekday')?.value))
+  if (hour < SAME_DAY_CUTOFF_HOUR && !closed.includes(day)) return 'Terimakasih bos, siap kirim hari ini ya'
+  if (!closed.includes((day + 1) % 7)) return 'Terimakasih bos, siap kirim besok ya'
+  return 'Terimakasih bos, siap kirim di hari kerja berikutnya ya'
+}
+/** Batas jam (WIB) pesanan ready masih dikirim hari yang sama. */
+export const SAME_DAY_CUTOFF_HOUR = 15
+
+/** Setelan (ada celana) tapi nomor celana belum diketahui: total jangan dikirim dulu. */
+export function pantsNumberMissing(spec: string, rincian: string) {
+  const text = `${spec || ''}\n${rincian || ''}`
+  if (!/\bcelana\b|setelan/i.test(text)) return false
+  if (/menyesuaikan|disesuaikan|ukuran custom|lingkar pinggang/i.test(text)) return false
+  if (/size\s*\w{1,4}\s*\/\s*\d{2}\b/i.test(text)) return false
+  return !text
+    .split('\n')
+    .some((line) => /celana|\bno\.?\b|nomor|\bsize\b/i.test(line) && /\b(2[5-9]|3\d|4\d|5[0-2])\b/.test(line))
 }
 
 /** Pesan total yang dikirim kode setelah CS mengisi ongkir. Formatnya meniru CS. */
@@ -1085,12 +1148,14 @@ export async function verifyAutoTotal(
     active: boolean
   }>,
   hints: string[] = [],
-  statedPrices: number[] = []
+  statedPrices: number[] = [],
+  spec?: string
 ): Promise<{ ok: true; total: VerifiedAutoTotal } | { ok: false; reason: string }> {
   const order = await readLeanOrder(orderId)
   if (!order || order.status !== 'pending') return { ok: false, reason: 'order bukan pending' }
   const options = order.shipping_options ? JSON.parse(String(order.shipping_options)) : null
   if (!options?.prices?.length) return { ok: false, reason: 'tarif ongkir belum ada di order' }
+  if (pantsNumberMissing(String(spec ?? order.spec ?? ''), draft.rincian)) return { ok: false, reason: 'nomor celana belum diketahui' }
   const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices)
   if (!result.ok) return result
   return {

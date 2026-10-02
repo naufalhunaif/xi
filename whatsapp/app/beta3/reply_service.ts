@@ -18,6 +18,7 @@ import {
   latestLeanOrder,
   noteAutoTotalReason,
   verifyAutoTotal,
+  renderActiveOrder,
   updatePendingOrderRates,
   type VerifiedAutoTotal,
 } from '#beta3/order_service'
@@ -56,6 +57,7 @@ import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
+import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 
 /**
@@ -63,7 +65,7 @@ import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3
  * token. Angka/tahap ditangani kode; AI hanya menulis kata-kata.
  */
 export const LEAN_SKILL_NAME = 'beta3-cs-inti'
-export const LEAN_SKILL_TOKEN_LIMIT = 6000
+export const LEAN_SKILL_TOKEN_LIMIT = 7000
 const HISTORY_LIMIT = 30
 
 export type LeanSettings = LeanProviderSettings & {
@@ -458,7 +460,7 @@ export async function createLeanReply(input: {
   // Lacak resi: pelanggan menanyakan posisi paket → resi dari pesan ini atau dari pesan
   // toko terakhir yang menyebut resi, lalu track_awb (cache 30 menit).
   const asksTracking =
-    /\b(resi|paket|lacak|tracking|posisi|sampai mana|sampe mana|nyampe|sudah sampai|udah sampai|belum sampai|belum datang|kapan sampai|kapan datang|kapan tiba)\b/i.test(
+    /\b(resi|paket|lacak|tracking|posisi|sampai mana|sampe mana|nyampe|sudah sampai|udah sampai|belum sampai|belum datang|kapan sampai|kapan datang|kapan tiba|dikirim|sudah kirim|udah kirim|sdh dikirim)\b/i.test(
       input.text
     )
   if (asksTracking && mcp.url) {
@@ -609,7 +611,11 @@ export async function createLeanReply(input: {
   }
 
   const store = await readLeanState('store_profile')
+  const policy = await readExchangePolicy()
+  const activeOrder = await renderActiveOrder(jid).catch(() => '')
   const prompt = buildLeanPrompt({
+    policy: renderExchangePolicy(policy.text),
+    activeOrder,
     skill: skill.content,
     store,
     fabrics: await readLeanState('fabrics'),
@@ -644,7 +650,7 @@ export async function createLeanReply(input: {
   const decision = parseLeanDecision(result.text)
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
   if (style) {
-    decision.pesan = normalizeStyle(decision.pesan, style)
+    decision.pesan = normalizeStyle(decision.pesan, style, [policy.text])
   }
   // Ongkir selalu tampil rapi (satu layanan per baris), model apa pun yang menulis.
   decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
@@ -741,7 +747,7 @@ export async function createLeanReply(input: {
       ...rows.slice(lastOngkir + 1).filter((row) => row.direction === 'in').map((row) => String(row.body || '')),
       input.text,
     ]
-    const verdict = await verifyAutoTotal(totalOrderId, draft, digest.rows, customerText, statedPrices)
+    const verdict = await verifyAutoTotal(totalOrderId, draft, digest.rows, customerText, statedPrices, String(specNow || ''))
     if (verdict.ok) autoTotal = verdict.total
     await noteAutoTotalReason(totalOrderId, verdict.ok ? '' : verdict.reason)
     // Ongkir lebih dari satu dan pelanggan belum memilih: tanyakan, jangan dipilihkan.
@@ -759,6 +765,14 @@ export async function createLeanReply(input: {
         decision.pesan.push(block ? `${block}\n\nMau pakai yang mana ${address}?` : `Pengirimannya mau pakai yang mana ${address}?`)
       }
       if (!decision.pesan.length) decision.pesan.push(`Siap ${style?.address || 'bos'}, datanya sudah masuk ya`)
+    }
+    // Setelan tanpa nomor celana: tanya dulu (kalimat CS), total menyusul setelah dijawab.
+    if (!verdict.ok && verdict.reason === 'nomor celana belum diketahui' && !decision.serah_cs) {
+      decision.pesan = decision.pesan
+        .map((bubble) => bubble.replace(/,?\s*(ini|berikut)\s+totalnya.*$/i, '').trim())
+        .filter((bubble) => bubble && !/\b(ini|berikut)\b[^.?!]*\btotal/i.test(bubble))
+      if (!decision.pesan.some((bubble) => /celana/i.test(bubble) && /\?/.test(bubble)))
+        decision.pesan.push(`celana menyesuaikan kah atau pakai No. berapa ya ${style?.address || 'bos'}?`)
     }
     // Total belum bisa dikirim: jangan menjanjikan "ini totalnya" yang tidak pernah datang.
     if (!verdict.ok && !decision.serah_cs) {

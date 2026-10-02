@@ -71,3 +71,20 @@
     </div>
   @end
 </div>
+<div class="wa-card wa-policy-card" id="policyCard">
+  <div class="wa-card-head">
+    <div class="wa-card-title">
+      <strong data-i18n="Kebijakan tukar size">Kebijakan tukar size</strong>
+      <small data-i18n="Dipakai AI apa adanya saat pelanggan bertanya. CS bisa menyalin teks yang sama.">Dipakai AI apa adanya saat pelanggan bertanya. CS bisa menyalin teks yang sama.</small>
+    </div>
+  </div>
+  <div class="wa-policy-box">
+    <textarea id="policyText" rows="11" maxlength="2000" data-settings-ignore aria-label="Kebijakan tukar size" data-i18n-aria-label="Kebijakan tukar size" disabled></textarea>
+    <div id="policyLoading" class="wa-loading" data-i18n="Memuat…">Memuat…</div>
+  </div>
+  <div class="wa-policy-foot">
+    <small id="policyStatus" class="wa-muted" role="status" aria-live="polite"></small>
+    <button id="policyCopy" class="button" type="button" data-i18n="Salin">Salin</button>
+    <button id="policySave" class="button primary" type="button" disabled data-i18n="Simpan">Simpan</button>
+  </div>
+</div>
