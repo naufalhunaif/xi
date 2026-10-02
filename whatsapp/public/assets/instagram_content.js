@@ -108,6 +108,7 @@
         time: item.timestamp || post?.publishedAt,
         status: 'published',
         stats: { likes: item.like_count, comments: item.comments_count, ...(item.stats || {}) },
+        signals: item.signals || null,
         permalink: item.permalink || post?.permalink || '',
         post,
       })
@@ -150,7 +151,7 @@
   }
 
   /* ───── Tabel ───── */
-  const COLUMNS = 7
+  const COLUMNS = 8
   const statCell = (row, key) => {
     const value = row.stats?.[key]
     return el('td', value === undefined || value === null ? '—' : num(value), 'wa-order-amount')
@@ -230,7 +231,13 @@
       const badge = el('span', label, 'wa-order-badge')
       badge.dataset.tone = tone
       state.append(badge)
-      tr.append(head, time, statCell(row, 'reach'), statCell(row, 'views'), statCell(row, 'likes'), statCell(row, 'comments'), state)
+      // Tanya = komentar yang bertanya (minat beli); hijau bila ada penanya yang order.
+      const ask = el('td', row.signals ? num(row.signals.questions) : '—', 'wa-order-amount')
+      if (row.signals?.orders) {
+        ask.classList.add('wa-igp-ask-order')
+        ask.title = t('{0} penanya sudah order', row.signals.orders)
+      }
+      tr.append(head, time, statCell(row, 'reach'), statCell(row, 'views'), statCell(row, 'likes'), statCell(row, 'comments'), ask, state)
       const open = () => openDetail(row)
       tr.addEventListener('click', open)
       tr.addEventListener('keydown', (event) => {
@@ -460,6 +467,21 @@
       else perf.append(el('p', t('Belum ada data performa.'), 'wa-muted'))
       box.append(perf)
     }
+    if (row.signals) {
+      const interest = section(t('Minat beli'))
+      const list = el('dl', undefined, 'wa-b3-fields wa-igp-metrics')
+      for (const [label, value] of [
+        [t('Komentar masuk'), row.signals.comments],
+        [t('Pertanyaan'), row.signals.questions],
+        [t('Order dari penanya'), row.signals.orders],
+      ]) {
+        const item = el('div')
+        item.append(el('dt', label), el('dd', num(value)))
+        list.append(item)
+      }
+      interest.append(list)
+      box.append(interest)
+    }
 
     const actions = el('div', undefined, 'wa-b3-actions')
     const post = row.post
@@ -609,12 +631,44 @@
     byId('igpAt').value = localInput(new Date(at))
     form.querySelector('input[name="igpWhen"][value="later"]').checked = true
     formNotice('')
+    aiStatus(t('Tulis poin singkat (opsional), lalu klik Buat dengan AI.'))
     syncSave()
     setKind(post?.kind || 'feed')
     showDrawer('form', editing ? t('Ubah postingan') : t('Buat postingan'))
     original = snapshot()
   }
   byId('igpNew').addEventListener('click', () => openForm())
+
+  /* Caption dari AI: isi kolom caption (bila ada) dipakai sebagai catatan/draf. */
+  const aiStatus = (text, error = false) => {
+    byId('igpAiStatus').textContent = text || ''
+    byId('igpAiStatus').classList.toggle('error', Boolean(error))
+  }
+  byId('igpAi').addEventListener('click', async () => {
+    if (uploading) return aiStatus(t('Tunggu unggahan selesai.'), true)
+    const area = byId('igpCaption')
+    const button = byId('igpAi')
+    button.disabled = true
+    area.readOnly = true
+    byId('igpAiLoading').hidden = false
+    aiStatus('')
+    try {
+      const { caption } = await api('/api/instagram/caption', 'POST', {
+        kind,
+        items: items.map(({ file, type }) => ({ file, type })),
+        note: area.value,
+      })
+      area.value = caption
+      byId('igpCount').textContent = `${caption.length}/2200`
+      aiStatus(t('Caption dari AI. Cek dan ubah bila perlu.'))
+    } catch (error) {
+      aiStatus(error.message, true)
+    } finally {
+      button.disabled = false
+      area.readOnly = false
+      byId('igpAiLoading').hidden = true
+    }
+  })
   byId('igpCancel').addEventListener('click', () => closeDrawer())
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
@@ -788,8 +842,66 @@
       if (seq === summarySeq) emptyState(error.message)
     }
   }
+  /* Analisis AI: postingan mana yang mendatangkan pertanyaan & order. Berjalan di latar. */
+  let analysisTimer
+  function renderAnalysis(data) {
+    const body = byId('igpAnalysisBody')
+    const button = byId('igpAnalyze')
+    clearTimeout(analysisTimer)
+    button.disabled = data.status === 'running'
+    button.textContent = data.result ? t('Analisis ulang') : t('Analisis sekarang')
+    const parts = []
+    if (data.status === 'running') {
+      parts.push(el('div', t('AI sedang menganalisis…'), 'wa-loading'))
+      if (mode === 'summary') analysisTimer = setTimeout(loadAnalysis, 4000)
+    } else if (data.status === 'failed') parts.push(el('p', t(data.error || 'Analisis gagal. Coba lagi.'), 'wa-alert'))
+    if (data.result && data.status !== 'running') {
+      const r = data.result
+      if (r.ringkasan) parts.push(el('p', r.ringkasan, 'wa-igp-analysis-lead'))
+      for (const [title, list] of [
+        [t('Yang berhasil'), r.berhasil],
+        [t('Yang kurang'), r.kurang],
+        [t('Saran'), r.saran],
+        [t('Ide konten berikutnya'), r.ide],
+      ]) {
+        if (!list?.length) continue
+        const group = el('div', undefined, 'wa-igp-analysis-group')
+        const ul = el('ul')
+        for (const line of list) ul.append(el('li', line))
+        group.append(el('h4', title), ul)
+        parts.push(group)
+      }
+      if (r.waktu) {
+        const group = el('div', undefined, 'wa-igp-analysis-group')
+        group.append(el('h4', t('Waktu posting terbaik')), el('p', r.waktu))
+        parts.push(group)
+      }
+      parts.push(el('small', t('Dianalisis {0} dari {1} postingan', when(data.at), data.posts || 0), 'wa-muted'))
+    }
+    if (!parts.length)
+      parts.push(el('p', t('Klik Analisis sekarang untuk melihat konten yang paling mendatangkan pertanyaan dan order.'), 'wa-muted'))
+    body.replaceChildren(...parts)
+  }
+  async function loadAnalysis() {
+    try {
+      renderAnalysis(await api('/api/instagram/analysis'))
+    } catch (error) {
+      byId('igpAnalysisBody').replaceChildren(el('p', error.message, 'wa-alert'))
+    }
+  }
+  byId('igpAnalyze').addEventListener('click', async () => {
+    byId('igpAnalyze').disabled = true
+    byId('igpAnalysisBody').replaceChildren(el('div', t('AI sedang menganalisis…'), 'wa-loading'))
+    try {
+      renderAnalysis(await api('/api/instagram/analysis', 'POST', {}))
+    } catch (error) {
+      byId('igpAnalyze').disabled = false
+      byId('igpAnalysisBody').replaceChildren(el('p', error.message, 'wa-alert'))
+    }
+  })
   function openSummary() {
     showDrawer('summary', t('Ringkasan akun'))
+    loadAnalysis()
     loadSummary()
   }
   byId('igpSummaryOpen').addEventListener('click', openSummary)

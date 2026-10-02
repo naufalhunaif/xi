@@ -16,6 +16,7 @@ import {
 } from '#services/instagram_publish'
 import { accountOverview, audience, mediaPerformance } from '#services/instagram_insights'
 import { mediaChildren as igChildren } from '#services/instagram_api'
+import { generateCaption, postSignals, readAnalysis, startAnalysis } from '#services/instagram_ai'
 
 const NEEDED = ['instagram_business_content_publish', 'instagram_business_manage_insights']
 
@@ -178,9 +179,48 @@ export default class InstagramContentController {
     if (!config.token) return response.json({ connected: false, posts: [], stories: [], next: '' })
     const after = String(request.input('after') || '').slice(0, 500)
     try {
-      return response.json({ connected: true, ...(await mediaPerformance(config, after)) })
+      const data = await mediaPerformance(config, after)
+      // Minat beli per postingan: komentar yang bertanya & penanya yang order.
+      const signals = await postSignals(data.posts.map((post: any) => String(post.id))).catch(() => new Map())
+      const posts = data.posts.map((post: any) => ({
+        ...post,
+        signals: signals.get(String(post.id)) || { comments: 0, questions: 0, orders: 0 },
+      }))
+      return response.json({ connected: true, ...data, posts })
     } catch (error) {
       return response.json({ connected: true, posts: [], stories: [], next: '', error: error instanceof Error ? error.message : String(error) })
+    }
+  }
+
+  /** Caption dari AI untuk form Buat postingan (draf di kolom caption dipakai sebagai catatan). */
+  async caption({ request, response }: HttpContext) {
+    await ensureIgTables()
+    const kind = String(request.input('kind') || 'feed') as PostKind
+    if (!['feed', 'carousel', 'reels', 'story'].includes(kind)) return response.badRequest({ error: 'Jenis postingan tidak valid.' })
+    const items = (Array.isArray(request.input('items')) ? request.input('items') : []).slice(0, 10).map((item: any) => ({
+      file: String(item?.file || ''),
+      type: item?.type === 'video' ? 'video' : 'image',
+    })) as PostItem[]
+    try {
+      const caption = await generateCaption({ kind, items, note: String(request.input('note') || '').slice(0, 2200) })
+      return response.json({ caption })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : String(error) })
+    }
+  }
+
+  async analysis({ response }: HttpContext) {
+    await ensureIgTables()
+    response.header('cache-control', 'no-store')
+    return response.json(await readAnalysis())
+  }
+
+  async analyze({ response }: HttpContext) {
+    await ensureIgTables()
+    try {
+      return response.json(await startAnalysis())
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : String(error) })
     }
   }
 

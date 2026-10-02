@@ -698,3 +698,21 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
   .workspace-ui .wa-igp-gallery :is(img, video) { height: 90vw; }
   .workspace-ui .wa-igp-gallery-loading { width: 72vw; height: 90vw; }
 }
+/* Konten Instagram: caption AI & analisis AI. */
+.workspace-ui .wa-igp-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.workspace-ui .wa-igp-head-row h3 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+.workspace-ui .wa-igp-caption-box { position: relative; }
+.workspace-ui .wa-igp-caption-box > .wa-loading { position: absolute; inset: 0; padding: 0; border-radius: 6px; background: color-mix(in srgb, var(--wa-surface, #fff) 82%, transparent); }
+.workspace-ui .wa-igp-caption-box > .wa-loading[hidden] { display: none; }
+.workspace-ui .wa-igp-caption-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.workspace-ui .wa-igp-caption-foot small { margin-left: 0; }
+.workspace-ui #igpAiStatus.error { color: var(--wa-err); }
+.workspace-ui .wa-igp-ask-order { color: var(--wa-ok); font-weight: 600; }
+.workspace-ui .wa-igp-analysis { padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; }
+.workspace-ui #igpAnalysisBody { display: grid; gap: 10px; }
+.workspace-ui #igpAnalysisBody > .wa-loading { padding: 16px 12px; }
+.workspace-ui #igpAnalysisBody p { margin: 0; }
+.workspace-ui #igpAnalysisBody > small { margin-left: 0; }
+.workspace-ui .wa-igp-analysis-lead { font-size: 13px; line-height: 1.5; }
+.workspace-ui .wa-igp-analysis-group h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; }
+.workspace-ui .wa-igp-analysis-group ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; line-height: 1.45; }
