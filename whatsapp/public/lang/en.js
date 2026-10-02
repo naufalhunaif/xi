@@ -1623,4 +1623,5 @@ window.waLocales.en = {
   "Jadwal dihapus.": "Schedule deleted.",
   "Hapus jadwal ini? Postingan tidak akan diposting.": "Delete this schedule? The post will not be published.",
   "Hanya jadwal yang belum terbit yang bisa dihapus.": "Only unpublished schedules can be deleted.",
+  "Total {0} · rata-rata {1}/hari · tertinggi {2} ({3})": "Total {0} · avg {1}/day · peak {2} ({3})",
 }

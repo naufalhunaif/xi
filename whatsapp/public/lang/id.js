@@ -1437,4 +1437,5 @@ window.waLocales.id = {
   "Jadwal dihapus.": "Jadwal dihapus.",
   "Hapus jadwal ini? Postingan tidak akan diposting.": "Hapus jadwal ini? Postingan tidak akan diposting.",
   "Hanya jadwal yang belum terbit yang bisa dihapus.": "Hanya jadwal yang belum terbit yang bisa dihapus.",
+  "Total {0} · rata-rata {1}/hari · tertinggi {2} ({3})": "Total {0} · rata-rata {1}/hari · tertinggi {2} ({3})",
 }

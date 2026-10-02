@@ -724,3 +724,13 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui .wa-igp-upload-label { font-size: 15px; font-variant-numeric: tabular-nums; }
 .workspace-ui .wa-igp-upload-name { max-width: 84px; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .workspace-ui .wa-igp-upload-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--wa-ok); transition: width .2s ease; }
+/* Grafik harian Ringkasan: angka per hari + tanggal. */
+.workspace-ui .wa-igp-chart-sum { margin: -2px 0 0; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.workspace-ui .wa-igp-chart-sum:empty { display: none; }
+.workspace-ui .wa-igp-bars { height: auto; min-height: 104px; gap: 2px; padding: 12px 10px 8px; box-sizing: border-box; }
+.workspace-ui .wa-igp-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; }
+.workspace-ui .wa-igp-bar { display: block; width: 100%; max-width: 28px; border-radius: 3px 3px 0 0; background: var(--wa-ok); opacity: .8; }
+.workspace-ui .wa-igp-col:hover .wa-igp-bar { opacity: 1; }
+.workspace-ui .wa-igp-val { font-size: 10px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.workspace-ui .wa-igp-day { min-height: 9px; font-size: 9px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+.workspace-ui .wa-igp-bars.is-dense .wa-igp-val { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 9px; }

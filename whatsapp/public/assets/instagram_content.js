@@ -44,8 +44,13 @@
           hour12: true,
         }).format(new Date(value))
       : ''
+  // ≥ 10 ribu disingkat dengan 1 desimal: 31.1K / 31,1 rb (bukan dibulatkan jadi 31K).
   const num = (value) =>
-    new Intl.NumberFormat(locale(), { notation: Number(value) >= 10000 ? 'compact' : 'standard' }).format(Number(value || 0))
+    new Intl.NumberFormat(
+      locale(),
+      Number(value) >= 10000 ? { notation: 'compact', maximumFractionDigits: 1 } : { maximumFractionDigits: 0 }
+    ).format(Number(value || 0))
+  const full = (value) => new Intl.NumberFormat(locale()).format(Number(value || 0))
   const KIND = () => ({ feed: t('Feed'), carousel: t('Carousel'), reels: t('Reels'), story: t('Story') })
   const STATUS = () => ({
     scheduled: [t('Terjadwal'), 'waiting', 'warn'],
@@ -871,8 +876,10 @@
     }
     const chart = (title) => {
       const node = section(title)
+      const sum = el('small', '', 'wa-igp-chart-sum')
       const body = el('div', undefined, 'wa-igp-bars')
-      node.append(body)
+      node.append(sum, body)
+      body.sum = sum
       return [node, body]
     }
     const [reachNode, reachBody] = chart(t('Jangkauan harian'))
@@ -904,18 +911,45 @@
       extra.classList.add('wa-igp-pending')
     }
     skeleton.reachBody.replaceChildren(spinner())
+    skeleton.reachBody.sum.textContent = ''
     if (!skeleton.followBody.childElementCount) skeleton.followBody.replaceChildren(spinner())
     if (withAudience) for (const body of Object.values(skeleton.lists)) body.replaceChildren(spinner())
   }
+  /* Grafik harian dengan angka: nilai di atas batang, tanggal di bawah, ringkasan di atas grafik. */
+  const compact = (value) =>
+    new Intl.NumberFormat(locale(), { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0))
+  const dayOf = (date, options) => new Intl.DateTimeFormat(locale(), { timeZone: 'Asia/Jakarta', ...options }).format(new Date(date))
   function fillBars(box, points) {
+    if (box.sum) box.sum.textContent = ''
     if (!points.length) return box.replaceChildren(el('span', t('Belum ada data.'), 'wa-muted wa-igp-bars-empty'))
-    const max = Math.max(1, ...points.map((p) => p.value))
+    const values = points.map((point) => Number(point.value || 0))
+    const max = Math.max(1, ...values)
+    const total = values.reduce((sum, value) => sum + value, 0)
+    const best = points[values.indexOf(Math.max(...values))]
+    if (box.sum)
+      box.sum.textContent = t(
+        'Total {0} · rata-rata {1}/hari · tertinggi {2} ({3})',
+        num(total),
+        num(Math.round(total / points.length)),
+        num(best.value),
+        dayOf(best.date, { weekday: 'short', day: 'numeric', month: 'short' })
+      )
+    const dense = points.length > 14
+    box.classList.toggle('is-dense', dense)
     box.replaceChildren(
-      ...points.map((point) => {
-        const bar = el('span')
-        bar.style.height = `${Math.max(3, Math.round((point.value / max) * 100))}%`
-        bar.title = `${new Intl.DateTimeFormat(locale(), { day: '2-digit', month: 'short' }).format(new Date(point.date))}: ${num(point.value)}`
-        return bar
+      ...points.map((point, index) => {
+        const col = el('div', undefined, 'wa-igp-col')
+        col.title = `${dayOf(point.date, { weekday: 'short', day: 'numeric', month: 'short' })}: ${num(point.value)}`
+        const bar = el('i', undefined, 'wa-igp-bar')
+        bar.style.height = `${Math.max(2, Math.round((Number(point.value || 0) / max) * 64))}px`
+        // Banyak hari: tanggal ditampilkan tiap 5 hari (dan hari terakhir) agar tidak berdesakan.
+        const showDay = !dense || index % 5 === 0 || index === points.length - 1
+        col.append(
+          el('b', compact(point.value), 'wa-igp-val'),
+          bar,
+          el('small', showDay ? dayOf(point.date, { day: 'numeric' }) : '', 'wa-igp-day')
+        )
+        return col
       })
     )
   }
@@ -939,8 +973,10 @@
       extra.textContent = ''
       extra.classList.remove('wa-igp-pending')
     }
-    skeleton.reachBody.replaceChildren()
-    skeleton.followBody.replaceChildren()
+    for (const body of [skeleton.reachBody, skeleton.followBody]) {
+      body.replaceChildren()
+      body.sum.textContent = ''
+    }
     for (const body of Object.values(skeleton.lists)) body.replaceChildren()
     skeleton.alert.textContent = message
   }
@@ -961,21 +997,23 @@
       const follow = o.metrics?.follows_and_unfollows?.breakdowns || []
       const gained = follow.find((b) => /^follower/i.test(b.key))?.value
       const lost = follow.find((b) => /non_follower|unfollow/i.test(b.key))?.value
-      const set = (key, value, extra = '') => {
+      const set = (key, value, extra = '', exact) => {
         f[key].value.textContent = value
+        f[key].value.title = exact === undefined || exact === null ? '' : full(exact)
         f[key].extra.textContent = extra
         f[key].extra.classList.remove('wa-igp-pending')
       }
-      set('followers', num(o.profile?.followers_count), gained !== undefined ? t('+{0} / −{1}', num(gained), num(lost || 0)) : '')
-      set('reach', num(m('reach')))
-      set('views', num(m('views')))
-      set('engaged', num(m('accounts_engaged')))
+      set('followers', num(o.profile?.followers_count), gained !== undefined ? t('+{0} / −{1}', num(gained), num(lost || 0)) : '', o.profile?.followers_count)
+      set('reach', num(m('reach')), '', m('reach'))
+      set('views', num(m('views')), '', m('views'))
+      set('engaged', num(m('accounts_engaged')), '', m('accounts_engaged'))
       set(
         'interactions',
         num(m('total_interactions')),
-        t('{0} suka · {1} komentar · {2} simpan · {3} bagikan', num(m('likes')), num(m('comments')), num(m('saves')), num(m('shares')))
+        t('{0} suka · {1} komentar · {2} simpan · {3} bagikan', num(m('likes')), num(m('comments')), num(m('saves')), num(m('shares'))),
+        m('total_interactions')
       )
-      set('taps', num(m('profile_links_taps')))
+      set('taps', num(m('profile_links_taps')), '', m('profile_links_taps'))
       fillBars(skeleton.reachBody, o.reach || [])
       fillBars(skeleton.followBody, o.followers || [])
       if (withAudience) {
