@@ -114,7 +114,11 @@ async function saveStats(media: any, product: string, stats: Record<string, numb
  * 6 sekaligus, karena halaman itu hanya dibuka sesekali.
  */
 export async function mediaPerformance(config: IgConfig, after = '') {
-  const page = await ig.mediaPage(config.token, 24, after)
+  // Halaman pertama juga mengambil jumlah total postingan di profil (untuk hitungan tab).
+  const [page, profile] = await Promise.all([
+    ig.mediaPage(config.token, 24, after),
+    after ? null : ig.profileStats(config.token).catch(() => null),
+  ])
   const media = page.items
   const ids = media.map((m) => String(m.id))
   const rows = ids.length ? await db.from('whatsapp_ig_media_stats').whereIn('media_id', ids) : []
@@ -149,6 +153,7 @@ export async function mediaPerformance(config: IgConfig, after = '') {
     posts,
     stories: (stories as any[]).map((row) => ({ ...JSON.parse(row.meta || '{}'), product: 'STORY', stats: JSON.parse(row.stats || '{}') })),
     next: page.after,
+    total: Number(profile?.media_count) || 0,
   }
 }
 

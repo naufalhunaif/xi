@@ -71,6 +71,7 @@
   let media = []
   let stories = []
   let mediaError = ''
+  let profileTotal = 0
   let postsLoaded = false
   let mediaLoaded = false
   let filter = 'all'
@@ -170,10 +171,17 @@
   }
   function render() {
     const all = buildRows()
-    for (const [key, test] of Object.entries(FILTERS)) {
-      const count = all.filter(test).length
+    const counts = Object.fromEntries(Object.entries(FILTERS).map(([key, test]) => [key, all.filter(test).length]))
+    // Hitungan = seluruh postingan di profil, walau baru sebagian yang dimuat (sisanya dimuat saat menggulir).
+    if (profileTotal) {
+      const unmatched = all.filter((row) => row.key.startsWith('p') && row.status === 'published').length
+      const notLoaded = Math.max(0, profileTotal - media.length - unmatched)
+      counts.published += notLoaded
+      counts.all += notLoaded
+    }
+    for (const [key, count] of Object.entries(counts)) {
       const badge = byId('igpTabs').querySelector(`[data-count="${key}"]`)
-      if (badge) badge.textContent = count ? String(count) : ''
+      if (badge) badge.textContent = count ? num(count) : ''
     }
     const query = byId('igpSearch').value.trim().toLowerCase()
     const rows = sorted(all.filter(FILTERS[filter]).filter((row) => !query || row.caption.toLowerCase().includes(query)))
@@ -293,6 +301,7 @@
       stories = data.stories || []
       mediaError = data.error || ''
       nextCursor = data.next || ''
+      profileTotal = Number(data.total) || 0
     } catch (error) {
       notice(error.message, true)
     } finally {
