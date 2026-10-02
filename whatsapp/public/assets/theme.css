@@ -781,3 +781,6 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui .wa-igp-chip.zero { color: var(--muted); }
 @media (max-width: 520px) { .workspace-ui .wa-igp-post-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .workspace-ui .wa-igp-comments .wa-muted, .workspace-ui .wa-igp-detail .wa-b3-section > p.wa-muted { margin-left: 0; }
+/* Panel detail: setiap bagian setinggi isinya, seluruh panel yang digulir (galeri tidak boleh tergencet). */
+.workspace-ui .wa-order-editor.wa-igp-detail { grid-auto-rows: max-content; }
+.workspace-ui .wa-igp-gallery { flex-shrink: 0; min-height: max-content; overflow-y: hidden; }
