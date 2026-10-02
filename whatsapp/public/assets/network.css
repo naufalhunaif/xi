@@ -31,3 +31,18 @@
 }
 .wa-network-notice button:disabled { opacity: .5; cursor: default; }
 .wa-network-notice textarea { flex: 1 0 100%; min-height: 180px; font-size: 12px; }
+.wa-network-notice[data-state="retrying"] #networkNoticeText::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 7px;
+  vertical-align: -1px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: wa-network-spin .8s linear infinite;
+}
+.wa-network-notice[data-state="offline"] #networkNoticeText::before { content: '●'; margin-right: 6px; color: #b54040; }
+@keyframes wa-network-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wa-network-notice #networkNoticeText::before { animation: none; } }

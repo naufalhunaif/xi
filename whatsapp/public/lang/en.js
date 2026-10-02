@@ -1684,4 +1684,7 @@ window.waLocales.en = {
   "Alasan jeda {0}": "Pause reason {0}",
   "Dipakai lagi otomatis sekitar {0}.": "Used again automatically around {0}.",
   "Lihat alasan": "See reason",
+  "Tidak ada internet": "No internet connection",
+  "Server belum bisa dihubungi": "Can't reach the server",
+  "Menghubungkan ulang…": "Reconnecting…",
 }

@@ -1500,4 +1500,7 @@ window.waLocales.id = {
   "Alasan jeda {0}": "Alasan jeda {0}",
   "Dipakai lagi otomatis sekitar {0}.": "Dipakai lagi otomatis sekitar {0}.",
   "Lihat alasan": "Lihat alasan",
+  "Tidak ada internet": "Tidak ada internet",
+  "Server belum bisa dihubungi": "Server belum bisa dihubungi",
+  "Menghubungkan ulang…": "Menghubungkan ulang…",
 }

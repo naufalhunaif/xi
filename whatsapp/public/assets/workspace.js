@@ -30,10 +30,17 @@
     const panel = document.getElementById('networkNotice')
     if (!panel) return
     panel.hidden = !recovering || changing
+    // Sederhana: tanpa internet → cukup keterangan (pulih sendiri saat internet kembali);
+    // server belum terjangkau → "menghubungkan ulang", tombol Coba lagi hanya bila tetap gagal.
+    const offline = !online()
+    const paused = failures >= 3 && !offline
+    panel.dataset.state = offline ? 'offline' : paused ? 'paused' : 'retrying'
     document.getElementById('networkNoticeText').textContent = t(
-      failures >= 3 ? 'Koneksi belum pulih. Coba lagi.' : 'Koneksi terputus. Mencoba kembali…'
+      offline ? 'Tidak ada internet' : paused ? 'Server belum bisa dihubungi' : 'Menghubungkan ulang…'
     )
-    document.getElementById('networkRetry').disabled = checking || !online()
+    const retry = document.getElementById('networkRetry')
+    retry.hidden = !paused
+    retry.disabled = checking
   }
   function failed(url, kind, response, probe) {
     if (failure?.kind === 'csp_blocked' && kind === 'network_error' && failures >= 3) return
@@ -199,6 +206,10 @@
   })
   window.addEventListener('pageshow', () => { suspended = false; void check() })
   window.addEventListener('online', () => void check(true))
+  window.addEventListener('offline', () => {
+    if (!recovering && !changing) failed(new URL(`${app}/api/workspace`), 'offline', null, false)
+    else renderNetwork()
+  })
   document.addEventListener('ui-language:change', renderNetwork)
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) void check()
