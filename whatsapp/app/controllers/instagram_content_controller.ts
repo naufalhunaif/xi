@@ -15,6 +15,7 @@ import {
   type PostKind,
 } from '#services/instagram_publish'
 import { accountOverview, audience, mediaPerformance } from '#services/instagram_insights'
+import { mediaChildren as igChildren } from '#services/instagram_api'
 
 const NEEDED = ['instagram_business_content_publish', 'instagram_business_manage_insights']
 
@@ -170,15 +171,37 @@ export default class InstagramContentController {
     return response.json({ connected: true, overview, audience: people })
   }
 
-  async performance({ response }: HttpContext) {
+  async performance({ request, response }: HttpContext) {
     await ensureIgTables()
     const config = await readIgConfig()
     response.header('cache-control', 'no-store')
-    if (!config.token) return response.json({ connected: false, posts: [], stories: [] })
+    if (!config.token) return response.json({ connected: false, posts: [], stories: [], next: '' })
+    const after = String(request.input('after') || '').slice(0, 500)
     try {
-      return response.json({ connected: true, ...(await mediaPerformance(config)) })
+      return response.json({ connected: true, ...(await mediaPerformance(config, after)) })
     } catch (error) {
-      return response.json({ connected: true, posts: [], stories: [], error: error instanceof Error ? error.message : String(error) })
+      return response.json({ connected: true, posts: [], stories: [], next: '', error: error instanceof Error ? error.message : String(error) })
+    }
+  }
+
+  /** Isi carousel dari Instagram: foto & video satu per satu. */
+  async children({ params, response }: HttpContext) {
+    const id = String(params.id || '')
+    if (!/^\d{1,40}$/.test(id)) return response.badRequest({ error: 'Postingan tidak valid.' })
+    const config = await readIgConfig()
+    if (!config.token) return response.badRequest({ error: 'Instagram belum terhubung' })
+    response.header('cache-control', 'no-store')
+    try {
+      const items = await igChildren(config.token, id)
+      return response.json({
+        items: items.map((item: any) => ({
+          type: item.media_type === 'VIDEO' ? 'video' : 'image',
+          url: String(item.media_url || ''),
+          thumb: String(item.thumbnail_url || item.media_url || ''),
+        })),
+      })
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : String(error) })
     }
   }
 }

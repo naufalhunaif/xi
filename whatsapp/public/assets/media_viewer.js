@@ -1,6 +1,6 @@
 ;(() => {
   const t = (value, ...args) => window.waI18n?.t(value, ...args) ?? value.replace(/\{(\d+)\}/g, (match, index) => args[index] ?? match)
-  const images = 'img.message-media, img.wa-contact-avatar, img.wa-room-avatar, img.avatar, .wa-cart-item img, #cartPaymentProof, #mediaPreview, #qrImage, .wa-trace-media img'
+  const images = 'img.message-media, img.wa-contact-avatar, img.wa-room-avatar, img.avatar, .wa-cart-item img, #cartPaymentProof, #mediaPreview, #qrImage, .wa-trace-media img, .wa-igp-gallery img'
   const players = '.message-media-wrap video, .message-media-wrap audio'
   const documents = 'a.message-document'
   const selector = `${images}, ${players}, ${documents}`

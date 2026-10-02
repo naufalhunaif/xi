@@ -34,7 +34,7 @@ const permissionError = (error: unknown) =>
   error instanceof ig.IgApiError && [10, 200, 190].includes(error.code)
 
 export async function accountOverview(config: IgConfig, days: number, fresh = false) {
-  const span = days === 30 ? 30 : days === 1 ? 1 : 7
+  const span = [1, 7, 14, 30].includes(days) ? days : 7
   return cached(
     `ig_ins_${span}`,
     TTL_MS,
@@ -108,26 +108,37 @@ async function saveStats(media: any, product: string, stats: Record<string, numb
   )
 }
 
-/** Postingan terbaru + performanya (cache 30 menit, maks 8 diambil ulang per permintaan). */
-export async function mediaPerformance(config: IgConfig) {
-  const media = await ig.recentMedia(config.token, 24)
+/**
+ * Postingan profil + performanya, per halaman 24 (cache 30 menit).
+ * Halaman pertama: maks 8 diambil ulang per permintaan. Halaman lama (`after`): semua yang belum ada diambil,
+ * 6 sekaligus, karena halaman itu hanya dibuka sesekali.
+ */
+export async function mediaPerformance(config: IgConfig, after = '') {
+  const page = await ig.mediaPage(config.token, 24, after)
+  const media = page.items
   const ids = media.map((m) => String(m.id))
   const rows = ids.length ? await db.from('whatsapp_ig_media_stats').whereIn('media_id', ids) : []
   const known = new Map((rows as any[]).map((row) => [String(row.media_id), row]))
-  let fetched = 0
-  const posts = []
+  const statsOf = new Map<string, Record<string, number>>()
+  const stale: any[] = []
   for (const item of media) {
-    const product = productOf(item)
     const row = known.get(String(item.id))
-    let stats = row ? JSON.parse(row.stats || '{}') : null
-    const stale = !row || Date.now() - new Date(row.fetched_at).getTime() > TTL_MS
-    if (stale && fetched < 8) {
-      fetched++
-      stats = await ig.mediaInsights(config.token, String(item.id), product)
-      await saveStats(item, product, stats).catch(() => {})
-    }
-    posts.push({ ...item, product, stats: stats || {} })
+    if (row) statsOf.set(String(item.id), JSON.parse(row.stats || '{}'))
+    if (!row || Date.now() - new Date(row.fetched_at).getTime() > TTL_MS) stale.push(item)
   }
+  const refresh = after ? stale : stale.slice(0, 8)
+  for (let index = 0; index < refresh.length; index += 6) {
+    await Promise.all(
+      refresh.slice(index, index + 6).map(async (item) => {
+        const product = productOf(item)
+        const stats = await ig.mediaInsights(config.token, String(item.id), product)
+        statsOf.set(String(item.id), stats)
+        await saveStats(item, product, stats).catch(() => {})
+      })
+    )
+  }
+  const posts = media.map((item) => ({ ...item, product: productOf(item), stats: statsOf.get(String(item.id)) || {} }))
+  if (after) return { posts, stories: [], next: page.after }
   // Story yang sudah lewat 24 jam (tersimpan oleh worker).
   const stories = await db
     .from('whatsapp_ig_media_stats')
@@ -137,6 +148,7 @@ export async function mediaPerformance(config: IgConfig) {
   return {
     posts,
     stories: (stories as any[]).map((row) => ({ ...JSON.parse(row.meta || '{}'), product: 'STORY', stats: JSON.parse(row.stats || '{}') })),
+    next: page.after,
   }
 }
 

@@ -1381,4 +1381,7 @@ window.waLocales.id = {
   "Foto/video": "Foto/video",
   "Tanggal dan jam": "Tanggal dan jam",
   "Rentang": "Rentang",
+  "14 hari": "14 hari",
+  "Slide {0}": "Slide {0}",
+  "Muat lebih banyak": "Muat lebih banyak",
 }

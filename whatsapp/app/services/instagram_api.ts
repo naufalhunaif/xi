@@ -299,7 +299,25 @@ export async function demographics(token: string, userId: string, breakdown: str
 const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count'
 
 export async function recentMedia(token: string, limit = 24) {
-  const data = await call(`${IG_GRAPH}/me/media?fields=${MEDIA_FIELDS}&limit=${limit}`, { headers: bearer(token) })
+  return (await mediaPage(token, limit)).items
+}
+
+/** Satu halaman postingan profil; `after` = kursor halaman berikutnya ('' bila sudah habis). */
+export async function mediaPage(token: string, limit = 24, after = '') {
+  const cursor = after ? `&after=${encodeURIComponent(after)}` : ''
+  const data = await call(`${IG_GRAPH}/me/media?fields=${MEDIA_FIELDS}&limit=${limit}${cursor}`, { headers: bearer(token) })
+  return {
+    items: (data.data || []) as any[],
+    after: data.paging?.next ? String(data.paging?.cursors?.after || '') : '',
+  }
+}
+
+/** Isi carousel (foto/video satu per satu). */
+export async function mediaChildren(token: string, id: string) {
+  const data = await call(
+    `${IG_GRAPH}/${encodeURIComponent(id)}/children?fields=id,media_type,media_url,thumbnail_url`,
+    { headers: bearer(token) }
+  )
   return (data.data || []) as any[]
 }
 

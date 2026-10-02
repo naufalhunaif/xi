@@ -649,7 +649,7 @@ html[data-theme="dark"] .workspace-ui :is(img.message-media:not(.sticker), .wa-i
 .workspace-ui .wa-igp-stat strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .workspace-ui .wa-igp-stat span { font-size: 11px; line-height: 15px; margin-left: 0; }
 .workspace-ui .wa-igp-bars { display: flex; align-items: flex-end; gap: 3px; height: 90px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; }
-.workspace-ui .wa-igp-bars span { flex: 1; min-width: 2px; border-radius: 3px 3px 0 0; background: var(--wa-ok); opacity: .8; }
+.workspace-ui .wa-igp-bars > span:not(.wa-loading, .wa-igp-bars-empty) { flex: 1; min-width: 2px; border-radius: 3px 3px 0 0; background: var(--wa-ok); opacity: .8; }
 .workspace-ui .wa-igp-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .workspace-ui .wa-igp-top-list { display: grid; gap: 2px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
 .workspace-ui .wa-igp-top-list h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
@@ -676,3 +676,25 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui .wa-message-list.wa-ssr-pending > .message { display: none; }
 .workspace-ui .wa-messages:has(> .wa-ssr-pending) { display: flex; flex-direction: column; }
 .workspace-ui .wa-message-list.wa-ssr-pending { flex: 1; justify-content: center; }
+/* Ringkasan Instagram: saat ganti rentang hanya angka/grafik yang memuat, ukuran kartu tetap. */
+.workspace-ui .wa-igp-stat strong { display: flex; align-items: center; min-height: 1.4em; }
+.workspace-ui .wa-igp-stat strong .wa-loading.inline { font-size: 12px; font-weight: 400; }
+.workspace-ui .wa-igp-stat span.wa-muted:empty { display: none; }
+.workspace-ui .wa-igp-bars > :is(.wa-loading, .wa-igp-bars-empty) { flex: 1; align-self: center; justify-content: center; text-align: center; padding: 0; background: none; }
+.workspace-ui .wa-igp-top-body { display: grid; gap: 2px; min-height: 24px; }
+.workspace-ui .wa-igp-stat .wa-igp-pending { visibility: hidden; }
+/* Detail postingan: galeri semua slide (gulir ke samping), video bisa diputar. */
+.workspace-ui .wa-igp-gallery { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
+.workspace-ui .wa-igp-gallery figure { margin: 0; flex: 0 0 auto; width: 200px; display: grid; gap: 4px; scroll-snap-align: start; }
+.workspace-ui .wa-igp-gallery :is(img, video) { width: 200px; height: 250px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); background: var(--wa-raised, var(--line)); display: block; }
+.workspace-ui .wa-igp-gallery img { cursor: zoom-in; }
+.workspace-ui .wa-igp-gallery video { object-fit: contain; background: #000; }
+.workspace-ui .wa-igp-gallery figcaption { font-size: 11px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.workspace-ui .wa-igp-gallery-loading { display: flex !important; align-items: center; justify-content: center; height: 250px; border: 1px dashed var(--line); border-radius: 6px; }
+.workspace-ui .wa-igp-more { display: flex; justify-content: center; padding: 12px 0; }
+.workspace-ui .wa-igp-more:has(> [hidden]) { padding: 0; }
+@media (max-width: 540px) {
+  .workspace-ui .wa-igp-gallery figure, .workspace-ui .wa-igp-gallery :is(img, video) { width: 72vw; }
+  .workspace-ui .wa-igp-gallery :is(img, video) { height: 90vw; }
+  .workspace-ui .wa-igp-gallery-loading { width: 72vw; height: 90vw; }
+}

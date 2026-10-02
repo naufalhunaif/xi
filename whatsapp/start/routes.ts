@@ -213,6 +213,7 @@ router
     router.post('/api/instagram/posts/:id/delete', [InstagramContentController, 'remove'])
     router.get('/api/instagram/insights', [InstagramContentController, 'insights'])
     router.get('/api/instagram/performance', [InstagramContentController, 'performance'])
+    router.get('/api/instagram/media/:id/children', [InstagramContentController, 'children'])
     router.get('/api/instagram/comments', [InstagramController, 'comments'])
     router.get('/api/instagram/comments/count', [InstagramController, 'commentsCount'])
     router.post('/api/instagram/comments/:id/reply', [InstagramController, 'replyComment'])

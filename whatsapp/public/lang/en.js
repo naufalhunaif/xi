@@ -1567,4 +1567,7 @@ window.waLocales.en = {
   "Foto/video": "Photo/video",
   "Tanggal dan jam": "Date and time",
   "Rentang": "Range",
+  "14 hari": "14 days",
+  "Slide {0}": "Slide {0}",
+  "Muat lebih banyak": "Load more",
 }

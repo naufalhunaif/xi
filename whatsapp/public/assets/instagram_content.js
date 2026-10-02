@@ -96,7 +96,14 @@
         count: post?.items.length || 0,
         thumb: item.thumbnail_url || item.media_url || post?.items[0]?.url || '',
         video: false,
-        pictures: post ? post.items : [{ url: item.thumbnail_url || item.media_url || '', type: 'image' }],
+        // Video/Reels bisa diputar; carousel diambil isinya saat detail dibuka.
+        pictures: post
+          ? post.items
+          : item.media_type === 'VIDEO' && item.media_url
+            ? [{ url: item.media_url, poster: item.thumbnail_url || '', type: 'video' }]
+            : [{ url: item.media_url || item.thumbnail_url || '', type: 'image' }],
+        mediaId: String(item.id),
+        carousel: item.media_type === 'CAROUSEL_ALBUM' && !post,
         caption: item.caption || post?.caption || '',
         time: item.timestamp || post?.publishedAt,
         status: 'published',
@@ -234,7 +241,8 @@
       })
       list.append(tr)
     }
-    if (!mediaLoaded) list.append(loadingRow())
+    if (!mediaLoaded || moreLoading) list.append(loadingRow())
+    byId('igpMoreButton').hidden = !nextCursor || moreLoading || !mediaLoaded
   }
   byId('igpTabs').addEventListener('click', (event) => {
     const button = event.target.closest('button[data-filter]')
@@ -269,19 +277,54 @@
       notice(error.message, true)
     }
   }
+  let nextCursor = ''
+  let moreLoading = false
   async function loadMedia() {
     try {
       const data = await api('/api/instagram/performance')
       media = data.posts || []
       stories = data.stories || []
       mediaError = data.error || ''
+      nextCursor = data.next || ''
     } catch (error) {
       notice(error.message, true)
     } finally {
       mediaLoaded = true
       render()
+      continueMore()
     }
   }
+  // Postingan lama dari profil: 24 per halaman, dimuat otomatis saat menggulir ke bawah.
+  async function loadMore() {
+    if (!nextCursor || moreLoading || !mediaLoaded) return
+    moreLoading = true
+    render()
+    try {
+      const data = await api(`/api/instagram/performance?after=${encodeURIComponent(nextCursor)}`)
+      const known = new Set(media.map((item) => String(item.id)))
+      media = media.concat((data.posts || []).filter((item) => !known.has(String(item.id))))
+      nextCursor = data.next || ''
+      if (data.error) notice(t(data.error), true)
+    } catch (error) {
+      notice(error.message, true)
+    } finally {
+      moreLoading = false
+      render()
+      continueMore()
+    }
+  }
+  byId('igpMoreButton').addEventListener('click', loadMore)
+  // Bawah tabel terlihat → muat halaman berikutnya (diulang selama masih terlihat).
+  let moreVisible = false
+  if ('IntersectionObserver' in window)
+    new IntersectionObserver(
+      (entries) => {
+        moreVisible = entries.some((entry) => entry.isIntersecting)
+        if (moreVisible) loadMore()
+      },
+      { rootMargin: '400px' }
+    ).observe(byId('igpMore'))
+  const continueMore = () => window.setTimeout(() => moreVisible && loadMore(), 300)
   async function loadState() {
     try {
       const state = await api('/api/instagram/content')
@@ -338,6 +381,46 @@
     node.append(el('h3', title))
     return node
   }
+  /* Galeri detail: semua foto/video bisa dilihat; video diputar langsung, foto dibuka besar saat diklik. */
+  function fillGallery(gallery, items) {
+    gallery.replaceChildren(
+      ...items
+        .filter((item) => item.url)
+        .map((item, index, all) => {
+          const figure = el('figure')
+          const node = el(item.type === 'video' ? 'video' : 'img')
+          node.src = item.url
+          if (item.type === 'video') {
+            node.controls = true
+            node.playsInline = true
+            node.preload = 'metadata'
+            if (item.poster) node.poster = item.poster
+          } else {
+            node.alt = all.length > 1 ? t('Slide {0}', index + 1) : ''
+            node.loading = 'lazy'
+          }
+          figure.append(node)
+          if (all.length > 1) figure.append(el('figcaption', `${index + 1}/${all.length}`))
+          return figure
+        })
+    )
+  }
+  const childrenCache = new Map()
+  async function loadChildren(row, gallery) {
+    const loading = el('figure', undefined, 'wa-igp-gallery-loading')
+    loading.append(el('div', t('Memuat…'), 'wa-loading'))
+    gallery.append(loading)
+    try {
+      if (!childrenCache.has(row.mediaId))
+        childrenCache.set(row.mediaId, (await api(`/api/instagram/media/${encodeURIComponent(row.mediaId)}/children`)).items || [])
+      const items = childrenCache.get(row.mediaId)
+      if (selectedKey === row.key && items.length)
+        fillGallery(gallery, items.map((item) => ({ url: item.url, poster: item.thumb, type: item.type })))
+      else loading.remove()
+    } catch {
+      loading.remove()
+    }
+  }
   function openDetail(row) {
     selectedKey = row.key
     byId('igpList').querySelectorAll('[data-order-id]').forEach((tr) => (tr.dataset.selected = String(tr.dataset.orderId === row.key)))
@@ -348,19 +431,10 @@
     head.append(el('span', label, `wa-pill ${pill}`), el('small', when(row.time), 'wa-muted'))
     box.append(head)
 
-    const pictures = el('div', undefined, 'wa-b3-pictures')
-    for (const item of row.pictures.filter((picture) => picture.url)) {
-      const figure = el('figure')
-      const node = el(item.type === 'video' ? 'video' : 'img')
-      node.src = item.url
-      if (item.type === 'video') {
-        node.controls = true
-        node.preload = 'metadata'
-      } else node.alt = ''
-      figure.append(node)
-      pictures.append(figure)
-    }
-    if (pictures.childElementCount) box.append(pictures)
+    const gallery = el('div', undefined, 'wa-igp-gallery')
+    fillGallery(gallery, row.pictures)
+    if (row.carousel) loadChildren(row, gallery)
+    if (gallery.childElementCount) box.append(gallery)
     if (row.error && row.status === 'failed') box.append(el('p', row.error, 'wa-alert'))
     if (row.caption) {
       const caption = section(t('Caption'))
@@ -567,87 +641,151 @@
     }
   })
 
-  /* ───── Ringkasan akun ───── */
+  /* ───── Ringkasan akun ─────
+     Kerangka dibuat sekali; saat ganti rentang hanya angka/grafik yang berubah jadi "memuat". */
   let days = 7
-  function bars(points) {
-    const box = el('div', undefined, 'wa-igp-bars')
+  let summarySeq = 0
+  let skeleton = null
+  const spinner = () => el('span', t('Memuat…'), 'wa-loading inline')
+  const STAT_KEYS = () => [
+    ['followers', t('Pengikut')],
+    ['reach', t('Jangkauan')],
+    ['views', t('Tayangan')],
+    ['engaged', t('Akun berinteraksi')],
+    ['interactions', t('Interaksi')],
+    ['taps', t('Klik link profil')],
+  ]
+  function buildSkeleton() {
+    const fields = {}
+    const cards = el('div', undefined, 'wa-igp-stats-grid')
+    for (const [key, label] of STAT_KEYS()) {
+      const node = el('div', undefined, 'wa-igp-stat')
+      const value = el('strong')
+      const extra = el('span', '', 'wa-muted')
+      node.append(el('small', label), value, extra)
+      cards.append(node)
+      fields[key] = { value, extra }
+    }
+    const chart = (title) => {
+      const node = section(title)
+      const body = el('div', undefined, 'wa-igp-bars')
+      node.append(body)
+      return [node, body]
+    }
+    const [reachNode, reachBody] = chart(t('Jangkauan harian'))
+    const [followNode, followBody] = chart(t('Pengikut baru harian'))
+    const people = section(t('Pengikut'))
+    const grid = el('div', undefined, 'wa-igp-people')
+    const lists = {}
+    for (const [key, label] of [
+      ['age', t('Umur')],
+      ['gender', t('Jenis kelamin')],
+      ['city', t('Kota')],
+      ['country', t('Negara')],
+    ]) {
+      const node = el('div', undefined, 'wa-igp-top-list')
+      const body = el('div', undefined, 'wa-igp-top-body')
+      node.append(el('h4', label), body)
+      grid.append(node)
+      lists[key] = body
+    }
+    people.append(grid)
+    const alert = el('p', '', 'wa-alert')
+    byId('igpSummary').replaceChildren(alert, cards, reachNode, followNode, people)
+    skeleton = { fields, reachBody, followBody, lists, alert, audience: false }
+  }
+  function loadingState(withAudience) {
+    // Keterangan kecil disembunyikan (bukan dihapus) agar tinggi kartu tidak berubah.
+    for (const { value, extra } of Object.values(skeleton.fields)) {
+      value.replaceChildren(spinner())
+      extra.classList.add('wa-igp-pending')
+    }
+    skeleton.reachBody.replaceChildren(spinner())
+    if (!skeleton.followBody.childElementCount) skeleton.followBody.replaceChildren(spinner())
+    if (withAudience) for (const body of Object.values(skeleton.lists)) body.replaceChildren(spinner())
+  }
+  function fillBars(box, points) {
+    if (!points.length) return box.replaceChildren(el('span', t('Belum ada data.'), 'wa-muted wa-igp-bars-empty'))
     const max = Math.max(1, ...points.map((p) => p.value))
-    for (const point of points) {
-      const bar = el('span')
-      bar.style.height = `${Math.max(3, Math.round((point.value / max) * 100))}%`
-      bar.title = `${new Intl.DateTimeFormat(locale(), { day: '2-digit', month: 'short' }).format(new Date(point.date))}: ${num(point.value)}`
-      box.append(bar)
-    }
-    return box
+    box.replaceChildren(
+      ...points.map((point) => {
+        const bar = el('span')
+        bar.style.height = `${Math.max(3, Math.round((point.value / max) * 100))}%`
+        bar.title = `${new Intl.DateTimeFormat(locale(), { day: '2-digit', month: 'short' }).format(new Date(point.date))}: ${num(point.value)}`
+        return bar
+      })
+    )
   }
-  function stat(label, value, extra) {
-    const node = el('div', undefined, 'wa-igp-stat')
-    node.append(el('small', label), el('strong', value))
-    if (extra) node.append(el('span', extra, 'wa-muted'))
-    return node
-  }
-  function topList(title, rows, rename = (k) => k) {
-    const node = el('div', undefined, 'wa-igp-top-list')
-    node.append(el('h4', title))
-    if (!rows?.length) {
-      node.append(el('p', t('Belum cukup data (butuh ≥100 pengikut).'), 'wa-muted'))
-      return node
-    }
+  function fillList(body, rows, rename = (k) => k) {
+    if (!rows?.length) return body.replaceChildren(el('p', t('Belum cukup data (butuh ≥100 pengikut).'), 'wa-muted'))
     const total = rows.reduce((sum, row) => sum + row.value, 0) || 1
-    for (const row of rows.slice(0, 6)) {
-      const line = el('div', undefined, 'wa-igp-line')
-      const fill = el('i')
-      const share = Math.round((row.value / total) * 100)
-      fill.style.width = `${share}%`
-      line.append(el('span', rename(row.key)), el('b', `${share}%`), fill)
-      node.append(line)
+    body.replaceChildren(
+      ...rows.slice(0, 6).map((row) => {
+        const line = el('div', undefined, 'wa-igp-line')
+        const fill = el('i')
+        const share = Math.round((row.value / total) * 100)
+        fill.style.width = `${share}%`
+        line.append(el('span', rename(row.key)), el('b', `${share}%`), fill)
+        return line
+      })
+    )
+  }
+  function emptyState(message) {
+    for (const { value, extra } of Object.values(skeleton.fields)) {
+      value.textContent = '—'
+      extra.textContent = ''
+      extra.classList.remove('wa-igp-pending')
     }
-    return node
+    skeleton.reachBody.replaceChildren()
+    skeleton.followBody.replaceChildren()
+    for (const body of Object.values(skeleton.lists)) body.replaceChildren()
+    skeleton.alert.textContent = message
   }
   async function loadSummary(fresh = false) {
-    const box = byId('igpSummary')
-    if (!box.childElementCount || fresh) box.replaceChildren(el('div', t('Memuat…'), 'wa-loading'))
+    if (!skeleton) buildSkeleton()
+    const seq = ++summarySeq
+    const withAudience = fresh || !skeleton.audience
+    skeleton.alert.textContent = ''
+    loadingState(withAudience)
     try {
       const data = await api(`/api/instagram/insights?days=${days}${fresh ? '&fresh=1' : ''}`)
-      if (!data.connected) return box.replaceChildren(el('p', t('Instagram belum terhubung'), 'wa-muted'))
+      if (seq !== summarySeq) return
+      if (!data.connected) return emptyState(t('Instagram belum terhubung'))
       const o = data.overview
       if (o.needsReconnect) byId('igpReconnect').hidden = false
       const m = (key) => o.metrics?.[key]?.value
+      const f = skeleton.fields
       const follow = o.metrics?.follows_and_unfollows?.breakdowns || []
       const gained = follow.find((b) => /^follower/i.test(b.key))?.value
       const lost = follow.find((b) => /non_follower|unfollow/i.test(b.key))?.value
-      const cards = el('div', undefined, 'wa-igp-stats-grid')
-      cards.append(
-        stat(t('Pengikut'), num(o.profile?.followers_count), gained !== undefined ? t('+{0} / −{1}', num(gained), num(lost || 0)) : ''),
-        stat(t('Jangkauan'), num(m('reach'))),
-        stat(t('Tayangan'), num(m('views'))),
-        stat(t('Akun berinteraksi'), num(m('accounts_engaged'))),
-        stat(
-          t('Interaksi'),
-          num(m('total_interactions')),
-          t('{0} suka · {1} komentar · {2} simpan · {3} bagikan', num(m('likes')), num(m('comments')), num(m('saves')), num(m('shares')))
-        ),
-        stat(t('Klik link profil'), num(m('profile_links_taps')))
-      )
-      const chart = (title, points) => {
-        const node = section(title)
-        node.append(points.length ? bars(points) : el('p', t('Belum ada data.'), 'wa-muted'))
-        return node
+      const set = (key, value, extra = '') => {
+        f[key].value.textContent = value
+        f[key].extra.textContent = extra
+        f[key].extra.classList.remove('wa-igp-pending')
       }
-      const gender = { F: t('Perempuan'), M: t('Laki-laki'), U: t('Lainnya') }
-      const people = section(t('Pengikut'))
-      const peopleGrid = el('div', undefined, 'wa-igp-people')
-      peopleGrid.append(
-        topList(t('Umur'), data.audience?.age),
-        topList(t('Jenis kelamin'), data.audience?.gender, (k) => gender[k] || k),
-        topList(t('Kota'), data.audience?.city),
-        topList(t('Negara'), data.audience?.country)
+      set('followers', num(o.profile?.followers_count), gained !== undefined ? t('+{0} / −{1}', num(gained), num(lost || 0)) : '')
+      set('reach', num(m('reach')))
+      set('views', num(m('views')))
+      set('engaged', num(m('accounts_engaged')))
+      set(
+        'interactions',
+        num(m('total_interactions')),
+        t('{0} suka · {1} komentar · {2} simpan · {3} bagikan', num(m('likes')), num(m('comments')), num(m('saves')), num(m('shares')))
       )
-      people.append(peopleGrid)
-      box.replaceChildren(cards, chart(t('Jangkauan harian'), o.reach || []), chart(t('Pengikut baru harian'), o.followers || []), people)
-      if (o.error && !Object.keys(o.metrics || {}).length) box.prepend(el('p', o.error, 'wa-alert'))
+      set('taps', num(m('profile_links_taps')))
+      fillBars(skeleton.reachBody, o.reach || [])
+      fillBars(skeleton.followBody, o.followers || [])
+      if (withAudience) {
+        const gender = { F: t('Perempuan'), M: t('Laki-laki'), U: t('Lainnya') }
+        fillList(skeleton.lists.age, data.audience?.age)
+        fillList(skeleton.lists.gender, data.audience?.gender, (k) => gender[k] || k)
+        fillList(skeleton.lists.city, data.audience?.city)
+        fillList(skeleton.lists.country, data.audience?.country)
+        skeleton.audience = true
+      }
+      if (o.error && !Object.keys(o.metrics || {}).length) skeleton.alert.textContent = o.error
     } catch (error) {
-      box.replaceChildren(el('p', error.message, 'wa-alert'))
+      if (seq === summarySeq) emptyState(error.message)
     }
   }
   function openSummary() {
@@ -658,7 +796,7 @@
   byId('igpSummaryRefresh').addEventListener('click', () => loadSummary(true))
   byId('igpDays').addEventListener('click', (event) => {
     const button = event.target.closest('button[data-days]')
-    if (!button) return
+    if (!button || Number(button.dataset.days) === days) return
     days = Number(button.dataset.days)
     byId('igpDays').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)))
     loadSummary()
@@ -667,6 +805,9 @@
   document.addEventListener('ui-language:change', () => {
     setKind(kind)
     render()
+    // Label ringkasan ikut bahasa: bangun ulang kerangkanya.
+    skeleton = null
+    if (mode === 'summary') loadSummary()
   })
 
   loadState()
