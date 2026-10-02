@@ -87,15 +87,11 @@ export async function latestInboxMessages() {
     `EXISTS (SELECT 1 FROM whatsapp_beta3_shipments ${alias} WHERE ${alias}.jid = m.jid${after})`
   const lastResiSql = `(SELECT MAX(rl.created_at) FROM whatsapp_beta3_shipments rl WHERE rl.jid = m.jid)`
   const shippedSql = `(${resiSql('rs', ' AND rs.created_at >= b.created_at')} OR (b.source = 'rekap' AND ${resiSql('r2')}))`
+  // Order = pesanan yang sudah dibayar (DP/lunas) dan belum dikirim. Belum bayar = belum order
+  // (masih tanya-tanya / menunggu pembayaran), jadi tidak masuk tab ini.
   const orderSql = beta3
     ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
-          AND ((b.status IN ('pending', 'awaiting_payment') AND NOT (b.source = 'rekap' AND ${resiSql('r3')}))
-            OR (b.status = 'paid' AND b.updated_at >= NOW() - INTERVAL 45 DAY AND NOT ${shippedSql})))
-        OR EXISTS (SELECT 1 FROM whatsapp_beta3_specs sp WHERE sp.jid = m.jid AND sp.spec <> ''
-          AND sp.updated_at >= NOW() - INTERVAL 14 DAY
-          AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
-            AND d.updated_at >= sp.updated_at)
-          AND NOT (${resiSql('r4', ' AND r4.created_at >= sp.updated_at')}))`
+          AND b.status = 'paid' AND b.updated_at >= NOW() - INTERVAL 45 DAY AND NOT ${shippedSql})`
     : ORDER_SQL
   const doneSql = beta3
     ? `(${resiSql('r5')}

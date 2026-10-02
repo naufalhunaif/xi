@@ -83,6 +83,8 @@ export function normalizeStyle(bubbles: string[], profile: StyleProfile) {
         .replace(/!{2,}/g, '!')
         .replace(/\?{2,}/g, '?')
       if (!profile.emoji) out = out.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️‍]/gu, '')
+      // Balas salam cukup salam: tanpa "ada yang bisa kami bantu" (bukan gaya CS toko).
+      out = out.replace(/^((?:wa'?alaikum(?:us)?salam|walaikumsalam|halo|hai|pagi|siang|sore|malam|selamat \w+)[^,.!?\n]*?)[,.]?\s*(?:ada yang bisa (?:kami|saya|di|dibantu)?\s*(?:bantu|dibantu)?[^?\n]*\??)$/i, '$1')
       // AI adalah CS-nya: jangan menyebut CS/admin sebagai orang lain ("nanti CS konfirmasi" → "nanti saya konfirmasi").
       out = out
         .replace(/\b(?:tim\s+)?(?:cs|admin)(?:\s+kami)?(\s+(?:akan\s+)?(?:konfirmasi|konfirmasikan|kabari|kabarin|cek|info|infokan|hubungi|bantu|hitung|kirim|kirimkan|jawab|balas)\b)/gi, (_match, rest: string, offset: number, whole: string) =>
