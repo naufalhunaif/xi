@@ -1497,4 +1497,7 @@ window.waLocales.id = {
   "akses ditolak layanan": "akses ditolak layanan",
   "gangguan sementara, dicoba lagi otomatis": "gangguan sementara, dicoba lagi otomatis",
   "Alasan: {0}": "Alasan: {0}",
+  "Alasan jeda {0}": "Alasan jeda {0}",
+  "Dipakai lagi otomatis sekitar {0}.": "Dipakai lagi otomatis sekitar {0}.",
+  "Lihat alasan": "Lihat alasan",
 }

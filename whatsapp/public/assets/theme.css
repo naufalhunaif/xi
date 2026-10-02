@@ -821,4 +821,10 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui #usageRunsFilter { margin-bottom: 8px; }
 .workspace-ui :is(#usageModels, #usagePhases) tr[data-filter-model], .workspace-ui #usagePhases tr[data-filter-phase] { cursor: pointer; }
 .workspace-ui :is(#usageModels, #usagePhases) tr:is([data-filter-model], [data-filter-phase]):hover { background: var(--wa-green-bg, #f1f8f4); }
-.workspace-ui .wa-quota-reason { display: block; width: 100%; margin: 2px 0 0; font-size: 11px; }
+.workspace-ui .wa-quota-state { position: relative; display: inline-flex; align-items: center; gap: 6px; justify-self: end; }
+.workspace-ui .wa-quota-paused { border: 0; font: inherit; font-size: 12px; cursor: pointer; }
+.workspace-ui .wa-quota-paused:hover, .workspace-ui .wa-quota-paused[aria-expanded="true"] { filter: brightness(.95); text-decoration: underline; }
+.workspace-ui .wa-quota-tip { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; display: grid; gap: 6px; width: min(320px, 80vw); padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--wa-surface, #fff); box-shadow: 0 10px 30px #0000001f; font-size: 12px; line-height: 1.45; text-align: left; }
+.workspace-ui .wa-quota-tip[hidden] { display: none; }
+.workspace-ui .wa-quota-tip p { margin: 0; overflow-wrap: anywhere; }
+.workspace-ui .wa-quota-tip .wa-usage-caption { margin: 0; }

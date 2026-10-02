@@ -13,6 +13,7 @@
     return node
   }
   let loading = false
+  let openTip = 0
   let failed = false
   let providers = []
   let configuredProvider = ''
@@ -93,22 +94,54 @@
       row.append(bars)
       if (account.limitedUntil > Date.now()) {
         const until = new Date(account.limitedUntil).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
-        const pill = el('span', t('Jeda s/d {0}', until), 'wa-pill warn')
-        // Alasan jeda: kuota pada kartu bisa masih banyak, jadi jelaskan penyebabnya.
+        // Klik "Jeda s/d …" untuk melihat alasannya (kuota di kartu bisa masih banyak).
         const REASON = {
           USAGE_LIMIT: t('batas pemakaian dari layanan'),
           AI_AUTH_REQUIRED: t('perlu login ulang'),
           ACCESS_DENIED: t('akses ditolak layanan'),
         }
         const reason = REASON[account.limitedCode] || t('gangguan sementara, dicoba lagi otomatis')
-        pill.title = account.lastError || reason
-        const detail = account.lastError ? ` — ${account.lastError.replace(/^[A-Z_]+:\s*/, '').slice(0, 90)}` : ''
-        row.append(pill, el('span', `${t('Alasan: {0}', reason)}${detail}`, 'wa-usage-caption wa-quota-reason'))
-        if (account.lastError) row.lastChild.title = account.lastError
+        const detail = account.lastError ? account.lastError.replace(/^[A-Z_]+:\s*/, '') : ''
+        const state = el('div', '', 'wa-quota-state')
+        const info = document.createElement('button')
+        info.type = 'button'
+        info.className = 'wa-pill warn wa-quota-paused'
+        info.textContent = t('Jeda s/d {0}', until)
+        info.title = t('Lihat alasan')
+        info.setAttribute('aria-expanded', String(openTip === account.id))
+        const tip = el('div', '', 'wa-quota-tip')
+        tip.setAttribute('role', 'tooltip')
+        tip.hidden = openTip !== account.id
+        tip.append(el('strong', t('Alasan: {0}', reason)))
+        if (detail) tip.append(el('p', detail))
+        tip.append(el('small', t('Dipakai lagi otomatis sekitar {0}.', until), 'wa-usage-caption'))
+        info.addEventListener('click', (event) => {
+          event.stopPropagation()
+          const show = tip.hidden
+          for (const other of root.querySelectorAll('.wa-quota-tip')) other.hidden = true
+          for (const other of root.querySelectorAll('.wa-quota-paused')) other.setAttribute('aria-expanded', 'false')
+          tip.hidden = !show
+          info.setAttribute('aria-expanded', String(show))
+          openTip = show ? account.id : 0
+        })
+        state.append(info, tip)
+        row.append(state)
       }
       root.append(row)
     }
   }
+  // Tutup keterangan saat klik di luar atau tekan Escape.
+  document.addEventListener('click', (event) => {
+    if (!openTip || event.target.closest?.('.wa-quota-tip')) return
+    openTip = 0
+    for (const tip of root.querySelectorAll('.wa-quota-tip')) tip.hidden = true
+    for (const button of root.querySelectorAll('.wa-quota-paused')) button.setAttribute('aria-expanded', 'false')
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !openTip) return
+    openTip = 0
+    for (const tip of root.querySelectorAll('.wa-quota-tip')) tip.hidden = true
+  })
   let loaded = false
   function render() {
     if (accounts.length) return renderAccounts()

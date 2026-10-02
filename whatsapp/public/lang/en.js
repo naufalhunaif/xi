@@ -1681,4 +1681,7 @@ window.waLocales.en = {
   "akses ditolak layanan": "access denied by the provider",
   "gangguan sementara, dicoba lagi otomatis": "temporary error, retried automatically",
   "Alasan: {0}": "Reason: {0}",
+  "Alasan jeda {0}": "Pause reason {0}",
+  "Dipakai lagi otomatis sekitar {0}.": "Used again automatically around {0}.",
+  "Lihat alasan": "See reason",
 }
