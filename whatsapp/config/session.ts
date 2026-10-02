@@ -27,7 +27,9 @@ const sessionConfig = defineConfig({
    * Define how long to keep the session data alive without
    * any activity.
    */
-  age: '2h',
+  // Standalone (login lokal): tetap masuk sampai 30 hari tanpa aktivitas; bundle tetap 2 jam.
+  age:
+    env.get('AUTH_MODE') === 'local' || !String(env.get('ACCOUNT_URL') || '').trim() ? '30d' : '2h',
 
   /**
    * Configuration for session cookie and the

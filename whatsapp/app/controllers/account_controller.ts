@@ -51,6 +51,15 @@ function authPage(
 export default class AccountController {
   async login({ request, session, response, view }: HttpContext) {
     response.header('Cache-Control', 'no-store, private')
+    // Login lokal: sudah masuk → langsung ke aplikasi, tidak perlu login lagi.
+    const current = session.get('account')
+    if (
+      isLocalAuth() &&
+      current?.local === true &&
+      /^[A-Za-z0-9_-]{43}$/.test(String(current.sessionToken || '')) &&
+      /^[a-f0-9]{64}$/.test(String(current.sub || ''))
+    )
+      return response.redirect().withQs(false).toPath(appUrl(request) || '/')
     // This endpoint starts a fresh login, including when an old signed cookie remains.
     session.forget('account')
     if (isLocalAuth()) {
