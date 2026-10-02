@@ -719,3 +719,8 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 /* Gambar yang sudah tidak ada (mis. file dibersihkan): tampil kotak polos, bukan ikon rusak. */
 .workspace-ui img.is-missing { color: transparent; font-size: 0; }
 .workspace-ui .wa-toggle-row > span > .wa-note { display: block; margin-top: 2px; font-weight: 400; }
+/* Unggah foto/video: kotak dengan persentase. */
+.workspace-ui .wa-igp-tile.is-uploading { display: grid; place-content: center; justify-items: center; gap: 2px; padding: 6px; box-sizing: border-box; text-align: center; }
+.workspace-ui .wa-igp-upload-label { font-size: 15px; font-variant-numeric: tabular-nums; }
+.workspace-ui .wa-igp-upload-name { max-width: 84px; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.workspace-ui .wa-igp-upload-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--wa-ok); transition: width .2s ease; }

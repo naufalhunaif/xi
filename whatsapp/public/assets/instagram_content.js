@@ -209,7 +209,12 @@
       return tr
     }
     // Data belum lengkap: tampilkan penanda memuat, bukan "tidak ada postingan".
-    if (!rows.length && !(postsLoaded && mediaLoaded)) {
+    // Muat bertahap hanya untuk tab yang isinya postingan profil (Semua, Terbit).
+    // Story datang bersama data pertama; Terjadwal/Gagal dari aplikasi sendiri.
+    const pageable = filter === 'all' || filter === 'published'
+    const needsMedia = pageable || filter === 'story'
+    byId('igpMoreButton').hidden = !pageable || !nextCursor || moreLoading || !mediaLoaded
+    if (!rows.length && !(postsLoaded && (mediaLoaded || !needsMedia))) {
       list.append(loadingRow())
       return
     }
@@ -269,8 +274,7 @@
       })
       list.append(tr)
     }
-    if (!mediaLoaded || moreLoading) list.append(loadingRow())
-    byId('igpMoreButton').hidden = !nextCursor || moreLoading || !mediaLoaded
+    if ((needsMedia && !mediaLoaded) || (pageable && moreLoading)) list.append(loadingRow())
   }
   byId('igpTabs').addEventListener('click', (event) => {
     const button = event.target.closest('button[data-filter]')
@@ -278,6 +282,7 @@
     filter = button.dataset.filter
     byId('igpTabs').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)))
     render()
+    continueMore()
   })
   byId('igpSearch').addEventListener('input', render)
 
@@ -329,7 +334,7 @@
   }
   // Postingan lama dari profil: 24 per halaman, dimuat otomatis saat menggulir ke bawah.
   async function loadMore() {
-    if (!nextCursor || moreLoading || !mediaLoaded) return
+    if (!nextCursor || moreLoading || !mediaLoaded || !['all', 'published'].includes(filter)) return
     moreLoading = true
     render()
     try {
@@ -609,32 +614,104 @@
         tile.append(node, remove)
         if (kind === 'carousel') tile.append(el('span', String(index + 1), 'wa-igp-index'))
         return tile
-      })
+      }),
+      ...pending.map(uploadTile)
     )
-    byId('igpPick').hidden = kind === 'carousel' ? items.length >= 10 : items.length >= 1
+    const used = items.length + pending.length
+    byId('igpPick').hidden = kind === 'carousel' ? used >= 10 : used >= 1
+  }
+
+  /* Unggah dengan persentase: tiap file punya kotak sendiri sampai selesai. */
+  let pending = []
+  let uploadSeq = 0
+  let formSession = 0
+  function uploadTile(job) {
+    const tile = el('div', undefined, 'wa-igp-tile is-uploading')
+    tile.dataset.upload = String(job.id)
+    const bar = el('i', undefined, 'wa-igp-upload-bar')
+    bar.style.width = `${job.percent}%`
+    tile.append(el('strong', uploadLabel(job), 'wa-igp-upload-label'), el('small', job.name, 'wa-igp-upload-name'), bar)
+    tile.setAttribute('role', 'progressbar')
+    tile.setAttribute('aria-valuemin', '0')
+    tile.setAttribute('aria-valuemax', '100')
+    tile.setAttribute('aria-valuenow', String(job.percent))
+    tile.setAttribute('aria-label', job.name)
+    return tile
+  }
+  const uploadLabel = (job) =>
+    job.state === 'queued' ? t('Antre') : job.state === 'processing' ? t('Memproses…') : `${job.percent}%`
+  function updateUploadTile(job) {
+    const tile = byId('igpMedia').querySelector(`[data-upload="${job.id}"]`)
+    if (!tile) return
+    tile.querySelector('.wa-igp-upload-label').textContent = uploadLabel(job)
+    tile.querySelector('.wa-igp-upload-bar').style.width = `${job.percent}%`
+    tile.setAttribute('aria-valuenow', String(job.percent))
+  }
+  const workspaceVersion = document.querySelector('meta[name="whatsapp-workspace"]')?.content || ''
+  function uploadWithProgress(data, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${base}/api/instagram/uploads`)
+      xhr.setRequestHeader('X-CSRF-TOKEN', csrf)
+      xhr.setRequestHeader('Accept', 'application/json')
+      if (workspaceVersion) xhr.setRequestHeader('X-WhatsApp-Workspace', workspaceVersion)
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+      })
+      xhr.upload.addEventListener('load', () => onProgress(100))
+      xhr.addEventListener('load', () => {
+        let result = {}
+        try {
+          result = JSON.parse(xhr.responseText || '{}')
+        } catch {}
+        if (xhr.status >= 200 && xhr.status < 300) resolve(result)
+        else reject(new Error(t(result.error || 'Permintaan gagal.')))
+      })
+      xhr.addEventListener('error', () => reject(new Error(t('Koneksi terputus. Coba lagi.'))))
+      xhr.send(data)
+    })
   }
   form.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-kind]')
     if (button) setKind(button.dataset.kind)
   })
   byId('igpFile').addEventListener('change', async (event) => {
-    const files = [...event.target.files]
+    const room = (kind === 'carousel' ? 10 : 1) - items.length - pending.length
+    const files = [...event.target.files].slice(0, Math.max(0, room))
     event.target.value = ''
-    for (const file of files) {
-      if (kind === 'carousel' ? items.length >= 10 : items.length >= 1) break
-      formNotice(t('Mengunggah {0}…', file.name))
-      uploading++
+    if (!files.length) return
+    formNotice('')
+    // Semua file langsung tampil sebagai kotak (antre), lalu diunggah berurutan agar urutan carousel tetap.
+    const session = formSession
+    const jobs = files.map((file) => ({ id: ++uploadSeq, name: file.name, file, percent: 0, state: 'queued' }))
+    pending.push(...jobs)
+    uploading += jobs.length
+    renderMedia()
+    for (const job of jobs) {
+      if (session !== formSession) {
+        uploading--
+        continue
+      }
+      job.state = 'sending'
+      updateUploadTile(job)
       const data = new FormData()
       data.append('kind', kind)
-      data.append('file', file)
+      data.append('file', job.file)
       try {
-        items.push(await api('/api/instagram/uploads', 'POST', data))
-        renderMedia()
-        formNotice('')
+        const saved = await uploadWithProgress(data, (percent) => {
+          job.percent = percent
+          if (percent >= 100) job.state = 'processing'
+          updateUploadTile(job)
+        })
+        pending = pending.filter((item) => item !== job)
+        if (form.hidden || session !== formSession) continue
+        items.push(saved)
       } catch (error) {
-        formNotice(error.message, true)
+        pending = pending.filter((item) => item !== job)
+        formNotice(`${job.name}: ${error.message}`, true)
       } finally {
         uploading--
+        renderMedia()
       }
     }
   })
@@ -648,6 +725,8 @@
   }
   form.querySelectorAll('input[name="igpWhen"]').forEach((input) => input.addEventListener('change', syncSave))
   function openForm(post) {
+    formSession++
+    pending = []
     editing = post?.id || 0
     items = post ? post.items.map((item) => ({ ...item })) : []
     byId('igpCaption').value = post?.caption || ''

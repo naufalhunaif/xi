@@ -1418,4 +1418,6 @@ window.waLocales.id = {
   "Jadwal lebih dari 1 hari ke depan disimpan di Drive, diambil kembali 2 jam sebelum terbit. Hemat ruang server.": "Jadwal lebih dari 1 hari ke depan disimpan di Drive, diambil kembali 2 jam sebelum terbit. Hemat ruang server.",
   "File sudah kedaluwarsa, unggah ulang fotonya.": "File sudah kedaluwarsa, unggah ulang fotonya.",
   "File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.": "File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.",
+  "Memproses…": "Memproses…",
+  "Koneksi terputus. Coba lagi.": "Koneksi terputus. Coba lagi.",
 }

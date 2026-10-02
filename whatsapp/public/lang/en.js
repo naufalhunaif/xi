@@ -1604,4 +1604,6 @@ window.waLocales.en = {
   "Jadwal lebih dari 1 hari ke depan disimpan di Drive, diambil kembali 2 jam sebelum terbit. Hemat ruang server.": "Posts scheduled more than 1 day ahead are kept in Drive and fetched back 2 hours before publishing. Saves server space.",
   "File sudah kedaluwarsa, unggah ulang fotonya.": "The file has expired, upload the photo again.",
   "File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.": "The media file is no longer on the server. Edit the post and upload the photo again.",
+  "Memproses…": "Processing…",
+  "Koneksi terputus. Coba lagi.": "Connection lost. Try again.",
 }
