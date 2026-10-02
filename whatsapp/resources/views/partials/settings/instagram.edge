@@ -1,0 +1,38 @@
+<div class="wa-card wa-ig-card" id="igCard">
+  <div class="wa-card-head">
+    <div class="wa-card-title">
+      <strong data-i18n="Instagram DM & komentar">Instagram DM & komentar</strong>
+      <small data-i18n="DM masuk inbox yang sama dan dibalas AI. Komentar yang bertanya dijawab lewat DM.">DM masuk inbox yang sama dan dibalas AI. Komentar yang bertanya dijawab lewat DM.</small>
+    </div>
+    <div class="actions"><span id="igState" class="wa-pill"></span></div>
+  </div>
+  <p id="igNotice" class="wa-alert" role="status" aria-live="polite" hidden></p>
+  <div class="wa-form-grid">
+    <label>
+      <span>Instagram App ID</span>
+      <input id="igAppId" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" data-settings-ignore />
+    </label>
+    <label>
+      <span>Instagram App Secret</span>
+      <input id="igAppSecret" type="password" autocomplete="new-password" spellcheck="false" data-settings-ignore />
+    </label>
+  </div>
+  <label class="wa-check">
+    <input id="igComments" type="checkbox" data-settings-ignore />
+    <span data-i18n="Balas komentar yang bertanya lewat DM">Balas komentar yang bertanya lewat DM</span>
+  </label>
+  <div class="actions wa-actions-start">
+    <button id="igSave" type="button" class="button" data-i18n="Simpan">Simpan</button>
+    <a id="igConnect" class="button primary" data-i18n="Hubungkan Instagram">Hubungkan Instagram</a>
+    <button id="igDisconnect" type="button" class="button secondary" hidden data-i18n="Putuskan">Putuskan</button>
+    <small id="igStatus" role="status" aria-live="polite"></small>
+  </div>
+  <details class="wa-ig-setup">
+    <summary data-i18n="Isian untuk Meta (sekali saja)">Isian untuk Meta (sekali saja)</summary>
+    <div class="wa-form-grid">
+      <label><span>Webhook callback URL</span><input id="igWebhookUrl" type="text" readonly data-settings-ignore /></label>
+      <label><span>Verify token</span><input id="igVerifyToken" type="text" readonly data-settings-ignore /></label>
+      <label><span>OAuth redirect URI</span><input id="igRedirectUri" type="text" readonly data-settings-ignore /></label>
+    </div>
+  </details>
+</div>

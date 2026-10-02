@@ -150,7 +150,7 @@ export async function saveRecap(jid: string, recap: ChatRecap) {
     district: (tidy?.district || '').slice(0, 120),
     regency: (tidy?.regency || '').slice(0, 120),
     postal_code: (tidy?.postalCode || '').slice(0, 20),
-    phone: (recap.hp || tidy?.phone || jid.split('@')[0]).replace(/\D/g, '').slice(0, 40),
+    phone: (recap.hp || tidy?.phone || (jid.endsWith('@ig') ? '' : jid.split('@')[0])).replace(/\D/g, '').slice(0, 40),
     items: recap.rincian.slice(0, 4000),
     spec: recap.rincian.slice(0, 4000),
     shipping_service: recap.layanan.slice(0, 40),

@@ -323,7 +323,7 @@
                 <strong id="roomName">
                   {{
                     selectedContact
-                      ? selectedContact.contact_name || (selectedJid.endsWith('@lid') ? 'Tanpa nama' : '+' + selectedJid.split('@')[0])
+                      ? selectedContact.contact_name || (selectedJid.endsWith('@ig') ? 'Instagram' : selectedJid.endsWith('@lid') ? 'Tanpa nama' : '+' + selectedJid.split('@')[0])
                       : 'Chat'
                   }}
                 </strong>
@@ -650,6 +650,7 @@
                 <span class="wa-settings-group" data-i18n="Aplikasi">Aplikasi</span>
                 <a href="#general" data-settings-menu="general" data-i18n="Umum">Umum</a>
                 <a href="#numbers" data-settings-menu="numbers" data-i18n="Nomor WhatsApp">Nomor WhatsApp</a>
+                <a href="#instagram" data-settings-menu="instagram">Instagram</a>
               </div>
               <div class="wa-settings-block">
                 <span class="wa-settings-group">AI</span>
@@ -750,6 +751,10 @@
                     <div class="wa-kv" id="linesList"></div>
                     <small id="linesStatus" role="status" aria-live="polite"></small>
                   </div>
+                </section>
+                <section id="settings-instagram" data-settings-panel="instagram" aria-labelledby="settings-title-instagram" hidden>
+                  <h2 id="settings-title-instagram">Instagram</h2>
+                  @include('partials/settings/instagram')
                 </section>
                 <section id="settings-weights" data-settings-panel="weights" aria-labelledby="settings-title-weights" hidden>
                   <h2 id="settings-title-weights" data-i18n="Berat & ongkir">Berat & ongkir</h2>

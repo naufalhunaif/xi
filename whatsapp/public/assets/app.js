@@ -552,7 +552,7 @@
   const contacts = byId('contacts')
   // ID internal WhatsApp (@lid) bukan nomor HP; jangan ditampilkan seolah nomor.
   const fallbackName = (jid) =>
-    String(jid).endsWith('@lid') ? t('Tanpa nama') : `+${String(jid).split('@')[0]}`
+    String(jid).endsWith('@ig') ? 'Instagram' : String(jid).endsWith('@lid') ? t('Tanpa nama') : `+${String(jid).split('@')[0]}`
   const inboxKeys = ['all', 'unanswered', 'cs', 'payment', 'order', 'done']
   // Pencarian kotak masuk: nama, nomor, pratinjau (langsung) + isi chat (server).
   const normalizeSearch = (value) =>
@@ -763,6 +763,13 @@
       content.className = 'wa-contact-content'
       const title = document.createElement('strong')
       title.textContent = name
+      if (String(contact.jid).endsWith('@ig')) {
+        const ig = document.createElement('span')
+        ig.className = 'wa-line-chip wa-ig-chip'
+        ig.title = 'Instagram'
+        ig.textContent = 'IG'
+        title.append(ig)
+      }
       if (contact.line_label) {
         const chip = document.createElement('span')
         chip.className = 'wa-line-chip'

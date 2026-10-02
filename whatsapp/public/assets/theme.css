@@ -476,3 +476,13 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 /* Jam pada bubble chat: kecil di kanan bawah, sebelum centang. */
 .workspace-ui .message-time { margin-left: auto; color: var(--muted, #8a8a86); font-size: 10px; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .workspace-ui .message-time + .message-status { margin-left: 4px; }
+
+/* Instagram: penanda room IG di daftar chat + kartu pengaturan. */
+.workspace-ui .wa-ig-chip { background: linear-gradient(135deg, #f58529, #dd2a7b 55%, #8134af); color: #fff; border-color: transparent; }
+.workspace-ui .wa-ig-card .wa-check { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; font-size: 13px; }
+.workspace-ui .wa-ig-card .wa-check input { width: auto; margin: 0; }
+.workspace-ui .wa-ig-card .button.disabled { opacity: .5; }
+.workspace-ui .wa-ig-setup { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.workspace-ui .wa-ig-setup summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.workspace-ui .wa-ig-setup input[readonly] { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.workspace-ui #igNotice.wa-note { font-size: 12px; margin: 2px 0 0; }

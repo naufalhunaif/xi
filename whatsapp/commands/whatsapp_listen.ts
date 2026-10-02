@@ -174,6 +174,7 @@ import { paymentDataSignature } from '#services/payment_context_service'
 import { resumeAiAfterHumanReply } from '#services/message_service'
 import { csOutgoingPayload, csMediaPath } from '#services/cs_media_service'
 import { markRoomRead } from '#services/contact_inbox_service'
+import { instagramTick, instagramNudge } from '#services/instagram_worker'
 import { isInternalOnlyQuestion } from '#services/customer_scope_service'
 import { readIncomingThrough, flushWorkspaceReads } from '#services/incoming_read_service'
 import {
@@ -235,6 +236,7 @@ const LEAN_SYNC_INTERVAL_MS = 30 * 60_000
 
 export default class WhatsappListen extends BaseCommand {
   private sessionScope?: WorkspaceScope
+  private igTimer?: ReturnType<typeof setInterval>
   private tasks = new Set<Promise<unknown>>()
   private track<T>(work: () => Promise<T>): Promise<T> {
     const task = work()
@@ -332,6 +334,7 @@ export default class WhatsappListen extends BaseCommand {
       if (this.mediaRetryTimer) clearInterval(this.mediaRetryTimer)
       if (this.leanSyncTimer) clearInterval(this.leanSyncTimer)
       if (this.recapTimer) clearInterval(this.recapTimer)
+      if (this.igTimer) clearInterval(this.igTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
       this.pendingTurns.clear()
       for (const child of this.lineChildren.values()) child.kill('SIGTERM')
@@ -1952,6 +1955,8 @@ export default class WhatsappListen extends BaseCommand {
       .from('whatsapp_messages')
       .where('direction', 'out')
       .where('status', 'queued')
+      // Room Instagram dikirim worker Instagram (Graph API), bukan lewat WhatsApp.
+      .whereRaw("jid NOT LIKE '%@ig'")
       // Tiap nomor hanya mengirim antrean miliknya (NULL = nomor utama).
       .where((query) => {
         if (line > 1) query.where('line_id', line)
@@ -2603,6 +2608,16 @@ export default class WhatsappListen extends BaseCommand {
       imageIds?: string[]
     }
   ) {
+    // Room Instagram (mis. coba ulang analisis): dikerjakan worker Instagram, bukan soket WhatsApp.
+    if (jid.endsWith('@ig')) {
+      await db.rawQuery(
+        `INSERT INTO whatsapp_ig_turns (jid, anchor_message_id, due_at, updated_at)
+         SELECT ?, message_id, NOW(), NOW() FROM whatsapp_messages WHERE jid = ? AND direction = 'in' ORDER BY id DESC LIMIT 1
+         ON DUPLICATE KEY UPDATE due_at = NOW(), updated_at = NOW()`,
+        [jid, jid]
+      ).catch(() => {})
+      return
+    }
     let trace: Awaited<ReturnType<typeof startTrace>> | undefined
     const canSend = async () =>
       (await isCurrentGoalRun(run)) &&
@@ -2825,6 +2840,7 @@ export default class WhatsappListen extends BaseCommand {
            LEFT JOIN whatsapp_contacts c ON c.jid = t.jid
            LEFT JOIN whatsapp_chat_goals g ON g.jid = t.jid
           WHERE t.direction = 'in'
+            AND t.jid NOT LIKE '%@ig'
             AND GREATEST(COALESCE(c.line_id, 1), 1) = ?
             AND COALESCE(c.handling_mode, 'ai') <> 'cs'
             AND COALESCE(c.ai_excluded, 0) = 0
@@ -4070,6 +4086,7 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
   }
 
   private async runBeta3Nudge(jid: string, socket: WASocket) {
+    if (jid.endsWith('@ig')) return instagramNudge(jid).catch(() => {})
     const nudge = await beta3.claimLeanNudge(jid)
     if (!nudge) return
     const canSend = async () =>
@@ -4208,6 +4225,14 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
   }
 
   private ensureWorkspaceTimers() {
+    if (!this.igTimer && this.primary) {
+      // Instagram (DM & komentar): berjalan terlepas dari koneksi nomor WhatsApp.
+      this.igTimer = setInterval(() => {
+        const scope = this.timerScope()
+        if (!scope) return
+        void inWorkspace(scope, () => instagramTick()).catch(() => {})
+      }, 4000)
+    }
     if (!this.recapTimer && this.primary) {
       // Beta 3: rekap order dari chat CS manusia (tombol di halaman Order), satu chat
       // per menit, tanpa pesan ke pelanggan. Hanya berjalan setelah tombol ditekan.

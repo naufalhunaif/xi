@@ -15,6 +15,7 @@ const Beta3Controller = () => import('#controllers/beta3_controller')
 const LinesController = () => import('#controllers/lines_controller')
 const AiAccountsController = () => import('#controllers/ai_accounts_controller')
 const BackupController = () => import('#controllers/backup_controller')
+const InstagramController = () => import('#controllers/instagram_controller')
 
 router.get('/login', [AccountController, 'login']).as('account.login')
 // Halaman publik untuk Google (Branding): kebijakan privasi & syarat layanan.
@@ -28,6 +29,9 @@ router
     return response.send(`google-site-verification: ${params.file}`)
   })
   .where('file', /^google[a-z0-9]{8,40}\.html$/)
+// Webhook Instagram (DM & komentar): publik, diverifikasi dengan tanda tangan Meta.
+router.get('/webhooks/instagram', [InstagramController, 'verify'])
+router.post('/webhooks/instagram', [InstagramController, 'receive'])
 router.post('/login', [AccountController, 'loginPost'])
 router.get('/setup', [AccountController, 'setup']).as('account.setup')
 router.post('/setup', [AccountController, 'setupPost'])
@@ -190,6 +194,11 @@ router
     router
       .get('/oauth/mcp/callback/:loginId/:callbackId', [DashboardController, 'mcpOauthCallback'])
       .as('mcp.callback.withId')
+    router.get('/api/instagram', [InstagramController, 'status'])
+    router.post('/api/instagram', [InstagramController, 'save'])
+    router.post('/api/instagram/disconnect', [InstagramController, 'disconnect'])
+    router.get('/instagram/connect', [InstagramController, 'connect'])
+    router.get('/instagram/callback', [InstagramController, 'callback'])
     router.post('/api/settings/mcp', [DashboardController, 'mcpCreate'])
     router.delete('/api/settings/mcp/:slug', [DashboardController, 'mcpDelete'])
   })

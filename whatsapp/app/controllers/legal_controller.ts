@@ -35,10 +35,13 @@ export default class LegalController {
 <li>Chat dipakai internal oleh pemilik dan tim toko.</li>
 <li>Google Drive hanya dipakai untuk menyimpan &amp; memulihkan file backup buatan aplikasi ini (izin drive.file). File lain tidak dibaca.</li>
 <li>Email akun Google hanya untuk menampilkan akun yang terhubung.</li>
+<li>Instagram: aplikasi membaca DM dan komentar di akun Instagram toko yang dihubungkan, lalu membalasnya atas nama toko. Data yang disimpan: isi pesan/komentar, nama dan username pengirim, serta foto yang dikirim.</li>
 <li>Data tidak dijual, tidak dibagikan, dan tidak dipakai untuk iklan.</li>
-<li>Akses bisa dicabut kapan saja di Pengaturan → Backup atau myaccount.google.com/permissions.</li>
+<li>Akses bisa dicabut kapan saja di Pengaturan → Backup atau myaccount.google.com/permissions. Akses Instagram dicabut lewat Pengaturan → Instagram → Putuskan, atau di pengaturan Instagram (Aplikasi dan situs web).</li>
 </ul>
-<small>Diperbarui 27 September 2026</small>`
+<h2 id="hapus-data">Penghapusan data</h2>
+<p>Untuk menghapus data percakapan Anda, kirim pesan "hapus data saya" lewat DM Instagram atau WhatsApp toko. Data dihapus paling lambat 30 hari.</p>
+<small>Diperbarui 2 Oktober 2026</small>`
       )
     )
   }
