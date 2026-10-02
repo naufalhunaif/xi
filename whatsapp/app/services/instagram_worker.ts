@@ -21,6 +21,7 @@ import {
   type IgConfig,
 } from '#services/instagram_store'
 import * as ig from '#services/instagram_api'
+import { saveRemoteImage } from '#services/instagram_inbox'
 
 /**
  * Worker Instagram (dipanggil berkala oleh worker WhatsApp, terlepas dari koneksi nomor):
@@ -327,8 +328,36 @@ export function isQuestionComment(text: string) {
 
 type CommentTurn = { id: string; publicReply: boolean; sent?: string; publicSent?: string; handoff?: boolean }
 
-/** Room DM pengomentar + pesan masuk "[Komentar di postingan …]" sebagai konteks chat. */
-export async function ensureCommentRoom(config: IgConfig, row: any) {
+/** Isi postingan yang dikomentari (caption, tautan, foto) — sekali per postingan. */
+export async function ensurePostInfo(config: IgConfig, row: any) {
+  if (Number(row.media_checked || 0) || !row.media_id) return row
+  const mediaId = String(row.media_id)
+  const known = await db
+    .from('whatsapp_ig_comments')
+    .where('media_id', mediaId)
+    .where('media_checked', 1)
+    .first()
+  let info = known
+    ? { caption: known.media_caption || '', permalink: known.permalink || '', image: known.media_image || '' }
+    : null
+  if (!info) {
+    const fetched = await ig.mediaInfo(config.token, mediaId)
+    const image = fetched.image ? await saveRemoteImage(`igp-${mediaId}`, fetched.image).catch(() => '') : ''
+    info = { caption: fetched.caption, permalink: fetched.permalink, image }
+  }
+  const update = {
+    media_caption: info.caption || null,
+    permalink: info.permalink || null,
+    media_image: info.image || null,
+    media_checked: 1,
+  }
+  await db.from('whatsapp_ig_comments').where('comment_id', row.comment_id).update(update)
+  return { ...row, ...update }
+}
+
+/** Room DM pengomentar + pesan masuk "[Komentar di postingan …]" (dengan foto postingan) sebagai konteks. */
+export async function ensureCommentRoom(config: IgConfig, source: any) {
+  const row = await ensurePostInfo(config, source)
   const jid = igJid(String(row.from_id))
   const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
   if (!contact)
@@ -338,15 +367,7 @@ export async function ensureCommentRoom(config: IgConfig, row: any) {
       handling_mode: 'ai',
       updated_at: new Date(),
     })
-  let caption = String(row.media_caption || '')
-  if (!caption && !row.permalink && row.media_id) {
-    const info = await ig.mediaInfo(config.token, String(row.media_id))
-    caption = info.caption
-    await db
-      .from('whatsapp_ig_comments')
-      .where('comment_id', row.comment_id)
-      .update({ media_caption: info.caption || null, permalink: info.permalink || null })
-  }
+  const caption = String(row.media_caption || '').replace(/\s+/g, ' ').trim()
   const anchor = `igc-${row.comment_id}`
   if (!(await db.from('whatsapp_messages').where('message_id', anchor).first()))
     await db.table('whatsapp_messages').insert({
@@ -355,7 +376,11 @@ export async function ensureCommentRoom(config: IgConfig, row: any) {
       contact_name: row.username ? `@${row.username}` : null,
       direction: 'in',
       sender_type: 'customer',
-      body: `[Komentar di postingan${caption ? `: "${caption.replace(/\s+/g, ' ').slice(0, 120)}"` : ''}] ${row.body}`,
+      body: `[Komentar di postingan Instagram${caption ? `: "${caption.slice(0, 300)}"` : ''}${row.media_image ? '; foto postingan terlampir' : ''}] ${row.body}`,
+      media_type: row.media_image ? 'image' : null,
+      media_url: row.media_image || null,
+      thumbnail_url: row.media_image || null,
+      media_status: row.media_image ? 'ready' : null,
       status: 'received',
       created_at: new Date(row.created_at),
     })
@@ -375,6 +400,7 @@ async function runComments(config: IgConfig) {
         .from('whatsapp_ig_comments')
         .where('comment_id', row.comment_id)
         .update({ status, processed_at: new Date(), force_ai: 0, ...extra })
+    await ensurePostInfo(config, row).catch(() => {})
     const forced = Boolean(Number(row.force_ai || 0))
     if (!config.comments && !forced) {
       await done('skipped')

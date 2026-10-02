@@ -505,3 +505,5 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 .workspace-ui .wa-inbox-channels button { border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .workspace-ui .wa-inbox-channels button[aria-pressed='true'] { background: #29946a20; color: var(--wa-ok, #1f7a55); font-weight: 600; }
 .workspace-ui .wa-inbox-channels button:hover { background: #88888820; }
+.workspace-ui .wa-igc-post { align-items: center; }
+.workspace-ui .wa-igc-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; flex: none; }

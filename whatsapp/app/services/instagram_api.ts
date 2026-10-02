@@ -167,12 +167,15 @@ export async function replyComment(token: string, commentId: string, text: strin
 
 export async function mediaInfo(token: string, mediaId: string) {
   try {
-    const data = await call(`${IG_GRAPH}/${encodeURIComponent(mediaId)}?fields=caption,permalink`, {
-      headers: bearer(token),
-    })
-    return { caption: String(data.caption || ''), permalink: String(data.permalink || '') }
+    const data = await call(
+      `${IG_GRAPH}/${encodeURIComponent(mediaId)}?fields=caption,permalink,media_type,media_url,thumbnail_url`,
+      { headers: bearer(token) }
+    )
+    // Video/reels: pakai gambar sampul.
+    const image = String(data.media_type === 'VIDEO' ? data.thumbnail_url || '' : data.media_url || data.thumbnail_url || '')
+    return { caption: String(data.caption || ''), permalink: String(data.permalink || ''), image }
   } catch {
-    return { caption: '', permalink: '' }
+    return { caption: '', permalink: '', image: '' }
   }
 }
 

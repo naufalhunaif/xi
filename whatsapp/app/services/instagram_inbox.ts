@@ -154,19 +154,24 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
 }
 
 /** Gambar CDN Instagram kedaluwarsa: disalin ke media aplikasi seperti WhatsApp. */
+/** Unduh gambar Instagram ke public/media; kembalikan path lokal. */
+export async function saveRemoteImage(name: string, url: string) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(20_000) })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const bytes = Buffer.from(await response.arrayBuffer())
+  if (bytes.byteLength > 25 * 1024 * 1024) throw new Error('Media terlalu besar')
+  const type = String(response.headers.get('content-type') || '')
+  const extension = type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : 'jpg'
+  const directory = app.makePath('public', 'media')
+  await mkdir(directory, { recursive: true })
+  const filename = workspaceFileName(`${name.replace(/[^a-z0-9_-]/gi, '').slice(-60)}.${extension}`)
+  await writeFile(app.makePath('public', 'media', filename), bytes, { mode: 0o644 })
+  return `${env.get('APP_BASE_PATH') || ''}/media/${filename}`
+}
+
 export async function downloadImage(messageId: string, url: string) {
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(20_000) })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const bytes = Buffer.from(await response.arrayBuffer())
-    if (bytes.byteLength > 25 * 1024 * 1024) throw new Error('Media terlalu besar')
-    const type = String(response.headers.get('content-type') || '')
-    const extension = type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : 'jpg'
-    const directory = app.makePath('public', 'media')
-    await mkdir(directory, { recursive: true })
-    const filename = workspaceFileName(`ig-${messageId.replace(/[^a-z0-9_-]/gi, '').slice(-60)}.${extension}`)
-    await writeFile(app.makePath('public', 'media', filename), bytes, { mode: 0o644 })
-    const local = `${env.get('APP_BASE_PATH') || ''}/media/${filename}`
+    const local = await saveRemoteImage(`ig-${messageId}`, url)
     await db
       .from('whatsapp_messages')
       .where('message_id', messageId)

@@ -123,6 +123,8 @@ export async function ensureIgTables() {
     'permalink VARCHAR(500) NULL',
     'public_reply TEXT NULL',
     'force_ai TINYINT(1) NOT NULL DEFAULT 0',
+    'media_image VARCHAR(500) NULL',
+    'media_checked TINYINT(1) NOT NULL DEFAULT 0',
   ])
     await db.rawQuery(`ALTER TABLE whatsapp_ig_comments ADD COLUMN IF NOT EXISTS ${column}`)
   ready.add(key)

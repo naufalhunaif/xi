@@ -76,8 +76,15 @@
     head.append(el('span', label, `wa-pill ${tone}`))
     node.append(head)
 
-    if (item.caption || item.permalink) {
+    if (item.caption || item.permalink || item.image) {
       const post = el('div', undefined, 'wa-igc-post')
+      if (item.image) {
+        const thumb = el('img', undefined, 'wa-igc-thumb')
+        thumb.src = item.image
+        thumb.alt = ''
+        thumb.loading = 'lazy'
+        post.append(thumb)
+      }
       post.append(el('span', item.caption ? `Postingan: ${item.caption.replace(/\s+/g, ' ').slice(0, 90)}` : 'Postingan'))
       if (item.permalink) {
         const link = el('a', 'Lihat postingan')
