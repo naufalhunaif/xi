@@ -40,7 +40,7 @@
     byId('igDisconnect').hidden = !state.connected
     const notice = byId('igNotice')
     const parts = []
-    if (state.lastError) parts.push(`⚠ ${state.lastError}`)
+    if (state.lastError) parts.push(`⚠ ${t(state.lastError)}`)
     if (state.connected) parts.push(state.lastWebhookAt ? t('Pesan terakhir diterima {0}', when(state.lastWebhookAt)) : t('Belum ada DM/komentar yang diterima.'))
     notice.textContent = parts.join(' · ')
     notice.hidden = !parts.length
@@ -101,4 +101,5 @@
   })
   observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['hidden'] })
   if (visible()) load()
+  document.addEventListener('ui-language:change', () => loaded && load())
 })()

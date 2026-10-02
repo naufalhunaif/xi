@@ -1,16 +1,16 @@
 <section id="igCommentsPage" class="wa-orders-page wa-igc-page">
   <div class="wa-orders-title">
-    <h1>Komentar Instagram</h1>
-    <div class="wa-orders-title-actions"><span id="igcAccount" class="wa-muted"></span><button id="igcRefresh" class="button" type="button">Perbarui</button></div>
+    <h1 data-i18n="Komentar Instagram">Komentar Instagram</h1>
+    <div class="wa-orders-title-actions"><span id="igcAccount" class="wa-muted"></span><button id="igcRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button></div>
   </div>
   <div class="wa-lean-toolbar">
-    <div id="igcTabs" class="wa-order-tabs" role="group" aria-label="Filter komentar">
-      <button type="button" data-status="all" aria-pressed="true">Semua <b class="wa-tab-count" data-count="all"></b></button>
-      <button type="button" data-status="open" aria-pressed="false">Perlu dibalas <b class="wa-tab-count" data-count="open"></b></button>
-      <button type="button" data-status="replied" aria-pressed="false">Sudah dibalas <b class="wa-tab-count" data-count="replied"></b></button>
-      <button type="button" data-status="ignored" aria-pressed="false">Bukan pertanyaan <b class="wa-tab-count" data-count="ignored"></b></button>
+    <div id="igcTabs" class="wa-order-tabs" role="group" aria-label="Filter komentar" data-i18n-aria-label="Filter komentar">
+      <button type="button" data-status="all" aria-pressed="true"><span data-i18n="Semua">Semua</span> <b class="wa-tab-count" data-count="all"></b></button>
+      <button type="button" data-status="open" aria-pressed="false"><span data-i18n="Perlu dibalas">Perlu dibalas</span> <b class="wa-tab-count" data-count="open"></b></button>
+      <button type="button" data-status="replied" aria-pressed="false"><span data-i18n="Sudah dibalas">Sudah dibalas</span> <b class="wa-tab-count" data-count="replied"></b></button>
+      <button type="button" data-status="ignored" aria-pressed="false"><span data-i18n="Bukan pertanyaan">Bukan pertanyaan</span> <b class="wa-tab-count" data-count="ignored"></b></button>
     </div>
-    <div class="wa-order-filters"><input id="igcSearch" type="search" placeholder="Cari komentar / username" aria-label="Cari komentar"></div>
+    <div class="wa-order-filters"><input id="igcSearch" type="search" placeholder="Cari komentar / username" data-i18n-placeholder="Cari komentar / username" aria-label="Cari komentar" data-i18n-aria-label="Cari komentar"></div>
   </div>
   <p id="igcNotice" role="status" aria-live="polite"></p>
   <div id="igcList" class="wa-igc-list"></div>

@@ -2,6 +2,8 @@
   const base = (document.querySelector('meta[name="app-url"]')?.content || '').replace(/\/$/, '')
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || ''
   const byId = (id) => document.getElementById(id)
+  const t = (value, ...args) =>
+    window.waI18n?.t(value, ...args) ?? value.replace(/\{(\d+)\}/g, (match, index) => args[index] ?? match)
   async function api(path, method = 'GET', body) {
     const response = await fetch(base + path, {
       method,
@@ -10,9 +12,9 @@
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
-    if (response.redirected) throw new Error('Sesi berakhir. Muat ulang halaman.')
+    if (response.redirected) throw new Error(t('Sesi berakhir. Muat ulang halaman.'))
     const result = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(result.error || 'Permintaan gagal.')
+    if (!response.ok) throw new Error(t(result.error || 'Permintaan gagal.'))
     return result
   }
 
@@ -43,7 +45,7 @@
   }
   const when = (value) =>
     value
-      ? new Intl.DateTimeFormat('id-ID', {
+      ? new Intl.DateTimeFormat(window.waI18n?.locale || 'id-ID', {
           timeZone: 'Asia/Jakarta',
           day: '2-digit',
           month: 'short',
@@ -52,15 +54,15 @@
           hour12: true,
         }).format(new Date(value))
       : ''
-  const STATUS = {
-    pending: ['Diproses AI', 'warn'],
-    processing: ['Diproses AI', 'warn'],
-    replied: ['Dibalas lewat DM', 'ok'],
-    cs: ['Perlu CS', 'err'],
-    skipped: ['Belum dibalas', 'warn'],
-    failed: ['Gagal', 'err'],
-    ignored: ['Bukan pertanyaan', ''],
-  }
+  const STATUS = () => ({
+    pending: [t('Diproses AI'), 'warn'],
+    processing: [t('Diproses AI'), 'warn'],
+    replied: [t('Dibalas lewat DM'), 'ok'],
+    cs: [t('Perlu CS'), 'err'],
+    skipped: [t('Belum dibalas'), 'warn'],
+    failed: [t('Gagal'), 'err'],
+    ignored: [t('Bukan pertanyaan'), ''],
+  })
   let status = 'all'
   let seq = 0
   const notice = (message, error = false) => {
@@ -72,7 +74,7 @@
     const node = el('article', undefined, 'wa-igc-card')
     const head = el('header', undefined, 'wa-igc-head')
     head.append(el('strong', item.username ? `@${item.username}` : 'Instagram'), el('span', when(item.createdAt), 'wa-muted'))
-    const [label, tone] = STATUS[item.status] || [item.status, '']
+    const [label, tone] = STATUS()[item.status] || [item.status, '']
     head.append(el('span', label, `wa-pill ${tone}`))
     node.append(head)
 
@@ -81,19 +83,19 @@
       if (item.image) {
         const thumb = el('img', undefined, 'wa-igc-thumb')
         thumb.src = item.image
-        thumb.alt = 'Foto postingan'
+        thumb.alt = t('Foto postingan')
         thumb.loading = 'lazy'
         const open = el('a', undefined, 'wa-igc-thumb-link')
         open.href = item.image
         open.target = '_blank'
         open.rel = 'noopener'
-        open.title = 'Lihat foto postingan'
+        open.title = t('Lihat foto postingan')
         open.append(thumb)
         post.append(open)
       }
-      post.append(el('span', item.caption ? `Postingan: ${item.caption.replace(/\s+/g, ' ').slice(0, 90)}` : 'Postingan'))
+      post.append(el('span', item.caption ? t('Postingan: {0}', item.caption.replace(/\s+/g, ' ').slice(0, 90)) : t('Postingan')))
       if (item.permalink) {
-        const link = el('a', 'Lihat postingan')
+        const link = el('a', t('Lihat postingan'))
         link.href = item.permalink
         link.target = '_blank'
         link.rel = 'noopener'
@@ -102,13 +104,13 @@
       node.append(post)
     }
     node.append(el('p', item.body, 'wa-igc-body'))
-    if (item.reply) node.append(el('p', `DM: ${item.reply}`, 'wa-igc-reply'))
-    if (item.publicReply) node.append(el('p', `Balasan di komentar: ${item.publicReply}`, 'wa-igc-reply'))
+    if (item.reply) node.append(el('p', t('DM: {0}', item.reply), 'wa-igc-reply'))
+    if (item.publicReply) node.append(el('p', t('Balasan di komentar: {0}', item.publicReply), 'wa-igc-reply'))
     if (item.error && item.status === 'failed') node.append(el('p', item.error, 'wa-igc-error'))
 
     const actions = el('div', undefined, 'wa-igc-actions')
     if (item.status === 'replied' || item.status === 'cs') {
-      const open = el('a', 'Buka chat', 'button')
+      const open = el('a', t('Buka chat'), 'button')
       open.href = `${base}/?jid=${encodeURIComponent(item.jid)}`
       actions.append(open)
     }
@@ -116,14 +118,14 @@
     form.hidden = true
     const input = el('textarea')
     input.rows = 2
-    input.placeholder = 'Tulis balasan…'
+    input.placeholder = t('Tulis balasan…')
     const send = (via) => async () => {
       const text = input.value.trim()
       if (!text) return input.focus()
       form.querySelectorAll('button').forEach((b) => (b.disabled = true))
       try {
         await api(`/api/instagram/comments/${encodeURIComponent(item.id)}/reply`, 'POST', { text, via })
-        notice(via === 'dm' ? 'Balasan DM terkirim.' : 'Balasan di komentar terkirim.')
+        notice(via === 'dm' ? t('Balasan DM terkirim.') : t('Balasan di komentar terkirim.'))
         load()
       } catch (error) {
         notice(error.message, true)
@@ -132,18 +134,18 @@
     }
     const row = el('div', undefined, 'wa-igc-form-actions')
     if (item.canDm) {
-      const dm = el('button', 'Kirim DM', 'button primary')
+      const dm = el('button', t('Kirim DM'), 'button primary')
       dm.type = 'button'
       dm.addEventListener('click', send('dm'))
       row.append(dm)
     }
-    const pub = el('button', 'Balas di komentar', 'button')
+    const pub = el('button', t('Balas di komentar'), 'button')
     pub.type = 'button'
     pub.addEventListener('click', send('public'))
     row.append(pub)
     form.append(input, row)
 
-    const reply = el('button', 'Balas', 'button')
+    const reply = el('button', t('Balas'), 'button')
     reply.type = 'button'
     reply.addEventListener('click', () => {
       form.hidden = !form.hidden
@@ -151,13 +153,13 @@
     })
     actions.append(reply)
     if (item.canDm && !['pending', 'processing'].includes(item.status)) {
-      const ai = el('button', 'Balas pakai AI', 'button')
+      const ai = el('button', t('Balas pakai AI'), 'button')
       ai.type = 'button'
       ai.addEventListener('click', async () => {
         ai.disabled = true
         try {
           await api(`/api/instagram/comments/${encodeURIComponent(item.id)}/ai`, 'POST', {})
-          notice('AI sedang membalas lewat DM…')
+          notice(t('AI sedang membalas lewat DM…'))
           load()
         } catch (error) {
           notice(error.message, true)
@@ -183,7 +185,7 @@
       const snapshot = JSON.stringify(data)
       if (auto && (snapshot === lastData || busy())) return
       lastData = snapshot
-      byId('igcAccount').textContent = data.connected ? `@${data.username}` : 'Instagram belum terhubung'
+      byId('igcAccount').textContent = data.connected ? `@${data.username}` : t('Instagram belum terhubung')
       for (const [key, value] of Object.entries(data.counts || {})) {
         const slot = root.querySelector(`[data-count="${key}"]`)
         if (slot) slot.textContent = value ? String(value) : ''
@@ -191,7 +193,7 @@
       const list = byId('igcList')
       list.replaceChildren(...data.comments.map(card))
       if (!data.comments.length)
-        list.append(el('p', data.connected ? 'Belum ada komentar.' : 'Hubungkan Instagram di Pengaturan → Instagram.', 'wa-muted'))
+        list.append(el('p', data.connected ? t('Belum ada komentar.') : t('Hubungkan Instagram di Pengaturan → Instagram.'), 'wa-muted'))
       badge()
     } catch (error) {
       if (mine === seq) notice(error.message, true)
@@ -212,6 +214,10 @@
   })
   byId('igcRefresh').addEventListener('click', () => {
     notice('')
+    load()
+  })
+  document.addEventListener('ui-language:change', () => {
+    lastData = ''
     load()
   })
   load()
