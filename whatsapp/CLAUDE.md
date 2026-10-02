@@ -42,6 +42,7 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 - Aturan gaya & alur ada di `skills-beta3/beta3-cs-inti/SKILL.md`. Ubah aturan di sana, bukan di kode, kecuali butuh logika.
 - Kalimat yang sudah ditetapkan pemilik dipakai **persis** (mis. "Oke bos, paling nanti kami sesuaikan dengan tinggi dan berat badan ya, biar pas").
 - Perubahan perilaku AI: tunjukkan contoh sebelum/sesudah; kalau pemilik bilang salah, kembalikan seperti semula.
+- Contoh chat CS dari pemilik untuk pembelajaran: **catat dulu** di `docs/cs-pelajaran.md`, jangan langsung ubah skill. Skill diubah sekaligus hanya bila pemilik meminta.
 
 ## Aturan UI
 
