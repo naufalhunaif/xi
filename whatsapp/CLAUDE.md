@@ -22,7 +22,7 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 | `public/assets/` | CSS/JS halaman. Tambahan tema & komponen baru masuk `theme.css`. |
 | `public/lang/en.js`, `id.js` | Kamus bahasa antarmuka (kunci = teks Indonesia). |
 | `start/routes.ts` | Rute publik di atas (webhook, `/ig-media`), rute login di dalam grup `accountAuth`. |
-| `docs/` | Catatan desain fitur. Tambahkan dokumen di sini untuk fitur besar baru. |
+| `docs/` | Catatan desain fitur. Tambahkan dokumen di sini untuk fitur besar baru. `docs/roadmap.md` = PR ke depan (jangan dikerjakan tanpa persetujuan pemilik). |
 | Beta 1/2 (`lean_*`, `orders_lean`, dll.) | Tidak dikembangkan lagi. Jangan menambah fitur di sana. |
 
 ## Konsep penting

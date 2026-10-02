@@ -63,6 +63,16 @@
     shares: t('Bagikan'),
     replies: t('Balasan'),
     ig_reels_avg_watch_time: t('Rata² tonton'),
+    navigation: t('Navigasi'),
+    total_interactions: t('Total interaksi'),
+    profile_activity: t('Aktivitas profil'),
+    profile_visits: t('Kunjungan profil'),
+    pa_bio_link_clicked: t('Klik link eksternal'),
+    pa_direction: t('Klik alamat bisnis'),
+    pa_call: t('Klik telepon'),
+    pa_email: t('Klik email'),
+    pa_text: t('Klik pesan'),
+    follows: t('Pengikut baru'),
   })
   const seconds = (ms) => `${(Number(ms || 0) / 1000).toFixed(1)}s`
 
@@ -493,23 +503,43 @@
       box.append(caption)
     }
     if (row.stats) {
-      const perf = section(t('Performa'))
-      const keys =
-        row.kind === 'story'
-          ? ['reach', 'views', 'replies', 'shares']
-          : row.kind === 'reels'
-            ? ['views', 'reach', 'likes', 'comments', 'shares', 'saved', 'ig_reels_avg_watch_time']
-            : ['reach', 'views', 'likes', 'comments', 'saved', 'shares']
-      const list = el('dl', undefined, 'wa-b3-fields wa-igp-metrics')
-      for (const key of keys) {
-        if (row.stats[key] === undefined || row.stats[key] === null) continue
-        const item = el('div')
-        item.append(el('dt', METRIC()[key]), el('dd', key === 'ig_reels_avg_watch_time' ? seconds(row.stats[key]) : num(row.stats[key])))
-        list.append(item)
+      // Dikelompokkan seperti halaman insights Instagram: Tayangan · Interaksi · Profil.
+      const st = row.stats
+      const has = (key) => st[key] !== undefined && st[key] !== null
+      const groups = [
+        [t('Tayangan'), ['views', 'reach', 'ig_reels_avg_watch_time', 'navigation']],
+        [t('Interaksi'), ['total_interactions', 'likes', 'comments', 'saved', 'shares', 'replies']],
+        [
+          t('Profil'),
+          has('profile_activity')
+            ? ['profile_activity', 'profile_visits', 'pa_bio_link_clicked', 'pa_direction', 'pa_call', 'pa_email', 'pa_text', 'follows']
+            : ['profile_visits', 'follows'],
+        ],
+      ]
+      // Rincian aktivitas profil yang tidak muncul berarti 0 (seperti di Instagram), khusus link & alamat.
+      const value = (key) =>
+        has(key) ? st[key] : ['pa_bio_link_clicked', 'pa_direction'].includes(key) && has('profile_activity') ? 0 : undefined
+      let any = false
+      for (const [title, keys] of groups) {
+        const list = el('dl', undefined, 'wa-b3-fields wa-igp-metrics')
+        for (const key of keys) {
+          const v = value(key)
+          if (v === undefined) continue
+          const item = el('div')
+          item.append(el('dt', METRIC()[key] || key), el('dd', key === 'ig_reels_avg_watch_time' ? seconds(v) : num(v)))
+          list.append(item)
+        }
+        if (!list.childElementCount) continue
+        any = true
+        const group = section(title)
+        group.append(list)
+        box.append(group)
       }
-      if (list.childElementCount) perf.append(list)
-      else perf.append(el('p', t('Belum ada data performa.'), 'wa-muted'))
-      box.append(perf)
+      if (!any) {
+        const perf = section(t('Performa'))
+        perf.append(el('p', t('Belum ada data performa.'), 'wa-muted'))
+        box.append(perf)
+      }
     }
     if (row.signals) {
       const interest = section(t('Minat beli'))

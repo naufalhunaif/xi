@@ -328,23 +328,74 @@ export async function activeStories(token: string) {
 
 const MEDIA_METRICS: Record<string, string[]> = {
   FEED: ['reach', 'views', 'likes', 'comments', 'shares', 'saved', 'total_interactions', 'profile_visits', 'follows'],
-  REELS: ['reach', 'views', 'likes', 'comments', 'shares', 'saved', 'total_interactions', 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time'],
+  REELS: [
+    'reach',
+    'views',
+    'likes',
+    'comments',
+    'shares',
+    'saved',
+    'total_interactions',
+    'ig_reels_avg_watch_time',
+    'ig_reels_video_view_total_time',
+    'profile_visits',
+    'follows',
+  ],
   STORY: ['reach', 'views', 'replies', 'shares', 'total_interactions', 'navigation', 'follows', 'profile_visits'],
 }
+/** Metrik yang pernah ditolak Instagram per jenis postingan → tidak diminta lagi (hemat panggilan). */
+const unsupported = new Map<string, Set<string>>()
 
-/** Insights satu postingan; bila ada metrik yang tidak didukung, coba set yang lebih kecil. */
+/**
+ * Insights satu postingan. Semua metrik diminta sekaligus; bila ada yang ditolak, diambil satu per satu
+ * agar metrik lain tetap ada. Untuk feed/reels juga rincian aktivitas profil (klik link bio, alamat, dll.).
+ */
 export async function mediaInsights(token: string, id: string, productType: string) {
-  const full = MEDIA_METRICS[productType] || MEDIA_METRICS.FEED
-  for (const metrics of [full, ['reach', 'views', 'total_interactions'], ['reach']]) {
-    try {
-      const data = await call(`${IG_GRAPH}/${encodeURIComponent(id)}/insights?metric=${metrics.join(',')}`, {
-        headers: bearer(token),
-      })
-      const out: Record<string, number> = {}
-      for (const row of (data.data || []) as any[])
-        out[row.name] = Number(row.total_value?.value ?? row.values?.[0]?.value ?? 0)
-      return out
-    } catch {}
+  const skip = unsupported.get(productType) || new Set<string>()
+  const metrics = (MEDIA_METRICS[productType] || MEDIA_METRICS.FEED).filter((metric) => !skip.has(metric))
+  const read = (data: any) => {
+    const out: Record<string, number> = {}
+    for (const row of (data.data || []) as any[]) out[row.name] = Number(row.total_value?.value ?? row.values?.[0]?.value ?? 0)
+    return out
   }
-  return {}
+  const fetchMetrics = (list: string[]) =>
+    call(`${IG_GRAPH}/${encodeURIComponent(id)}/insights?metric=${list.join(',')}`, { headers: bearer(token) })
+  let out: Record<string, number> = {}
+  try {
+    out = read(await fetchMetrics(metrics))
+  } catch {
+    const parts = await Promise.all(
+      metrics.map((metric) =>
+        fetchMetrics([metric])
+          .then(read)
+          .catch(() => {
+            skip.add(metric)
+            return {}
+          })
+      )
+    )
+    // Bila semua gagal (mis. postingan dihapus/izin), jangan tandai metrik sebagai tidak didukung.
+    if (parts.some((part) => Object.keys(part).length)) unsupported.set(productType, skip)
+    out = Object.assign({}, ...parts)
+  }
+  if (productType !== 'STORY' && !skip.has('profile_activity')) {
+    try {
+      const data = await call(
+        `${IG_GRAPH}/${encodeURIComponent(id)}/insights?metric=profile_activity&breakdown=action_type`,
+        { headers: bearer(token) }
+      )
+      const row = (data.data || [])[0]
+      if (row) {
+        out.profile_activity = Number(row.total_value?.value ?? 0)
+        for (const result of (row.total_value?.breakdowns?.[0]?.results || []) as any[])
+          out[`pa_${String(result.dimension_values?.[0] || '').toLowerCase()}`] = Number(result.value || 0)
+      }
+    } catch {
+      if (Object.keys(out).length) {
+        skip.add('profile_activity')
+        unsupported.set(productType, skip)
+      }
+    }
+  }
+  return out
 }
