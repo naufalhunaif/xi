@@ -1433,4 +1433,8 @@ window.waLocales.id = {
   "Klik pesan": "Klik pesan",
   "Pengikut baru": "Pengikut baru",
   "Profil": "Profil",
+  "Hapus jadwal": "Hapus jadwal",
+  "Jadwal dihapus.": "Jadwal dihapus.",
+  "Hapus jadwal ini? Postingan tidak akan diposting.": "Hapus jadwal ini? Postingan tidak akan diposting.",
+  "Hanya jadwal yang belum terbit yang bisa dihapus.": "Hanya jadwal yang belum terbit yang bisa dihapus.",
 }

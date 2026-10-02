@@ -579,11 +579,12 @@
       node.addEventListener('click', action)
       return node
     }
-    if (post && post.status !== 'publishing')
+    // Hanya untuk jadwal yang belum terbit. Postingan terbit dikelola di Instagram (datanya dari sana).
+    if (post && ['scheduled', 'failed', 'cancelled'].includes(post.status))
       actions.append(
         button(
-          t('Hapus'),
-          run(`/api/instagram/posts/${post.id}/delete`, t('Dihapus.'), t('Hapus dari daftar? Postingan yang sudah terbit tetap ada di Instagram.'))
+          t('Hapus jadwal'),
+          run(`/api/instagram/posts/${post.id}/delete`, t('Jadwal dihapus.'), t('Hapus jadwal ini? Postingan tidak akan diposting.'))
         )
       )
     if (post?.status === 'scheduled')

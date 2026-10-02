@@ -116,6 +116,18 @@ export async function sweepMedia(force = false) {
   return removed
 }
 
+/**
+ * Setelah terbit, data postingan diambil langsung dari Instagram; catatan jadwalnya tidak dipakai lagi.
+ * Disimpan 1 hari (cadangan sampai muncul di daftar Instagram), lalu dihapus. Filenya ikut dibersihkan sweepMedia.
+ */
+export async function removePublishedSchedules() {
+  return db
+    .from('whatsapp_ig_posts')
+    .where('status', 'published')
+    .where('published_at', '<', new Date(Date.now() - DAY))
+    .delete()
+}
+
 /* ───── Langkah 2: Google Drive untuk jadwal yang masih lama ───── */
 const mimeOf = (file: string) => (file.endsWith('.jpg') ? 'image/jpeg' : file.endsWith('.mov') ? 'video/quicktime' : 'video/mp4')
 

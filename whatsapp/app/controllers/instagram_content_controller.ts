@@ -199,9 +199,9 @@ export default class InstagramContentController {
     const changed = await db
       .from('whatsapp_ig_posts')
       .where('id', Number(params.id))
-      .whereNot('status', 'publishing')
+      .whereIn('status', ['scheduled', 'failed', 'cancelled'])
       .delete()
-    if (!changed) return response.badRequest({ error: 'Postingan sedang diterbitkan, tunggu sebentar.' })
+    if (!changed) return response.badRequest({ error: 'Hanya jadwal yang belum terbit yang bisa dihapus.' })
     return response.json({ ok: true })
   }
 

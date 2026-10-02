@@ -23,7 +23,7 @@ import {
 import * as ig from '#services/instagram_api'
 import { saveRemoteImage } from '#services/instagram_inbox'
 import { publishTick } from '#services/instagram_publish'
-import { driveMediaTick, sweepMedia } from '#services/instagram_media_store'
+import { driveMediaTick, removePublishedSchedules, sweepMedia } from '#services/instagram_media_store'
 import { workspaceScope } from '#services/workspace_context'
 import { captureStories } from '#services/instagram_insights'
 
@@ -50,6 +50,7 @@ export async function instagramTick() {
     await backfillPosts(config)
     await driveMediaTick(workspaceScope().prefix).catch(() => {})
     await publishTick(config).catch((error) => noteIgError(`Posting: ${error instanceof Error ? error.message : String(error)}`))
+    await removePublishedSchedules().catch(() => {})
     await sweepMedia().catch(() => {})
     await captureStories(config).catch(() => {})
   } catch (error) {
