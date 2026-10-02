@@ -107,6 +107,7 @@
             : [{ url: item.media_url || item.thumbnail_url || '', type: 'image' }],
         mediaId: String(item.id),
         carousel: item.media_type === 'CAROUSEL_ALBUM',
+        noVideo: item.media_type === 'VIDEO' && !item.media_url,
         caption: item.caption || post?.caption || '',
         time: item.timestamp || post?.publishedAt,
         status: 'published',
@@ -473,6 +474,18 @@
     fillGallery(gallery, row.pictures)
     if (row.carousel) loadChildren(row, gallery)
     if (gallery.childElementCount) box.append(gallery)
+    // Instagram tidak memberikan file video untuk Reels dengan musik berhak cipta → hanya sampulnya.
+    if (row.noVideo) {
+      const note = el('p', t('Video ini tidak bisa diputar di sini (biasanya karena musik berhak cipta).'), 'wa-note')
+      if (row.permalink) {
+        const link = el('a', t('Putar di Instagram'))
+        link.href = row.permalink
+        link.target = '_blank'
+        link.rel = 'noopener'
+        note.append(' ', link)
+      }
+      box.append(note)
+    }
     if (row.error && row.status === 'failed') box.append(el('p', row.error, 'wa-alert'))
     if (row.caption) {
       const caption = section(t('Caption'))

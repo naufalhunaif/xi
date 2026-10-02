@@ -1606,4 +1606,6 @@ window.waLocales.en = {
   "File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.": "The media file is no longer on the server. Edit the post and upload the photo again.",
   "Memproses…": "Processing…",
   "Koneksi terputus. Coba lagi.": "Connection lost. Try again.",
+  "Video ini tidak bisa diputar di sini (biasanya karena musik berhak cipta).": "This video can’t be played here (usually because of copyrighted music).",
+  "Putar di Instagram": "Play on Instagram",
 }

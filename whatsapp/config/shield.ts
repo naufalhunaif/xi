@@ -27,6 +27,8 @@ const shieldConfig = defineConfig({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'"],
       imgSrc: ["'self'", 'data:', 'https:'],
+      // Video/Reels Instagram diputar dari CDN Instagram (https), bukan dari server sendiri.
+      mediaSrc: ["'self'", 'blob:', 'https:'],
       connectSrc: ["'self'"],
     },
 

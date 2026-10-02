@@ -1420,4 +1420,6 @@ window.waLocales.id = {
   "File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.": "File media sudah tidak ada di server. Ubah postingan lalu unggah ulang fotonya.",
   "Memproses…": "Memproses…",
   "Koneksi terputus. Coba lagi.": "Koneksi terputus. Coba lagi.",
+  "Video ini tidak bisa diputar di sini (biasanya karena musik berhak cipta).": "Video ini tidak bisa diputar di sini (biasanya karena musik berhak cipta).",
+  "Putar di Instagram": "Putar di Instagram",
 }

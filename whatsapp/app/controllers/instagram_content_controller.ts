@@ -35,17 +35,37 @@ export default class InstagramContentController {
   }
 
   /** Media untuk diambil Instagram saat terbit (publik, nama acak). */
-  async media({ params, response }: HttpContext) {
+  async media({ params, request, response }: HttpContext) {
     const name = String(params.name || '')
     if (!isMediaFile(name)) return response.notFound()
     const type = name.endsWith('.jpg') ? 'image/jpeg' : name.endsWith('.mov') ? 'video/quicktime' : 'video/mp4'
+    let size = -1
     try {
-      const info = await stat(mediaPath(name))
-      response.header('content-type', type)
-      response.header('content-length', String(info.size))
-      response.header('cache-control', 'public, max-age=86400')
-      return response.stream(createReadStream(mediaPath(name)))
+      size = (await stat(mediaPath(name))).size
     } catch {}
+    if (size >= 0) {
+      response.header('content-type', type)
+      response.header('accept-ranges', 'bytes')
+      response.header('cache-control', 'public, max-age=86400')
+      // Safari hanya memutar video bila server melayani potongan (Range).
+      const range = /^bytes=(\d*)-(\d*)$/.exec(String(request.header('range') || ''))
+      if (range && size > 0) {
+        let start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2] || 0))
+        let end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1
+        if (start >= size || start > end) {
+          response.header('content-range', `bytes */${size}`)
+          return response.status(416).send('')
+        }
+        start = Math.max(0, start)
+        end = Math.max(start, end)
+        response.status(206)
+        response.header('content-range', `bytes ${start}-${end}/${size}`)
+        response.header('content-length', String(end - start + 1))
+        return response.stream(createReadStream(mediaPath(name), { start, end }))
+      }
+      response.header('content-length', String(size))
+      return response.stream(createReadStream(mediaPath(name)))
+    }
     // Media jadwal yang sedang disimpan di Google Drive: dialirkan langsung untuk pratinjau.
     const driveId = await driveIdFor(name)
     if (!driveId) return response.notFound()
