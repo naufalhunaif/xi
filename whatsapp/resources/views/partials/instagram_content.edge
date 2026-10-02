@@ -1,68 +1,101 @@
 <section id="igContentPage" class="wa-orders-page wa-igp-page">
   <div class="wa-orders-title">
     <h1 data-i18n="Konten Instagram">Konten Instagram</h1>
-    <div class="wa-orders-title-actions"><span id="igpAccount" class="wa-muted"></span></div>
+    <div class="wa-orders-title-actions">
+      <span id="igpAccount" class="wa-muted"></span>
+      <button id="igpSummaryOpen" class="button" type="button" data-i18n="Ringkasan">Ringkasan</button>
+      <button id="igpRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button>
+      <button id="igpNew" class="button primary" type="button" data-i18n="+ Buat postingan">+ Buat postingan</button>
+    </div>
   </div>
   <p id="igpReconnect" class="wa-alert warn" hidden>
     <span data-i18n="Untuk posting & insights, klik Hubungkan ulang di Pengaturan → Instagram (sekali saja).">Untuk posting & insights, klik Hubungkan ulang di Pengaturan → Instagram (sekali saja).</span>
     <a href="{{ appUrl }}/settings#instagram" data-i18n="Buka Pengaturan">Buka Pengaturan</a>
   </p>
-  <div id="igpTabs" class="wa-order-tabs" role="tablist">
-    <button type="button" data-tab="schedule" aria-pressed="true" data-i18n="Jadwal">Jadwal</button>
-    <button type="button" data-tab="posts" aria-pressed="false" data-i18n="Postingan">Postingan</button>
-    <button type="button" data-tab="summary" aria-pressed="false" data-i18n="Ringkasan">Ringkasan</button>
+  <div class="wa-lean-toolbar">
+    <div id="igpTabs" class="wa-order-tabs" role="group" aria-label="Filter postingan" data-i18n-aria-label="Filter postingan">
+      <button type="button" data-filter="all" aria-pressed="true"><span data-i18n="Semua">Semua</span> <b class="wa-tab-count" data-count="all"></b></button>
+      <button type="button" data-filter="scheduled" aria-pressed="false"><span data-i18n="Terjadwal">Terjadwal</span> <b class="wa-tab-count" data-count="scheduled"></b></button>
+      <button type="button" data-filter="published" aria-pressed="false"><span data-i18n="Terbit">Terbit</span> <b class="wa-tab-count" data-count="published"></b></button>
+      <button type="button" data-filter="story" aria-pressed="false"><span data-i18n="Story">Story</span> <b class="wa-tab-count" data-count="story"></b></button>
+      <button type="button" data-filter="failed" aria-pressed="false"><span data-i18n="Gagal">Gagal</span> <b class="wa-tab-count" data-count="failed"></b></button>
+    </div>
+    <div class="wa-order-filters"><input id="igpSearch" type="search" placeholder="Cari caption" data-i18n-placeholder="Cari caption" aria-label="Cari caption" data-i18n-aria-label="Cari caption"></div>
   </div>
   <p id="igpNotice" role="status" aria-live="polite"></p>
+  <div class="wa-order-workspace">
+    <div class="wa-order-table-scroll" tabindex="0" role="region" aria-label="Postingan" data-i18n-aria-label="Postingan">
+      <table class="wa-order-table wa-igp-table">
+        <thead><tr>
+          <th scope="col" data-i18n="Postingan">Postingan</th>
+          <th scope="col" data-i18n="Waktu">Waktu</th>
+          <th scope="col" class="wa-order-amount" data-i18n="Jangkauan">Jangkauan</th>
+          <th scope="col" class="wa-order-amount" data-i18n="Tayangan">Tayangan</th>
+          <th scope="col" class="wa-order-amount" data-i18n="Suka">Suka</th>
+          <th scope="col" class="wa-order-amount" data-i18n="Komentar">Komentar</th>
+          <th scope="col" data-i18n="Status">Status</th>
+        </tr></thead>
+        <tbody id="igpList"><tr><td colspan="7"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
 
-  <div data-panel="schedule">
-    <button id="igpNew" class="button primary" type="button" data-i18n="+ Buat postingan">+ Buat postingan</button>
-    <form id="igpForm" class="wa-igp-form" hidden>
-      <div class="wa-igp-kinds" role="group">
-        <button type="button" data-kind="feed" aria-pressed="true" data-i18n="Feed">Feed</button>
-        <button type="button" data-kind="carousel" aria-pressed="false" data-i18n="Carousel">Carousel</button>
-        <button type="button" data-kind="reels" aria-pressed="false" data-i18n="Reels">Reels</button>
-        <button type="button" data-kind="story" aria-pressed="false" data-i18n="Story">Story</button>
-      </div>
-      <div id="igpMedia" class="wa-igp-media"></div>
-      <label id="igpPick" class="wa-igp-pick button">
-        <span id="igpPickLabel" data-i18n="Pilih foto/video">Pilih foto/video</span>
-        <input id="igpFile" type="file" accept="image/*,video/mp4,video/quicktime" hidden />
-      </label>
-      <small id="igpHint" class="wa-muted"></small>
-      <label id="igpCaptionWrap" class="wa-igp-caption">
-        <span data-i18n="Caption">Caption</span>
-        <textarea id="igpCaption" rows="4" maxlength="2200"></textarea>
-        <small id="igpCount" class="wa-muted">0/2200</small>
-      </label>
-      <label id="igpFeedWrap" class="wa-check" hidden>
-        <input id="igpShareFeed" type="checkbox" checked />
-        <span data-i18n="Tampilkan juga di feed">Tampilkan juga di feed</span>
-      </label>
-      <div class="wa-igp-when">
-        <label class="wa-check"><input type="radio" name="igpWhen" value="later" checked /> <span data-i18n="Jadwalkan">Jadwalkan</span></label>
-        <input id="igpAt" type="datetime-local" />
-        <small class="wa-muted">WIB</small>
-        <label class="wa-check"><input type="radio" name="igpWhen" value="now" /> <span data-i18n="Posting sekarang">Posting sekarang</span></label>
-      </div>
-      <div class="wa-igp-actions">
-        <button id="igpSave" class="button primary" type="submit" data-i18n="Simpan jadwal">Simpan jadwal</button>
+  <dialog id="igpDrawer" class="wa-order-drawer" data-motion="sheet" aria-labelledby="igpDrawerTitle">
+    <header class="wa-order-drawer-header"><strong id="igpDrawerTitle"></strong><button id="igpDrawerClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+    <section id="igpDetail" class="wa-order-editor wa-igp-detail"></section>
+
+    <form id="igpForm" class="wa-order-editor wa-igp-detail" hidden>
+      <section class="wa-b3-section">
+        <h3 data-i18n="Jenis">Jenis</h3>
+        <div class="wa-segmented wa-igp-kinds" role="group" aria-label="Jenis" data-i18n-aria-label="Jenis">
+          <button type="button" data-kind="feed" aria-pressed="true" data-i18n="Feed">Feed</button>
+          <button type="button" data-kind="carousel" aria-pressed="false" data-i18n="Carousel">Carousel</button>
+          <button type="button" data-kind="reels" aria-pressed="false" data-i18n="Reels">Reels</button>
+          <button type="button" data-kind="story" aria-pressed="false" data-i18n="Story">Story</button>
+        </div>
+      </section>
+      <section class="wa-b3-section">
+        <h3 data-i18n="Foto/video">Foto/video</h3>
+        <div id="igpMedia" class="wa-igp-media"></div>
+        <label id="igpPick" class="wa-igp-pick button">
+          <span id="igpPickLabel" data-i18n="Pilih foto/video">Pilih foto/video</span>
+          <input id="igpFile" type="file" accept="image/*,video/mp4,video/quicktime" hidden />
+        </label>
+        <small id="igpHint" class="wa-muted"></small>
+      </section>
+      <section id="igpCaptionWrap" class="wa-b3-section">
+        <h3 data-i18n="Caption">Caption</h3>
+        <textarea id="igpCaption" rows="5" maxlength="2200" aria-label="Caption" data-i18n-aria-label="Caption"></textarea>
+        <small id="igpCount" class="wa-muted wa-igp-count">0/2200</small>
+        <label id="igpFeedWrap" class="wa-check" hidden>
+          <input id="igpShareFeed" type="checkbox" checked />
+          <span data-i18n="Tampilkan juga di feed">Tampilkan juga di feed</span>
+        </label>
+      </section>
+      <section class="wa-b3-section">
+        <h3 data-i18n="Waktu">Waktu</h3>
+        <div class="wa-igp-when">
+          <label class="wa-check"><input type="radio" name="igpWhen" value="later" checked /> <span data-i18n="Jadwalkan">Jadwalkan</span></label>
+          <label class="wa-check"><input type="radio" name="igpWhen" value="now" /> <span data-i18n="Posting sekarang">Posting sekarang</span></label>
+        </div>
+        <div class="wa-igp-at"><input id="igpAt" type="datetime-local" aria-label="Tanggal dan jam" data-i18n-aria-label="Tanggal dan jam" /><small class="wa-muted">WIB</small></div>
+      </section>
+      <p id="igpFormNotice" class="wa-igp-form-notice" role="status" aria-live="polite"></p>
+      <div class="wa-b3-actions">
         <button id="igpCancel" class="button" type="button" data-i18n="Batal">Batal</button>
+        <button id="igpSave" class="button primary" type="submit" data-i18n="Simpan jadwal">Simpan jadwal</button>
       </div>
     </form>
-    <div id="igpList" class="wa-igp-list"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
-  </div>
 
-  <div data-panel="posts" hidden>
-    <div id="igpPosts" class="wa-igp-grid"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
-    <h2 class="wa-igp-sub" data-i18n="Story (tersimpan)">Story (tersimpan)</h2>
-    <div id="igpStories" class="wa-igp-grid"></div>
-  </div>
-
-  <div data-panel="summary" hidden>
-    <div id="igpDays" class="wa-igp-kinds" role="group">
-      <button type="button" data-days="7" aria-pressed="true" data-i18n="7 hari">7 hari</button>
-      <button type="button" data-days="30" aria-pressed="false" data-i18n="30 hari">30 hari</button>
-    </div>
-    <div id="igpSummary"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
-  </div>
+    <section id="igpSummaryBox" class="wa-order-editor wa-igp-detail" hidden>
+      <div class="wa-igp-summary-head">
+        <div id="igpDays" class="wa-segmented" role="group" aria-label="Rentang" data-i18n-aria-label="Rentang">
+          <button type="button" data-days="7" aria-pressed="true" data-i18n="7 hari">7 hari</button>
+          <button type="button" data-days="30" aria-pressed="false" data-i18n="30 hari">30 hari</button>
+        </div>
+        <button id="igpSummaryRefresh" class="button small" type="button" data-i18n="Perbarui data">Perbarui data</button>
+      </div>
+      <div id="igpSummary"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+    </section>
+  </dialog>
 </section>

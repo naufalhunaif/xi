@@ -85,6 +85,7 @@ export default class InstagramContentController {
         permalink: row.permalink || '',
         error: row.error || '',
         publishedAt: row.published_at,
+        mediaId: row.media_id || '',
       })),
     })
   }
