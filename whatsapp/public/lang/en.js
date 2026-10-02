@@ -1468,4 +1468,8 @@ window.waLocales.en = {
   "Sesi login kedaluwarsa, coba lagi.": "Login session expired, try again.",
   "Pesan Instagram tidak terkirim: lewat 24 jam sejak pesan terakhir pelanggan.": "Instagram message not sent: more than 24 hours since the customer's last message.",
   "Webhook ditolak: tanda tangan tidak cocok (cek Instagram app secret).": "Webhook rejected: signature mismatch (check the Instagram app secret).",
+  "{0} komentar": "{0} comments",
+  "{0} perlu dibalas": "{0} need a reply",
+  "Lihat {0} komentar lainnya": "View {0} more comments",
+  "Sembunyikan": "Hide",
 }

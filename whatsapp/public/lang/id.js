@@ -1282,4 +1282,8 @@ window.waLocales.id = {
   "Sesi login kedaluwarsa, coba lagi.": "Sesi login kedaluwarsa, coba lagi.",
   "Pesan Instagram tidak terkirim: lewat 24 jam sejak pesan terakhir pelanggan.": "Pesan Instagram tidak terkirim: lewat 24 jam sejak pesan terakhir pelanggan.",
   "Webhook ditolak: tanda tangan tidak cocok (cek Instagram app secret).": "Webhook ditolak: tanda tangan tidak cocok (cek Instagram app secret).",
+  "{0} komentar": "{0} komentar",
+  "{0} perlu dibalas": "{0} perlu dibalas",
+  "Lihat {0} komentar lainnya": "Lihat {0} komentar lainnya",
+  "Sembunyikan": "Sembunyikan",
 }

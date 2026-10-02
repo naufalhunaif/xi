@@ -185,6 +185,7 @@ export default class InstagramController {
         caption: row.media_caption || '',
         permalink: row.permalink || '',
         image: row.media_image || '',
+        mediaId: row.media_id || '',
         jid: `${row.from_id}@ig`,
         createdAt: row.created_at,
         canDm: row.status !== 'replied' && now - new Date(row.created_at).getTime() < PRIVATE_REPLY_MS,

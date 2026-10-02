@@ -70,50 +70,26 @@
     byId('igcNotice').classList.toggle('error', Boolean(error))
   }
 
-  function card(item) {
-    const node = el('article', undefined, 'wa-igc-card')
-    const head = el('header', undefined, 'wa-igc-head')
-    head.append(el('strong', item.username ? `@${item.username}` : 'Instagram'), el('span', when(item.createdAt), 'wa-muted'))
-    const [label, tone] = STATUS()[item.status] || [item.status, '']
+  // Tautan kecil bergaya teks (hemat tempat).
+  const link = (label, action, primary = false) => {
+    const node = el('button', label, `wa-igc-link${primary ? ' primary' : ''}`)
+    node.type = 'button'
+    node.addEventListener('click', action)
+    return node
+  }
+
+  /** Satu komentar dalam utas postingan. */
+  function item(entry) {
+    const node = el('li', undefined, 'wa-igc-item')
+    const head = el('div', undefined, 'wa-igc-head')
+    head.append(el('strong', entry.username ? `@${entry.username}` : 'Instagram'), el('span', when(entry.createdAt), 'wa-muted'))
+    const [label, tone] = STATUS()[entry.status] || [entry.status, '']
     head.append(el('span', label, `wa-pill ${tone}`))
-    node.append(head)
+    node.append(head, el('p', entry.body, 'wa-igc-body'))
+    if (entry.reply) node.append(el('p', `↳ ${t('DM: {0}', entry.reply)}`, 'wa-igc-reply'))
+    if (entry.publicReply) node.append(el('p', `↳ ${t('Balasan di komentar: {0}', entry.publicReply)}`, 'wa-igc-reply'))
+    if (entry.error && entry.status === 'failed') node.append(el('p', entry.error, 'wa-igc-error'))
 
-    if (item.caption || item.permalink || item.image) {
-      const post = el('div', undefined, 'wa-igc-post')
-      if (item.image) {
-        const thumb = el('img', undefined, 'wa-igc-thumb')
-        thumb.src = item.image
-        thumb.alt = t('Foto postingan')
-        thumb.loading = 'lazy'
-        const open = el('a', undefined, 'wa-igc-thumb-link')
-        open.href = item.image
-        open.target = '_blank'
-        open.rel = 'noopener'
-        open.title = t('Lihat foto postingan')
-        open.append(thumb)
-        post.append(open)
-      }
-      post.append(el('span', item.caption ? t('Postingan: {0}', item.caption.replace(/\s+/g, ' ').slice(0, 90)) : t('Postingan')))
-      if (item.permalink) {
-        const link = el('a', t('Lihat postingan'))
-        link.href = item.permalink
-        link.target = '_blank'
-        link.rel = 'noopener'
-        post.append(link)
-      }
-      node.append(post)
-    }
-    node.append(el('p', item.body, 'wa-igc-body'))
-    if (item.reply) node.append(el('p', t('DM: {0}', item.reply), 'wa-igc-reply'))
-    if (item.publicReply) node.append(el('p', t('Balasan di komentar: {0}', item.publicReply), 'wa-igc-reply'))
-    if (item.error && item.status === 'failed') node.append(el('p', item.error, 'wa-igc-error'))
-
-    const actions = el('div', undefined, 'wa-igc-actions')
-    if (item.status === 'replied' || item.status === 'cs') {
-      const open = el('a', t('Buka chat'), 'button')
-      open.href = `${base}/?jid=${encodeURIComponent(item.jid)}`
-      actions.append(open)
-    }
     const form = el('div', undefined, 'wa-igc-form')
     form.hidden = true
     const input = el('textarea')
@@ -124,8 +100,9 @@
       if (!text) return input.focus()
       form.querySelectorAll('button').forEach((b) => (b.disabled = true))
       try {
-        await api(`/api/instagram/comments/${encodeURIComponent(item.id)}/reply`, 'POST', { text, via })
+        await api(`/api/instagram/comments/${encodeURIComponent(entry.id)}/reply`, 'POST', { text, via })
         notice(via === 'dm' ? t('Balasan DM terkirim.') : t('Balasan di komentar terkirim.'))
+        form.hidden = true
         load()
       } catch (error) {
         notice(error.message, true)
@@ -133,7 +110,7 @@
       }
     }
     const row = el('div', undefined, 'wa-igc-form-actions')
-    if (item.canDm) {
+    if (entry.canDm) {
       const dm = el('button', t('Kirim DM'), 'button primary')
       dm.type = 'button'
       dm.addEventListener('click', send('dm'))
@@ -145,20 +122,18 @@
     row.append(pub)
     form.append(input, row)
 
-    const reply = el('button', t('Balas'), 'button')
-    reply.type = 'button'
-    reply.addEventListener('click', () => {
-      form.hidden = !form.hidden
-      if (!form.hidden) input.focus()
-    })
-    actions.append(reply)
-    if (item.canDm && !['pending', 'processing'].includes(item.status)) {
-      const ai = el('button', t('Balas pakai AI'), 'button')
-      ai.type = 'button'
-      ai.addEventListener('click', async () => {
+    const actions = el('div', undefined, 'wa-igc-actions')
+    actions.append(
+      link(t('Balas'), () => {
+        form.hidden = !form.hidden
+        if (!form.hidden) input.focus()
+      })
+    )
+    if (entry.canDm && !['pending', 'processing'].includes(entry.status)) {
+      const ai = link(t('Balas pakai AI'), async () => {
         ai.disabled = true
         try {
-          await api(`/api/instagram/comments/${encodeURIComponent(item.id)}/ai`, 'POST', {})
+          await api(`/api/instagram/comments/${encodeURIComponent(entry.id)}/ai`, 'POST', {})
           notice(t('AI sedang membalas lewat DM…'))
           load()
         } catch (error) {
@@ -168,8 +143,77 @@
       })
       actions.append(ai)
     }
+    if (entry.status === 'replied' || entry.status === 'cs') {
+      const open = el('a', t('Buka chat'), 'wa-igc-link')
+      open.href = `${base}/?jid=${encodeURIComponent(entry.jid)}`
+      actions.append(open)
+    }
     node.append(actions, form)
     return node
+  }
+
+  // Utas per postingan: postingan sekali di atas, komentar berjejer di bawahnya.
+  const SHOWN = 3
+  const expanded = new Set()
+  function post(group) {
+    const first = group.items[0]
+    const node = el('article', undefined, 'wa-igc-card')
+    const head = el('header', undefined, 'wa-igc-post-head')
+    if (first.image) {
+      const thumb = el('img', undefined, 'wa-igc-thumb')
+      thumb.src = first.image
+      thumb.alt = t('Foto postingan')
+      thumb.loading = 'lazy'
+      const open = el('a', undefined, 'wa-igc-thumb-link')
+      open.href = first.image
+      open.target = '_blank'
+      open.rel = 'noopener'
+      open.title = t('Lihat foto postingan')
+      open.append(thumb)
+      head.append(open)
+    }
+    const info = el('div', undefined, 'wa-igc-post-info')
+    info.append(el('p', first.caption ? first.caption.replace(/\s+/g, ' ') : t('Postingan'), 'wa-igc-caption'))
+    const meta = el('div', undefined, 'wa-igc-post-meta')
+    meta.append(el('span', t('{0} komentar', group.items.length)))
+    const open = group.items.filter((entry) => ['failed', 'skipped', 'cs'].includes(entry.status)).length
+    if (open) meta.append(el('span', t('{0} perlu dibalas', open), 'wa-igc-open'))
+    if (first.permalink) {
+      const view = el('a', t('Lihat postingan'))
+      view.href = first.permalink
+      view.target = '_blank'
+      view.rel = 'noopener'
+      meta.append(view)
+    }
+    info.append(meta)
+    head.append(info)
+    const thread = el('ol', undefined, 'wa-igc-thread')
+    const all = expanded.has(group.key)
+    const visible = all ? group.items : group.items.slice(0, SHOWN)
+    thread.append(...visible.map(item))
+    node.append(head, thread)
+    if (group.items.length > SHOWN) {
+      node.append(
+        link(all ? t('Sembunyikan') : t('Lihat {0} komentar lainnya', group.items.length - SHOWN), () => {
+          if (all) expanded.delete(group.key)
+          else expanded.add(group.key)
+          render()
+        })
+      )
+      node.lastChild.classList.add('wa-igc-more')
+    }
+    return node
+  }
+
+  let current = []
+  function render() {
+    const groups = new Map()
+    for (const entry of current) {
+      const key = entry.mediaId || entry.permalink || entry.caption || 'none'
+      if (!groups.has(key)) groups.set(key, { key, items: [] })
+      groups.get(key).items.push(entry)
+    }
+    byId('igcList').replaceChildren(...[...groups.values()].map(post))
   }
 
   let lastData = ''
@@ -191,7 +235,8 @@
         if (slot) slot.textContent = value ? String(value) : ''
       }
       const list = byId('igcList')
-      list.replaceChildren(...data.comments.map(card))
+      current = data.comments
+      render()
       if (!data.comments.length)
         list.append(el('p', data.connected ? t('Belum ada komentar.') : t('Hubungkan Instagram di Pengaturan → Instagram.'), 'wa-muted'))
       badge()
