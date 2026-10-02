@@ -31,7 +31,7 @@
     } catch {}
   }
   badge()
-  setInterval(() => document.visibilityState === 'visible' && badge(), 60_000)
+  setInterval(() => document.visibilityState === 'visible' && badge(), 20_000)
 
   const root = byId('igCommentsPage')
   if (!root) return
@@ -146,7 +146,6 @@
           await api(`/api/instagram/comments/${encodeURIComponent(item.id)}/ai`, 'POST', {})
           notice('AI sedang membalas lewat DM…')
           load()
-          setTimeout(load, 20_000)
         } catch (error) {
           notice(error.message, true)
           ai.disabled = false
@@ -158,12 +157,19 @@
     return node
   }
 
-  async function load() {
+  let lastData = ''
+  // Saat sedang menulis balasan, daftar tidak diganti supaya ketikan tidak hilang.
+  const busy = () => [...root.querySelectorAll('.wa-igc-form')].some((form) => !form.hidden)
+  async function load(auto = false) {
+    if (auto && busy()) return
     const mine = ++seq
     const q = byId('igcSearch').value.trim()
     try {
       const data = await api(`/api/instagram/comments?status=${status}&q=${encodeURIComponent(q)}`)
       if (mine !== seq) return
+      const snapshot = JSON.stringify(data)
+      if (auto && (snapshot === lastData || busy())) return
+      lastData = snapshot
       byId('igcAccount').textContent = data.connected ? `@${data.username}` : 'Instagram belum terhubung'
       for (const [key, value] of Object.entries(data.counts || {})) {
         const slot = root.querySelector(`[data-count="${key}"]`)
@@ -196,5 +202,7 @@
     load()
   })
   load()
-  setInterval(() => document.visibilityState === 'visible' && load(), 30_000)
+  // Komentar baru muncul sendiri (cek tiap 8 detik saat halaman terbuka).
+  setInterval(() => document.visibilityState === 'visible' && load(true), 8_000)
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && load(true))
 })()
