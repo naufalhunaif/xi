@@ -314,9 +314,11 @@
     window.addEventListener('pointercancel', end)
   }
 
+  const MODEL_LABELS = {"opus": "opus (selalu terbaru)", "sonnet": "sonnet (selalu terbaru)", "haiku": "haiku (selalu terbaru)", "claude-opus-5-5": "Opus 5.5", "claude-opus-5": "Opus 5", "claude-opus-4-8": "Opus 4.8", "claude-opus-4-7": "Opus 4.7", "claude-opus-4-6": "Opus 4.6", "claude-opus-4-5-20251101": "Opus 4.5", "claude-sonnet-5-5": "Sonnet 5.5", "claude-sonnet-5": "Sonnet 5", "claude-sonnet-4-6": "Sonnet 4.6", "claude-haiku-4-5-20251001": "Haiku 4.5"}
   const MODELS = {
     chatgpt: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5'],
-    claude: ['opus', 'sonnet', 'haiku'],
+    // Alias (opus/sonnet/haiku) selalu ikut versi terbaru; versi tertentu bisa dipilih langsung.
+    claude: ["opus", "sonnet", "haiku", "claude-opus-5-5", "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5-20251101", "claude-sonnet-5-5", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
     gemini: ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'],
   }
   function modelPicker(account) {
@@ -326,7 +328,7 @@
     if (account.model && !options.includes(account.model)) options.push(account.model)
     select.append(new Option(t('Otomatis (hemat)'), ''))
     select.title = t('Otomatis: model ringan/menengah/utama dipilih per tugas supaya hemat.')
-    for (const model of options) select.append(new Option(model, model))
+    for (const model of options) select.append(new Option(MODEL_LABELS[model] ? t(MODEL_LABELS[model]) : model, model))
     select.append(new Option(t('Model lainnya…'), '__custom__'))
     select.value = account.model || ''
     select.addEventListener('change', async () => {

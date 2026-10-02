@@ -1485,4 +1485,7 @@ window.waLocales.id = {
   "Menampilkan {0} dari {1} proses": "Menampilkan {0} dari {1} proses",
   "Fase: {0}": "Fase: {0}",
   "Model: {0}": "Model: {0}",
+  "opus (selalu terbaru)": "opus (selalu terbaru)",
+  "sonnet (selalu terbaru)": "sonnet (selalu terbaru)",
+  "haiku (selalu terbaru)": "haiku (selalu terbaru)",
 }

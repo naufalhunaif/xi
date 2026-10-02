@@ -1669,4 +1669,7 @@ window.waLocales.en = {
   "Menampilkan {0} dari {1} proses": "Showing {0} of {1} runs",
   "Fase: {0}": "Phase: {0}",
   "Model: {0}": "Model: {0}",
+  "opus (selalu terbaru)": "opus (always latest)",
+  "sonnet (selalu terbaru)": "sonnet (always latest)",
+  "haiku (selalu terbaru)": "haiku (always latest)",
 }
