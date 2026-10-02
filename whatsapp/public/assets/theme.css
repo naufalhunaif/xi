@@ -762,3 +762,22 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 .workspace-ui .wa-igp-comment small.wa-muted { margin-left: 0; }
 .workspace-ui .wa-igc-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 760px; box-sizing: border-box; margin: 12px 0 10px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
 .workspace-ui .wa-igc-filter[hidden] { display: none; }
+/* Ringkasan desktop: Analisis AI di kolom kanan (melekat saat digulir). */
+@media (min-width: 1100px) {
+  .workspace-ui .wa-igp-summary-panel { max-width: none; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-areas: "head ai" "sum ai"; column-gap: 20px; align-items: start; }
+  .workspace-ui .wa-igp-summary-panel > .wa-igp-analysis { grid-area: ai; position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
+  .workspace-ui .wa-igp-summary-panel > .wa-igp-summary-head { grid-area: head; }
+  .workspace-ui .wa-igp-summary-panel > #igpSummary { grid-area: sum; min-width: 0; }
+}
+/* Detail postingan: angka utama, batang interaksi, chip kecil */
+.workspace-ui .wa-igp-post-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.workspace-ui .wa-igp-post-stats .wa-igp-stat { padding: 10px; }
+.workspace-ui .wa-igp-split { display: grid; gap: 4px; }
+.workspace-ui .wa-igp-split .wa-igp-line { font-size: 12px; }
+.workspace-ui .wa-igp-line.zero { color: var(--muted); }
+.workspace-ui .wa-igp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.workspace-ui .wa-igp-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+.workspace-ui .wa-igp-chip b { font-variant-numeric: tabular-nums; }
+.workspace-ui .wa-igp-chip.zero { color: var(--muted); }
+@media (max-width: 520px) { .workspace-ui .wa-igp-post-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.workspace-ui .wa-igp-comments .wa-muted, .workspace-ui .wa-igp-detail .wa-b3-section > p.wa-muted { margin-left: 0; }

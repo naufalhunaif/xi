@@ -476,6 +476,90 @@
       loading.remove()
     }
   }
+  /* Performa satu postingan: 4 angka utama besar, rincian interaksi sebagai batang, sisanya chip kecil. */
+  function chips(pairs) {
+    const list = el('div', undefined, 'wa-igp-chips')
+    for (const [label, value] of pairs) {
+      const chip = el('span', undefined, `wa-igp-chip${Number(value) ? '' : ' zero'}`)
+      chip.append(el('span', label), el('b', typeof value === 'string' ? value : num(value)))
+      list.append(chip)
+    }
+    return list
+  }
+  function statsBlocks(st) {
+    const has = (key) => st[key] !== undefined && st[key] !== null
+    const blocks = []
+    const tiles = el('div', undefined, 'wa-igp-stats-grid wa-igp-post-stats')
+    const tile = (label, value, extra = '', exact) => {
+      const node = el('div', undefined, 'wa-igp-stat')
+      const strong = el('strong', value)
+      if (exact !== undefined) strong.title = full(exact)
+      node.append(el('small', label), strong)
+      if (extra) node.append(el('span', extra, 'wa-muted'))
+      tiles.append(node)
+    }
+    if (has('views')) tile(t('Tayangan'), num(st.views), '', st.views)
+    if (has('reach')) tile(t('Jangkauan'), num(st.reach), '', st.reach)
+    if (has('total_interactions'))
+      tile(
+        t('Interaksi'),
+        num(st.total_interactions),
+        Number(st.reach) > 0 ? t('{0}% dari jangkauan', new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format((Number(st.total_interactions) / Number(st.reach)) * 100)) : '',
+        st.total_interactions
+      )
+    const fourth = has('ig_reels_avg_watch_time') ? 'ig_reels_avg_watch_time' : has('profile_visits') ? 'profile_visits' : ''
+    if (fourth === 'ig_reels_avg_watch_time') tile(t('Rata² tonton'), seconds(st.ig_reels_avg_watch_time))
+    else if (fourth) tile(t('Kunjungan profil'), num(st.profile_visits), '', st.profile_visits)
+    if (tiles.childElementCount) {
+      const perf = section(t('Performa'))
+      perf.append(tiles)
+      blocks.push(perf)
+    }
+    // Rincian interaksi: batang sebanding supaya langsung terlihat mana yang paling banyak.
+    const parts = ['likes', 'comments', 'saved', 'shares', 'replies'].filter(has)
+    if (parts.length) {
+      const max = Math.max(1, ...parts.map((key) => Number(st[key] || 0)))
+      const list = el('div', undefined, 'wa-igp-split')
+      for (const key of parts) {
+        const line = el('div', undefined, `wa-igp-line${Number(st[key]) ? '' : ' zero'}`)
+        const fill = el('i')
+        fill.style.width = `${Math.round((Number(st[key] || 0) / max) * 100)}%`
+        line.append(el('span', METRIC()[key]), el('b', num(st[key])), fill)
+        list.append(line)
+      }
+      const group = section(t('Rincian interaksi'))
+      group.append(list)
+      blocks.push(group)
+    }
+    // Aktivitas profil yang tidak muncul berarti 0 (seperti di Instagram), khusus link & alamat.
+    const value = (key) =>
+      has(key) ? st[key] : ['pa_bio_link_clicked', 'pa_direction'].includes(key) && has('profile_activity') ? 0 : undefined
+    const others = [
+      ...(fourth === 'profile_visits' ? [] : ['profile_visits']),
+      'profile_activity',
+      'pa_bio_link_clicked',
+      'pa_direction',
+      'pa_call',
+      'pa_email',
+      'pa_text',
+      'follows',
+      'navigation',
+    ]
+      .filter((key) => value(key) !== undefined)
+      .map((key) => [METRIC()[key] || key, value(key)])
+    if (others.length) {
+      const group = section(t('Profil & lainnya'))
+      group.append(chips(others))
+      blocks.push(group)
+    }
+    if (!blocks.length) {
+      const perf = section(t('Performa'))
+      perf.append(el('p', t('Belum ada data performa.'), 'wa-muted'))
+      blocks.push(perf)
+    }
+    return blocks
+  }
+
   /** Komentar postingan ini (terbaru), dengan tautan ke tab Komentar. */
   const COMMENT_STATUS = () => ({
     replied: t('Dibalas lewat DM'),
@@ -551,58 +635,16 @@
       caption.append(el('pre', row.caption, 'wa-b3-spec'))
       box.append(caption)
     }
-    if (row.stats) {
-      // Dikelompokkan seperti halaman insights Instagram: Tayangan · Interaksi · Profil.
-      const st = row.stats
-      const has = (key) => st[key] !== undefined && st[key] !== null
-      const groups = [
-        [t('Tayangan'), ['views', 'reach', 'ig_reels_avg_watch_time', 'navigation']],
-        [t('Interaksi'), ['total_interactions', 'likes', 'comments', 'saved', 'shares', 'replies']],
-        [
-          t('Profil'),
-          has('profile_activity')
-            ? ['profile_activity', 'profile_visits', 'pa_bio_link_clicked', 'pa_direction', 'pa_call', 'pa_email', 'pa_text', 'follows']
-            : ['profile_visits', 'follows'],
-        ],
-      ]
-      // Rincian aktivitas profil yang tidak muncul berarti 0 (seperti di Instagram), khusus link & alamat.
-      const value = (key) =>
-        has(key) ? st[key] : ['pa_bio_link_clicked', 'pa_direction'].includes(key) && has('profile_activity') ? 0 : undefined
-      let any = false
-      for (const [title, keys] of groups) {
-        const list = el('dl', undefined, 'wa-b3-fields wa-igp-metrics')
-        for (const key of keys) {
-          const v = value(key)
-          if (v === undefined) continue
-          const item = el('div')
-          item.append(el('dt', METRIC()[key] || key), el('dd', key === 'ig_reels_avg_watch_time' ? seconds(v) : num(v)))
-          list.append(item)
-        }
-        if (!list.childElementCount) continue
-        any = true
-        const group = section(title)
-        group.append(list)
-        box.append(group)
-      }
-      if (!any) {
-        const perf = section(t('Performa'))
-        perf.append(el('p', t('Belum ada data performa.'), 'wa-muted'))
-        box.append(perf)
-      }
-    }
+    if (row.stats) box.append(...statsBlocks(row.stats))
     if (row.signals) {
       const interest = section(t('Minat beli'))
-      const list = el('dl', undefined, 'wa-b3-fields wa-igp-metrics')
-      for (const [label, value] of [
+      const values = [
         [t('Komentar masuk'), row.signals.comments],
         [t('Pertanyaan'), row.signals.questions],
         [t('Order dari penanya'), row.signals.orders],
-      ]) {
-        const item = el('div')
-        item.append(el('dt', label), el('dd', num(value)))
-        list.append(item)
-      }
-      interest.append(list)
+      ]
+      if (values.every(([, value]) => !Number(value))) interest.append(el('p', t('Belum ada pertanyaan dari komentar.'), 'wa-muted'))
+      else interest.append(chips(values))
       box.append(interest)
     }
 
@@ -926,10 +968,13 @@
       const body = el('div', undefined, 'wa-igp-bars')
       node.append(sum, body)
       body.sum = sum
+      body.title = node.querySelector('h3')
       return [node, body]
     }
     const [reachNode, reachBody] = chart(t('Jangkauan harian'))
     const [followNode, followBody] = chart(t('Pengikut baru harian'))
+    reachBody.titles = [t('Jangkauan harian'), t('Jangkauan per minggu')]
+    followBody.titles = [t('Pengikut baru harian'), t('Pengikut baru per minggu')]
     const people = section(t('Pengikut'))
     const grid = el('div', undefined, 'wa-igp-people')
     const lists = {}
@@ -965,9 +1010,50 @@
   const compact = (value) =>
     new Intl.NumberFormat(locale(), { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0))
   const dayOf = (date, options) => new Intl.DateTimeFormat(locale(), { timeZone: 'Asia/Jakarta', ...options }).format(new Date(date))
-  function fillBars(box, points) {
+  /** Lebih dari 45 hari: batang per minggu (7 hari) supaya angkanya tetap terbaca. */
+  function weekly(points) {
+    const out = []
+    for (let index = 0; index < points.length; index += 7) {
+      const chunk = points.slice(index, index + 7)
+      out.push({ date: chunk[0].date, end: chunk[chunk.length - 1].date, value: chunk.reduce((sum, point) => sum + Number(point.value || 0), 0) })
+    }
+    return out
+  }
+  function fillBars(box, points, note = '') {
     if (box.sum) box.sum.textContent = ''
     if (!points.length) return box.replaceChildren(el('span', t('Belum ada data.'), 'wa-muted wa-igp-bars-empty'))
+    const daily = points
+    const byWeek = points.length > 45
+    if (box.title && box.titles) box.title.textContent = box.titles[byWeek ? 1 : 0]
+    if (byWeek) {
+      const weeks = weekly(points)
+      const values = daily.map((point) => Number(point.value || 0))
+      const total = values.reduce((sum, value) => sum + value, 0)
+      const best = daily[values.indexOf(Math.max(...values))]
+      if (box.sum)
+        box.sum.textContent =
+          t(
+            'Total {0} · rata-rata {1}/hari · tertinggi {2} ({3})',
+            num(total),
+            num(Math.round(total / daily.length)),
+            num(best.value),
+            dayOf(best.date, { weekday: 'short', day: 'numeric', month: 'short' })
+          ) + (note ? ` · ${note}` : '')
+      const max = Math.max(1, ...weeks.map((week) => week.value))
+      box.classList.remove('is-dense')
+      box.replaceChildren(
+        ...weeks.map((week) => {
+          const col = el('div', undefined, 'wa-igp-col')
+          const range = `${dayOf(week.date, { day: 'numeric', month: 'short' })} – ${dayOf(week.end, { day: 'numeric', month: 'short' })}`
+          col.title = `${range}: ${num(week.value)}`
+          const bar = el('i', undefined, 'wa-igp-bar')
+          bar.style.height = `${Math.max(2, Math.round((week.value / max) * 64))}px`
+          col.append(el('b', compact(week.value), 'wa-igp-val'), bar, el('small', dayOf(week.date, { day: 'numeric', month: 'short' }), 'wa-igp-day'))
+          return col
+        })
+      )
+      return
+    }
     const values = points.map((point) => Number(point.value || 0))
     const max = Math.max(1, ...values)
     const total = values.reduce((sum, value) => sum + value, 0)
@@ -979,7 +1065,7 @@
         num(Math.round(total / points.length)),
         num(best.value),
         dayOf(best.date, { weekday: 'short', day: 'numeric', month: 'short' })
-      )
+      ) + (note ? ` · ${note}` : '')
     const dense = points.length > 14
     box.classList.toggle('is-dense', dense)
     box.replaceChildren(
@@ -1050,9 +1136,10 @@
         f[key].extra.classList.remove('wa-igp-pending')
       }
       set('followers', num(o.profile?.followers_count), gained !== undefined ? t('+{0} / −{1}', num(gained), num(lost || 0)) : '', o.profile?.followers_count)
-      set('reach', num(m('reach')), '', m('reach'))
+      const approx = (key) => (o.metrics?.[key]?.approx ? t('perkiraan') : '')
+      set('reach', num(m('reach')), approx('reach'), m('reach'))
       set('views', num(m('views')), '', m('views'))
-      set('engaged', num(m('accounts_engaged')), '', m('accounts_engaged'))
+      set('engaged', num(m('accounts_engaged')), approx('accounts_engaged'), m('accounts_engaged'))
       set(
         'interactions',
         num(m('total_interactions')),
@@ -1061,7 +1148,7 @@
       )
       set('taps', num(m('profile_links_taps')), '', m('profile_links_taps'))
       fillBars(skeleton.reachBody, o.reach || [])
-      fillBars(skeleton.followBody, o.followers || [])
+      fillBars(skeleton.followBody, o.followers || [], days > 30 ? t('Instagram hanya memberi 30 hari terakhir') : '')
       if (withAudience) {
         const gender = { F: t('Perempuan'), M: t('Laki-laki'), U: t('Lainnya') }
         fillList(skeleton.lists.age, data.audience?.age)

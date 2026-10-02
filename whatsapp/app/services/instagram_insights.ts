@@ -33,8 +33,40 @@ async function cached<T>(key: string, ttl: number, load: () => Promise<T>, fresh
 const permissionError = (error: unknown) =>
   error instanceof ig.IgApiError && [10, 200, 190].includes(error.code)
 
+/** Instagram membatasi rentang since–until maksimal 30 hari: rentang lebih panjang dipecah per 30 hari. */
+const WINDOW_S = 30 * 86_400
+function windows(since: number, until: number) {
+  const out: Array<[number, number]> = []
+  for (let start = since; start < until; start += WINDOW_S) out.push([start, Math.min(until, start + WINDOW_S)])
+  return out
+}
+/** Akun unik (bukan jumlah): total rentang > 30 hari hanya perkiraan (dijumlah per 30 hari). */
+const UNIQUE = new Set(['reach', 'accounts_engaged'])
+
+async function totalOver(config: IgConfig, metric: string, since: number, until: number) {
+  const parts = await Promise.allSettled(windows(since, until).map(([s, u]) => ig.accountTotal(config.token, config.userId, metric, s, u)))
+  const ok = parts.filter((r) => r.status === 'fulfilled') as PromiseFulfilledResult<{ value: number; breakdowns: { key: string; value: number }[] }>[]
+  if (!ok.length) throw (parts[0] as PromiseRejectedResult).reason
+  const breakdowns = new Map<string, number>()
+  for (const part of ok) for (const b of part.value.breakdowns) breakdowns.set(b.key, (breakdowns.get(b.key) || 0) + b.value)
+  return {
+    value: ok.reduce((sum, part) => sum + part.value.value, 0),
+    breakdowns: [...breakdowns].map(([key, value]) => ({ key, value })),
+    ...(parts.length > 1 && UNIQUE.has(metric) ? { approx: true } : {}),
+  }
+}
+
+async function seriesOver(config: IgConfig, metric: string, since: number, until: number) {
+  const parts = await Promise.allSettled(windows(since, until).map(([s, u]) => ig.accountSeries(config.token, config.userId, metric, s, u)))
+  const ok = parts.filter((r) => r.status === 'fulfilled') as PromiseFulfilledResult<{ date: string; value: number }[]>[]
+  if (!ok.length) throw (parts[0] as PromiseRejectedResult).reason
+  const byDate = new Map<string, { date: string; value: number }>()
+  for (const part of ok) for (const point of part.value) byDate.set(point.date.slice(0, 10), point)
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
 export async function accountOverview(config: IgConfig, days: number, fresh = false) {
-  const span = [1, 7, 14, 30].includes(days) ? days : 7
+  const span = [1, 7, 14, 30, 90].includes(days) ? days : 7
   return cached(
     `ig_ins_${span}`,
     TTL_MS,
@@ -43,14 +75,15 @@ export async function accountOverview(config: IgConfig, days: number, fresh = fa
       const since = until - span * 86_400
       const [profile, ...totals] = await Promise.allSettled([
         ig.profileStats(config.token),
-        ...TOTALS.map((metric) => ig.accountTotal(config.token, config.userId, metric, since, until)),
+        ...TOTALS.map((metric) => totalOver(config, metric, since, until)),
       ])
+      // Pengikut harian dari Instagram hanya tersedia 30 hari terakhir.
       const [reach, followers] = await Promise.allSettled([
-        ig.accountSeries(config.token, config.userId, 'reach', since, until),
+        seriesOver(config, 'reach', since, until),
         ig.accountSeries(config.token, config.userId, 'follower_count', Math.max(since, until - 30 * 86_400), until),
       ])
       const failures = [profile, ...totals].filter((r) => r.status === 'rejected') as PromiseRejectedResult[]
-      const metrics: Record<string, { value: number; breakdowns: { key: string; value: number }[] }> = {}
+      const metrics: Record<string, { value: number; breakdowns: { key: string; value: number }[]; approx?: boolean }> = {}
       TOTALS.forEach((metric, index) => {
         const result = totals[index]
         if (result.status === 'fulfilled') metrics[metric] = result.value

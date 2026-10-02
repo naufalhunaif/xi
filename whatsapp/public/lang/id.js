@@ -1451,4 +1451,12 @@ window.waLocales.id = {
   "Komentar belum bisa dimuat.": "Komentar belum bisa dimuat.",
   "Komentar untuk: {0}": "Komentar untuk: {0}",
   "Tampilkan semua": "Tampilkan semua",
+  "Jangkauan per minggu": "Jangkauan per minggu",
+  "Pengikut baru per minggu": "Pengikut baru per minggu",
+  "Instagram hanya memberi 30 hari terakhir": "Instagram hanya memberi 30 hari terakhir",
+  "perkiraan": "perkiraan",
+  "Belum ada pertanyaan dari komentar.": "Belum ada pertanyaan dari komentar.",
+  "{0}% dari jangkauan": "{0}% dari jangkauan",
+  "Rincian interaksi": "Rincian interaksi",
+  "Profil & lainnya": "Profil & lainnya",
 }

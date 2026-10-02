@@ -1636,4 +1636,12 @@ window.waLocales.en = {
   "Komentar belum bisa dimuat.": "Comments could not be loaded.",
   "Komentar untuk: {0}": "Comments on: {0}",
   "Tampilkan semua": "Show all",
+  "Jangkauan per minggu": "Weekly reach",
+  "Pengikut baru per minggu": "Weekly new followers",
+  "Instagram hanya memberi 30 hari terakhir": "Instagram only provides the last 30 days",
+  "perkiraan": "estimate",
+  "Belum ada pertanyaan dari komentar.": "No questions from comments yet.",
+  "{0}% dari jangkauan": "{0}% of reach",
+  "Rincian interaksi": "Interaction breakdown",
+  "Profil & lainnya": "Profile & more",
 }
