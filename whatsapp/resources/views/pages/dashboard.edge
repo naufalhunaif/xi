@@ -147,29 +147,6 @@
         </span>
         <span class="nav-text" data-i18n="Pengaturan">Pengaturan</span>
       </a>
-      <div class="owner-row" title="{{ account.name }} · {{ account.username }}">
-        @if(account.picture)
-          <img class="avatar" src="{{ account.picture }}" alt="" />
-        @else
-          <span class="avatar" aria-hidden="true">
-            {{ account.name.slice(0, 1).toUpperCase() }}
-          </span>
-        @end
-
-        <div class="owner-info">
-          <strong>{{ account.name }}</strong>
-          <small>{{ account.username }}</small>
-          <small class="wa-app-version" title="Versi aplikasi">v{{ appVersion }}</small>
-        </div>
-        <form class="owner-actions" action="{{ appUrl }}/logout" method="post">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}" />
-          <button class="shell-icon-button" type="submit" title="Keluar" aria-label="Keluar" data-i18n-title="Keluar" data-i18n-aria-label="Keluar">
-            <span class="icon">
-              <img src="{{ appUrl }}/assets/bundle/icons/log-out-outline.svg" alt="" />
-            </span>
-          </button>
-        </form>
-      </div>
     </div>
   </aside>
 
@@ -258,7 +235,7 @@
                       @end
                     </strong>
                     <small class="{{ contact.activity ? 'active' : '' }}">
-                      {{ contact.activity || contact.body || '' }}
+                      {{ contact.activity || String(contact.body || '').replace(/^\[Komentar di postingan[^\]]*\]\s*/, '💬 ') }}
                     </small>
                   </span>
                   <span class="wa-contact-meta">
@@ -655,6 +632,21 @@
           <div class="wa-settings-header">
             <h1 class="wa-settings-heading" data-i18n="Pengaturan">Pengaturan</h1>
             <span id="settingsSaveState" role="status" aria-live="polite" data-i18n="Tersimpan otomatis" data-i18n-auto>Tersimpan otomatis</span>
+          </div>
+          <div class="wa-account-bar" title="{{ account.name }} · {{ account.username }}">
+            @if(account.picture)
+              <img class="avatar" src="{{ account.picture }}" alt="" />
+            @else
+              <span class="avatar" aria-hidden="true">{{ account.name.slice(0, 1).toUpperCase() }}</span>
+            @end
+            <div class="wa-account-info">
+              <strong>{{ account.name }}</strong>
+              <small>{{ account.username }} · <span class="wa-app-version" title="Versi aplikasi">v{{ appVersion }}</span></small>
+            </div>
+            <form action="{{ appUrl }}/logout" method="post">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}" />
+              <button class="button" type="submit" data-i18n="Keluar">Keluar</button>
+            </form>
           </div>
           <div class="wa-settings-layout">
             <nav class="wa-settings-menu" aria-label="Menu pengaturan" data-i18n-aria-label="Menu pengaturan">

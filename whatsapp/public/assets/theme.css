@@ -555,3 +555,34 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 .workspace-ui .message-ig-post small { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
 .workspace-ui .message-ig-post span { font-size: 11px; line-height: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 html[data-theme="dark"] .workspace-ui .message-ig-post { background: rgba(255, 255, 255, 0.07); }
+/* Akun & keluar di halaman Pengaturan. */
+.workspace-ui .wa-account-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--wa-surface, #fff); }
+.workspace-ui .wa-account-bar .avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; }
+.workspace-ui .wa-account-info { flex: 1; min-width: 0; display: grid; }
+.workspace-ui .wa-account-info strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-ui .wa-account-info small { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-ui .wa-account-bar form { margin: 0; flex: none; }
+
+/* HP: menu pindah ke bawah (mudah dijangkau jempol). Saat room chat terbuka, menu disembunyikan. */
+@media (max-width: 760px) {
+  html body.workspace-ui { --wa-rail-width: 0px; --wa-tabbar-h: calc(58px + env(safe-area-inset-bottom)); }
+  html body.workspace-ui .sidebar {
+    top: auto; bottom: 0; left: 0; right: 0; width: 100%; height: var(--wa-tabbar-h);
+    flex-direction: row; align-items: center; gap: 2px;
+    padding: 4px 6px env(safe-area-inset-bottom);
+    border-right: 0; border-top: 1px solid var(--line);
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none; z-index: 40;
+    transform: none !important; visibility: visible !important;
+  }
+  html body.workspace-ui .sidebar::-webkit-scrollbar { display: none; }
+  html body.workspace-ui .sidebar .brand { display: none; }
+  html body.workspace-ui .sidebar nav, html body.workspace-ui .sidebar .sidebar-bottom { display: contents; }
+  html body.workspace-ui .sidebar .nav-item, html body.workspace-ui .sidebar .app-launcher { flex: 1 0 46px; height: 48px; margin: 0; }
+  html body.workspace-ui .sidebar .app-launcher-toggle { width: 100%; height: 48px; }
+  html body.workspace-ui .sidebar .app-launcher-popover { left: 8px; right: 8px; bottom: calc(var(--wa-tabbar-h) + 8px); width: auto; }
+  html body.workspace-ui .sidebar .nav-badge { top: 4px; right: calc(50% - 20px); }
+  html body.workspace-ui .shell { margin-left: 0; padding-bottom: var(--wa-tabbar-h); }
+  html body.workspace-ui .wa-shell-chat { height: 100dvh; }
+  html body.workspace-ui:has(#main.wa-main-chat[data-room='open']) .sidebar { display: none; }
+  html body.workspace-ui:has(#main.wa-main-chat[data-room='open']) .shell { padding-bottom: 0; }
+}
