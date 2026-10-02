@@ -181,6 +181,11 @@
           <aside class="wa-panel wa-contact-panel">
             <div class="wa-inbox-heading">
               <strong>Chat</strong>
+              <div id="inboxChannels" class="wa-inbox-channels" role="group" aria-label="Saluran" hidden>
+                <button type="button" data-channel="all" aria-pressed="true">Semua</button>
+                <button type="button" data-channel="wa" aria-pressed="false">WhatsApp</button>
+                <button type="button" data-channel="ig" aria-pressed="false">Instagram</button>
+              </div>
               <a id="connectHint" class="wa-connect-hint" href="{{ appUrl }}/settings#numbers" hidden data-i18n="Hubungkan nomor">Hubungkan nomor</a>
             </div>
 

@@ -500,3 +500,8 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 .workspace-ui .wa-igc-form textarea { width: 100%; resize: vertical; }
 .workspace-ui .wa-igc-page .wa-order-tabs { overflow-x: auto; scrollbar-width: none; }
 .workspace-ui .wa-igc-page .wa-order-tabs button { white-space: nowrap; }
+.workspace-ui .wa-inbox-channels { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; margin-left: auto; }
+.workspace-ui .wa-inbox-channels[hidden] { display: none; }
+.workspace-ui .wa-inbox-channels button { border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.workspace-ui .wa-inbox-channels button[aria-pressed='true'] { background: #29946a20; color: var(--wa-ok, #1f7a55); font-weight: 600; }
+.workspace-ui .wa-inbox-channels button:hover { background: #88888820; }

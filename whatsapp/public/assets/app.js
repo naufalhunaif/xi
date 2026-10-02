@@ -571,12 +571,26 @@
     const params = new URLSearchParams(location.search)
     // Tautan lama ?unanswered=1 tetap membuka tab Belum dibalas.
     const key = params.get('unanswered') === '1' ? 'unanswered' : params.get('inbox')
-    return { filter: inboxKeys.includes(key) ? key : 'all' }
+    const channel = params.get('ch')
+    return { filter: inboxKeys.includes(key) ? key : 'all', channel: ['wa', 'ig'].includes(channel) ? channel : 'all' }
   }
+  // Saluran: WhatsApp / Instagram (room Instagram ber-jid "@ig").
+  const isIgRow = (row) => String(row.dataset.jid || '').endsWith('@ig')
+  const inChannel = (row, channel) => channel === 'all' || (channel === 'ig') === isIgRow(row)
   function applyInboxFilters() {
     if (!contacts || !byId('inboxFilters')) return
     const state = inboxState()
-    const rows = [...contacts.querySelectorAll('.wa-contact')]
+    const allRows = [...contacts.querySelectorAll('.wa-contact')]
+    const channels = byId('inboxChannels')
+    if (channels) {
+      // Tombol saluran hanya muncul bila ada chat Instagram.
+      channels.hidden = !allRows.some(isIgRow) && state.channel === 'all'
+      channels.querySelectorAll('[data-channel]').forEach((button) =>
+        button.setAttribute('aria-pressed', String(button.dataset.channel === state.channel))
+      )
+    }
+    for (const row of allRows) if (!inChannel(row, state.channel)) row.hidden = true
+    const rows = allRows.filter((row) => inChannel(row, state.channel))
     const matches = (row, key) =>
       key === 'all' ||
       (key === 'unanswered' && Number(row.dataset.unanswered) > 0) ||
@@ -618,7 +632,9 @@
       url.searchParams.delete('inbox')
       url.searchParams.delete('unanswered')
       url.searchParams.delete('q')
+      url.searchParams.delete('ch')
       if (state.filter !== 'all') url.searchParams.set('inbox', state.filter)
+      if (state.channel !== 'all') url.searchParams.set('ch', state.channel)
       if (inboxQuery) url.searchParams.set('q', inboxQuery)
       row.href = url.href
     }
@@ -629,7 +645,9 @@
       backUrl.searchParams.delete('jid')
       backUrl.searchParams.delete('inbox')
       backUrl.searchParams.delete('unanswered')
+      backUrl.searchParams.delete('ch')
       if (state.filter !== 'all') backUrl.searchParams.set('inbox', state.filter)
+      if (state.channel !== 'all') backUrl.searchParams.set('ch', state.channel)
       back.href = backUrl.href
     }
     contacts.querySelectorAll('.wa-empty').forEach((element) => element.remove())
@@ -672,6 +690,27 @@
     history.replaceState(null, '', url)
     applyInboxFilters()
   })
+  byId('inboxChannels')?.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-channel]')
+    if (!button) return
+    const url = new URL(location.href)
+    if (button.dataset.channel === 'all') url.searchParams.delete('ch')
+    else url.searchParams.set('ch', button.dataset.channel)
+    history.replaceState(null, '', url)
+    try {
+      localStorage.setItem('wa-inbox-channel', button.dataset.channel)
+    } catch {}
+    applyInboxFilters()
+  })
+  // Pilihan saluran terakhir diingat di perangkat ini.
+  try {
+    const saved = localStorage.getItem('wa-inbox-channel')
+    const url = new URL(location.href)
+    if (!url.searchParams.has('ch') && (saved === 'wa' || saved === 'ig')) {
+      url.searchParams.set('ch', saved)
+      history.replaceState(null, '', url)
+    }
+  } catch {}
   window.addEventListener('popstate', applyInboxFilters)
   const inboxSearch = byId('inboxSearch')
   let inboxSearchTimer
