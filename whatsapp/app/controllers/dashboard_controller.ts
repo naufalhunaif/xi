@@ -302,9 +302,9 @@ export default class DashboardController {
     const linesConnected = lines.filter((line) => line.status === 'connected').length
     return response.json({ ...state, pendingOrders, linesConnected })
   }
-  async usage({ response }: HttpContext) {
+  async usage({ request, response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
-    return response.json(await readUsage())
+    return response.json(await readUsage({ days: Number(request.qs().days || 30), date: String(request.qs().date || '') }))
   }
   async quotas({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')

@@ -5,12 +5,52 @@
 <div id="quotaCards" class="wa-usage-cards" aria-busy="true"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
 <p id="quotaStatus" class="wa-usage-caption" role="status"></p>
 <div class="wa-usage-toolbar">
-  <span data-i18n="30 hari terakhir · WIB">30 hari terakhir · WIB</span>
-  <button id="usageRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button>
+  <strong data-i18n="Pemakaian token">Pemakaian token</strong>
+  <button id="usageRefresh" class="button small" type="button" data-i18n="Perbarui">Perbarui</button>
 </div>
 <div id="usageStatus" class="wa-usage-caption" role="status"></div>
-<div id="usageCards" class="wa-usage-cards"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
-<div class="wa-usage-table-wrap">
+<section class="wa-heat-box" aria-label="Pemakaian per hari, 1 tahun" data-i18n-aria-label="Pemakaian per hari, 1 tahun">
+  <div id="usageHeatmap" class="wa-heat-scroll"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+  <div class="wa-heat-foot">
+    <span id="usageHeatSummary" class="wa-usage-caption"></span>
+    <span class="wa-heat-legend" aria-hidden="true"><span data-i18n="Sedikit">Sedikit</span><i data-level="0"></i><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span data-i18n="Banyak">Banyak</span></span>
+  </div>
+</section>
+<div class="wa-usage-range">
+  <div id="usageRange" class="wa-segmented" role="group" aria-label="Rentang" data-i18n-aria-label="Rentang">
+    <button type="button" data-days="7" aria-pressed="false" data-i18n="7 hari">7 hari</button>
+    <button type="button" data-days="30" aria-pressed="true" data-i18n="30 hari">30 hari</button>
+    <button type="button" data-days="90" aria-pressed="false" data-i18n="90 hari">90 hari</button>
+    <button type="button" data-days="365" aria-pressed="false" data-i18n="1 tahun">1 tahun</button>
+  </div>
+  <button id="usageDay" class="wa-usage-day" type="button" hidden></button>
+</div>
+<div id="usageCards" class="wa-usage-stats"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+<p id="usageProviders" class="wa-usage-caption"></p>
+<div id="usageTabs" class="wa-segmented wa-usage-tabs" role="group" aria-label="Rincian" data-i18n-aria-label="Rincian">
+  <button type="button" data-usage-show="models" aria-pressed="true" data-i18n="Per model">Per model</button>
+  <button type="button" data-usage-show="phases" aria-pressed="false" data-i18n="Per fase">Per fase</button>
+  <button type="button" data-usage-show="recent" aria-pressed="false" data-i18n="Proses terbaru">Proses terbaru</button>
+</div>
+<div class="wa-usage-table-wrap" data-usage-tab="models">
+  <table class="wa-usage-table">
+    <caption data-i18n="Token per model">Token per model</caption>
+    <thead>
+      <tr>
+        <th>AI / Model</th>
+        <th data-i18n="Proses">Proses</th>
+        <th>Input</th>
+        <th data-i18n="Cache dibaca">Cache dibaca</th>
+        <th>Output</th>
+      </tr>
+    </thead>
+    <tbody id="usageModels"><tr><td colspan="5"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
+  </table>
+  <p class="wa-usage-caption" data-i18n="Model Otomatis dipilih per tugas: ringan untuk salam/terima kasih, menengah untuk balasan biasa, utama untuk foto, order, pembayaran, komplain dan analisis.">
+    Model Otomatis dipilih per tugas: ringan untuk salam/terima kasih, menengah untuk balasan biasa, utama untuk foto, order, pembayaran, komplain dan analisis.
+  </p>
+</div>
+<div class="wa-usage-table-wrap" data-usage-tab="phases" hidden>
   <table class="wa-usage-table">
     <caption data-i18n="Token per fase proses">Token per fase proses</caption>
     <thead>
@@ -26,29 +66,11 @@
     </thead>
     <tbody id="usagePhases"><tr><td colspan="7"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
   </table>
+  <p class="wa-usage-caption" data-i18n="Satu pesan pelanggan dapat memicu beberapa fase; tiap fase adalah satu panggilan penuh ke layanan AI.">
+    Satu pesan pelanggan dapat memicu beberapa fase; tiap fase adalah satu panggilan penuh ke layanan AI.
+  </p>
 </div>
-<p class="wa-usage-caption" data-i18n="Satu pesan pelanggan dapat memicu beberapa fase; tiap fase adalah satu panggilan penuh ke layanan AI.">
-  Satu pesan pelanggan dapat memicu beberapa fase; tiap fase adalah satu panggilan penuh ke layanan AI.
-</p>
-<div class="wa-usage-table-wrap">
-  <table class="wa-usage-table">
-    <caption data-i18n="Token per model">Token per model</caption>
-    <thead>
-      <tr>
-        <th>AI / Model</th>
-        <th data-i18n="Proses">Proses</th>
-        <th>Input</th>
-        <th data-i18n="Cache dibaca">Cache dibaca</th>
-        <th>Output</th>
-      </tr>
-    </thead>
-    <tbody id="usageModels"><tr><td colspan="5"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
-  </table>
-</div>
-<p class="wa-usage-caption" data-i18n="Model Otomatis dipilih per tugas: ringan untuk salam/terima kasih, menengah untuk balasan biasa, utama untuk foto, order, pembayaran, komplain dan analisis.">
-  Model Otomatis dipilih per tugas: ringan untuk salam/terima kasih, menengah untuk balasan biasa, utama untuk foto, order, pembayaran, komplain dan analisis.
-</p>
-<div class="wa-usage-table-wrap">
+<div class="wa-usage-table-wrap" data-usage-tab="recent" hidden>
   <table class="wa-usage-table">
     <caption data-i18n="Proses terbaru">Proses terbaru</caption>
     <thead>

@@ -784,3 +784,35 @@ body:has(#igpDrawer[open]) { overflow: hidden; }
 /* Panel detail: setiap bagian setinggi isinya, seluruh panel yang digulir (galeri tidak boleh tergencet). */
 .workspace-ui .wa-order-editor.wa-igp-detail { grid-auto-rows: max-content; }
 .workspace-ui .wa-igp-gallery { flex-shrink: 0; min-height: max-content; overflow-y: hidden; }
+/* Usage: kalender pemakaian 1 tahun (seperti GitHub) + ringkasan */
+.workspace-ui .wa-heat-box { display: grid; gap: 8px; margin: 8px 0 4px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.workspace-ui .wa-heat-scroll { overflow-x: auto; scrollbar-width: thin; min-width: 0; }
+.workspace-ui .wa-heat { display: block; }
+.workspace-ui .wa-heat text { font-size: 10px; fill: var(--muted); }
+.workspace-ui .wa-heat rect { cursor: pointer; fill: var(--wa-raised, #ebedf0); }
+.workspace-ui .wa-heat rect:hover { stroke: var(--muted); stroke-width: 1; }
+.workspace-ui .wa-heat rect[data-level="1"] { fill: color-mix(in srgb, #18865b 30%, var(--wa-raised, #ebedf0)); }
+.workspace-ui .wa-heat rect[data-level="2"] { fill: color-mix(in srgb, #18865b 55%, var(--wa-raised, #ebedf0)); }
+.workspace-ui .wa-heat rect[data-level="3"] { fill: color-mix(in srgb, #18865b 80%, var(--wa-raised, #ebedf0)); }
+.workspace-ui .wa-heat rect[data-level="4"] { fill: #18865b; }
+.workspace-ui .wa-heat rect[data-selected] { stroke: var(--text); stroke-width: 2; }
+.workspace-ui .wa-heat-legend i { display: block; width: 10px; height: 10px; border-radius: 2px; background: var(--wa-raised, #ebedf0); }
+.workspace-ui .wa-heat-legend i[data-level="1"] { background: color-mix(in srgb, #18865b 30%, var(--wa-raised, #ebedf0)); }
+.workspace-ui .wa-heat-legend i[data-level="2"] { background: color-mix(in srgb, #18865b 55%, var(--wa-raised, #ebedf0)); }
+.workspace-ui .wa-heat-legend i[data-level="3"] { background: color-mix(in srgb, #18865b 80%, var(--wa-raised, #ebedf0)); }
+.workspace-ui .wa-heat-legend i[data-level="4"] { background: #18865b; }
+.workspace-ui .wa-heat-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.workspace-ui .wa-heat-legend { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--muted); }
+.workspace-ui .wa-heat-legend span { margin: 0 3px; }
+.workspace-ui .wa-usage-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 10px; }
+.workspace-ui .wa-usage-range .wa-segmented { margin: 0; }
+.workspace-ui .wa-usage-day { padding: 5px 10px; border: 1px solid #18865b; border-radius: 999px; background: color-mix(in srgb, #18865b 10%, transparent); font: inherit; font-size: 12px; font-weight: 600; color: inherit; cursor: pointer; }
+.workspace-ui .wa-usage-day[hidden] { display: none; }
+.workspace-ui .wa-usage-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.workspace-ui .wa-usage-stat { display: grid; gap: 2px; align-content: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.workspace-ui .wa-usage-stat small { font-size: 11px; color: var(--muted); }
+.workspace-ui .wa-usage-stat strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.workspace-ui .wa-usage-stat .wa-usage-caption { margin: 0; font-size: 11px; }
+.workspace-ui .wa-usage-tabs { margin: 14px 0 6px; }
+.workspace-ui [data-usage-tab][hidden] { display: none; }
+@media (max-width: 640px) { .workspace-ui .wa-usage-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

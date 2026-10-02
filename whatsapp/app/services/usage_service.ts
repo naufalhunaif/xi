@@ -1,6 +1,7 @@
 import db from '#services/workspace_database'
 import { DateTime } from 'luxon'
 import { initializeDatabase } from '#services/init_model'
+import { workspaceScope } from '#services/workspace_context'
 
 export type TokenUsage = { input: number; output: number; cached: number; cacheWrite: number }
 
@@ -62,13 +63,25 @@ export async function recordUsage(input: {
   })
 }
 
-export async function readUsage() {
+const ZONE = 'Asia/Jakarta'
+export const USAGE_RANGES = [7, 30, 90, 365]
+
+/**
+ * Ringkasan pemakaian untuk satu rentang (7/30/90/365 hari) atau satu tanggal (YYYY-MM-DD, WIB).
+ * Kalender 1 tahun (seperti grafik kontribusi GitHub) dihitung terpisah dan di-cache.
+ */
+export async function readUsage(options: { days?: number; date?: string } = {}) {
   await initializeDatabase()
-  const since = DateTime.now().setZone('Asia/Jakarta').startOf('day').minus({ days: 29 }).toJSDate()
+  const days = USAGE_RANGES.includes(Number(options.days)) ? Number(options.days) : 30
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(options.date || '')) ? DateTime.fromISO(String(options.date), { zone: ZONE }) : null
+  const since = (day?.isValid ? day : DateTime.now().setZone(ZONE).minus({ days: days - 1 })).startOf('day').toJSDate()
+  const until = day?.isValid ? day.endOf('day').toJSDate() : null
+  const range = <T>(query: T): T => {
+    const builder = (query as any).where('created_at', '>=', since)
+    return (until ? builder.where('created_at', '<=', until) : builder) as T
+  }
   const [rows, recent] = await Promise.all([
-    db
-      .from('whatsapp_ai_usage')
-      .where('created_at', '>=', since)
+    range(db.from('whatsapp_ai_usage'))
       .select('provider')
       .count('* as runs')
       .count('input_tokens as measured')
@@ -79,12 +92,10 @@ export async function readUsage() {
       .select(db.raw("SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed"))
       .avg('duration_ms as duration')
       .groupBy('provider'),
-    db.from('whatsapp_ai_usage').where('created_at', '>=', since).orderBy('id', 'desc').limit(10),
+    range(db.from('whatsapp_ai_usage')).orderBy('id', 'desc').limit(10),
   ])
   // Where the tokens actually go: one customer message can trigger several full runs.
-  const phases = await db
-    .from('whatsapp_ai_usage')
-    .where('created_at', '>=', since)
+  const phases = await range(db.from('whatsapp_ai_usage'))
     .select('phase')
     .count('* as runs')
     .sum('input_tokens as input')
@@ -96,9 +107,7 @@ export async function readUsage() {
     .orderByRaw('SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)) DESC')
     .limit(12)
   // Model yang benar-benar dipakai (mode Otomatis memilih model per tugas).
-  const models = await db
-    .from('whatsapp_ai_usage')
-    .where('created_at', '>=', since)
+  const models = await range(db.from('whatsapp_ai_usage'))
     .select('provider', 'model')
     .count('* as runs')
     .sum('input_tokens as input')
@@ -108,7 +117,9 @@ export async function readUsage() {
     .orderByRaw('COUNT(*) DESC')
     .limit(12)
   return {
-    days: 30,
+    days: day?.isValid ? 1 : days,
+    date: day?.isValid ? day.toISODate() : '',
+    calendar: await usageCalendar().catch(() => []),
     models: models.map((row) => ({
       provider: row.provider,
       model: row.model || 'bawaan akun',
@@ -156,4 +167,34 @@ export async function readUsage() {
       createdAt: new Date(row.created_at).toISOString(),
     })),
   }
+}
+
+/** Token per hari (WIB) 1 tahun terakhir; dihitung per jam lalu digeser ke WIB. Cache 10 menit. */
+const calendarCache = new Map<string, { at: number; data: Array<{ date: string; tokens: number; runs: number }> }>()
+export async function usageCalendar() {
+  const key = workspaceScope().prefix || 'default'
+  const cached = calendarCache.get(key)
+  if (cached && Date.now() - cached.at < 10 * 60_000) return cached.data
+  const since = DateTime.now().setZone(ZONE).startOf('day').minus({ days: 371 }).toJSDate()
+  const rows = (await db
+    .from('whatsapp_ai_usage')
+    .where('created_at', '>=', since)
+    .select(db.raw("DATE_FORMAT(created_at, '%Y-%m-%d %H') as hour"))
+    .count('* as runs')
+    .select(db.raw('SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) as tokens'))
+    .groupBy('hour')) as any[]
+  const byDate = new Map<string, { date: string; tokens: number; runs: number }>()
+  for (const row of rows) {
+    // created_at tersimpan dalam zona waktu server (mysql2 "local").
+    const [date, hour] = String(row.hour).split(' ')
+    const local = new Date(`${date}T${hour}:00:00`)
+    const wib = DateTime.fromJSDate(local).setZone(ZONE).toISODate() || date
+    const entry = byDate.get(wib) || { date: wib, tokens: 0, runs: 0 }
+    entry.tokens += Number(row.tokens || 0)
+    entry.runs += Number(row.runs || 0)
+    byDate.set(wib, entry)
+  }
+  const data = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+  calendarCache.set(key, { at: Date.now(), data })
+  return data
 }

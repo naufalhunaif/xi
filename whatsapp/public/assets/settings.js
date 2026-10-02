@@ -9,6 +9,10 @@
   const base = document.querySelector('meta[name="app-url"]').content.replace(/\/$/, '')
   let loading = false
   let evaluationLoading = false
+  // Usage: rentang/tanggal terpilih & cache kalender (dipakai selectPanel saat halaman dibuka).
+  const usageState = { days: 30, date: '' }
+  let calendarKey = ''
+  let lastCalendar = []
   function refreshRelativeTimes() {
     for (const time of document.querySelectorAll('time[data-relative-time]')) {
       const seconds = Math.max(0, (Date.now() - new Date(time.dateTime).getTime()) / 1000)
@@ -64,53 +68,174 @@
     if (className) element.className = className
     return element
   }
+  /* ───── Usage: kalender 1 tahun (seperti GitHub), rentang, ringkasan, rincian bertab ───── */
+  const locale = () => window.waI18n?.locale || 'id-ID'
+  const compact = (value) => new Intl.NumberFormat(locale(), { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+  const dayLabel = (iso, options = { day: 'numeric', month: 'short', year: 'numeric' }) =>
+    new Intl.DateTimeFormat(locale(), { timeZone: 'UTC', ...options }).format(new Date(`${iso}T00:00:00Z`))
+  const isoOf = (date) => date.toISOString().slice(0, 10)
+  function todayWib() {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date())
+    return new Date(`${parts}T00:00:00Z`)
+  }
+  window.addEventListener('resize', () => {
+    if (byId('settings-usage')?.hidden || !lastCalendar.length) return
+    calendarKey = ''
+    renderCalendar(lastCalendar)
+  })
+  function renderCalendar(calendar) {
+    const box = byId('usageHeatmap')
+    if (!box) return
+    lastCalendar = calendar
+    const key = JSON.stringify(calendar) + usageState.date + locale() + box.clientWidth
+    if (key === calendarKey) return
+    calendarKey = key
+    const byDate = new Map(calendar.map((row) => [row.date, row]))
+    const values = calendar.map((row) => row.tokens).filter((value) => value > 0).sort((a, b) => a - b)
+    const cut = (q) => values[Math.min(values.length - 1, Math.floor(q * values.length))] || 0
+    const steps = [cut(0.25), cut(0.5), cut(0.75)]
+    const level = (tokens) => (!tokens ? 0 : tokens <= steps[0] ? 1 : tokens <= steps[1] ? 2 : tokens <= steps[2] ? 3 : 4)
+    // 53 minggu ke belakang, kolom = minggu (Senin di atas), seperti GitHub. Digambar sebagai SVG.
+    const end = todayWib()
+    const start = new Date(end)
+    start.setUTCDate(start.getUTCDate() - 364)
+    start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7))
+    const columns = Math.floor((end - start) / 86_400_000 / 7) + 1
+    const left = 26
+    const top = 16
+    // Ukuran kotak menyesuaikan lebar panel; layar sempit → geser ke samping (terbaru di kanan).
+    const fit = Math.floor((box.clientWidth - left) / columns)
+    const gap = fit >= 13 ? 3 : 2
+    const cell = Math.max(8, Math.min(13, fit - gap))
+    const step = cell + gap
+    const NS = 'http://www.w3.org/2000/svg'
+    const svg = document.createElementNS(NS, 'svg')
+    const width = left + columns * step
+    const height = top + 7 * step
+    svg.setAttribute('width', String(width))
+    svg.setAttribute('height', String(height))
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
+    svg.setAttribute('class', 'wa-heat')
+    const text = (value, x, y, anchor = 'start') => {
+      const node = document.createElementNS(NS, 'text')
+      node.setAttribute('x', String(x))
+      node.setAttribute('y', String(y))
+      node.setAttribute('text-anchor', anchor)
+      node.textContent = value
+      svg.append(node)
+      return node
+    }
+    for (const [row, iso] of [[0, '2024-01-01'], [2, '2024-01-03'], [4, '2024-01-05']])
+      text(dayLabel(iso, { weekday: 'short' }), left - 6, top + row * step + cell - 1, 'end')
+    let column = 0
+    let lastMonth = -1
+    let lastLabel = null
+    for (const cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+      const weekday = (cursor.getUTCDay() + 6) % 7
+      if (weekday === 0 && cursor > start) column++
+      const iso = isoOf(cursor)
+      if (weekday === 0 && cursor.getUTCMonth() !== lastMonth) {
+        lastMonth = cursor.getUTCMonth()
+        // Label bulan berdekatan (bulan pertama yang terpotong) → pakai yang baru saja.
+        if (lastLabel && column - lastLabel.column < 3) lastLabel.node.remove()
+        if (column < columns - 2) lastLabel = { column, node: text(dayLabel(iso, { month: 'short' }), left + column * step, top - 5) }
+      }
+      const row = byDate.get(iso)
+      const rect = document.createElementNS(NS, 'rect')
+      rect.setAttribute('x', String(left + column * step))
+      rect.setAttribute('y', String(top + weekday * step))
+      rect.setAttribute('width', String(cell))
+      rect.setAttribute('height', String(cell))
+      rect.setAttribute('rx', '2')
+      rect.dataset.date = iso
+      rect.dataset.level = String(level(row?.tokens || 0))
+      if (iso === usageState.date) rect.dataset.selected = 'true'
+      const title = document.createElementNS(NS, 'title')
+      title.textContent = row
+        ? t('{0}: {1} token · {2} proses', dayLabel(iso), number(row.tokens), number(row.runs))
+        : t('{0}: tidak ada pemakaian', dayLabel(iso))
+      rect.append(title)
+      svg.append(rect)
+    }
+    box.replaceChildren(svg)
+    box.scrollLeft = box.scrollWidth
+    const total = calendar.reduce((sum, row) => sum + row.tokens, 0)
+    const busiest = calendar.reduce((best, row) => (row.tokens > (best?.tokens || 0) ? row : best), null)
+    byId('usageHeatSummary').textContent = calendar.length
+      ? t('{0} token dalam 1 tahun · tersibuk {1} ({2})', compact(total), dayLabel(busiest.date, { day: 'numeric', month: 'short' }), compact(busiest.tokens))
+      : t('Belum ada penggunaan tercatat')
+  }
+  byId('usageHeatmap')?.addEventListener('click', (event) => {
+    const cell = event.target.closest('[data-date]')
+    if (!cell) return
+    usageState.date = usageState.date === cell.dataset.date ? '' : cell.dataset.date
+    updateUsage()
+  })
+  byId('usageDay')?.addEventListener('click', () => {
+    usageState.date = ''
+    updateUsage()
+  })
+  byId('usageRange')?.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-days]')
+    if (!button) return
+    usageState.days = Number(button.dataset.days)
+    usageState.date = ''
+    updateUsage()
+  })
+  byId('usageTabs')?.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-usage-show]')
+    if (!button) return
+    for (const item of byId('usageTabs').querySelectorAll('button')) item.setAttribute('aria-pressed', String(item === button))
+    for (const panel of document.querySelectorAll('[data-usage-tab]')) panel.hidden = panel.dataset.usageTab !== button.dataset.usageShow
+  })
+  function renderSummary(data) {
+    const sum = (key) => data.providers.reduce((total, row) => total + Number(row[key] || 0), 0)
+    const input = sum('input')
+    const output = sum('output')
+    const runs = sum('runs')
+    const failed = sum('failed')
+    const measured = sum('measured')
+    const duration = runs ? data.providers.reduce((total, row) => total + row.durationMs * row.runs, 0) / runs : 0
+    const cards = byId('usageCards')
+    cards.replaceChildren()
+    for (const [label, value, extra] of [
+      [t('Token'), measured ? compact(input + output) : '—', measured ? t('input {0} · output {1}', compact(input), compact(output)) : ''],
+      [t('Proses AI'), number(runs), failed ? t('{0} gagal', number(failed)) : ''],
+      [t('Cache dibaca'), input ? `${Math.round((sum('cached') / input) * 100)}%` : '—', input ? t('{0} token dari cache', compact(sum('cached'))) : ''],
+      [t('Rata-rata'), runs ? t('{0} dtk', number(Math.round(duration / 1000))) : '—', t('per proses')],
+    ]) {
+      const card = textElement('article', '', 'wa-usage-stat')
+      card.append(textElement('small', label), textElement('strong', value))
+      if (extra) card.append(textElement('span', extra, 'wa-usage-caption'))
+      cards.append(card)
+    }
+    const names = { claude: 'Claude', gemini: 'Gemini', chatgpt: 'ChatGPT' }
+    const used = data.providers.filter((row) => row.runs)
+    byId('usageProviders').textContent = used.length
+      ? used.map((row) => `${names[row.provider] || row.provider} ${row.measured ? compact(row.input + row.output) : '—'} (${number(row.runs)} ${t('proses')})`).join(' · ')
+      : ''
+    for (const button of byId('usageRange').querySelectorAll('button'))
+      button.setAttribute('aria-pressed', String(!usageState.date && Number(button.dataset.days) === usageState.days))
+    const chip = byId('usageDay')
+    chip.hidden = !usageState.date
+    chip.textContent = usageState.date ? `${dayLabel(usageState.date)} ×` : ''
+    chip.title = t('Kembali ke rentang')
+  }
   async function updateUsage() {
     if (loading || document.hidden) return
     loading = true
     byId('usageRefresh').disabled = true
     try {
-      const response = await fetch(`${base}/api/ai/usage`, {
+      const query = usageState.date ? `date=${usageState.date}` : `days=${usageState.days}`
+      const response = await fetch(`${base}/api/ai/usage?${query}`, {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
       })
       if (!response.ok || response.redirected)
         throw new Error(t('Usage belum dapat dimuat. Coba perbarui.'))
       const data = await response.json()
-      const cards = byId('usageCards')
-      cards.replaceChildren()
-      for (const usage of data.providers) {
-        const card = textElement('article', '', 'wa-usage-card')
-        card.append(textElement('h3', ({ claude: 'Claude', gemini: 'Gemini' })[usage.provider] || 'ChatGPT'))
-        card.append(
-          textElement(
-            'strong',
-            usage.measured ? number(usage.input + usage.output) : '—',
-            'wa-usage-total'
-          )
-        )
-        card.append(textElement('span', t('token tercatat'), 'wa-usage-caption'))
-        const details = document.createElement('dl')
-        for (const [label, value] of [
-          ['Input', usage.measured ? number(usage.input) : '—'],
-          ['Output', usage.measured ? number(usage.output) : '—'],
-          [t('Cache dibaca'), usage.measured ? number(usage.cached) : '—'],
-          [t('Cache ditulis'), usage.measured ? number(usage.cacheWrite) : '—'],
-          [t('Proses AI'), number(usage.runs)],
-          [t('Gagal'), number(usage.failed)],
-          [t('Rata-rata'), usage.runs ? t("{0} dtk", number(Math.round(usage.durationMs / 1000))) : '—'],
-        ])
-          details.append(textElement('dt', label), textElement('dd', value))
-        card.append(details)
-        if (usage.runs > usage.measured)
-          card.append(
-            textElement(
-              'small',
-              t("{0} proses tanpa laporan token", number(usage.runs - usage.measured)),
-              'wa-usage-caption'
-            )
-          )
-        cards.append(card)
-      }
+      renderCalendar(data.calendar || [])
+      renderSummary(data)
       const phases = byId('usagePhases')
       if (phases) {
         phases.replaceChildren()
@@ -199,7 +324,7 @@
         row.append(cell)
         recent.append(row)
       }
-      byId('usageStatus').textContent = t('Diperbarui otomatis setiap 15 detik')
+      byId('usageStatus').textContent = ''
     } catch (error) {
       byId('usageStatus').textContent = error.message
     } finally {
