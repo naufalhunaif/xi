@@ -756,7 +756,12 @@ export async function createLeanReply(input: {
         .map((note) => note.match(/<<<ONGKIR\n([\s\S]+?)\nONGKIR>>>/)?.[1])
         .filter(Boolean)
         .pop()
-      const asks = decision.pesan.some((bubble) => /\?/.test(bubble) && /(mana|pilih|layanan|reg|yes)/i.test(bubble))
+      // Tanya layanan wajib menyertakan tarifnya (blok ONGKIR), bukan hanya "REG atau YES?".
+      const shown = Boolean(block) && decision.pesan.some((bubble) => /\d{1,3}(?:\.\d{3})+/.test(bubble) && /(reg|yes|jtr|ongkir)/i.test(bubble))
+      const serviceQuestion = /[^.!?\n]*\b(reg|yes|jtr|layanan|pengiriman|ekspedisi|kurir|ongkir)\b[^.!?\n]*\?/gi
+      if (block && !shown)
+        decision.pesan = decision.pesan.map((bubble) => bubble.replace(serviceQuestion, '').replace(/\s{2,}/g, ' ').trim())
+      const asks = shown && decision.pesan.some((bubble) => /\?/.test(bubble) && /(mana|pilih|layanan|reg|yes)/i.test(bubble))
       decision.pesan = decision.pesan
         .map((bubble) => bubble.replace(/,?\s*(ini|berikut)\s+totalnya.*$/i, '').trim())
         .filter((bubble) => bubble && !/\b(ini|berikut)\b[^.?!]*\btotal/i.test(bubble))
@@ -1015,6 +1020,19 @@ async function ratesForAddress(
       ...(address.postalCode ? { zip_code: address.postalCode } : {}),
     })
   if (address.district && city) attempts.push({ destination: address.district })
+  // Hasil harus benar-benar kecamatan & kota yang diminta: "Wara, Palopo" pernah terbaca
+  // "Warambe, Muna" (nama mirip di kota lain) → ongkir salah. Hasil yang tidak cocok dibuang.
+  const squash = (value: unknown) => String(value || '').toLowerCase().replace(/[^a-z]/g, '')
+  const wantDistrict = squash(address.district)
+  const wantCity = squash(city)
+  const fits = (rates: ShippingRates | null) => {
+    const found = rates?.destination
+    if (!found?.district && !found?.city) return true
+    if (wantCity && found.city && !squash(found.city).includes(wantCity) && !wantCity.includes(squash(found.city))) return false
+    if (wantDistrict && found.district && squash(found.district) !== wantDistrict && !(found as any).subdistrict?.toString().toLowerCase().replace(/[^a-z]/g, '').includes(wantDistrict))
+      return false
+    return true
+  }
   let lastError: unknown = null
   for (const args of attempts) {
     try {
@@ -1023,9 +1041,23 @@ async function ratesForAddress(
         { ...args, weight_grams: grams },
         mcp
       )
-      if (rates?.prices?.length) return rates
+      if (rates?.prices?.length && (args.destination === lastResolved?.code || fits(rates))) return rates
     } catch (error) {
       lastError = error
+    }
+  }
+  // Cadangan: cari daftar tujuan di kota itu, pilih kecamatan yang namanya persis sama.
+  if (wantDistrict && city) {
+    try {
+      const area = groupDestinations(await findDestinations(city, mcp)).find(
+        (item) => squash(item.district) === wantDistrict && squash(item.city).includes(wantCity)
+      )
+      if (area) {
+        const rates = await callLeanTool<ShippingRates>('check_shipping_rates', { destination: area.code, weight_grams: grams }, mcp)
+        if (rates?.prices?.length) return { ...rates, destination: { ...(rates.destination || {}), code: area.code, district: area.district, city: area.city } }
+      }
+    } catch (error) {
+      lastError = lastError || error
     }
   }
   if (lastError) throw lastError
