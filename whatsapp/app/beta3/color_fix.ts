@@ -43,9 +43,9 @@ function customerNamed(
 }
 
 /**
- * Baris "Produk - Warna" yang warnanya tidak ada untuk produk itu di KATALOG diganti
- * dengan nama warna KATALOG yang sekelompok. `swaps` = pasangan [salah, benar] untuk
- * merapikan kalimat balasan di giliran yang sama.
+ * Baris "Produk - Warna" dengan warna KATALOG yang tidak pernah difotokan di chat dan tidak
+ * disebut pelanggan diganti warna foto katalog terakhir produk itu (foto Choco ditulis "Brown").
+ * `swaps` = pasangan [salah, benar] untuk merapikan kalimat balasan di giliran yang sama.
  */
 export function fixCatalogColors(
   text: string,
@@ -68,12 +68,9 @@ export function fixCatalogColors(
       if (!match) return line
       const colors = colorsOf.get(norm(match[2]))
       if (!colors?.length) return line
+      // Warna di luar KATALOG = permintaan custom pelanggan (mis. "Broken White"): dibiarkan.
       let color = match[3]
-      if (!colors.some((known) => norm(known) === norm(color))) {
-        const group = COLOR_GROUPS.find((names) => names.includes(norm(color)))
-        const hits = group ? colors.filter((known) => group.includes(norm(known))) : []
-        if (hits.length === 1) color = hits[0]
-      }
+      if (!colors.some((known) => norm(known) === norm(color))) return line
       // Warna yang ditunjukkan di chat: foto katalog produk ini yang dikirim toko (mis. setelah
       // pelanggan kirim gambar "yang seperti ini"). Warna lain yang tidak pernah disebut
       // pelanggan dan tidak pernah difotokan → pakai foto terakhir produk itu.

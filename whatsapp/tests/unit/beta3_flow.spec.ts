@@ -199,22 +199,21 @@ test.group('beta3 · alur order (database)', () => {
 })
 
 test.group('beta3 · warna katalog', () => {
-  test('warna di luar katalog diganti nama katalog', ({ assert }) => {
+  test('warna spesifikasi mengikuti foto katalog di chat; warna custom dibiarkan', ({ assert }) => {
     const catalog = [
       { product: 'Bescap Cross Placket', color: 'Black' },
       { product: 'Bescap Cross Placket', color: 'Choco' },
       { product: 'Tuxedo', color: 'Brown' },
     ]
-    const fixed = fixCatalogColors(
-      'Bescap Cross Placket - Brown\nJas, Celana\nTuxedo - Brown',
-      catalog
+    // Warna di luar katalog = permintaan custom ("Broken White"): tidak diganti.
+    assert.lengthOf(
+      fixCatalogColors('Bescap Cross Placket - Broken White\nTuxedo - Brown', catalog).swaps,
+      0
     )
-    assert.equal(fixed.text, 'Bescap Cross Placket - Choco\nJas, Celana\nTuxedo - Brown')
-    assert.deepEqual(swapColorWords(['warna brown-nya cocok', 'Brown ya'], fixed.swaps), [
+    assert.deepEqual(swapColorWords(['warna brown-nya cocok', 'Brown ya'], [['Brown', 'Choco']]), [
       'warna choco-nya cocok',
       'Choco ya',
     ])
-    assert.lengthOf(fixCatalogColors('Bescap Cross Placket - Navy', catalog).swaps, 0)
     // Produk punya Brown & Choco: warna mengikuti foto yang ditunjukkan di chat.
     const both = [...catalog, { product: 'Bescap Cross Placket', color: 'Brown' }]
     const chat = [

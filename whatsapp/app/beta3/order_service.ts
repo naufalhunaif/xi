@@ -901,6 +901,50 @@ export async function requeueLeanOrderGroup(id: number, chosenGroup?: string | n
   })
 }
 
+const ITEM_PARTS = /^(jas|celana|rompi|vest|kemeja|outer)(\s*(,|\+|dan|&)\s*(jas|celana|rompi|vest|kemeja|outer))*(\s+saja|\s+aja)?$/i
+const PANTS_LINE = /\bcelana\b/i
+
+/**
+ * Data pesanan mudah dibaca: per item, baris "Produk - Warna" dan "Jas, Celana" sebagai judul,
+ * detail diberi "- ", lalu ukuran celana dipisah satu baris kosong dari detail jas.
+ * "Ukuran custom, celana no 34" dipecah jadi detail jas + detail celana.
+ */
+export function layoutOrderLines(lines: string[]) {
+  const items: string[][] = [[]]
+  for (const line of lines) {
+    if (line === '') {
+      if (items[items.length - 1].length) items.push([])
+    } else items[items.length - 1].push(line)
+  }
+  const out: string[] = []
+  for (const item of items.filter((group) => group.length)) {
+    const head: string[] = []
+    const body: string[] = []
+    const pants: string[] = []
+    item.forEach((line, index) => {
+      const bare = line.replace(/^[-•*]\s*/, '').trim()
+      if (!bare) return
+      if ((index === 0 && /\s[-\u2013\u2014]\s/.test(bare)) || ITEM_PARTS.test(bare)) return head.push(bare)
+      if (/^dikirim sebelum/i.test(bare)) return body.push(bare)
+      // "Ukuran custom, celana no 34" → dua detail.
+      const parts = PANTS_LINE.test(bare) && !/^celana/i.test(bare) && /,\s*celana/i.test(bare)
+        ? bare.split(/,\s*(?=celana)/i)
+        : [bare]
+      for (const part of parts) {
+        const text = part.charAt(0).toUpperCase() + part.slice(1)
+        ;(PANTS_LINE.test(text) ? pants : body).push(`- ${text}`)
+      }
+    })
+    if (out.length) out.push('')
+    out.push(...head, ...body)
+    if (pants.length) {
+      if (body.length) out.push('')
+      out.push(...pants)
+    }
+  }
+  return out
+}
+
 /**
  * Teks untuk grup produksi — singkat seperti catatan CS ke penjahit:
  * produk/warna, jas/celana, size, tinggi/berat, detail custom, lalu nama pelanggan.
@@ -924,10 +968,12 @@ export function renderGroupOrderMessage(order: Record<string, any>) {
     lines.push(line.charAt(0).toUpperCase() + line.slice(1))
   }
   while (lines.length && lines[lines.length - 1] === '') lines.pop()
+  const laid = layoutOrderLines(lines)
+  lines.splice(0, lines.length, ...laid)
   const extra = [order.note, order.cs_note].map((value) => String(value || '').trim()).filter(Boolean)
   for (const value of extra) if (!lines.some((line) => line.includes(value))) lines.push(value)
   if (order.ship_by && !lines.some((line) => /dikirim sebelum|kirim sebelum/i.test(line)))
-    lines.push(`Dikirim sebelum: ${shipByText(order.ship_by)}`)
+    lines.push('', `Dikirim sebelum: ${shipByText(order.ship_by)}`)
   // Penutup: nama pelanggan (dari order, atau nama kontak WhatsApp) + nomor order untuk dilacak.
   const name = String(order.customer_name || order.contact_name || '').trim()
   const number = String(order.order_number || '').trim()

@@ -409,7 +409,7 @@ export default class Beta3Controller {
     // kalau kosong juga, order terakhir yang sudah lunas.
     const active = order && ['pending', 'awaiting_payment'].includes(String(order.status))
     const shown = active ? order : spec ? null : order && order.status === 'paid' ? order : null
-    const text = shown ? renderGroupOrderMessage(shown) : spec
+    const text = shown ? renderGroupOrderMessage(shown) : spec ? renderGroupOrderMessage({ spec }) : ''
     const refs = shown && shown.status === 'paid' ? await refsForOrder(Number(shown.id)) : await listActiveRefs(jid)
     const [withPhotos] = await attachOrderPhotos([{ spec: text, items: '', chat_note: '' }])
     if (order) {

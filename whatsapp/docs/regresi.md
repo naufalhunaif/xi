@@ -32,12 +32,13 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Pesan toko berisi total/rekening dikenali; janji AI ("ini totalnya saya kirimkan") tidak dianggap total | `beta3.spec` · form terlewat |
 | Tanpa form order, AI tidak menjanjikan total; minta data pengiriman / "saya cek dulu" | `beta3.spec` · janji total tanpa order |
 | Pesan grup produksi: tanpa harga, alamat, telepon; ditutup nama + nomor order | `beta3.spec` · pesan grup produksi |
+| Data pesanan (panel, halaman Order, grup): judul "Produk - Warna" + "Jas, Celana", detail diberi "- ", ukuran celana dipisah satu baris kosong dari jas | `beta3.spec` · data pesanan rapi |
 
 ## Beta 3 — isi balasan
 
 | Perilaku | Tes |
 |---|---|
-| Warna di spesifikasi & balasan = warna KATALOG yang difotokan di chat (foto Choco tidak ditulis "Brown"), kecuali pelanggan menyebut warnanya sendiri | `beta3_flow.spec` · warna katalog |
+| Warna di spesifikasi & balasan = warna KATALOG yang difotokan di chat (foto Choco tidak ditulis "Brown"), kecuali pelanggan menyebut warnanya sendiri; warna di luar katalog (custom, mis. "Broken White") tidak diganti | `beta3_flow.spec` · warna spesifikasi |
 | Kebijakan tukar size dari Pengaturan masuk prompt dan dikirim apa adanya | `beta3.spec` · pelajaran chat CS |
 | Pertanyaan yang baru ditanyakan tidak diulang | `beta3.spec` · form order |
 | Prompt lengkap tetap di bawah 10 ribu token | `beta3.spec` · prompt dan keluaran |

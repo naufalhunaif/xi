@@ -227,7 +227,7 @@ test.group('beta3 · form order', () => {
     // Ditutup nama + nomor order (untuk dilacak di grup), tanpa alamat/telepon/harga.
     assert.equal(
       text,
-      'Beskap Clean Look - Choco, size M, jas saja\nKerah: shanghai hitam\n\noyen\n#PO-20260923-001'
+      'Beskap Clean Look - Choco, size M, jas saja\n- Kerah: shanghai hitam\n\noyen\n#PO-20260923-001'
     )
     assert.notInclude(text, 'lapangan bola')
     assert.notInclude(text, '0822')
@@ -238,7 +238,7 @@ test.group('beta3 · form order', () => {
     })
     assert.equal(
       simple,
-      'Tuxedo Double Breasted - Maroon\nJas, Celana\nSize M/31\nTinggi 164/68\n\nDeva Hidayat'
+      'Tuxedo Double Breasted - Maroon\nJas, Celana\n- Size M/31\n- Tinggi 164/68\n\nDeva Hidayat'
     )
   })
 
@@ -764,6 +764,21 @@ test.group('beta3 · janji total tanpa order', () => {
     assert.isFalse(
       guardTotalPromise(['Harga setelannya 705.000 bos'], { address: 'bos', hasAddress: false })
         .changed
+    )
+  })
+})
+
+test.group('beta3 · data pesanan rapi', () => {
+  test('detail diberi "- " dan ukuran celana dipisah satu baris kosong dari jas', ({ assert }) => {
+    const text = renderGroupOrderMessage({
+      id: 5,
+      order_number: 'PO-20261003-001',
+      customer_name: 'Ardi',
+      spec: 'Bescap Cross Placket - Choco\nJas, Celana\nUkuran custom, celana no 34\nTinggi 170/69\nPanjang lengan 60 cm\nCelana pinggang 88 cm\nPanjang celana 91 cm\nSaku welt',
+    })
+    assert.equal(
+      text,
+      'Bescap Cross Placket - Choco\nJas, Celana\n- Ukuran custom\n- Tinggi 170/69\n- Panjang lengan 60 cm\n- Saku welt\n\n- Celana no 34\n- Celana pinggang 88 cm\n- Panjang celana 91 cm\n\nArdi\n#PO-20261003-001'
     )
   })
 })
