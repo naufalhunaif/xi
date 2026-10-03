@@ -224,3 +224,7 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 1. Form order yang terlewat (12 jam terakhir, lebih baru dari order terakhir) diambil di giliran berikutnya: ongkir dicek, order tercatat, total + rekening dikirim otomatis. Dilewati bila toko sudah mengirim total/rekening setelah form.
 2. Tanpa form order, janji "ini totalnya saya kirimkan" diganti: minta data pengiriman, atau "totalnya saya cek dulu" bila alamat sudah ada di chat.
 3. Skill: jangan sebut REG/YES yang tidak ada di ONGKIR; satu layanan → langsung pakai; ongkir yang disebut CS dipakai apa adanya.
+
+**Lanjutan (v3.4.179)**
+4. Form terlewat yang totalnya sudah dikirim CS manual tetap dicatat sebagai order "menunggu pembayaran" dengan total dari CS, supaya bukti transfer tampil dan tombol konfirmasi pembayaran muncul.
+5. Warna di spesifikasi mengikuti foto katalog yang ditunjukkan di chat: pelanggan mengirim gambar, AI membalas foto Bescap Cross Placket - Choco, tapi spesifikasi ditulis "Brown" (Brown dan Choco sama-sama ada di katalog). Kode sekarang mengganti warna yang tidak pernah difotokan dan tidak disebut pelanggan dengan warna foto terakhir produk itu.

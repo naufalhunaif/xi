@@ -904,7 +904,7 @@ export async function requeueLeanOrderGroup(id: number, chosenGroup?: string | n
 /**
  * Teks untuk grup produksi — singkat seperti catatan CS ke penjahit:
  * produk/warna, jas/celana, size, tinggi/berat, detail custom, lalu nama pelanggan.
- * Tanpa harga, alamat, telepon, nomor order, dan info pembayaran.
+ * Tanpa harga, alamat, telepon, dan info pembayaran; ditutup nama + nomor order (#…).
  */
 export function renderGroupOrderMessage(order: Record<string, any>) {
   const money = /\s*\(?\b(?:rp\.?\s*)?\d{1,3}(?:[.,]\d{3})+\)?|\s*\b\d{2,4}\s*(?:rb|ribu|k)\b/gi
@@ -935,7 +935,7 @@ export function renderGroupOrderMessage(order: Record<string, any>) {
   const partial = order.status === 'paid' && paid > 0 && Number(order.total || 0) > paid
   if (lines.length) lines.push('')
   if (name) lines.push(name)
-  const tail = [number ? `#${number}` : `#${order.id}`, partial ? 'DP' : order.status === 'paid' ? 'Lunas' : '']
+  const tail = [number ? `#${number}` : order.id ? `#${order.id}` : '', partial ? 'DP' : order.status === 'paid' ? 'Lunas' : '']
     .filter(Boolean)
     .join(' · ')
   if (tail) lines.push(tail)

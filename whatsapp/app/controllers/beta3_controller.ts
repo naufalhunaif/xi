@@ -37,6 +37,8 @@ import db from '#services/workspace_database'
 import { queueOutgoingMessage } from '#services/message_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
+import { recoverHandledOrder } from '#beta3/reply_service'
+import { fixCatalogColors } from '#beta3/color_fix'
 import { readExchangePolicy, saveExchangePolicy } from '#beta3/store_policy'
 import { customerImagesForOrder, listActiveRefs, refCaption, refsForOrder } from '#beta3/refs_service'
 import { readRecapProgress, requestRecap } from '#beta3/recap_service'
@@ -341,6 +343,29 @@ export default class Beta3Controller {
     void recheckPaidOrders().catch(() => {})
     const jid = String(request.qs().jid || '')
     if (!jid) return response.badRequest({ error: 'jid wajib.' })
+    // Spesifikasi lama yang warnanya tidak sesuai foto yang ditunjukkan di chat / KATALOG dirapikan.
+    const storedSpec = await readOrderSpec(jid)
+    if (storedSpec) {
+      const chat = await db
+        .from('whatsapp_messages')
+        .where('jid', jid)
+        .orderBy('id', 'desc')
+        .limit(200)
+        .select('direction', 'body', 'media_type')
+      const fixed = fixCatalogColors(
+        String(storedSpec),
+        (await catalogDigest().catch(() => ({ rows: [] }))).rows,
+        chat.map((row: any) => ({ direction: String(row.direction), body: row.body, mediaType: row.media_type })).reverse()
+      )
+      if (fixed.swaps.length) {
+        await writeOrderSpec(jid, fixed.text)
+        await updatePendingOrderSpec(jid, fixed.text)
+      }
+    }
+    // Form yang terlewat saat CS membalas + total dikirim CS manual: order dicatat supaya
+    // tombol konfirmasi pembayaran muncul.
+    const payment = await readSettings().catch(() => null)
+    await recoverHandledOrder(jid, (payment?.paymentMethods || []).map((method) => String(method.destination || ''))).catch(() => null)
     const [spec, order, contact, chatNote] = await Promise.all([
       readOrderSpec(jid),
       latestLeanOrder(jid),

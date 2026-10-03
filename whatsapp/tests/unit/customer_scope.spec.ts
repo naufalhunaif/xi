@@ -51,10 +51,10 @@ test.group('Customer conversation scope', () => {
       assert.equal(result.note, '')
       assert.equal(result.handoff_category, 'none')
       assert.isFalse(result.business_lookup_required)
-      assert.deepEqual(
-        events.map((event) => event.key),
-        ['skill-routing', 'customer-scope']
-      )
+      // Langkah ringan (level, waktu, ringkasan) boleh bertambah; provider/tool/handoff tidak boleh jalan.
+      const keys = events.map((event) => String(event.key))
+      assert.include(keys, 'customer-scope')
+      assert.notOk(keys.find((key) => /provider|tool|mcp|codex|handoff|business-/.test(key)))
     })
   }
   for (const text of [

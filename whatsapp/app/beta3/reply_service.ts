@@ -58,6 +58,7 @@ import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
+import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 
 /**
@@ -143,21 +144,58 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
   }))
 }
 
+/**
+ * Tanpa form order, total + rekening tidak pernah dikirim sistem: kalimat "ini totalnya saya
+ * kirimkan" dibuang, diganti minta data pengiriman (atau "saya cek dulu" bila alamat sudah ada).
+ */
+export function guardTotalPromise(pesan: string[], options: { address: string; hasAddress: boolean }) {
+  const promise = /\b(ini|berikut|saya kirim\w*|kami kirim\w*|menyusul)\b[^.?!\n]*\btotal\w*\b[^.?!\n]*/i
+  const promiseAfter = /\btotal\w*\b[^.?!\n]*\b(saya kirim\w*|kami kirim\w*|menyusul|dikirim\w*)\b[^.?!\n]*/i
+  if (!pesan.some((bubble) => promise.test(bubble) || promiseAfter.test(bubble)))
+    return { pesan, changed: false, waitCs: false }
+  const kept = pesan
+    .map((bubble) => bubble.replace(promise, '').replace(promiseAfter, '').replace(/\s*[.,]\s*$/, '').replace(/\s{2,}/g, ' ').trim())
+    .filter(Boolean)
+  kept.push(
+    options.hasAddress
+      ? `Totalnya saya cek dulu ya ${options.address}`
+      : `Boleh kirim data pengirimannya dulu ${options.address}? (nama, alamat lengkap + kecamatan, kota, no HP) biar totalnya langsung saya kirim`
+  )
+  return { pesan: kept, changed: true, waitCs: options.hasAddress }
+}
+
 /** Pesan toko yang sudah berisi total/rekening: order itu sudah ditangani (mis. oleh CS). */
 export function looksLikeTotalSent(body: string, destinations: string[] = []) {
   const text = String(body || '')
   const digits = text.replace(/\D/g, '')
   if (destinations.some((dest) => dest.replace(/\D/g, '').length >= 6 && digits.includes(dest.replace(/\D/g, ''))))
     return true
-  if (/\b(no\.?\s*rek|rekening|atas nama|a\.n\.?)\b/i.test(text) && /\d{6,}/.test(digits)) return true
+  if (/\b(no\.?\s*rek|rek|rekening|atas nama|a\.n\.?)\b/i.test(text) && /\d{6,}/.test(digits)) return true
   return /\btotal\w*\b[^\n]*\d{1,3}(?:\.\d{3}){1,}/i.test(text) && /\b(transfer|tf|rek|rekening)\b/i.test(text)
+}
+
+/** Total (dan ongkir) yang ditulis toko di chat, mis. "Total 705.000 + 95.000 = 800.000". */
+export function totalFromStoreMessages(bodies: string[]) {
+  let total = 0
+  let ongkir = 0
+  const money = (value: string) => Number(value.replace(/\./g, '')) || 0
+  for (const body of bodies) {
+    for (const line of String(body || '').split(/\n/)) {
+      const totalPart = line.match(/\btotal\w*\b(.*)$/i)?.[1] || ''
+      const amounts = totalPart.match(/\d{1,3}(?:\.\d{3})+/g)
+      if (amounts?.length) total = money(amounts[amounts.length - 1])
+      const fee = line.match(/\bongkir\w*\b[^\d\n]{0,20}(\d{1,3}(?:\.\d{3})+)/i)?.[1]
+      if (fee) ongkir = money(fee)
+    }
+  }
+  return { total, ongkir: ongkir > 0 && ongkir < total ? ongkir : 0 }
 }
 
 /**
  * Form order yang terlewat: pelanggan mengirimnya saat CS sedang membalas (giliran AI
- * dibatalkan), jadi belum tercatat dan total tidak pernah dikirim otomatis. Dicari di
- * pesan masuk 12 jam terakhir yang lebih baru dari order terakhir; dilewati bila toko
- * sudah mengirim total/rekening setelahnya.
+ * dibatalkan), jadi belum tercatat. Dicari di pesan masuk 24 jam terakhir yang lebih
+ * baru dari order terakhir. `handled` = toko sudah mengirim total/rekening setelahnya
+ * (order tetap dicatat dengan total dari CS, tanpa kirim total lagi).
  */
 export async function missedOrderForm(
   jid: string,
@@ -166,7 +204,7 @@ export async function missedOrderForm(
   fallback: { name: string; phone: string }
 ) {
   const latest = await latestLeanOrder(jid).catch(() => null)
-  const floor = Date.now() - 12 * 60 * 60_000
+  const floor = Date.now() - 24 * 60 * 60_000
   const since = latest ? Math.max(floor, new Date(latest.created_at).getTime()) : floor
   const rows = await db
     .from('whatsapp_messages')
@@ -176,7 +214,7 @@ export async function missedOrderForm(
     .whereNotIn('status', ['failed', 'queued'])
     .orderBy('created_at', 'desc')
     .orderBy('id', 'desc')
-    .limit(40)
+    .limit(80)
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index]
     const id = String(row.message_id || '')
@@ -186,13 +224,61 @@ export async function missedOrderForm(
     const typed = parseOrderForm(text)
     const form = typed || looseAddressForm(text, fallback.name, fallback.phone)
     if (!form) continue
-    const handled = rows
+    const storeRows = rows
       .slice(0, index)
-      .some((later) => later.direction !== 'in' && looksLikeTotalSent(String(later.body || ''), destinations))
-    if (handled) return null
-    return { form, text, messageId: id, pasted: !typed }
+      .filter((later) => later.direction !== 'in')
+      .reverse()
+    const store = storeRows.map((later) => String(later.body || ''))
+    const handled = store.some((body) => looksLikeTotalSent(body, destinations))
+    // Saat total dikirim toko: bukti transfer setelahnya yang ditampilkan untuk dicek.
+    const totalRow = storeRows.find((later) => /\btotal\w*\b[^\n]*\d{1,3}(?:\.\d{3})+/i.test(String(later.body || '')))
+    return {
+      form,
+      text,
+      messageId: id,
+      pasted: !typed,
+      handled,
+      storeTotal: handled ? totalFromStoreMessages(store) : null,
+      storeTotalAt: totalRow ? new Date(totalRow.created_at) : null,
+    }
   }
   return null
+}
+
+/**
+ * Form terlewat yang totalnya sudah dikirim CS manual: catat ordernya langsung sebagai
+ * "menunggu pembayaran" dengan total dari CS, supaya tombol konfirmasi pembayaran muncul.
+ * Tidak mengirim pesan apa pun. Mengembalikan id order atau null.
+ */
+export async function recoverHandledOrder(jid: string, destinations: string[]) {
+  const latest = await latestLeanOrder(jid).catch(() => null)
+  if (latest && ['pending', 'awaiting_payment'].includes(String(latest.status))) return null
+  const contact = await db.from('whatsapp_contacts').where('jid', jid).select('name').first()
+  const waPhone = phoneFromJid(jid)
+  const found = await missedOrderForm(jid, new Set(), destinations, {
+    name: contact?.name ? String(contact.name) : '',
+    phone: waPhone ? `0${waPhone.replace(/^62/, '')}` : '',
+  })
+  if (!found?.handled || !found.storeTotal?.total) return null
+  const [spec, chatNote] = await Promise.all([readOrderSpec(jid), readBeta3ChatNote(jid)])
+  const id = await saveLeanOrder({
+    jid,
+    sourceMessageId: found.messageId,
+    form: found.form,
+    items: spec || [found.form.note, chatNote].filter(Boolean).join('\n'),
+    spec: spec || undefined,
+    chatNote: chatNote || undefined,
+  })
+  await syncOrderFromChat(jid, {
+    total: found.storeTotal.total,
+    ongkir: found.storeTotal.ongkir,
+    layanan: '',
+    dibayar: 0,
+    dikonfirmasi: false,
+  })
+  if (found.storeTotalAt)
+    await db.from('whatsapp_beta3_orders').where('id', id).update({ updated_at: found.storeTotalAt })
+  return id
 }
 
 /** Ganti bubble yang menyebut ongkir berderet dalam satu kalimat dengan blok ongkir rapi. */
@@ -422,7 +508,20 @@ export async function createLeanReply(input: {
         settings.paymentMethods.map((method) => method.destination),
         fallback
       ).catch(() => null)
-      if (found) {
+      if (found?.handled) {
+        // Total sudah dikirim CS: catat order + totalnya saja, jangan kirim total lagi.
+        const recovered = await recoverHandledOrder(
+          jid,
+          settings.paymentMethods.map((method) => method.destination)
+        ).catch(() => null)
+        if (recovered)
+          onTrace?.({
+            key: 'beta3-order',
+            label: `Order #${recovered} dicatat dari form + total CS · menunggu pembayaran`,
+            status: 'completed',
+            detail: { orderId: recovered },
+          })
+      } else if (found) {
         missed = true
         formText = found.text
         formMessageId = found.messageId
@@ -725,6 +824,18 @@ export async function createLeanReply(input: {
     jid,
   })
   const decision = parseLeanDecision(result.text)
+  // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
+  const colorFix = fixCatalogColors(decision.spesifikasi, digest.rows, rows)
+  if (colorFix.swaps.length) {
+    decision.spesifikasi = colorFix.text
+    decision.pesan = swapColorWords(decision.pesan, colorFix.swaps)
+    onTrace?.({
+      key: 'beta3-color',
+      label: `Warna disesuaikan katalog · ${colorFix.swaps.map(([from, to]) => `${from} → ${to}`).join(', ')}`,
+      status: 'completed',
+      detail: colorFix.swaps,
+    })
+  }
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
   if (style) {
     decision.pesan = normalizeStyle(decision.pesan, style, [policy.text])
@@ -873,30 +984,21 @@ export async function createLeanReply(input: {
       status: 'completed',
       detail: { draft, fromAi: Boolean(decision.order), verdict },
     })
-  } else if (!decision.serah_cs) {
+  } else if (!decision.serah_cs && (await latestLeanOrder(jid))?.status !== 'awaiting_payment') {
     // Belum ada form/order: total + rekening tidak akan terkirim otomatis. Jangan janji
-    // "ini totalnya saya kirimkan"; minta data pengirimannya supaya total bisa dihitung.
-    const promise = /\b(ini|berikut|saya kirim\w*|kami kirim\w*|menyusul)\b[^.?!\n]*\btotal\w*\b[^.?!\n]*/i
-    const promiseAfter = /\btotal\w*\b[^.?!\n]*\b(saya kirim\w*|kami kirim\w*|menyusul|dikirim\w*)\b[^.?!\n]*/i
-    if (decision.pesan.some((bubble) => promise.test(bubble) || promiseAfter.test(bubble))) {
-      const address = style?.address || 'bos'
-      decision.pesan = decision.pesan
-        .map((bubble) => bubble.replace(promise, '').replace(promiseAfter, '').replace(/\s*[.,]\s*$/, '').replace(/\s{2,}/g, ' ').trim())
-        .filter(Boolean)
-      // Data pengiriman sudah ada di chat tapi tidak terbaca sebagai form: CS yang menghitung.
-      const hasAddress = rows.some(
+    // "ini totalnya saya kirimkan"; minta data pengiriman, atau tunggu CS bila alamat sudah ada.
+    const guarded = guardTotalPromise(decision.pesan, {
+      address: style?.address || 'bos',
+      hasAddress: rows.some(
         (row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos)\b/i.test(String(row.body || ''))
-      )
-      if (hasAddress) {
-        decision.pesan.push(`Totalnya saya cek dulu ya ${address}`)
-        decision.tahap = 'tunggu_cs'
-      } else
-        decision.pesan.push(
-          `Boleh kirim data pengirimannya dulu ${address}? (nama, alamat lengkap + kecamatan, kota, no HP) biar totalnya langsung saya kirim`
-        )
+      ),
+    })
+    if (guarded.changed) {
+      decision.pesan = guarded.pesan
+      if (guarded.waitCs) decision.tahap = 'tunggu_cs'
       onTrace?.({
         key: 'beta3-total',
-        label: hasAddress ? 'Janji total tanpa order · menunggu CS' : 'Janji total tanpa form order · minta data pengiriman',
+        label: guarded.waitCs ? 'Janji total tanpa order · menunggu CS' : 'Janji total tanpa form order · minta data pengiriman',
         status: 'completed',
         detail: {},
       })

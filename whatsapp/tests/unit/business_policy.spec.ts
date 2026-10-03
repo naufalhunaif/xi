@@ -29,7 +29,8 @@ test.group('Business data first', () => {
     assert.include(prompt, skills[1].content)
     assert.include(prompt, '=== SKILL: copy ===')
     assert.include(prompt, 'seluruh isinya berlaku juga di posisi ini')
-    assert.isBelow(prompt.length, content.length * 3)
+    // Isi identik (copy) tidak diulang: isi asli hanya muncul di 'original' dan 'different'.
+    assert.equal(prompt.split(content).length - 1, 2)
     const sections = new Map(skillSections(skills))
     assert.isBelow(sections.get('skill: copy')!, sections.get('skill: original')!)
     assert.isAbove(sections.get('skill: different')!, content.length)

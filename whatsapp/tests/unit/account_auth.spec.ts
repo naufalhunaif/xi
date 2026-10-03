@@ -5,8 +5,13 @@ import AccountController from '#controllers/account_controller'
 import env from '#start/env'
 import { validateWorkspaceUrls } from '#services/workspace_urls'
 
-const accountUrl = String(env.get('ACCOUNT_URL') || '').replace(/\/$/, '')
+// Tes ini untuk mode login Account (OAuth); di mesin dev ACCOUNT_URL bisa kosong (login lokal).
+const previousAccountUrl = env.get('ACCOUNT_URL')
+const previousAuthMode = env.get('AUTH_MODE')
+const accountUrl = String(previousAccountUrl || 'https://account.example.test').replace(/\/$/, '')
 const login = `${env.get('APP_URL').replace(/\/$/, '')}/login`
+// Tautan login mengikuti host yang dipakai pengunjung (sama dengan APP_URL di tes).
+const appUrl = new URL(env.get('APP_URL'))
 function context(path = '/api/workspace', account?: Record<string, unknown>) {
   const data = new Map<string, unknown>(account ? [['account', account]] : [])
   const result = {
@@ -28,7 +33,7 @@ function context(path = '/api/workspace', account?: Record<string, unknown>) {
     },
   }
   const ctx = {
-    request: { url: () => path, accepts: () => 'html' },
+    request: { url: () => path, accepts: () => 'html', protocol: () => appUrl.protocol.replace(':', ''), host: () => appUrl.host, method: () => 'GET' },
     session: {
       get: (key: string) => data.get(key),
       forget: (key: string) => data.delete(key),
@@ -47,6 +52,10 @@ function context(path = '/api/workspace', account?: Record<string, unknown>) {
         result.body = body
       },
       redirect: () => redirect,
+      send: (body: unknown) => {
+        result.status = 200
+        result.body = body
+      },
     },
   } as unknown as HttpContext
   return {
@@ -64,6 +73,14 @@ function session(checkedAt = 0) {
 const guard = new AccountAuthMiddleware()
 
 test.group('Account API authentication without OAuth redirects', (group) => {
+  group.setup(() => {
+    env.set('ACCOUNT_URL', accountUrl)
+    env.set('AUTH_MODE', 'oauth')
+    return () => {
+      env.set('ACCOUNT_URL', String(previousAccountUrl || ''))
+      env.set('AUTH_MODE', String(previousAuthMode || ''))
+    }
+  })
   group.each.setup(() => {
     const original = globalThis.fetch
     globalThis.fetch = async () => {
@@ -94,7 +111,13 @@ test.group('Account API authentication without OAuth redirects', (group) => {
   test('guest pages and media still require login and do not forward query strings', async ({
     assert,
   }) => {
-    for (const path of ['/', '/settings', '/orders', '/media/private.jpg']) {
+    // Beranda "/" untuk tamu = halaman publik (verifikasi Google), bukan redirect.
+    const home = context('/')
+    await guard.handle(home.ctx, home.next)
+    assert.equal(home.result.status, 200)
+    assert.isString(home.result.body)
+    assert.isFalse(home.result.next)
+    for (const path of ['/settings', '/orders', '/media/private.jpg']) {
       const mock = context(path)
       await guard.handle(mock.ctx, mock.next)
       assert.equal(mock.result.status, 302)
@@ -176,7 +199,7 @@ test.group('Account API authentication without OAuth redirects', (group) => {
     const mock = context('/login', session())
     await new AccountController().login(mock.ctx)
     const url = new URL(mock.result.location)
-    assert.equal(url.pathname, `${new URL(accountUrl).pathname}/oauth/account/authorize`)
+    assert.equal(url.pathname, `${new URL(accountUrl).pathname.replace(/\/$/, '')}/oauth/account/authorize`)
     assert.equal(url.searchParams.get('redirect_uri'), login.replace(/\/login$/, '/auth/callback'))
     assert.equal(url.searchParams.get('code_challenge_method'), 'S256')
     assert.isFalse(mock.result.withQs)

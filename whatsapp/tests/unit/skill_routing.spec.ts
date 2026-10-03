@@ -193,9 +193,11 @@ test('full library reconstructs originals exactly and cannot read outside this s
 test('headings inside code fences stay in their original policy section', async ({ assert }) => {
   const fenced = {
     name: bundle.name,
-    content: `# Root\n## Katalog\n\`\`\`markdown\n## Pembayaran\nCODE ORIGINAL\n\`\`\`\n${block('CATALOG')}## Pembayaran\n${block('PAYMENT')}`,
+    // Bagian lain cukup besar supaya routing memang dipakai (bukan dikirim penuh karena hemat kecil).
+    content: `# Root\n## Katalog\n\`\`\`markdown\n## Pembayaran\nCODE ORIGINAL\n\`\`\`\n${block('CATALOG')}## Pembayaran\n${block('PAYMENT').repeat(4)}`,
   }
   const plan = planSkillRouting([fenced], 'harga jas')
+  assert.equal(plan.detail.delivery, 'routed')
   assert.include(plan.skills[0].content, '## Pembayaran\nCODE ORIGINAL')
   assert.notInclude(plan.skills[0].content, block('PAYMENT'))
   const result = await plan

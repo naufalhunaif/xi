@@ -56,7 +56,11 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 
 ## Pengujian sebelum rilis
 
+0. **Jangan merusak yang sudah settle.** Baca `docs/regresi.md` sebelum mengubah fitur yang bersinggungan.
+   Bug diperbaiki → tambah tes + baris di `docs/regresi.md`. Perilaku sengaja diubah → ubah tes & barisnya
+   di commit yang sama; jangan melonggarkan tes supaya lulus.
 1. `npx tsc --noEmit` harus bersih; `node --check` untuk JS yang diubah.
+   `node ace test unit` harus **lulus semua** (butuh MariaDB; jalankan di salinan Linux).
 2. Uji perilaku di salinan lokal (MariaDB + `node ace serve`) — termasuk Playwright untuk tampilan 1440 px & 390 px.
 3. Panggilan ke API luar (Instagram/Meta) di-*mock* lewat `globalThis.fetch` di `node ace repl` (tulis satu baris, `inWorkspace(ctx.EMPTY_WORKSPACE, …)`).
 4. Jangan memanggil API sungguhan dengan token pengguna dari lingkungan uji.

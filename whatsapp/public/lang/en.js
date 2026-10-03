@@ -1687,4 +1687,12 @@ window.waLocales.en = {
   "Tidak ada internet": "No internet connection",
   "Server belum bisa dihubungi": "Can't reach the server",
   "Menghubungkan ulang…": "Reconnecting…",
+  "Beta 3 memakai koneksi MCP yang sama dengan Pengaturan → Data bisnis. Pilih sumbernya di sini; kalau statusnya belum Terhubung, tekan Hubungkan di Data bisnis dulu.": "Beta 3 uses the same MCP connection as Settings → Business data. Choose the source here; if it is not Connected yet, press Connect in Business data first.",
+  "Klik untuk mengubah": "Click to edit",
+  "Dana masuk": "Payment received",
+  "Selesai · minta pelunasan": "Done · request final payment",
+  "Selesai · kabari pelanggan": "Done · notify customer",
+  "Hapus seluruh chat, media, cart, order, pembayaran, saldo, alamat tersimpan, ingatan AI, dan antrean nomor aktif? Tidak dapat dibatalkan. Cadangkan data penting terlebih dahulu. Kontak dasar, skill, pengaturan, akun AI, dan koneksi nomor tetap disimpan. Data nomor lain dan Orion/MCP tidak diubah.": "Delete all chats, media, carts, orders, payments, balances, saved addresses, AI memory and the queue for the active number? This cannot be undone. Back up important data first. Basic contacts, skills, settings, AI accounts and the number connection are kept. Other numbers' data and Orion/MCP are not changed.",
+  "Hapus chat dan media pada nomor aktif? Tidak dapat dibatalkan. Catatan AI per chat (Beta 2) ikut dihapus. Kontak, cart, order, saldo, akun AI, skill, katalog, pengaturan, dan sesi nomor tetap tersimpan. Media referensi pesanan tetap disimpan.": "Delete chats and media for the active number? This cannot be undone. Per-chat AI notes (Beta 2) are deleted too. Contacts, carts, orders, balances, AI accounts, skills, catalog, settings and the number session are kept. Order reference media is kept.",
+  "Invalid production settings.": "Invalid production settings.",
 }

@@ -1,6 +1,13 @@
 import { test } from '@japa/runner'
 import { readFile } from 'node:fs/promises'
-import { parseOrderForm, parseLooseAddress, tidyLooseAddress, looseAddressForm, renderGroupOrderMessage, renderTotalMessage } from '#beta3/order_service'
+import {
+  parseOrderForm,
+  parseLooseAddress,
+  tidyLooseAddress,
+  looseAddressForm,
+  renderGroupOrderMessage,
+  renderTotalMessage,
+} from '#beta3/order_service'
 import {
   findCatalogVariant,
   renderCatalogDigest,
@@ -8,9 +15,21 @@ import {
   type LeanCatalogRow,
 } from '#beta3/catalog_service'
 import { keywords, pickExamples, type LeanExample } from '#beta3/examples_service'
-import { addProductionDays, buildLeanPrompt, closedDaysFromStore, parseLeanDecision, renderProductionEstimate } from '#beta3/prompt'
+import {
+  addProductionDays,
+  buildLeanPrompt,
+  closedDaysFromStore,
+  parseLeanDecision,
+  renderProductionEstimate,
+} from '#beta3/prompt'
 import { mergeCustomerNote } from '#beta3/customer_service'
-import { dropRepeatedQuestions, looksLikeTotalSent, resolvePhotos, selectLeanSkill } from '#beta3/reply_service'
+import {
+  dropRepeatedQuestions,
+  guardTotalPromise,
+  looksLikeTotalSent,
+  resolvePhotos,
+  selectLeanSkill,
+} from '#beta3/reply_service'
 import { normalizeBox } from '#beta3/refs_service'
 import { matchAutoTotal } from '#beta3/order_service'
 import {
@@ -62,7 +81,9 @@ test.group('beta3 · form order', () => {
       'Deva Wahyu Hidayat\n085157754566\nJalan Kapt Tendean, Balong Barat (Dekost 2 ), KAB. NGAWI, NGAWI, JAWA TIMUR, ID, 63216'
     )
     assert.deepEqual(shopee, { district: 'NGAWI', regency: 'KAB. NGAWI', postalCode: '63216' })
-    const inline = parseLooseAddress('Jl. Merdeka No 10 Kec. Serpong, Kota Tangerang Selatan 15310 hp 08123456789')
+    const inline = parseLooseAddress(
+      'Jl. Merdeka No 10 Kec. Serpong, Kota Tangerang Selatan 15310 hp 08123456789'
+    )
     assert.equal(inline!.district, 'Serpong')
     assert.equal(inline!.regency, 'Kota Tangerang Selatan')
     assert.equal(inline!.postalCode, '15310')
@@ -75,25 +96,52 @@ test.group('beta3 · form order', () => {
     assert.equal(addProductionDays(now, 3, true).toISOString().slice(0, 10), '2026-09-30')
     assert.equal(addProductionDays(now, 3, false).toISOString().slice(0, 10), '2026-09-28')
     const text = renderProductionEstimate(
-      { rules: { preorder: { enabled: true, minDays: 3, maxDays: 7, estimateDays: null, dayType: 'working', startsAfter: 'payment' } } },
+      {
+        rules: {
+          preorder: {
+            enabled: true,
+            minDays: 3,
+            maxDays: 7,
+            estimateDays: null,
+            dayType: 'working',
+            startsAfter: 'payment',
+          },
+        },
+      },
       now
     )
     assert.include(text, 'siap kirim sekitar 30 Sep–6 Okt')
-    const store = 'TOKO: X.\nOrder lewat chat/website bisa 24 jam. Toko fisik buka Sen-Sab 09:00-17:00, Min tutup WIB (untuk yang mau datang/ukur langsung).'
+    const store =
+      'TOKO: X.\nOrder lewat chat/website bisa 24 jam. Toko fisik buka Sen-Sab 09:00-17:00, Min tutup WIB (untuk yang mau datang/ukur langsung).'
     assert.deepEqual(closedDaysFromStore(store), [0])
     assert.equal(addProductionDays(now, 3, true, [0]).toISOString().slice(0, 10), '2026-09-29')
-    assert.include(renderProductionEstimate({ rules: {} }, now, store + '\nLIBUR: x'), 'belum diatur')
+    assert.include(
+      renderProductionEstimate({ rules: {} }, now, store + '\nLIBUR: x'),
+      'belum diatur'
+    )
   })
 
   test('alamat tempelan dirapikan tanpa pengulangan', ({ assert }) => {
     const text =
       'Deva Wahyu Hidayat\n085157754566\nJalan Kapt Tendean, Balong Barat (Dekost 2 ), KAB. NGAWI, NGAWI, JAWA TIMUR, ID, 63216'
-    const tidy = tidyLooseAddress(text, { district: 'NGAWI', city: 'NGAWI', province: 'JAWA TIMUR' })!
+    const tidy = tidyLooseAddress(text, {
+      district: 'NGAWI',
+      city: 'NGAWI',
+      province: 'JAWA TIMUR',
+    })!
     assert.equal(tidy.name, 'Deva Wahyu Hidayat')
     assert.equal(tidy.phone, '085157754566')
-    assert.equal(tidy.full, 'Jl. Kapt. Tendean, Balong Barat (Dekost 2), Kec. Ngawi, Kab. Ngawi, Jawa Timur 63216')
-    const inline = tidyLooseAddress('Budi\nJl. Merdeka No 10 RT 02/RW 03 Kec. Serpong, Kota Tangerang Selatan, Banten 15310 hp 08123456789')!
-    assert.equal(inline.full, 'Jl. Merdeka No. 10 RT 02/RW 03, Kec. Serpong, Kota Tangerang Selatan, Banten 15310')
+    assert.equal(
+      tidy.full,
+      'Jl. Kapt. Tendean, Balong Barat (Dekost 2), Kec. Ngawi, Kab. Ngawi, Jawa Timur 63216'
+    )
+    const inline = tidyLooseAddress(
+      'Budi\nJl. Merdeka No 10 RT 02/RW 03 Kec. Serpong, Kota Tangerang Selatan, Banten 15310 hp 08123456789'
+    )!
+    assert.equal(
+      inline.full,
+      'Jl. Merdeka No. 10 RT 02/RW 03, Kec. Serpong, Kota Tangerang Selatan, Banten 15310'
+    )
   })
 
   test('referensi gambar: kotak dinormalkan dan dibaca dari keputusan AI', ({ assert }) => {
@@ -101,8 +149,20 @@ test.group('beta3 · form order', () => {
     assert.deepEqual(normalizeBox([-5, 900, 50, 400]), [0, 900, 50, 100])
     assert.isNull(normalizeBox([1, 2, 3]))
     const decision = parseLeanDecision(
-      JSON.stringify({ pesan: ['siap bos, dicatat ya'], foto: [], catatan: '', tahap: 'lain', serah_cs: false, alasan: '', susulan: '', spesifikasi: '',
-        referensi: [{ gambar: 1, bagian: 'kerah' }, { gambar: 0, bagian: 'x' }] })
+      JSON.stringify({
+        pesan: ['siap bos, dicatat ya'],
+        foto: [],
+        catatan: '',
+        tahap: 'lain',
+        serah_cs: false,
+        alasan: '',
+        susulan: '',
+        spesifikasi: '',
+        referensi: [
+          { gambar: 1, bagian: 'kerah' },
+          { gambar: 0, bagian: 'x' },
+        ],
+      })
     )
     assert.lengthOf(decision.referensi!, 1)
     assert.equal(decision.referensi![0].bagian, 'kerah')
@@ -115,22 +175,37 @@ test.group('beta3 · form order', () => {
     assert.equal(form.customerName, 'Deva Wahyu Hidayat')
     assert.equal(form.phone, '085157754566')
     assert.equal(form.postalCode, '63216')
-    const noName = looseAddressForm('Jl. Merdeka No 10 Kec. Serpong, Kota Tangerang Selatan 15310', 'Budi', '0812')!
+    const noName = looseAddressForm(
+      'Jl. Merdeka No 10 Kec. Serpong, Kota Tangerang Selatan 15310',
+      'Budi',
+      '0812'
+    )!
     assert.equal(noName.customerName, 'Budi')
     assert.isNull(looseAddressForm('size M ada bos? kalau ke kota bandung ongkirnya berapa'))
   })
 
   test('pertanyaan yang baru saja ditanyakan tidak diulang', ({ assert }) => {
     const rows = [
-      { direction: 'out' as const, body: 'ini foto tuxedo putihnya bos, biasanya pakai size apa?', createdAt: '' },
+      {
+        direction: 'out' as const,
+        body: 'ini foto tuxedo putihnya bos, biasanya pakai size apa?',
+        createdAt: '',
+      },
       { direction: 'in' as const, body: 'Ini ready to wear yah?', createdAt: '', current: true },
     ]
     assert.deepEqual(
-      dropRepeatedQuestions(['Iya ready bos, size S M L XL ada', 'biasanya pakai size apa bos?'], rows),
+      dropRepeatedQuestions(
+        ['Iya ready bos, size S M L XL ada', 'biasanya pakai size apa bos?'],
+        rows
+      ),
       ['Iya ready bos, size S M L XL ada']
     )
-    assert.deepEqual(dropRepeatedQuestions(['biasanya pakai size apa bos?'], rows), ['biasanya pakai size apa bos?'])
-    assert.deepEqual(dropRepeatedQuestions(['alamatnya di mana bos?'], rows), ['alamatnya di mana bos?'])
+    assert.deepEqual(dropRepeatedQuestions(['biasanya pakai size apa bos?'], rows), [
+      'biasanya pakai size apa bos?',
+    ])
+    assert.deepEqual(dropRepeatedQuestions(['alamatnya di mana bos?'], rows), [
+      'alamatnya di mana bos?',
+    ])
   })
 
   test('pesan biasa bukan form', ({ assert }) => {
@@ -149,15 +224,22 @@ test.group('beta3 · form order', () => {
       total: 502000,
       shipping_service: 'REG',
     })
-    assert.equal(text, 'Beskap Clean Look - Choco, size M, jas saja\nKerah: shanghai hitam\noyen')
+    // Ditutup nama + nomor order (untuk dilacak di grup), tanpa alamat/telepon/harga.
+    assert.equal(
+      text,
+      'Beskap Clean Look - Choco, size M, jas saja\nKerah: shanghai hitam\n\noyen\n#PO-20260923-001'
+    )
     assert.notInclude(text, 'lapangan bola')
     assert.notInclude(text, '0822')
-    assert.notInclude(text, 'PO-20260923-001')
+    assert.notInclude(text, '502')
     const simple = renderGroupOrderMessage({
       customer_name: 'Deva Hidayat',
       spec: 'Tuxedo Double Breasted - Maroon 755.000\nJas, Celana\nSize M/31\nTinggi 164/68\nHarga 755.000',
     })
-    assert.equal(simple, 'Tuxedo Double Breasted - Maroon\nJas, Celana\nSize M/31\nTinggi 164/68\nDeva Hidayat')
+    assert.equal(
+      simple,
+      'Tuxedo Double Breasted - Maroon\nJas, Celana\nSize M/31\nTinggi 164/68\n\nDeva Hidayat'
+    )
   })
 
   test('pesan total meniru format CS', ({ assert }) => {
@@ -169,7 +251,13 @@ test.group('beta3 · form order', () => {
     })
     assert.include(text, 'Ongkir one day 19.000')
     assert.include(text, 'Total 485.000 + 19.000 = 504.000 bos')
-    const po = renderTotalMessage({ items: 'Jas broken white size L 500.000', subtotal: 500000, shippingService: 'REG', shippingCost: 25000, preorder: true })
+    const po = renderTotalMessage({
+      items: 'Jas broken white size L 500.000',
+      subtotal: 500000,
+      shippingService: 'REG',
+      shippingCost: 25000,
+      preorder: true,
+    })
     assert.include(po, 'Pre order bisa DP dulu sekitar 50%, pelunasan saat siap kirim')
   })
 })
@@ -412,8 +500,10 @@ test.group('beta3 · tool pendukung', () => {
       ],
     })
     assert.include(text, 'ONGKIR ke KEBON JERUK, JAKARTA BARAT')
-    assert.include(text, 'REG 14.000 (1-2 hari)')
-    assert.include(text, 'JTR 65.000')
+    // JTR (kargo min. 8 kg) tidak ditawarkan untuk pesanan ringan → hanya satu layanan, tidak ditanya.
+    assert.include(text, 'hanya satu layanan, REG 14.000')
+    assert.include(text, 'estimasi 1-2 hari')
+    assert.notInclude(text, 'JTR 65.000')
   })
 
   test('tujuan ongkir dikenali dari pertanyaan bebas', ({ assert }) => {
@@ -491,7 +581,9 @@ test.group('beta3 · total otomatis', () => {
         layanan: 'CTCYES',
       },
       catalog,
-      prices
+      prices,
+      // Lebih dari satu layanan: harus dipilih pelanggan (bukan dipilihkan AI).
+      ['pakai yes aja kak']
     )
     assert.isTrue(result.ok)
     if (result.ok) {
@@ -521,6 +613,15 @@ test.group('beta3 · total otomatis', () => {
         prices
       ).ok
     )
+    // Dua layanan dan pelanggan belum memilih: AI tidak boleh memilihkan.
+    assert.isFalse(
+      matchAutoTotal(
+        { rincian: 'Peak Suit - Black 485.000', subtotal: 485000, layanan: 'CTCYES' },
+        catalog,
+        prices,
+        ['oke kak']
+      ).ok
+    )
     const big = matchAutoTotal(
       {
         rincian: 'Peak Suit - Black size XXL 585.000\n2x Vest - Black 350.000',
@@ -528,27 +629,37 @@ test.group('beta3 · total otomatis', () => {
         layanan: 'ctc',
       },
       catalog,
-      prices
+      prices,
+      ['reg aja']
     )
     assert.isTrue(big.ok)
   })
   test('harga yang disebut toko & baris detail tidak menahan total', ({ assert }) => {
     const detail = matchAutoTotal(
-      { rincian: 'Peak Suit - Black size L 485.000\nfull polos, bahan doff\npre order', subtotal: 485000, layanan: 'CTC' },
+      {
+        rincian: 'Peak Suit - Black size L 485.000\nfull polos, bahan doff\npre order',
+        subtotal: 485000,
+        layanan: 'CTC',
+      },
       catalog,
-      prices
+      prices,
+      ['reg']
     )
     assert.isTrue(detail.ok)
     const stated = matchAutoTotal(
       { rincian: 'Jas custom broken white size L 500.000', subtotal: 500000, layanan: 'CTC' },
       catalog,
       prices,
-      [],
+      ['reg'],
       [500000]
     )
     assert.isTrue(stated.ok)
     assert.isFalse(
-      matchAutoTotal({ rincian: 'Peak Suit - Black 485.000\nRompi Maroon', subtotal: 485000, layanan: 'CTC' }, catalog, prices).ok
+      matchAutoTotal(
+        { rincian: 'Peak Suit - Black 485.000\nRompi Maroon', subtotal: 485000, layanan: 'CTC' },
+        catalog,
+        prices
+      ).ok
     )
   })
 })
@@ -556,7 +667,9 @@ test.group('beta3 · total otomatis', () => {
 test.group('Beta 3 · pelajaran chat CS', () => {
   test('total ditahan bila nomor celana setelan belum diketahui', async ({ assert }) => {
     const { pantsNumberMissing } = await import('#beta3/order_service')
-    assert.isTrue(pantsNumberMissing('Basic Suit - Black\nJas, Celana\nSize XL', 'Basic Suit Black XL 485.000'))
+    assert.isTrue(
+      pantsNumberMissing('Basic Suit - Black\nJas, Celana\nSize XL', 'Basic Suit Black XL 485.000')
+    )
     assert.isTrue(pantsNumberMissing('Jas, Celana\nSize L\nTinggi 168/50', ''))
     assert.isFalse(pantsNumberMissing('Jas, Celana\nSize M/31', ''))
     assert.isFalse(pantsNumberMissing('Jas, Celana, Rompi\nSize XL, celana menyesuaikan', ''))
@@ -585,7 +698,9 @@ test.group('Beta 3 · pelajaran chat CS', () => {
     const profile = { emoji: false, address: 'bos', samples: 20 } as any
     const [kept] = normalizeStyle([DEFAULT_EXCHANGE_POLICY], profile, [DEFAULT_EXCHANGE_POLICY])
     assert.equal(kept, DEFAULT_EXCHANGE_POLICY)
-    const [other] = normalizeStyle(['Kamu bisa pakai size M 😊'], profile, [DEFAULT_EXCHANGE_POLICY])
+    const [other] = normalizeStyle(['Kamu bisa pakai size M 😊'], profile, [
+      DEFAULT_EXCHANGE_POLICY,
+    ])
     assert.notInclude(other, '😊')
   })
 })
@@ -593,14 +708,24 @@ test.group('Beta 3 · pelajaran chat CS', () => {
 test.group('Beta 3 · model otomatis', () => {
   test('model dipilih per tugas', async ({ assert }) => {
     const { autoTier, autoModels } = await import('#beta3/provider')
-    const reply = (message: string) => ({ system: 'x', user: `RIWAYAT...\n\nSEKARANG: 10.00 WIB\nPESAN PELANGGAN SEKARANG:\n${message}\n\nCustom (gambar/model/ukuran dari pelanggan): ...` })
+    const reply = (message: string) => ({
+      system: 'x',
+      user: `RIWAYAT...\n\nSEKARANG: 10.00 WIB\nPESAN PELANGGAN SEKARANG:\n${message}\n\nCustom (gambar/model/ukuran dari pelanggan): ...`,
+    })
     assert.equal(autoTier('beta3-reply', reply('Assalamualaikum kak'), 0), 'light')
     assert.equal(autoTier('beta3-reply', reply('makasih bos'), 0), 'light')
     assert.equal(autoTier('beta3-reply', reply('ready size L warna navy?'), 0), 'standard')
     assert.equal(autoTier('beta3-reply', reply('oke'), 0), 'standard')
     assert.equal(autoTier('beta3-reply', reply('halo'), 1), 'heavy')
     assert.equal(autoTier('beta3-reply', reply('sudah tf ya kak'), 0), 'heavy')
-    assert.equal(autoTier('beta3-reply', reply('Nama : Budi\n\nCATATAN SISTEM: form order #3 sudah tercatat'), 0), 'heavy')
+    assert.equal(
+      autoTier(
+        'beta3-reply',
+        reply('Nama : Budi\n\nCATATAN SISTEM: form order #3 sudah tercatat'),
+        0
+      ),
+      'heavy'
+    )
     assert.equal(autoTier('ig-analysis', { system: '', user: '' }, 0), 'heavy')
     assert.equal(autoTier('beta3-recap', { system: '', user: '' }, 0), 'standard')
     assert.equal(autoModels('claude').light, 'haiku')
@@ -610,10 +735,35 @@ test.group('Beta 3 · model otomatis', () => {
 
 test.group('beta3 · form terlewat', () => {
   test('pesan total/rekening toko dikenali, janji total tidak', ({ assert }) => {
-    assert.isTrue(looksLikeTotalSent('Total 800.000\nTransfer ke BCA 1234567890 a.n Toko', ['1234567890']))
+    assert.isTrue(
+      looksLikeTotalSent('Total 800.000\nTransfer ke BCA 1234567890 a.n Toko', ['1234567890'])
+    )
     assert.isTrue(looksLikeTotalSent('Rekening BRI 0987654321 atas nama Chameleon'))
+    assert.isTrue(looksLikeTotalSent('Untuk pembayaran tf ke rek BRI 1112223334445 An Toko'))
     assert.isTrue(looksLikeTotalSent('Totalnya 800.000 ya bos, silakan transfer'))
     assert.isFalse(looksLikeTotalSent('Iya bos, totalnya 800.000 ya. Ini totalnya saya kirimkan.'))
     assert.isFalse(looksLikeTotalSent('Estimasi jadi 7 hari bos, DP 50% bisa'))
+  })
+})
+
+test.group('beta3 · janji total tanpa order', () => {
+  test('"ini totalnya saya kirimkan" tanpa form → tidak dijanjikan', ({ assert }) => {
+    const noAddress = guardTotalPromise(
+      ['Iya bos, totalnya 800.000 ya. Ini totalnya saya kirimkan.'],
+      { address: 'bos', hasAddress: false }
+    )
+    assert.isTrue(noAddress.changed)
+    assert.equal(noAddress.pesan[0], 'Iya bos, totalnya 800.000 ya.')
+    assert.match(noAddress.pesan[1], /data pengirimannya/)
+    const withAddress = guardTotalPromise(['Siap bos, totalnya menyusul ya'], {
+      address: 'bos',
+      hasAddress: true,
+    })
+    assert.deepEqual(withAddress.pesan, ['Siap bos', 'Totalnya saya cek dulu ya bos'])
+    assert.isTrue(withAddress.waitCs)
+    assert.isFalse(
+      guardTotalPromise(['Harga setelannya 705.000 bos'], { address: 'bos', hasAddress: false })
+        .changed
+    )
   })
 })
