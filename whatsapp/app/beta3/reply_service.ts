@@ -248,6 +248,8 @@ export async function createLeanReply(input: {
   imageIds?: string[]
   settings: LeanSettings
   onTrace?: TraceSink
+  /** Catatan sistem untuk giliran ini (mis. CS sudah menjawab sebagian, chat sedang menunggu CS). */
+  note?: string
 }): Promise<LeanReply> {
   const { jid, settings, onTrace } = input
   const skill = selectLeanSkill(settings.skills)
@@ -631,7 +633,7 @@ export async function createLeanReply(input: {
     spec,
     history: rows,
     context: collectContext({ history: rows, catalog: digest.rows, text: input.text }),
-    message: `${replyContext(rows)}${acceptedOffer(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}`,
+    message: `${replyContext(rows)}${acceptedOffer(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}${input.note ? `\n\nCATATAN SISTEM: ${input.note}` : ''}`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
     production: settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : '',
     imageCount: input.imagePaths?.length || 0,

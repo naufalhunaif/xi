@@ -232,6 +232,10 @@ type PendingMessage = {
  */
 const FALLBACK_TURN_WINDOW_MS = Number(process.env.AI_TURN_WINDOW_MS || 6000)
 const SWEEP_INTERVAL_MS = Number(process.env.AI_SWEEP_INTERVAL_MS || 300_000)
+/** Chat yang dialihkan AI ke CS: bila CS belum membalas selama ini, pesan baru tetap dijawab AI. */
+const HANDOFF_GRACE_MS = Number(process.env.AI_HANDOFF_GRACE_MS || 20 * 60_000)
+/** CS membalas sebagian: AI memeriksa poin yang terlewat setelah CS diam selama ini. */
+const AFTER_HUMAN_MS = Number(process.env.AI_AFTER_HUMAN_MS || 3 * 60_000)
 const LEAN_SYNC_INTERVAL_MS = 30 * 60_000
 
 export default class WhatsappListen extends BaseCommand {
@@ -2102,7 +2106,7 @@ export default class WhatsappListen extends BaseCommand {
     if (
       !isAiWorking(settings) ||
       !settings.hasSkill ||
-      contact?.handling_mode === 'cs' ||
+      !(await this.aiMayAnswer(jid, contact)) ||
       contact?.ai_excluded ||
       !this.socket
     ) {
@@ -2216,7 +2220,7 @@ export default class WhatsappListen extends BaseCommand {
     if (
       !isAiWorking(settings) ||
       !settings.hasSkill ||
-      contact?.handling_mode === 'cs' ||
+      !(await this.aiMayAnswer(jid, contact)) ||
       contact?.ai_excluded ||
       !this.socket
     ) {
@@ -2606,6 +2610,7 @@ export default class WhatsappListen extends BaseCommand {
       keys: WAMessageKey[]
       imagePaths: string[]
       imageIds?: string[]
+      note?: string
     }
   ) {
     // Room Instagram (mis. coba ulang analisis): dikerjakan worker Instagram, bukan soket WhatsApp.
@@ -2644,6 +2649,7 @@ export default class WhatsappListen extends BaseCommand {
           aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
         },
         onTrace: trace?.emit,
+        note: input.note || (await this.handoffNote(jid)),
       })
       const { decision } = reply
       if (!(await canSend())) {
@@ -2842,7 +2848,10 @@ export default class WhatsappListen extends BaseCommand {
           WHERE t.direction = 'in'
             AND t.jid NOT LIKE '%@ig'
             AND GREATEST(COALESCE(c.line_id, 1), 1) = ?
-            AND COALESCE(c.handling_mode, 'ai') <> 'cs'
+            AND (COALESCE(c.handling_mode, 'ai') <> 'cs'
+              OR (COALESCE(c.handoff_reason, '') <> '' AND c.handoff_at < ? AND t.created_at > c.handoff_at
+                  AND NOT EXISTS (SELECT 1 FROM whatsapp_messages h WHERE h.jid = t.jid AND h.direction = 'out'
+                                  AND h.sender_type IN ('cs', 'owner') AND h.created_at > c.handoff_at)))
             AND COALESCE(c.ai_excluded, 0) = 0
             AND COALESCE(g.analyzed_anchor_id, 0) <> t.id
             AND NOT (COALESCE(g.status, '') = 'processing' AND g.anchor_id = t.id)
@@ -2850,7 +2859,7 @@ export default class WhatsappListen extends BaseCommand {
             AND NOT EXISTS (SELECT 1 FROM whatsapp_ai_reviews r WHERE r.jid=t.jid AND r.status IN ('pending','processing'))
           ORDER BY t.created_at ASC
           LIMIT ?`,
-        [since, currentLine(), batch * 5]
+        [since, currentLine(), new Date(now - HANDOFF_GRACE_MS), batch * 5]
       )
       const candidates = (Array.isArray(result) ? result[0] : result) as Array<{
         jid: string
@@ -2864,7 +2873,7 @@ export default class WhatsappListen extends BaseCommand {
         if (this.pendingTurns.has(candidate.jid) || this.chatLocks.has(candidate.jid)) continue
         // Diperiksa ulang: mode bisa berubah antara kueri dan giliran ini.
         const contact = await db.from('whatsapp_contacts').where('jid', candidate.jid).first()
-        if (contact?.handling_mode === 'cs' || contact?.ai_excluded) continue
+        if (!(await this.aiMayAnswer(candidate.jid, contact)) || contact?.ai_excluded) continue
         if (settings.beta3Mode) {
           const task = this.answerBacklogBeta3(candidate.jid, settings)
           this.chatLocks.set(candidate.jid, task)
@@ -2877,11 +2886,131 @@ export default class WhatsappListen extends BaseCommand {
         } else await this.answerBacklog(candidate.jid, settings)
         handled += 1
       }
+      if (settings.beta3Mode && handled < batch) await this.sweepAfterHuman(settings, batch - handled, since)
     } catch (error) {
       this.logger.error(`Sapuan: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       this.sweeping = false
     }
+  }
+
+  /**
+   * Chat yang dialihkan AI ke CS tapi CS belum membalas selama HANDOFF_GRACE_MS: pesan baru
+   * pelanggan tetap dijawab AI (hal yang diserahkan tetap menunggu CS). Mode CS manual tidak terpengaruh.
+   */
+  private async aiMayAnswer(jid: string, contact?: Record<string, any> | null) {
+    if (contact?.handling_mode !== 'cs') return true
+    if (!contact.handoff_reason || !contact.handoff_at) return false
+    const since = new Date(contact.handoff_at)
+    if (Date.now() - since.getTime() < HANDOFF_GRACE_MS) return false
+    const human = await db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'out')
+      .whereIn('sender_type', ['cs', 'owner'])
+      .where('created_at', '>', since)
+      .first()
+    return !human
+  }
+  private async handoffNote(jid: string) {
+    const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
+    if (contact?.handling_mode !== 'cs' || !contact.handoff_reason) return ''
+    return (
+      `chat ini sedang menunggu CS untuk: ${String(contact.handoff_reason).slice(0, 200)}. ` +
+      'Jangan memutuskan hal itu sendiri; kalau pelanggan menanyakannya, bilang masih dicek tim ya bos. ' +
+      'Pertanyaan lain dijawab seperti biasa.'
+    )
+  }
+
+  /**
+   * CS manusia membalas sebagian pesan (mis. menjawab DP & estimasi, tapi form order terlewat):
+   * setelah CS diam AFTER_HUMAN_MS, AI memeriksa pesan pelanggan sejak balasan AI terakhir dan
+   * hanya menjawab poin yang belum dijawab CS (boleh diam bila semua sudah terjawab). Sekali per balasan CS.
+   */
+  private async sweepAfterHuman(settings: Awaited<ReturnType<typeof readSettings>>, limit: number, since: Date) {
+    const now = Date.now()
+    const result = await db.rawQuery(
+      `SELECT t.jid, t.id, t.message_id, t.created_at
+         FROM whatsapp_messages t
+         JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
+                FROM whatsapp_messages WHERE created_at >= ? AND status NOT IN ('failed', 'queued')) x
+           ON x.id = t.id AND x.position = 1
+         LEFT JOIN whatsapp_contacts c ON c.jid = t.jid
+         LEFT JOIN whatsapp_chat_goals g ON g.jid = t.jid
+        WHERE t.direction = 'out' AND t.sender_type IN ('cs', 'owner')
+          AND t.created_at < ?
+          AND t.jid NOT LIKE '%@ig'
+          AND GREATEST(COALESCE(c.line_id, 1), 1) = ?
+          AND COALESCE(c.handling_mode, 'ai') <> 'cs'
+          AND COALESCE(c.ai_excluded, 0) = 0
+          AND COALESCE(g.analyzed_anchor_id, 0) <> t.id
+          AND NOT (COALESCE(g.status, '') = 'processing' AND g.anchor_id = t.id)
+          AND EXISTS (SELECT 1 FROM whatsapp_messages i WHERE i.jid = t.jid AND i.direction = 'in'
+                AND i.created_at >= ? AND i.created_at <= t.created_at
+                AND i.created_at > COALESCE((SELECT MAX(a.created_at) FROM whatsapp_messages a
+                      WHERE a.jid = t.jid AND a.direction = 'out' AND a.sender_type = 'ai' AND a.created_at <= t.created_at), '1970-01-01'))
+        ORDER BY t.created_at ASC
+        LIMIT ?`,
+      [since, new Date(now - AFTER_HUMAN_MS), currentLine(), since, limit * 3]
+    )
+    const rows = (Array.isArray(result) ? result[0] : result) as Array<{ jid: string; id: number; message_id: string; created_at: Date | string }>
+    let handled = 0
+    for (const row of rows || []) {
+      if (handled >= limit) break
+      if (this.pendingTurns.has(row.jid) || this.chatLocks.has(row.jid)) continue
+      const task = this.answerAfterHumanBeta3(row, settings)
+      this.chatLocks.set(row.jid, task)
+      try {
+        await task
+      } finally {
+        if (this.chatLocks.get(row.jid) === task) this.chatLocks.delete(row.jid)
+        await this.setActivity(row.jid, null).catch(() => {})
+      }
+      handled += 1
+    }
+  }
+  private async answerAfterHumanBeta3(
+    anchor: { jid: string; message_id: string; created_at: Date | string },
+    settings: Awaited<ReturnType<typeof readSettings>>
+  ) {
+    const jid = anchor.jid
+    if (!this.socket || !isAiWorking(settings) || !settings.hasSkill) return
+    const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
+    if (contact?.ai_excluded || contact?.handling_mode === 'cs') return
+    const lastAi = await db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'out')
+      .where('sender_type', 'ai')
+      .where('created_at', '<=', anchor.created_at)
+      .orderBy('created_at', 'desc')
+      .first()
+    const pending = await db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'in')
+      .where('created_at', '<=', anchor.created_at)
+      .where('created_at', '>', lastAi?.created_at || new Date(Date.now() - 6 * 3_600_000))
+      .orderBy('created_at', 'asc')
+      .orderBy('id', 'asc')
+      .limit(15)
+    if (!pending.length) return
+    const goalRun = await beginGoalTurn(jid, String(anchor.message_id))
+    if (!goalRun) return
+    const text = pending
+      .map((row) => String(row.body || '').trim() || (row.media_type ? `[${row.media_type}]` : ''))
+      .filter(Boolean)
+      .join('\n')
+    await this.runBeta3Turn(jid, goalRun, this.socket, settings, {
+      text,
+      messageIds: pending.map((row) => String(row.message_id)),
+      keys: pending.map((row) => ({ remoteJid: jid, id: String(row.message_id), fromMe: false })),
+      imagePaths: [],
+      note:
+        'CS manusia sudah membalas sebagian pesan pelanggan di atas (lihat RIWAYAT: balasan CS ada setelah pesan-pesan ini). ' +
+        'Jawab HANYA poin yang belum dijawab CS (mis. form order yang belum ditanggapi, pertanyaan yang terlewat). ' +
+        'Jangan mengulang, membantah, atau menyalin jawaban CS. Kalau semuanya sudah dijawab CS, kosongkan pesan.',
+    })
   }
 
   private async answerBacklog(jid: string, settings: Awaited<ReturnType<typeof readSettings>>) {
@@ -3054,7 +3183,7 @@ export default class WhatsappListen extends BaseCommand {
   private async answerBacklogBeta3(jid: string, settings: Awaited<ReturnType<typeof readSettings>>) {
     if (!this.socket || !isAiWorking(settings) || !settings.hasSkill) return
     const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
-    if (contact?.ai_excluded || contact?.handling_mode === 'cs') return
+    if (contact?.ai_excluded || !(await this.aiMayAnswer(jid, contact))) return
     const lastOut = await db
       .from('whatsapp_messages')
       .where('jid', jid)
@@ -3109,7 +3238,7 @@ export default class WhatsappListen extends BaseCommand {
     return (
       isAiWorking(settings) &&
       settings.hasSkill &&
-      contact?.handling_mode !== 'cs' &&
+      (await this.aiMayAnswer(jid, contact)) &&
       !contact?.ai_excluded
     )
   }

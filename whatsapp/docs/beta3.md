@@ -28,3 +28,8 @@ terpisah, walau daftar koneksinya sama dengan Data bisnis.
 
 Perilaku saat ini identik dengan Beta 2 pada commit pemisahan; perubahan
 berikutnya di Beta 3 tidak menyentuh Beta 2, dan sebaliknya.
+
+## CS membalas sebagian & chat yang menunggu CS
+
+- **CS membalas sebagian** (mis. menjawab DP & estimasi, tapi form order terlewat): sapuan memeriksa chat yang pesan terakhirnya dari CS/pemilik (≥ 3 menit, `AI_AFTER_HUMAN_MS`). Pesan pelanggan sejak balasan AI terakhir dikirim ke AI dengan catatan "jawab hanya poin yang belum dijawab CS; kosongkan bila semua sudah". Sekali per balasan CS.
+- **Dialihkan AI ke CS tapi CS belum membalas** selama 20 menit (`AI_HANDOFF_GRACE_MS`): pesan baru pelanggan tetap dijawab AI dengan catatan bahwa hal yang diserahkan masih dicek tim. Mode CS yang dipilih manual tidak terpengaruh.
