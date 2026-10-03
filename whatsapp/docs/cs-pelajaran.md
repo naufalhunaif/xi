@@ -213,3 +213,14 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 
 **Catatan lain**
 - Gambar size chart: periksa apakah AI sudah punya gambar ini (media CS / panduan bisnis). Kalau belum, pemilik perlu mengunggahnya agar AI bisa mengirimkannya.
+
+## #6 · 3 Okt 2026 · form masuk saat CS membalas → total tidak dikirim (diterapkan v3.4.178)
+
+**Yang terjadi**
+- Pelanggan mengirim form order lalu bertanya DP; CS menjawab DP lebih dulu. Giliran AI yang berisi form ikut batal, jadi order tidak tercatat.
+- Akibatnya AI tidak punya ONGKIR dan tidak bisa mengirim total: menebak "REG atau YES" (ke tujuan itu hanya REG), lalu "ini totalnya saya kirimkan" tanpa total yang datang. CS mengirim total manual.
+
+**Perubahan**
+1. Form order yang terlewat (12 jam terakhir, lebih baru dari order terakhir) diambil di giliran berikutnya: ongkir dicek, order tercatat, total + rekening dikirim otomatis. Dilewati bila toko sudah mengirim total/rekening setelah form.
+2. Tanpa form order, janji "ini totalnya saya kirimkan" diganti: minta data pengiriman, atau "totalnya saya cek dulu" bila alamat sudah ada di chat.
+3. Skill: jangan sebut REG/YES yang tidak ada di ONGKIR; satu layanan → langsung pakai; ongkir yang disebut CS dipakai apa adanya.

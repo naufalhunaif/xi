@@ -10,7 +10,7 @@ import {
 import { keywords, pickExamples, type LeanExample } from '#beta3/examples_service'
 import { addProductionDays, buildLeanPrompt, closedDaysFromStore, parseLeanDecision, renderProductionEstimate } from '#beta3/prompt'
 import { mergeCustomerNote } from '#beta3/customer_service'
-import { dropRepeatedQuestions, resolvePhotos, selectLeanSkill } from '#beta3/reply_service'
+import { dropRepeatedQuestions, looksLikeTotalSent, resolvePhotos, selectLeanSkill } from '#beta3/reply_service'
 import { normalizeBox } from '#beta3/refs_service'
 import { matchAutoTotal } from '#beta3/order_service'
 import {
@@ -605,5 +605,15 @@ test.group('Beta 3 · model otomatis', () => {
     assert.equal(autoTier('beta3-recap', { system: '', user: '' }, 0), 'standard')
     assert.equal(autoModels('claude').light, 'haiku')
     assert.equal(autoModels('chatgpt').heavy, 'gpt-5.6-sol')
+  })
+})
+
+test.group('beta3 · form terlewat', () => {
+  test('pesan total/rekening toko dikenali, janji total tidak', ({ assert }) => {
+    assert.isTrue(looksLikeTotalSent('Total 800.000\nTransfer ke BCA 1234567890 a.n Toko', ['1234567890']))
+    assert.isTrue(looksLikeTotalSent('Rekening BRI 0987654321 atas nama Chameleon'))
+    assert.isTrue(looksLikeTotalSent('Totalnya 800.000 ya bos, silakan transfer'))
+    assert.isFalse(looksLikeTotalSent('Iya bos, totalnya 800.000 ya. Ini totalnya saya kirimkan.'))
+    assert.isFalse(looksLikeTotalSent('Estimasi jadi 7 hari bos, DP 50% bisa'))
   })
 })

@@ -143,6 +143,58 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
   }))
 }
 
+/** Pesan toko yang sudah berisi total/rekening: order itu sudah ditangani (mis. oleh CS). */
+export function looksLikeTotalSent(body: string, destinations: string[] = []) {
+  const text = String(body || '')
+  const digits = text.replace(/\D/g, '')
+  if (destinations.some((dest) => dest.replace(/\D/g, '').length >= 6 && digits.includes(dest.replace(/\D/g, ''))))
+    return true
+  if (/\b(no\.?\s*rek|rekening|atas nama|a\.n\.?)\b/i.test(text) && /\d{6,}/.test(digits)) return true
+  return /\btotal\w*\b[^\n]*\d{1,3}(?:\.\d{3}){1,}/i.test(text) && /\b(transfer|tf|rek|rekening)\b/i.test(text)
+}
+
+/**
+ * Form order yang terlewat: pelanggan mengirimnya saat CS sedang membalas (giliran AI
+ * dibatalkan), jadi belum tercatat dan total tidak pernah dikirim otomatis. Dicari di
+ * pesan masuk 12 jam terakhir yang lebih baru dari order terakhir; dilewati bila toko
+ * sudah mengirim total/rekening setelahnya.
+ */
+export async function missedOrderForm(
+  jid: string,
+  currentIds: Set<string>,
+  destinations: string[],
+  fallback: { name: string; phone: string }
+) {
+  const latest = await latestLeanOrder(jid).catch(() => null)
+  const floor = Date.now() - 12 * 60 * 60_000
+  const since = latest ? Math.max(floor, new Date(latest.created_at).getTime()) : floor
+  const rows = await db
+    .from('whatsapp_messages')
+    .select('message_id', 'direction', 'body', 'created_at')
+    .where('jid', jid)
+    .where('created_at', '>', new Date(since))
+    .whereNotIn('status', ['failed', 'queued'])
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(40)
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index]
+    const id = String(row.message_id || '')
+    if (row.direction !== 'in' || !row.body || currentIds.has(id)) continue
+    if (latest && String(latest.source_message_id || '') === id) return null
+    const text = String(row.body)
+    const typed = parseOrderForm(text)
+    const form = typed || looseAddressForm(text, fallback.name, fallback.phone)
+    if (!form) continue
+    const handled = rows
+      .slice(0, index)
+      .some((later) => later.direction !== 'in' && looksLikeTotalSent(String(later.body || ''), destinations))
+    if (handled) return null
+    return { form, text, messageId: id, pasted: !typed }
+  }
+  return null
+}
+
 /** Ganti bubble yang menyebut ongkir berderet dalam satu kalimat dengan blok ongkir rapi. */
 export function tidyShippingBubbles(bubbles: string[], notes: string[], address: string) {
   const block = notes
@@ -349,16 +401,37 @@ export async function createLeanReply(input: {
   const typedForm = parseOrderForm(input.text)
   // Alamat yang ditempel bebas juga dianggap form order supaya total terkirim otomatis.
   let pasted: ReturnType<typeof looseAddressForm> = null
+  let typedLookback: ReturnType<typeof parseOrderForm> = null
+  let formText = input.text
+  let formMessageId = input.messageIds[input.messageIds.length - 1]
+  let missed = false
   if (!typedForm) {
     const contact = await db.from('whatsapp_contacts').where('jid', jid).select('name').first()
     const waPhone = phoneFromJid(jid)
-    pasted = looseAddressForm(
-      input.text,
-      contact?.name ? String(contact.name) : '',
-      waPhone ? `0${waPhone.replace(/^62/, '')}` : ''
-    )
+    const fallback = {
+      name: contact?.name ? String(contact.name) : '',
+      phone: waPhone ? `0${waPhone.replace(/^62/, '')}` : '',
+    }
+    pasted = looseAddressForm(input.text, fallback.name, fallback.phone)
+    // Form yang dikirim saat CS membalas belum tercatat: ambil sekarang supaya ongkir
+    // dicek dan total bisa dikirim otomatis, bukan menunggu CS.
+    if (!pasted) {
+      const found = await missedOrderForm(
+        jid,
+        new Set(input.messageIds),
+        settings.paymentMethods.map((method) => method.destination),
+        fallback
+      ).catch(() => null)
+      if (found) {
+        missed = true
+        formText = found.text
+        formMessageId = found.messageId
+        if (found.pasted) pasted = found.form
+        else typedLookback = found.form
+      }
+    }
   }
-  const form = typedForm || pasted
+  const form = typedForm || typedLookback || pasted
 
   // Pertanyaan ongkir bebas ("ongkir ke cinyawang berapa"): kode cari tujuan lalu tarif.
   // Lanjutannya ("kalo ke jakarta?", "mampang", "jakarta selatan") dikenali 30 menit.
@@ -511,7 +584,7 @@ export async function createLeanReply(input: {
           orderGrams
         )
         // Alamat tempelan dirapikan ulang dengan nama resmi tujuan dari cek ongkir.
-        const tidy = pasted ? tidyLooseAddress(input.text, rates?.destination || null) : null
+        const tidy = pasted ? tidyLooseAddress(formText, rates?.destination || null) : null
         if (tidy) {
           form.address = tidy.full
           form.district = tidy.district || form.district
@@ -534,7 +607,7 @@ export async function createLeanReply(input: {
     }
     orderId = await saveLeanOrder({
       jid,
-      sourceMessageId: input.messageIds[input.messageIds.length - 1],
+      sourceMessageId: formMessageId,
       form,
       items: spec || [form.note, chatNote].filter(Boolean).join('\n'),
       spec,
@@ -546,7 +619,9 @@ export async function createLeanReply(input: {
     systemNote =
       '\n\nCATATAN SISTEM: form order pelanggan sudah tercatat (#' +
       orderId +
-      '). Jangan menulis total atau rekening di pesan — sistem yang mengirimnya. ' +
+      ')' +
+      (missed ? ' — form ini dikirim pelanggan sebelumnya (saat CS membalas) dan baru tercatat sekarang; lanjutkan prosesnya sendiri, jangan menunggu CS' : '') +
+      '. Jangan menulis total atau rekening di pesan — sistem yang mengirimnya. ' +
       'Isi field order (rincian per item dengan nama persis KATALOG + harga, subtotal, layanan ongkir yang dipilih pelanggan). ' +
       'Kalau ada TB/BB dan size yang dipilih terlihat tidak cocok, konfirmasi size dulu (satu pertanyaan). ' +
       (rateText
@@ -798,6 +873,34 @@ export async function createLeanReply(input: {
       status: 'completed',
       detail: { draft, fromAi: Boolean(decision.order), verdict },
     })
+  } else if (!decision.serah_cs) {
+    // Belum ada form/order: total + rekening tidak akan terkirim otomatis. Jangan janji
+    // "ini totalnya saya kirimkan"; minta data pengirimannya supaya total bisa dihitung.
+    const promise = /\b(ini|berikut|saya kirim\w*|kami kirim\w*|menyusul)\b[^.?!\n]*\btotal\w*\b[^.?!\n]*/i
+    const promiseAfter = /\btotal\w*\b[^.?!\n]*\b(saya kirim\w*|kami kirim\w*|menyusul|dikirim\w*)\b[^.?!\n]*/i
+    if (decision.pesan.some((bubble) => promise.test(bubble) || promiseAfter.test(bubble))) {
+      const address = style?.address || 'bos'
+      decision.pesan = decision.pesan
+        .map((bubble) => bubble.replace(promise, '').replace(promiseAfter, '').replace(/\s*[.,]\s*$/, '').replace(/\s{2,}/g, ' ').trim())
+        .filter(Boolean)
+      // Data pengiriman sudah ada di chat tapi tidak terbaca sebagai form: CS yang menghitung.
+      const hasAddress = rows.some(
+        (row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos)\b/i.test(String(row.body || ''))
+      )
+      if (hasAddress) {
+        decision.pesan.push(`Totalnya saya cek dulu ya ${address}`)
+        decision.tahap = 'tunggu_cs'
+      } else
+        decision.pesan.push(
+          `Boleh kirim data pengirimannya dulu ${address}? (nama, alamat lengkap + kecamatan, kota, no HP) biar totalnya langsung saya kirim`
+        )
+      onTrace?.({
+        key: 'beta3-total',
+        label: hasAddress ? 'Janji total tanpa order · menunggu CS' : 'Janji total tanpa form order · minta data pengiriman',
+        status: 'completed',
+        detail: {},
+      })
+    }
   }
   // Total/pembayaran yang dikerjakan CS langsung di chat ikut tercatat di order.
   if (!autoTotal && decision.pembayaran) {
