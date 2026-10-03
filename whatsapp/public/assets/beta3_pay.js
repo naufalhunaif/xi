@@ -22,8 +22,9 @@
     if (!['awaiting_payment', 'paid'].includes(order.status)) return null
     const total = Number(order.total || 0)
     const waiting = order.status === 'awaiting_payment'
-    // Menunggu bayar: nominal dari bukti transfer (dibaca AI), belum ada = total.
-    let value = waiting ? Number(order.reported_amount || 0) || total : Number(order.paid_amount || total)
+    // Menunggu bayar: nominal dari bukti transfer (dibaca AI). Belum terbaca = kosong, diisi CS
+    // (tidak diisi total: DP bisa terkonfirmasi sebagai lunas).
+    let value = waiting ? Number(order.reported_amount || 0) : Number(order.paid_amount || total)
     let saved = value
     let ready = null
 
@@ -32,10 +33,16 @@
     input.inputMode = 'numeric'
     input.readOnly = true
     input.value = format(value)
+    input.placeholder = t('Isi nominal')
     input.title = t('Klik untuk mengubah')
     input.setAttribute('aria-label', waiting ? t('Nominal dana masuk') : t('Nominal dibayar'))
     const pill = el('small', '')
     const paint = () => {
+      if (!value) {
+        pill.textContent = t('Cek nominal di bukti transfer')
+        pill.className = 'wa-pill warn'
+        return
+      }
       pill.textContent = !total ? '' : value < total ? `${t('DP')} · ${t('Sisa')} ${money(total - value)}` : t('Lunas')
       pill.className = total && value < total ? 'wa-pill warn' : 'wa-pill ok'
     }
@@ -100,6 +107,12 @@
       const confirm = el('button', t('Konfirmasi dana masuk'), 'button primary')
       confirm.type = 'button'
       confirm.addEventListener('click', async () => {
+        if (!(digits(input.value) || value)) {
+          ctx.notice(t('Isi nominal dana masuk dulu.'), true)
+          input.readOnly = false
+          input.focus()
+          return
+        }
         if (ctx.confirmGroup && !ctx.confirmGroup()) return
         confirm.disabled = true
         try {

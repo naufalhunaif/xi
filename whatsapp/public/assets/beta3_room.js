@@ -67,11 +67,12 @@
     })
     return node
   }
-  const thumb = (url, caption) => {
+  const thumb = (url, caption, keep = false) => {
     const figure = el('figure')
     const link = el('a'); link.href = url; link.target = '_blank'; link.rel = 'noopener'
-    const img = el('img'); img.src = url; img.alt = caption; img.loading = 'lazy'
-    img.addEventListener('error', () => figure.remove())
+    const img = el('img'); img.src = url; img.alt = caption; img.loading = keep ? 'eager' : 'lazy'
+    // Bukti transfer tetap terlihat ada walau gambarnya gagal dimuat (cek langsung di chat).
+    img.addEventListener('error', () => (keep ? img.replaceWith(el('span', t('Gambar belum terunduh'), 'wa-muted')) : figure.remove()))
     link.append(img)
     figure.append(link, el('figcaption', caption))
     return figure
@@ -169,7 +170,7 @@
     } else if (order.status === 'awaiting_payment') {
       if (proofsCache.length) {
         const proofs = el('div', undefined, 'wa-b3-photos')
-        for (const proof of proofsCache) proofs.append(thumb(proof.media_url, t('Bukti transfer')))
+        for (const proof of proofsCache) proofs.append(thumb(proof.media_url, t('Bukti transfer'), true))
         box.append(proofs)
       }
       if (pay) actions.append(...pay.buttons)

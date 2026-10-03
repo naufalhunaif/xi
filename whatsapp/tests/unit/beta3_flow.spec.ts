@@ -185,6 +185,14 @@ test.group('beta3 · alur order (database)', () => {
     assert.equal(out.order?.status, 'awaiting_payment')
     assert.equal(Number(out.order?.total), 800000)
     assert.deepEqual(out.proofs, [{ media_url: '/media/proof.jpg' }])
+    // Order dicatat dengan waktu form, bukan waktu panel dibuka.
+    assert.isBelow(new Date(out.order.created_at).getTime(), Date.now() - 170 * 60_000)
+    // Order lama yang tercatat belakangan (created_at sesudah bukti) tetap menampilkan buktinya.
+    await db.from('whatsapp_beta3_orders').where('jid', jid).update({ created_at: new Date() })
+    await new Beta3Controller().room(ctx)
+    assert.deepEqual(out.proofs, [{ media_url: '/media/proof.jpg' }])
+    // Nominal belum terbaca: tidak dianggap lunas (isian kosong, bukan total).
+    assert.equal(Number(out.order.reported_amount || 0), 0)
     await db.from('whatsapp_messages').where('jid', jid).delete()
     await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
   })

@@ -431,6 +431,34 @@ export async function customerImagesForOrder(
 }
 
 
+/**
+ * Gambar bukti transfer untuk order yang menunggu pembayaran: gambar pelanggan sejak order
+ * dibuat yang dikenali sebagai bukti, atau dikirim setelah total. Gambar yang belum terunduh
+ * penuh memakai thumbnail-nya.
+ */
+export async function orderProofImages(jid: string, order: { created_at: unknown; updated_at: unknown }) {
+  const totalAt = new Date(String(order.updated_at)).getTime()
+  // Order dari form terlewat bisa tercatat belakangan: mulai dari yang lebih awal.
+  const since = new Date(Math.min(new Date(String(order.created_at)).getTime(), totalAt))
+  const [rows, ids] = await Promise.all([
+    db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'in')
+      .where('media_type', 'image')
+      .where('created_at', '>=', since)
+      .orderBy('id', 'desc')
+      .limit(8)
+      .select('message_id', 'media_url', 'thumbnail_url', 'created_at'),
+    paymentProofIds(jid).catch(() => new Set<string>()),
+  ])
+  return rows
+    .filter((row: any) => ids.has(String(row.message_id)) || new Date(row.created_at).getTime() > totalAt)
+    .map((row: any) => ({ media_url: String(row.media_url || row.thumbnail_url || '') }))
+    .filter((row) => row.media_url)
+    .slice(0, 3)
+}
+
 /** Nominal di keterangan bukti transfer ("transfer Rp250.000 ke …") — angka ribuan terbesar. */
 export function proofAmount(note: string) {
   const values = (String(note || '').match(/\d{1,3}(?:[.,]\d{3})+/g) || []).map((part) => Number(part.replace(/[.,]/g, '')))

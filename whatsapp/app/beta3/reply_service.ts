@@ -236,6 +236,7 @@ export async function missedOrderForm(
       form,
       text,
       messageId: id,
+      formAt: new Date(row.created_at),
       pasted: !typed,
       handled,
       storeTotal: handled ? totalFromStoreMessages(store) : null,
@@ -276,8 +277,11 @@ export async function recoverHandledOrder(jid: string, destinations: string[]) {
     dibayar: 0,
     dikonfirmasi: false,
   })
-  if (found.storeTotalAt)
-    await db.from('whatsapp_beta3_orders').where('id', id).update({ updated_at: found.storeTotalAt })
+  // Waktu asli: order dibuat saat form masuk, total saat CS mengirimnya (dasar bukti transfer).
+  await db
+    .from('whatsapp_beta3_orders')
+    .where('id', id)
+    .update({ created_at: found.formAt, ...(found.storeTotalAt ? { updated_at: found.storeTotalAt } : {}) })
   return id
 }
 

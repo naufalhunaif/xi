@@ -1695,4 +1695,8 @@ window.waLocales.id = {
   "Hapus nomor {0}? Chat yang sudah ada tetap tersimpan.": "Hapus nomor {0}? Chat yang sudah ada tetap tersimpan.",
   "Belum ada nomor. Klik Tambah nomor lalu scan QR dari HP.": "Belum ada nomor. Klik Tambah nomor lalu scan QR dari HP.",
   "Menyiapkan QR… scan dari HP (Perangkat tertaut).": "Menyiapkan QR… scan dari HP (Perangkat tertaut).",
+  "Isi nominal": "Isi nominal",
+  "Cek nominal di bukti transfer": "Cek nominal di bukti transfer",
+  "Isi nominal dana masuk dulu.": "Isi nominal dana masuk dulu.",
+  "Gambar belum terunduh": "Gambar belum terunduh",
 }

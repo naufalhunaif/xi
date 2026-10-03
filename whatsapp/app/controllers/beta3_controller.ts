@@ -40,7 +40,14 @@ import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { recoverHandledOrder } from '#beta3/reply_service'
 import { fixCatalogColors } from '#beta3/color_fix'
 import { readExchangePolicy, saveExchangePolicy } from '#beta3/store_policy'
-import { customerImagesForOrder, listActiveRefs, refCaption, refsForOrder } from '#beta3/refs_service'
+import {
+  customerImagesForOrder,
+  listActiveRefs,
+  orderProofImages,
+  proofTotalSince,
+  refCaption,
+  refsForOrder,
+} from '#beta3/refs_service'
 import { readRecapProgress, requestRecap } from '#beta3/recap_service'
 import { skillStatus, syncRemoteSkills } from '#beta3/skill_sync'
 import { ensureDefaults, readSettings } from '#services/settings_service'
@@ -66,6 +73,9 @@ import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '
 import env from '#start/env'
 
 /** Beta 2: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
+/** Bukti transfer yang nominalnya sedang/baru dibaca AI (sekali per 10 menit per order). */
+const proofReads = new Map<string, number>()
+
 export default class Beta3Controller {
   async page({ view, session }: HttpContext) {
     await ensureDefaults()
@@ -372,20 +382,29 @@ export default class Beta3Controller {
       db.from('whatsapp_contacts').where('jid', jid).first(),
       readBeta3ChatNote(jid),
     ])
-    // Bukti transfer: gambar pelanggan setelah total dikirim (untuk dicek sebelum Lunas).
-    const proofs =
-      order && order.status === 'awaiting_payment'
-        ? await db
-            .from('whatsapp_messages')
-            .where('jid', jid)
-            .where('direction', 'in')
-            .where('media_type', 'image')
-            .where('created_at', '>', order.updated_at)
-            .whereNotNull('media_url')
-            .orderBy('id', 'desc')
-            .limit(3)
-            .select('media_url')
-        : []
+    // Bukti transfer untuk dicek sebelum Lunas. Nominalnya dibaca AI dari gambar (di latar)
+    // supaya isian "Dana masuk" tidak otomatis = total (DP 400 ribu terbaca lunas).
+    const proofs = order && order.status === 'awaiting_payment' ? await orderProofImages(jid, order).catch(() => []) : []
+    const readKey = `${order?.id}:${proofs.length}`
+    if (
+      order &&
+      order.status === 'awaiting_payment' &&
+      proofs.length &&
+      !Number(order.reported_amount || 0) &&
+      Date.now() - (proofReads.get(readKey) || 0) > 10 * 60_000
+    ) {
+      proofReads.set(readKey, Date.now())
+      void proofTotalSince(
+        jid,
+        new Date(Math.min(new Date(order.created_at).getTime(), new Date(order.updated_at).getTime()))
+      )
+        .then((amount) =>
+          amount > 0
+            ? db.from('whatsapp_beta3_orders').where('id', order.id).whereNull('reported_amount').update({ reported_amount: amount })
+            : null
+        )
+        .catch(() => null)
+    }
     // Pesanan yang tampil: order aktif; kalau tidak ada, detail yang sedang ditulis AI;
     // kalau kosong juga, order terakhir yang sudah lunas.
     const active = order && ['pending', 'awaiting_payment'].includes(String(order.status))

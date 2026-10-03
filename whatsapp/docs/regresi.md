@@ -27,6 +27,8 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Setelan tanpa nomor celana → total ditahan, tanya "celana menyesuaikan kah atau pakai No. berapa" | `beta3.spec` · pelajaran chat CS |
 | Form yang terkirim saat CS membalas tetap diproses di giliran berikutnya (sekali saja) | `beta3_flow.spec` · form terlewat |
 | Form terlewat + CS sudah kirim total manual → order tercatat "menunggu pembayaran" dengan total CS, bukti transfer tampil, tombol konfirmasi muncul; total tidak dikirim ulang | `beta3_flow.spec` · total CS |
+| "Dana masuk" saat menunggu bayar = nominal yang dibaca dari bukti transfer; belum terbaca → kosong + "Cek nominal di bukti transfer", tidak pernah otomatis = total (DP 400 ribu tidak jadi lunas) | `beta3_flow.spec` · panel room (+ cek Playwright `beta3_pay.js`) |
+| Bukti transfer tampil di panel walau order tercatat belakangan; gambar yang gagal dimuat tetap ditandai "Gambar belum terunduh" | `beta3_flow.spec` · panel room |
 | Pesan toko berisi total/rekening dikenali; janji AI ("ini totalnya saya kirimkan") tidak dianggap total | `beta3.spec` · form terlewat |
 | Tanpa form order, AI tidak menjanjikan total; minta data pengiriman / "saya cek dulu" | `beta3.spec` · janji total tanpa order |
 | Pesan grup produksi: tanpa harga, alamat, telepon; ditutup nama + nomor order | `beta3.spec` · pesan grup produksi |
