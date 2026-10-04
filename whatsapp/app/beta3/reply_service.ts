@@ -63,7 +63,7 @@ import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
-import { photosToShow, polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { polishText, polishWithPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -1423,13 +1423,6 @@ export async function createLeanReply(input: {
       decision,
     },
   })
-  if (!decision.foto.length && !decision.serah_cs) {
-    const shown = photosToShow(decision.pesan, input.text, digest.rows)
-    if (shown.length) {
-      decision.foto = shown
-      onTrace?.({ key: 'beta3-photo-guard', label: `Minta lihat model · foto ditambahkan sistem (${shown.join(', ')})`, status: 'completed', detail: { foto: shown } })
-    }
-  }
   const photos = resolvePhotos(digest.rows, decision.foto)
   // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
   if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')

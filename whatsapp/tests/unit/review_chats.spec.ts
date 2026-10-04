@@ -2,7 +2,7 @@
 // (reply_polish, quick reply, penjaga custom, tahap & susulan). Setiap ulasan baru → tambah kasus
 // di sini, supaya perbaikan yang saling bersinggungan tidak merusak ulasan sebelumnya.
 import { test } from '@japa/runner'
-import { photosToShow, polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { polishText, polishWithPhotos } from '#beta3/reply_polish'
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
 import { keepCustomInChat, CUSTOM_REPLY } from '#beta3/reply_guards'
@@ -144,19 +144,17 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.equal(goalStatus({ ...decision('tanya_model', 'x'), serah_cs: true }), 'paused')
   })
 
-  test('#12 model mengikuti keputusan Jev: biasa → standar, rumit → berat, ringan hanya untuk yang sederhana', ({ assert }) => {
+  test('#12 model mengikuti keputusan Jev: pertanyaan apa pun minimal standar, rumit → berat, ringan hanya salam', ({ assert }) => {
     const base = { imageCount: 0, systemNote: '', toolNotes: 0 }
     // Jev menjawab skor mulai 0; "Biasa" (skor 1) dulu terbaca tingkat 1 → model murah.
-    const tier = (score: number, extra: Partial<typeof base> = {}, more = {}) =>
-      chooseReplyTier({ difficulty: scoreLevel({ score }, 3), ...more }, { ...base, ...extra }).tier
+    const tier = (score: number, extra: Partial<typeof base> = {}) =>
+      chooseReplyTier({ difficulty: scoreLevel({ score }, 3) }, { ...base, ...extra }).tier
     assert.equal(tier(1), 'standard')
     assert.equal(tier(1.4), 'standard')
     assert.equal(tier(2), 'heavy')
-    assert.equal(tier(0.2), 'light')
-    // Sederhana tapi ada ongkir/catatan sistem atau topik custom/bayar → standar.
+    // "Sederhana" (satu pertanyaan harga/stok) tetap standar: model murah jawabannya kurang tepat (v3.5.17).
+    assert.equal(tier(0.2), 'standard')
     assert.equal(tier(0, { toolNotes: 1 }), 'standard')
-    assert.equal(tier(0, { systemNote: '\n\nCATATAN SISTEM: x' }), 'standard')
-    assert.equal(tier(0, {}, { topics: { custom: true } }), 'standard')
     // Salam / tanda terima → ringan; komplain → berat; gambar → aturan lama.
     assert.equal(chooseReplyTier({ intent: 'sapaan' }, base).tier, 'light')
     assert.equal(chooseReplyTier({ reaction: 'terima', difficulty: 2 }, base).tier, 'light')
@@ -165,19 +163,18 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.isUndefined(chooseReplyTier({}, base).tier)
   })
 
-  test('#13 "seperti apa" sesudah tanya harga → foto produk yang disebut, pengantar singkat', ({ assert }) => {
+  test('#13 daftar model dengan harga berbeda tidak diringkas jadi "Ini fotonya" (informasi dipertahankan)', ({ assert }) => {
     const raw = [
       'Model jas yang tersedia:\n- Basic Suit mulai 485.000\n- Tuxedo mulai 485.000\n- Bescap Cross Placket 485.000\n- Peak Suit 485.000\n- Premium Basic Suit 685.000',
       'Mau pilih yang mana bos?',
     ]
-    const shown = photosToShow(raw, 'Seperti apa', catalog)
-    assert.deepEqual(shown, ['Basic Suit - Black 2.0', 'Tuxedo - Black', 'Bescap Cross Placket - Black'])
-    assert.deepEqual(polish(raw, 'Seperti apa', ['Harga jas mulai 485.000 bos'], shown), [
-      'Ini fotonya bos, mulai 485.000',
-      'Mau pilih yang mana bos?',
-    ])
-    // Tanya detail (beda/bahan) atau hanya satu produk disebut → tidak ditambah foto.
-    assert.deepEqual(photosToShow(raw, 'Bedanya apa', catalog), [])
-    assert.deepEqual(photosToShow(['Premium Basic Suit 685.000 bos'], 'Premium seperti apa', catalog), [])
+    const out = polish(raw, 'Seperti apa', ['Harga jas mulai 485.000 bos'], ['Basic Suit - Black 2.0', 'Tuxedo - Black'])
+    assert.include(out[0], '- Premium Basic Suit 685.000')
+    assert.equal(out[1], 'Mau pilih yang mana bos?')
+    // Satu harga (semua model sama) → pengantar singkat tetap seperti #7.
+    assert.deepEqual(
+      polish(['Ini Basic Suit, Tuxedo, dan Peak Suit bos, semuanya 485.000. Yang cocok yang mana bos?'], 'Seperti apa', [], ['Basic Suit - Black 2.0', 'Tuxedo - Black', 'Peak Suit - Black']),
+      ['Ini fotonya bos, harganya 485.000', 'Yang cocok yang mana?']
+    )
   })
 })

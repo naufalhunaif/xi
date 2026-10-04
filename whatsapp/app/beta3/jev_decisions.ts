@@ -241,18 +241,15 @@ export async function understandTurn(input: {
   if (!Object.keys(questions).length) return {}
   const answers = await askJev(
     'pahami',
-    // Hemat token Jev: 6 baris terakhir (300 huruf), data lain hanya bila pertanyaannya ditanyakan.
+    // Konteks penuh (10 baris × 500 huruf): dipotong lebih pendek membuat Jev lebih sering ragu
+    // soal seri harga, setuju, dan kesulitan — hematnya kecil, akibatnya model murah terpilih lagi.
     {
-      pesan_terbaru: maskPii(input.text).slice(0, 1200),
-      percakapan: conversationLines(input.history, 6, 300),
-      ...(on.layanan ? { layanan_tersedia: input.services } : {}),
-      ...(on.tanggapan || on.setuju
-        ? {
-            pesan_toko_terakhir: maskPii(
-              String([...input.history].reverse().find((row) => row.direction === 'out')?.body || '')
-            ).slice(0, 400),
-          }
-        : {}),
+      pesan_terbaru: maskPii(input.text).slice(0, 2000),
+      percakapan: conversationLines(input.history),
+      layanan_tersedia: input.services,
+      pesan_toko_terakhir: maskPii(
+        String([...input.history].reverse().find((row) => row.direction === 'out')?.body || '')
+      ).slice(0, 600),
     },
     questions
   )

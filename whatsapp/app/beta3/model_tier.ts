@@ -9,7 +9,7 @@ const DIFFICULTY_LABEL = ['', 'sederhana', 'biasa', 'rumit']
 export type TierChoice = { tier: AutoTier; reason: string } | { tier: undefined; reason: string }
 
 export function chooseReplyTier(
-  understanding: Pick<TurnUnderstanding, 'intent' | 'reaction' | 'difficulty' | 'topics' | 'urgency' | 'csReason'>,
+  understanding: Pick<TurnUnderstanding, 'intent' | 'reaction' | 'difficulty' | 'urgency' | 'csReason'>,
   context: { imageCount: number; systemNote: string; toolNotes: number }
 ): TierChoice {
   if (context.imageCount) return { tier: undefined, reason: 'ada gambar → aturan lama (berat)' }
@@ -23,10 +23,7 @@ export function chooseReplyTier(
   if (!level) return { tier: undefined, reason: 'Jev belum yakin → pola kata' }
   const label = `Jev: ${DIFFICULTY_LABEL[level]}`
   if (level >= 3) return { tier: 'heavy', reason: label }
-  if (level === 2) return { tier: 'standard', reason: label }
-  // Sederhana, tapi ada data sistem (ongkir, catatan) atau topik custom/bayar → jangan model termurah.
-  const risky = understanding.topics?.custom || understanding.topics?.bayar
-  if (extra || risky)
-    return { tier: 'standard', reason: `${label}, tapi ada ${extra ? 'catatan sistem/ongkir' : 'topik custom/bayar'}` }
-  return { tier: 'light', reason: label }
+  // Pertanyaan pelanggan apa pun (produk, harga, size, order) minimal model standar: model termurah
+  // hanya untuk salam/tanda terima — jawabannya terasa kurang tepat bila diberi pertanyaan toko.
+  return { tier: 'standard', reason: level === 1 ? `${label} → standar (bukan salam)` : label }
 }

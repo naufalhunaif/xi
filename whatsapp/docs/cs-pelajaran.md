@@ -334,3 +334,19 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 4. "Seperti apa?" tanpa field foto → sistem mengirim foto produk yang disebut (maks 3), pengantar "Ini fotonya bos, mulai 485.000".
 5. Harga setelan disebut langsung ("Setelan premium 955.000 bos, sudah jas + celana"), tanpa penjumlahan.
 
+## #14 · Okt 2026 · jawaban terasa kurang tepat & kurang cerdas (diterapkan v3.5.17)
+
+**Laporan pemilik**
+- Pola jawaban sejak v3.5.14–16 terasa kurang tepat; v3.5.11 lebih stabil.
+
+**Hasil tinjauan ulang**
+1. Konteks Jev yang dipotong (6 baris × 300 huruf) membuat Jev lebih sering ragu → model murah terpilih lagi. Dikembalikan ke 10 × 500.
+2. Model termurah kini hanya untuk salam/tanda terima. Pertanyaan apa pun (produk, harga, size, order) minimal model standar; rumit/komplain → berat.
+3. Foto otomatis saat "seperti apa" dihapus: daftar model berharga beda sempat diganti "Ini fotonya bos, mulai 485.000" dan hanya 3 foto — informasi hilang. Pengantar singkat hanya bila harganya satu.
+4. Aturan "harga setelan tanpa penjumlahan" dihapus (jawaban "685.000 + 270.000 jadi 955.000" jelas dan tidak dikeluhkan).
+
+**Pelajaran**
+- Hemat token tidak boleh memotong konteks keputusan (Jev maupun AI).
+- Jangan menambah perapian otomatis yang membuang isi jawaban; perapian hanya merapikan bentuk.
+- Perubahan yang tidak diminta pemilik tidak dimasukkan ke rilis perbaikan ulasan.
+

@@ -49,42 +49,10 @@ export function compactPhotoIntro(
   const mentioned = [...names].filter((name) => first.toLowerCase().includes(name)).length
   if (mentioned < 2 && first.length <= 90) return pesan
   const prices = [...new Set(first.match(/\d{1,3}(?:\.\d{3})+/g) || [])]
-  const lowest = prices.sort((a, b) => Number(a.replace(/\./g, '')) - Number(b.replace(/\./g, '')))[0]
-  const intro = `Ini fotonya ${address}${prices.length === 1 ? `, harganya ${prices[0]}` : lowest ? `, mulai ${lowest}` : ''}`
+  // Harga berbeda-beda (daftar model) = informasi; tidak diringkas.
+  if (prices.length > 1) return pesan
+  const intro = `Ini fotonya ${address}${prices.length === 1 ? `, harganya ${prices[0]}` : ''}`
   return [intro, ...pesan.slice(1)]
-}
-
-/**
- * Pelanggan minta lihat ("seperti apa?") tapi model hanya menulis daftar nama tanpa field `foto`:
- * sistem memilih foto produk yang disebut di balasan (urutan sebutan, satu warna per produk).
- */
-export function photosToShow(
-  pesan: string[],
-  customerText: string,
-  rows: Array<{ product: string; color: string; photoUrl: string | null; active?: boolean }>,
-  max = 3
-) {
-  if (!SEE_REQUEST.test(customerText) || ASKS_DETAIL.test(customerText)) return []
-  let text = pesan.join('\n').toLowerCase()
-  const names = [...new Set(rows.filter((row) => row.photoUrl && row.active !== false).map((row) => row.product))]
-    .filter((name) => name.trim().length >= 4)
-    .sort((a, b) => b.length - a.length)
-  const found: Array<{ at: number; name: string }> = []
-  for (const name of names) {
-    const at = text.indexOf(name.toLowerCase())
-    if (at < 0) continue
-    found.push({ at, name })
-    // "Premium Basic Suit" tidak ikut terhitung "Basic Suit".
-    text = text.split(name.toLowerCase()).join(' '.repeat(name.length))
-  }
-  if (found.length < 2) return []
-  return found
-    .sort((a, b) => a.at - b.at)
-    .slice(0, max)
-    .map(({ name }) => {
-      const row = rows.find((item) => item.product === name && item.photoUrl)!
-      return row.color ? `${row.product} - ${row.color}` : row.product
-    })
 }
 
 export type PolishContext = {

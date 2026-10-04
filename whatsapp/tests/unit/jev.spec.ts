@@ -185,11 +185,11 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
     })
     assert.equal(result.difficulty, 2)
     assert.equal(result.urgency, 4)
-    // Hemat token: 6 baris × 300 huruf, tanpa data yang tidak ditanyakan.
-    assert.lengthOf(sent.state.percakapan, 6)
-    assert.isAtMost(Math.max(...sent.state.percakapan.map((line: string) => line.length)), 320)
-    assert.notProperty(sent.state, 'layanan_tersedia')
-    assert.notProperty(sent.state, 'pesan_toko_terakhir')
+    // Konteks penuh untuk Jev (v3.5.17): 10 baris × 500 huruf, layanan & pesan toko terakhir selalu ikut.
+    assert.lengthOf(sent.state.percakapan, 10)
+    assert.isAtMost(Math.max(...sent.state.percakapan.map((line: string) => line.length)), 520)
+    assert.deepEqual(sent.state.layanan_tersedia, ['reg'])
+    assert.property(sent.state, 'pesan_toko_terakhir')
   })
 
   test('seri & barang yang ditanya harganya (v3.5.12)', async ({ assert }) => {
