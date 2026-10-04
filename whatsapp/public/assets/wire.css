@@ -522,3 +522,34 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* ---------- Kartu foto bercoak (notch) — hanya foto produk/bukti: order, keranjang Beta3, galeri & media post IG ---------- */
+.workspace-ui :is(.wa-b3-pictures, .wa-b3-photos, .wa-order-photos, .wa-igp-gallery) :is(img, video),
+.workspace-ui .wa-igp-tile {
+  --notch: 14px;
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% 100%, 0 100%);
+  background: var(--wa-subtle);
+}
+.workspace-ui :is(.wa-b3-pictures, .wa-b3-photos, .wa-order-photos, .wa-igp-gallery) figure {
+  position: relative;
+}
+.workspace-ui :is(.wa-b3-pictures, .wa-b3-photos, .wa-order-photos, .wa-igp-gallery) figure::after {
+  /* Garis diagonal coak, supaya potongannya terbaca di atas latar putih. */
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(to bottom left, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+  pointer-events: none;
+}
+.workspace-ui :is(.wa-b3-pictures, .wa-b3-photos, .wa-order-photos) figcaption {
+  font-family: var(--wa-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
