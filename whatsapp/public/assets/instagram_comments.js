@@ -47,17 +47,6 @@
     if (className) node.className = className
     return node
   }
-  const when = (value) =>
-    value
-      ? new Intl.DateTimeFormat(window.waI18n?.locale || 'id-ID', {
-          timeZone: 'Asia/Jakarta',
-          day: '2-digit',
-          month: 'short',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        }).format(new Date(value))
-      : ''
   const STATUS = () => ({
     pending: [t('Diproses AI'), 'warn'],
     processing: [t('Diproses AI'), 'warn'],
@@ -101,7 +90,7 @@
       who.href = `${base}/?jid=${encodeURIComponent(entry.jid)}`
       who.title = t('Buka chat')
     } else who = el('strong', name, 'wa-igc-name')
-    line.append(dot, who, el('span', entry.body, 'wa-igc-text'), el('time', when(entry.createdAt), 'wa-igc-time'))
+    line.append(dot, who, el('span', entry.body, 'wa-igc-text'), Object.assign(window.waTime.node(entry.createdAt), { className: 'wa-igc-time' }))
     node.append(line)
     if (entry.reply) {
       // Balasan DM turun dari komentarnya sebagai cabang kecil.

@@ -136,3 +136,10 @@ Perubahan v3.6.6:
 - Coak hanya pada foto produk/bukti: foto order (`.wa-order-photos`, `.wa-b3-pictures`), bukti bayar di keranjang Beta3 (`.wa-b3-photos`), galeri post Instagram (`.wa-igp-gallery`) dan ubin media composer IG (`.wa-igp-tile`). `clip-path` memotong sudut kanan-atas 14px; `figure::after` menggambar garis diagonal tipis supaya potongannya terbaca di atas latar putih; keterangan foto monospace huruf besar.
 - Tidak dipakai di gelembung chat, avatar, atau kartu teks.
 - Bersinggungan: `border-radius` dan `border` foto-foto itu dihapus (sudut jadi tajam, sesuai gaya angular); `media_viewer` (zoom) tidak terpengaruh karena hanya membaca `src`.
+
+## v3.6.10 — waktu relatif ringkas
+
+- `i18n.js` menyediakan `window.waTime`: `ago(nilai)` → `just now` / `1s ago` / `5m ago` / `3h ago` / `2d ago` / `1mo ago` / `1y ago`; `full(nilai)` tanggal lengkap (WIB) untuk `title`; `node(nilai)` membuat `<time data-relative-time>` yang disegarkan tiap 10 detik di semua halaman (sebelumnya hanya di Pengaturan, tiap 60 detik, tanpa detik).
+- Dipakai di: orkestra ("last … 21h ago"), Instagram "Last message received", skill CS "Last updated / Checked", status katalog Beta 3 ("updated 2h ago"), backup terakhir, daftar keputusan Jev, waktu komentar Instagram, tabel Recent runs di Pemakaian. Tanggal lengkap tetap tersedia lewat tooltip.
+- Tetap absolut (memang perlu tanggalnya): waktu pesan di chat, tanggal order, jadwal post Instagram, riwayat file backup, batas kuota (waktu mendatang).
+- Bersinggungan: `settings.js refreshRelativeTimes` kini memanggil `waTime.refresh` (event `skills:updated` tetap). `textElement` di settings.js menerima Node. Kunci katalog baru: "diperbarui {0}".

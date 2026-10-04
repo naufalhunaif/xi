@@ -100,12 +100,8 @@
     const labels = Object.fromEntries(state.decisions.map((item) => [item.key, item.label]))
     for (const row of rows) {
       const item = el('li', 'wa-quality-item')
-      const time = new Date(row.created_at).toLocaleString(window.waI18n?.locale || 'id-ID', {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      const time = window.waTime.ago(row.created_at)
+      item.title = window.waTime.full(row.created_at)
       const who = row.contact_name || String(row.jid || '').split('@')[0] || '—'
       const text = el('span')
       text.append(el('strong', '', `${t(labels[row.decision] || row.decision)}: ${row.answer}`))

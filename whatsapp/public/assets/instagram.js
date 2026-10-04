@@ -21,8 +21,7 @@
     return result
   }
   const status = (text) => (byId('igStatus').textContent = text || '')
-  const when = (ms) =>
-    ms ? new Date(ms).toLocaleString(window.waI18n?.locale || 'id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''
+  const when = (ms) => (ms ? window.waTime.ago(ms) : '')
   function render(state) {
     byId('igAppId').value = state.appId || ''
     byId('igAppSecret').value = ''
@@ -48,6 +47,7 @@
     if (state.lastError) parts.push(`⚠ ${t(state.lastError)}`)
     if (state.connected) parts.push(state.lastWebhookAt ? t('Pesan terakhir diterima {0}', when(state.lastWebhookAt)) : t('Belum ada DM/komentar yang diterima.'))
     notice.textContent = parts.join(' · ')
+    notice.title = state.lastWebhookAt ? window.waTime.full(state.lastWebhookAt) : ''
     notice.hidden = !parts.length
     notice.className = state.lastError ? 'wa-alert' : 'wa-note'
   }

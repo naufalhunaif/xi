@@ -19,27 +19,8 @@
   const runsState = { filter: null, next: 0, total: 0, shown: 0, extended: false, busy: false }
   let calendarKey = ''
   let lastCalendar = []
-  function refreshRelativeTimes() {
-    for (const time of document.querySelectorAll('time[data-relative-time]')) {
-      const seconds = Math.max(0, (Date.now() - new Date(time.dateTime).getTime()) / 1000)
-      const units = [
-        [31536000, 'y'],
-        [2592000, 'mo'],
-        [86400, 'd'],
-        [3600, 'h'],
-        [60, 'm'],
-      ]
-      const unit = units.find(([size]) => seconds >= size)
-      time.textContent = !Number.isFinite(seconds)
-        ? '—'
-        : unit
-          ? `${Math.floor(seconds / unit[0])}${unit[1]} ago`
-          : 'just now'
-    }
-  }
-  refreshRelativeTimes()
+  const refreshRelativeTimes = () => window.waTime?.refresh()
   document.addEventListener('skills:updated', refreshRelativeTimes)
-  window.setInterval(refreshRelativeTimes, 60_000)
 
   let lastView = ''
   function selectPanel() {
@@ -84,7 +65,8 @@
 
   function textElement(tag, value, className) {
     const element = document.createElement(tag)
-    element.textContent = value
+    if (value instanceof Node) element.append(value)
+    else element.textContent = value
     if (className) element.className = className
     return element
   }
@@ -312,13 +294,7 @@
   /* Proses terbaru: 20 per halaman, "Muat lebih banyak", filter dari klik baris model/fase. */
   function runRow(run) {
     const row = document.createElement('tr')
-    const date = new Intl.DateTimeFormat(locale(), {
-      timeZone: 'Asia/Jakarta',
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(run.createdAt))
+    const date = window.waTime.node(run.createdAt)
     for (const value of [
       date,
       run.phase || '—',

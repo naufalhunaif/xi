@@ -113,7 +113,56 @@
     },
   }
   document.documentElement.lang = language
+
+  // v3.6.10: waktu relatif ringkas untuk label "terakhir …" (1s ago, 5m ago, 3h ago, 2d ago).
+  // <time data-relative-time datetime="…"> disegarkan tiap 10 detik; judulnya menyimpan tanggal lengkap.
+  const toMs = (value) =>
+    value instanceof Date ? value.getTime() : typeof value === 'number' ? value : new Date(value).getTime()
+  const fullDate = (value) =>
+    new Date(toMs(value)).toLocaleString('en-US', {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  const ago = (value) => {
+    const ms = toMs(value)
+    if (!Number.isFinite(ms)) return '—'
+    const seconds = Math.max(0, Math.round((Date.now() - ms) / 1000))
+    if (seconds < 1) return 'just now'
+    const units = [
+      [31536000, 'y'],
+      [2592000, 'mo'],
+      [86400, 'd'],
+      [3600, 'h'],
+      [60, 'm'],
+    ]
+    const unit = units.find(([size]) => seconds >= size)
+    return unit ? `${Math.floor(seconds / unit[0])}${unit[1]} ago` : `${seconds}s ago`
+  }
+  const relativeNode = (value, node) => {
+    const time = node || document.createElement('time')
+    const ms = toMs(value)
+    if (!Number.isFinite(ms)) {
+      time.textContent = '—'
+      return time
+    }
+    time.dateTime = new Date(ms).toISOString()
+    time.dataset.relativeTime = ''
+    time.title = fullDate(ms)
+    time.textContent = ago(ms)
+    return time
+  }
+  const refreshRelative = () => {
+    for (const time of document.querySelectorAll('time[data-relative-time]')) time.textContent = ago(time.dateTime)
+  }
+  window.setInterval(refreshRelative, 10_000)
+  window.waTime = { ago, full: fullDate, node: relativeNode, refresh: refreshRelative }
+
   document.addEventListener('DOMContentLoaded', () => {
+    refreshRelative()
     sync()
     document
       .getElementById('uiLanguage')

@@ -24,14 +24,7 @@
     return node
   }
   const clock = (ms) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-  const ago = (ms) => {
-    if (!ms) return t('belum pernah')
-    const minutes = Math.round((Date.now() - ms) / 60000)
-    if (minutes < 1) return t('baru saja')
-    if (minutes < 60) return t('{0} mnt lalu', minutes)
-    const hours = Math.round(minutes / 60)
-    return hours < 24 ? t('{0} jam lalu', hours) : t('{0} hari lalu', Math.round(hours / 24))
-  }
+  const ago = (ms) => (ms ? window.waTime.ago(ms) : t('belum pernah'))
   const phaseLabel = (phase) =>
     /recap/.test(phase) ? t('rekap order') : /catalog|vision|ciri/.test(phase) ? t('baca katalog') : t('balasan chat')
 

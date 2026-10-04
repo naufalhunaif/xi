@@ -1911,5 +1911,6 @@ window.waLocales.en = {
   "URL authorize MCP tidak aman.": "MCP authorize URL is not secure.",
   "Ukuran file harus 1 byte–16 MB.": "File size must be 1 byte–16 MB.",
   "Ulangi password tidak sama.": "Repeated password does not match.",
+  "diperbarui {0}": "updated {0}",
   "jid wajib.": "jid is required.",
 }

@@ -58,11 +58,11 @@
         ? t('Sedang membuat backup…')
         : last
           ? last.ok
-            ? t('Terakhir: {0} · {1}', when(last.at), size(last.size)) +
+            ? t('Terakhir: {0} · {1}', window.waTime.ago(last.at), size(last.size)) +
               (last.media
                 ? ` · ${t('media: {0} file baru, total {1}', last.media.uploaded, last.media.total)}${last.media.pending ? ` · ${t('{0} menunggu backup berikutnya', last.media.pending)}` : ''}`
                 : '')
-            : t('Gagal {0}: {1}', when(last.at), last.error || '')
+            : t('Gagal {0}: {1}', window.waTime.ago(last.at), last.error || '')
           : t('Belum pernah backup.')
     byId('backupNow').disabled = !state.connected || Boolean(state.running)
     byId('backupList').disabled = !state.connected || Boolean(state.running)

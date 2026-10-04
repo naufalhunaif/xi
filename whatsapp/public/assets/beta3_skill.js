@@ -6,15 +6,16 @@
   const csrf = document.querySelector('meta[name="csrf-token"]').content
   const t = (value, ...args) =>
     window.waI18n?.t(value, ...args) ?? value.replace(/\{(\d+)\}/g, (match, index) => args[index] ?? match)
-  const when = (value) =>
-    value
-      ? new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
-      : '—'
+  const when = (value, id) => {
+    const node = byId(id)
+    node.title = value ? window.waTime.full(value) : ''
+    node.textContent = value ? window.waTime.ago(value) : '—'
+  }
   function render(data) {
     byId('skillName').textContent = data.name || '—'
     byId('skillSource').textContent = data.installed ? `(${data.source === 'online' ? t('dari rilis online') : t('bawaan aplikasi')})` : t('(belum terpasang)')
-    byId('skillUpdated').textContent = when(data.updatedAt)
-    byId('skillChecked').textContent = when(data.checkedAt)
+    when(data.updatedAt, 'skillUpdated')
+    when(data.checkedAt, 'skillChecked')
     byId('skillContent').textContent = data.content || ''
   }
   async function call(path, method = 'GET') {

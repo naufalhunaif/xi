@@ -125,7 +125,8 @@
 
   async function loadCatalog() {
     const result = await api('/api/beta3/catalog')
-    const when = result.updatedAt ? new Date(result.updatedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : ''
+    const when = result.updatedAt ? t('diperbarui {0}', window.waTime.ago(result.updatedAt)) : ''
+    byId('beta3CatalogStatus').title = result.updatedAt ? window.waTime.full(result.updatedAt) : ''
     byId('beta3CatalogStatus').textContent = result.rows.length
       ? [t('{0} varian', result.rows.length), t('≈{0} token', result.tokens), result.version ? t('versi {0}', String(result.version).slice(0, 8)) : '', when].filter(Boolean).join(' · ')
       : t('Belum ada katalog — tekan Sync katalog.')
