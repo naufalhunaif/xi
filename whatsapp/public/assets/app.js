@@ -447,9 +447,17 @@
     messageList.classList.remove('wa-ssr-pending')
     if (!items.length) {
       const empty = document.createElement('div')
-      empty.className = 'wa-empty'
-      empty.textContent = t('Pilih kontak')
+      empty.className = 'wa-empty wa-empty-moment'
+      empty.dataset.wireHost = ''
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      icon.setAttribute('class', 'wire-icon')
+      icon.setAttribute('viewBox', '0 0 200 200')
+      icon.setAttribute('aria-hidden', 'true')
+      const label = document.createElement('span')
+      label.textContent = t('Pilih kontak')
+      empty.append(icon, label)
       messageList.append(empty)
+      window.waWire?.mount(icon)
       return
     }
     for (const message of items) {

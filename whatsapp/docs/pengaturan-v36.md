@@ -114,3 +114,11 @@ Perubahan v3.6.6:
 - `calm.css` v10: aturan `.wa-bento*`, tombol segmented monospace, `.wa-heat-box` dan tabel dibungkus kartu putih, judul tabel monospace.
 - `settings.js`: `renderTrend` memakai ukuran SVG nyata untuk `viewBox` (ubin bento tingginya mengikuti grid) dan dirender ulang saat `resize`; `modelLabel` toleran terhadap label lama "Â· otomatis".
 - Bersinggungan: `#usageCards` tidak lagi punya kotak sendiri — skrip yang mengisi `.wa-usage-stat` tetap jalan (struktur anak tidak berubah). Grafik butuh tinggi dari grid; bila `.wa-bento` dihapus, `#usageTrend` kembali ke `aspect-ratio`.
+
+## v3.6.7 — gaya Wireframe untuk dasar semua halaman + beranda chat
+
+- `public/assets/wire.css` (dimuat paling akhir, setelah `calm.css`): token terang Wireframe untuk semua halaman — latar `#edebe5`, sidebar `#e9e7e0`, garis `#e0ddd5`, teks `#151515`; kartu/panel radius 8; tombol `primary` hitam-teks; item menu sidebar aktif = kartu putih bergaris tipis; `nav-caption` monospace. Mode gelap tetap memakai token lama (hanya bentuk yang ikut).
+- Beranda chat: judul "Chat" tipis; tombol saluran & tab filter monospace huruf besar (aktif = latar off-white, bukan hijau); avatar monokrom; baris aktif = garis kiri tipis gelap (`ai-running` tetap hijau); badge belum dibaca hitam; badge AI/CS/Penting monospace (CS = hitam). Pesan masuk kartu putih, pesan keluar AI off-white, pesan keluar CS putih bergaris gelap; meta/waktu/status monospace. Komposer: garis tipis, fokus = outline hitam 1px.
+- Momen kosong "Pilih kontak": ikon gelombang kawat 3D + label monospace (`.wa-empty-moment`), dirender di SSR (`dashboard.edge`) dan di `app.js` saat daftar pesan kosong (`window.waWire.mount`).
+- `public/assets/wire_icon.js` menggantikan `auth_wire.js`: dipasang ke setiap `svg.wire-icon` (login & chat), `data-wire-host` menentukan area hover. Ikon kawat hanya untuk momen (login, kosong), bukan di tiap kartu.
+- Bersinggungan: warna hijau pada tab filter/badge/akun tidak dipakai lagi di mode terang — skrip yang mengandalkan kelas tetap jalan, hanya tampilannya berubah. `theme.css` aturan warna per filter (`[data-inbox-filter="cs"] span`) tetap berlaku untuk angka. Halaman lain ikut berubah latar & radius; pemeriksaan tampilan tiap halaman dilanjutkan di versi berikut (Koneksi → Toko → Cara AI membalas → Aplikasi & data → Beta3/Instagram).

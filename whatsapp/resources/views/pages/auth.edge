@@ -13,8 +13,8 @@
     {{-- Gaya Wireframe (keluarga wireframe-services-grid): kartu putih minimal, ikon gelombang 3D kawat berputar. --}}
     <main class="page">
       <aside class="rail" aria-hidden="true"><h2>{{ mode === 'setup' ? 'First run' : 'Sign in' }}</h2><span class="mark"></span></aside>
-      <section class="card" aria-labelledby="authTitle">
-        <svg class="icon" id="authWave" viewBox="0 0 200 200" aria-hidden="true"></svg>
+      <section class="card" aria-labelledby="authTitle" data-wire-host>
+        <svg class="icon wire-icon" viewBox="0 0 200 200" aria-hidden="true"></svg>
         <div class="text">
           @if(mode === 'setup')
             <h1 id="authTitle">Create owner account</h1>
@@ -46,6 +46,6 @@
         <footer>v{{ appVersion }}</footer>
       </section>
     </main>
-    <script src="{{ appUrl }}/assets/auth_wire.js?v=1" defer></script>
+    <script src="{{ appUrl }}/assets/wire_icon.js?v=1" defer></script>
   </body>
 </html>

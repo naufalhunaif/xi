@@ -1,0 +1,316 @@
+/*
+ * v3.6.7 — lapisan gaya Wireframe (dimuat paling akhir, setelah calm.css).
+ * Dasar untuk semua halaman: latar off-white, panel/kartu putih radius 8 tanpa bayangan,
+ * garis tipis, label kecil monospace huruf besar, satu warna aksen hanya untuk tanda penting.
+ * Halaman per halaman: beranda chat (v3.6.7). Mode gelap memakai token lama, hanya bentuk yang ikut.
+ */
+.workspace-ui {
+  --wa-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+html:not([data-theme='dark']) .workspace-ui {
+  --sidebar: #e9e7e0;
+  --text: #151515;
+  --muted: #6b6b66;
+  --line: #e0ddd5;
+  --border: #e0ddd5;
+  --wa-page: #edebe5;
+  --wa-chat-bg: #edebe5;
+  --wa-raised: #f4f3ef;
+  --wa-subtle: #f1f0eb;
+  --wa-form-border: #d8d5cc;
+}
+html:not([data-theme='dark']) {
+  background: #edebe5;
+}
+
+/* Bentuk: radius 8 untuk kartu/panel, 6 untuk kontrol. */
+.workspace-ui :is(.wa-card, .wa-panel, .wa-settings-block, .wa-account-bar, .wa-cart-section, .wa-quality-item, .wa-quality-test, .wa-settings-panel) {
+  border-radius: 8px;
+}
+.workspace-ui .button.primary,
+.workspace-ui button.button.primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--wa-page);
+}
+.workspace-ui .button.primary:hover,
+.workspace-ui button.button.primary:hover {
+  opacity: 0.88;
+  background: var(--text);
+}
+
+/* Label kecil monospace (dipakai tab, chip, meta). */
+.workspace-ui .wa-mono-label {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Sidebar: item aktif = kartu putih bergaris tipis, ikon tetap warna aksen. */
+html:not([data-theme='dark']) .workspace-ui .nav-item.active {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-weight: 500;
+}
+.workspace-ui .nav-caption {
+  font-family: var(--wa-mono);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+
+/* ---------- Beranda chat ---------- */
+.workspace-ui .wa-inbox-heading > strong {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.workspace-ui .wa-inbox-channels {
+  border-radius: 6px;
+  padding: 2px;
+}
+.workspace-ui .wa-inbox-channels button,
+.workspace-ui .wa-inbox-filters button {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-radius: 5px;
+}
+.workspace-ui .wa-inbox-channels button {
+  padding: 4px 7px;
+  letter-spacing: 0.05em;
+}
+.workspace-ui .wa-inbox-heading {
+  gap: 6px;
+}
+.workspace-ui .wa-inbox-channels button[aria-pressed='true'],
+.workspace-ui .wa-inbox-filters button[aria-pressed='true'] {
+  background: var(--wa-subtle);
+  color: var(--text);
+  font-weight: 500;
+}
+html:not([data-theme='dark']) .workspace-ui .wa-inbox-filters button[aria-pressed='true'] {
+  background: var(--wa-page);
+}
+.workspace-ui .wa-inbox-filters button:focus-visible,
+.workspace-ui .wa-inbox-channels button:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: -1px;
+}
+.workspace-ui .wa-inbox-filters button span {
+  margin-left: 4px;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.workspace-ui .wa-inbox-search input {
+  background: transparent;
+  border-color: var(--line);
+}
+.workspace-ui .wa-inbox-search input:focus,
+.workspace-ui .wa-room-search input:focus {
+  outline: 1px solid var(--text);
+  border-color: var(--text);
+}
+.workspace-ui .wa-connect-hint {
+  font-family: var(--wa-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 2px 6px;
+}
+
+/* Daftar kontak: baris bergaris tipis, avatar monokrom, baris aktif = garis kiri tipis gelap. */
+.workspace-ui .wa-contact {
+  border-bottom-color: var(--line);
+  color: var(--text);
+}
+html:not([data-theme='dark']) .workspace-ui .wa-contact:hover,
+html:not([data-theme='dark']) .workspace-ui .wa-contact.active {
+  background: var(--wa-subtle);
+}
+.workspace-ui .wa-contact.active {
+  box-shadow: inset 2px 0 var(--text);
+}
+.workspace-ui .wa-contact.ai-running {
+  box-shadow: inset 2px 0 var(--wa-ok, #18865b);
+}
+html:not([data-theme='dark']) .workspace-ui .wa-contact-avatar,
+html:not([data-theme='dark']) .workspace-ui .wa-room-avatar {
+  background: var(--wa-page);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-family: var(--wa-mono);
+  font-weight: 500;
+}
+.workspace-ui .wa-contact-content strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.workspace-ui .wa-contact-content small {
+  color: var(--muted);
+}
+.workspace-ui .wa-contact-pending,
+.workspace-ui .wa-line-chip {
+  font-family: var(--wa-mono);
+  color: var(--muted);
+}
+.workspace-ui .wa-unread-count {
+  background: var(--text);
+  color: var(--wa-page);
+  font-family: var(--wa-mono);
+  font-weight: 500;
+  font-size: 10.5px;
+  min-width: 18px;
+  height: 18px;
+}
+.workspace-ui .wa-contact-mode,
+.workspace-ui .wa-room-mode,
+.workspace-ui .message-source-badge {
+  font-family: var(--wa-mono);
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+html:not([data-theme='dark']) .workspace-ui :is(.wa-contact-mode, .wa-room-mode, .message-source-badge) {
+  background: var(--wa-page);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+html:not([data-theme='dark']) .workspace-ui :is(.wa-contact-mode.cs, .wa-room-mode.cs, .source-cs .message-source-badge) {
+  background: var(--text);
+  color: var(--wa-page);
+  box-shadow: none;
+}
+html:not([data-theme='dark']) .workspace-ui .wa-contact-mode.urgent {
+  background: var(--wa-err-bg, #fdecec);
+  color: var(--wa-err, #a33);
+  box-shadow: none;
+}
+.workspace-ui .wa-empty {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Room: judul tipis, meta monospace. */
+.workspace-ui .wa-room-title #roomName {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.workspace-ui .wa-room-status small,
+.workspace-ui .wa-room-title small {
+  font-family: var(--wa-mono);
+  font-size: 9.5px;
+  color: var(--muted);
+}
+.workspace-ui button.wa-room-mode::after {
+  content: 'i';
+  font-size: 8px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px currentColor;
+  opacity: 0.7;
+}
+.workspace-ui .wa-room-handling .button {
+  border-radius: 6px;
+}
+
+/* Pesan: masuk = kartu putih; keluar (AI) = off-white; keluar (CS) = garis gelap. Meta monospace. */
+html:not([data-theme='dark']) .workspace-ui .wa-messages {
+  background: var(--wa-page);
+}
+.workspace-ui .wa-messages .message {
+  border-radius: 8px;
+  border-color: var(--line);
+}
+html:not([data-theme='dark']) .workspace-ui .wa-messages .message.out {
+  background: var(--wa-subtle);
+  border-color: var(--line);
+}
+html:not([data-theme='dark']) .workspace-ui .wa-messages .message.out.source-cs {
+  background: #fff;
+  border-color: var(--text);
+}
+.workspace-ui .message.has-media .message-media {
+  border-radius: 7px 7px 0 0;
+}
+.workspace-ui .message-meta,
+.workspace-ui .message-footer time,
+.workspace-ui .message-time,
+.workspace-ui .message-status {
+  font-family: var(--wa-mono);
+  font-size: 9.5px;
+  color: var(--muted);
+}
+.workspace-ui .message-status.read {
+  color: var(--text);
+}
+.workspace-ui .message-body {
+  font-size: 12.5px;
+}
+.workspace-ui .new-message-divider {
+  font-family: var(--wa-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.workspace-ui .message-reply-preview {
+  border-radius: 6px;
+  border-left: 2px solid var(--text);
+}
+
+/* Komposer. */
+.workspace-ui .wa-composer input[type='text'] {
+  border-radius: 6px;
+  border-color: var(--line);
+}
+.workspace-ui .wa-composer input[type='text']:focus {
+  outline: 1px solid var(--text);
+  border-color: var(--text);
+}
+.workspace-ui .wa-attach {
+  border-radius: 6px;
+}
+.workspace-ui .wa-reply-composer {
+  border-left-color: var(--text);
+  border-radius: 6px;
+  font-family: var(--wa-mono);
+}
+
+/* Momen kosong: ikon gelombang kawat + label monospace. */
+.workspace-ui .wa-empty-moment {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 24px 24px 32px;
+}
+.workspace-ui .wa-empty-moment .wire-icon {
+  width: clamp(120px, 18vw, 180px);
+  height: auto;
+  color: var(--text);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+.workspace-ui .wa-empty-moment .wire-icon path {
+  vector-effect: non-scaling-stroke;
+}
+.workspace-ui .wa-message-list:has(> .wa-empty-moment) {
+  min-height: 100%;
+  justify-content: center;
+}
