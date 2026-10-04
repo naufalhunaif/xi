@@ -368,3 +368,18 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 - Jev untuk menambah sinyal, bukan menggantikan aturan yang sudah terbukti.
 - Biaya model boleh naik; akurasi jawaban yang diutamakan pemilik.
 
+## #16 · Okt 2026 · "bedanya apa" dijawab 5 model + "Ini contoh fotonya", foto tidak lengkap (diterapkan v3.5.19)
+
+**Laporan pemilik**
+- AI membandingkan Basic Suit, Tuxedo, Bescap, Peak Suit, Premium Basic Suit lalu bilang "Ini contoh fotonya", tapi tidak semua model itu dikirim fotonya.
+
+**Penyebab**
+- Field `foto` dibatasi 3 dan AI tidak diminta melengkapi semua model yang disebut.
+
+**Perubahan**
+1. Batas `foto` 3 → 5 (kiriman maks 6). Skill: menyebut/membandingkan beberapa model + "ini fotonya" → semua model itu harus ada fotonya.
+2. Sistem melengkapi (`completePhotos`): bila balasan menjanjikan foto atau pelanggan minta lihat, produk yang disebut tapi belum ada di `foto` ditambahkan — urut sesuai sebutan, warna yang disebut dipilih, "Basic Suit" ≠ "Premium Basic Suit". Teks balasan tidak diubah. Trace: "Foto dilengkapi · …".
+
+**Pelajaran**
+- Janji di teks ("ini fotonya") harus ditepati sistem: yang disebut, itu yang dikirim.
+

@@ -2,7 +2,7 @@
 // (reply_polish, quick reply, penjaga custom, tahap & susulan). Setiap ulasan baru → tambah kasus
 // di sini, supaya perbaikan yang saling bersinggungan tidak merusak ulasan sebelumnya.
 import { test } from '@japa/runner'
-import { polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { completePhotos, polishText, polishWithPhotos } from '#beta3/reply_polish'
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
 import { keepCustomInChat, CUSTOM_REPLY } from '#beta3/reply_guards'
@@ -173,5 +173,26 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
       polish(['Ini Basic Suit, Tuxedo, dan Peak Suit bos, semuanya 485.000. Yang cocok yang mana bos?'], 'Seperti apa', [], ['Basic Suit - Black 2.0', 'Tuxedo - Black', 'Peak Suit - Black']),
       ['Ini fotonya bos, harganya 485.000', 'Yang cocok yang mana?']
     )
+  })
+
+  test('#16 "bedanya apa" + "ini contoh fotonya" → semua model yang disebut dikirim fotonya', ({ assert }) => {
+    const pesan = [
+      'Bedanya Basic Suit kerah notch, Tuxedo kerah shawl, Bescap Cross Placket kerah shanghai dengan kancing menyilang, Peak Suit kerah lancip, sedangkan Premium Basic Suit bahannya Black Label bos',
+      'Ini contoh fotonya',
+    ]
+    // AI hanya mengisi 2 foto → 3 model lain dilengkapi sistem, urut sesuai sebutan.
+    assert.deepEqual(completePhotos(pesan, ['Basic Suit - Black 2.0', 'Tuxedo - Black'], 'Pengen liat dulu, bedanya apa ya', catalog), [
+      'Bescap Cross Placket - Black',
+      'Peak Suit - Black',
+      'Premium Basic Suit - Green Emerald',
+    ])
+    // Tanpa field foto sama sekali → semua lima.
+    assert.lengthOf(completePhotos(pesan, [], 'Pengen liat dulu, bedanya apa ya', catalog), 5)
+    // "Basic Suit" sudah ada → "Premium Basic Suit" tetap dihitung model lain, dan sebaliknya.
+    assert.deepEqual(completePhotos(['Premium Basic Suit bahannya Black Label bos, ini fotonya'], [], 'ok', catalog), ['Premium Basic Suit - Green Emerald'])
+    // Tidak janji foto & pelanggan tidak minta lihat → tidak ditambah.
+    assert.deepEqual(completePhotos(['Basic Suit 485.000, Tuxedo 485.000 bos'], [], 'Harga berapa', catalog), [])
+    // Warna yang disebut di balasan dipilih.
+    assert.deepEqual(completePhotos(['Ini fotonya Pants Premium warna Gray bos'], [], 'liat celananya', catalog), ['Pants Premium - Gray'])
   })
 })

@@ -55,6 +55,51 @@ export function compactPhotoIntro(
   return [intro, ...pesan.slice(1)]
 }
 
+const PROMISES_PHOTO = /\b(foto|fotonya|gambar|gambarnya|contohnya)\b/i
+
+type PhotoRow = { product: string; color: string; photoUrl: string | null; active?: boolean }
+
+/**
+ * Balasan bilang "ini fotonya" (atau pelanggan minta lihat) dan menyebut beberapa model, tapi field
+ * `foto` tidak memuat semuanya → produk yang disebut tapi belum ada fotonya ditambahkan (warna yang
+ * disebut di balasan bila ada, selain itu varian pertama yang punya foto). Mengembalikan label tambahan.
+ */
+export function completePhotos(pesan: string[], foto: string[], customerText: string, rows: PhotoRow[], max = 6) {
+  const text = pesan.join('\n')
+  if (!PROMISES_PHOTO.test(text) && !SEE_REQUEST.test(customerText)) return []
+  const withPhoto = rows.filter((row) => row.photoUrl && row.active !== false)
+  const names = [...new Set(withPhoto.map((row) => row.product))]
+    .filter((name) => name.trim().length >= 4)
+    .sort((a, b) => b.length - a.length)
+  let blanked = text.toLowerCase()
+  const mentioned: Array<{ at: number; name: string }> = []
+  for (const name of names) {
+    const at = blanked.indexOf(name.toLowerCase())
+    if (at < 0) continue
+    mentioned.push({ at, name })
+    // "Premium Basic Suit" tidak ikut terhitung sebagai "Basic Suit".
+    blanked = blanked.split(name.toLowerCase()).join(' '.repeat(name.length))
+  }
+  if (!mentioned.length) return []
+  const covered = new Set(
+    foto.map((label) => {
+      const lower = label.toLowerCase()
+      const hit = names.find((name) => lower.startsWith(name.toLowerCase()))
+      return hit || label
+    })
+  )
+  const extra: string[] = []
+  for (const { name } of mentioned.sort((a, b) => a.at - b.at)) {
+    if (covered.has(name) || foto.length + extra.length >= max) continue
+    const variants = withPhoto.filter((row) => row.product === name)
+    const row = variants.find((item) => item.color && text.toLowerCase().includes(item.color.toLowerCase())) || variants[0]
+    if (!row) continue
+    extra.push(row.color ? `${row.product} - ${row.color}` : row.product)
+    covered.add(name)
+  }
+  return extra
+}
+
 export type PolishContext = {
   customerText: string
   address?: string

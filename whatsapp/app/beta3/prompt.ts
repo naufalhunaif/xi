@@ -38,7 +38,7 @@ export const LEAN_OUTPUT_SCHEMA = {
       type: 'array',
       items: { type: 'string' },
       description:
-        'Nama varian katalog yang fotonya dikirim setelah pesan, persis seperti di KATALOG (misal "Tuxedo - Black"). Hanya bila pelanggan minta lihat atau baru memilih model. Maksimal 3.',
+        'Nama varian katalog yang fotonya dikirim setelah pesan, persis seperti di KATALOG (misal "Tuxedo - Black"). Hanya bila pelanggan minta lihat atau baru memilih model. Kalau kamu menyebut/membandingkan beberapa model dan bilang "ini fotonya", SEMUA model yang disebut harus ada fotonya. Maksimal 5.',
     },
     catatan: {
       type: 'string',
@@ -362,7 +362,7 @@ export function parseLeanDecision(text: string): LeanDecision {
   const foto = (Array.isArray(raw.foto) ? raw.foto : [])
     .map((item) => String(item || '').trim())
     .filter(Boolean)
-    .slice(0, 3)
+    .slice(0, 5)
   const tahap = normalizeStage(raw.tahap)
   return {
     pesan,

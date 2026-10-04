@@ -55,6 +55,7 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Susulan tetap terjadwal bila AI menulisnya walau tahap "lain"; tahap mirip ("tanya_harga") dipetakan; "oke" tanda terima tidak menghapus susulan yang sudah direncanakan | `review_chats.spec` · #11 |
 | Tingkat model: dasar pola kata v3.5.7 (`autoTier`), Jev hanya menaikkan (rumit/komplain → berat), skor Jev mulai 0 (`scoreLevel`); alasan di trace "Tingkat model" | `review_chats.spec` · #12/#14, `beta3.spec` · model otomatis, `jev.spec` · skor Jev mulai 0 |
 | Susulan selalu dari AI (tanpa kalimat bawaan); "oke" yang tidak dibalas tetap mengirim susulan AI yang sudah direncanakan | `beta3_flow.spec` · susulan menuju pembelian |
+| "Ini fotonya" / minta lihat + beberapa model disebut → semua model yang disebut dikirim fotonya (`completePhotos`, maks 6; teks tidak diubah) | `review_chats.spec` · #16 |
 | Daftar model dengan harga berbeda tidak diringkas jadi "Ini fotonya"; pengantar singkat hanya bila harganya satu | `review_chats.spec` · #13 |
 | Catatan harga dari seri Jev hanya bila cocok dengan seri yang disebut di chat; teks chat lebih dipercaya | `beta3.spec` · pola harga |
 | Jev menerima konteks penuh (10 baris × 500 huruf, layanan & pesan toko terakhir) — tidak dipotong demi token | `jev.spec` · skor Jev mulai 0 |

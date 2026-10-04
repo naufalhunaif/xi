@@ -63,7 +63,7 @@ import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
-import { polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { completePhotos, polishText, polishWithPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -460,7 +460,7 @@ export function resolvePhotos(rows: LeanCatalogRow[], labels: string[]) {
     if (photos.some((photo) => photo.url === row.photoUrl)) continue
     photos.push({ caption, url: row.photoUrl })
   }
-  return photos.slice(0, 3)
+  return photos.slice(0, 6)
 }
 
 export async function createLeanReply(input: {
@@ -1391,6 +1391,12 @@ export async function createLeanReply(input: {
       decision,
     },
   })
+  // "Ini fotonya" / pelanggan minta lihat: semua model yang disebut di balasan harus ada fotonya.
+  const missing = completePhotos(decision.pesan, decision.foto, input.text, digest.rows)
+  if (missing.length) {
+    decision.foto = [...decision.foto, ...missing]
+    onTrace?.({ key: 'beta3-photo-complete', label: `Foto dilengkapi · ${missing.join(', ')}`, status: 'completed', detail: { ditambah: missing } })
+  }
   const photos = resolvePhotos(digest.rows, decision.foto)
   // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
   if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')
