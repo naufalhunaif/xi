@@ -42,6 +42,7 @@ Jev (TypeSafe AI, `app/beta3/jev.ts` + `jev_decisions.ts`) menjawab keputusan ke
 | `dana_masuk` (v3.5.11) | Pemeriksa kedua sebelum order ditandai lunas dari chat (AI & Jev harus sama) | AI saja |
 | `lanjut` (v3.5.11) | Tunda → susulan dibatalkan; batal → order belum dibayar ditutup | AI mengosongkan susulan |
 | `urgensi` (v3.5.11) | Skor 1–5 → badge "Penting" di kotak masuk (24 jam, chat belum dibalas/CS) | — |
+| `harga_konteks` (v3.5.12) | Seri (reguler/signature/premium) & barang yang ditanya → angka dari POLA HARGA + pemeriksa harga sesuai konteks (`price_pattern.ts`) | Seri terakhir yang disebut di chat |
 | `warna_gambar` (v3.5.8) | Warna produk di gambar pelanggan dari hasil ukur piksel (`app/beta3/image_color.ts`) vs foto katalog | Warna terdekat bila selisihnya jelas, selain itu kandidat ke AI |
 
 Batas waktu 800 ms per panggilan; ambang yakin per keputusan di `JEV_THRESHOLD`. Setiap keputusan

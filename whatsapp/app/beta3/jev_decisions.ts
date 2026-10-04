@@ -53,6 +53,10 @@ export type TurnUnderstanding = {
   follow?: 'lanjut' | 'tunda' | 'batal'
   /** 1–5: seberapa penting/mendesak chat ini untuk ditangani toko. */
   urgency?: number
+  /** Seri bahan yang sedang dibahas (untuk pola harga). */
+  series?: 'reguler' | 'signature' | 'premium'
+  /** Barang yang ditanya harganya di pesan ini. */
+  item?: 'jas' | 'celana' | 'setelan' | 'rompi'
 }
 
 export type TurnTopic = 'ongkir' | 'ukuran' | 'bayar' | 'custom' | 'warna'
@@ -90,6 +94,9 @@ export async function understandTurn(input: {
     sudah_tf: Boolean(input.awaitingPayment) && (await jevOn('sudah_tf')),
     lanjut: await jevOn('lanjut'),
     urgensi: await jevOn('urgensi'),
+    harga_konteks:
+      /harga|berapa|brp|\bset\b|setel|celana|rompi|vest|premium|signature|bahan|sekalian/i.test(input.text) &&
+      (await jevOn('harga_konteks')),
   }
   const questions: Record<string, JevQuestion> = {}
   if (on.maksud)
@@ -207,6 +214,29 @@ export async function understandTurn(input: {
         'Komplain, marah, barang rusak/salah, minta refund',
       ],
     }
+  if (on.harga_konteks) {
+    questions.seri = {
+      type: 'choice',
+      instructions: 'Seri bahan produk yang sedang dibahas pelanggan dan toko di percakapan (yang terakhir dibahas)?',
+      criteria: {
+        reguler: 'Seri biasa/reguler (bahan Maximotion, Aldo Moretti; harga jas mulai 485 ribu)',
+        signature: 'Seri Signature (bahan Scuro)',
+        premium: 'Seri Premium (bahan Black Label, Portofino; produk bernama "Premium")',
+        belum: 'Belum jelas seri mana',
+      },
+    }
+    questions.barang = {
+      type: 'choice',
+      instructions: 'Barang apa yang ditanyakan harganya di pesan_terbaru (lihat juga percakapan)?',
+      criteria: {
+        jas: 'Jas/blazer saja',
+        celana: 'Celana saja',
+        setelan: 'Setelan / set / jas sekalian celana',
+        rompi: 'Rompi/vest',
+        belum: 'Tidak menanyakan harga barang',
+      },
+    }
+  }
   if (!Object.keys(questions).length) return {}
   const answers = await askJev(
     'pahami',
@@ -261,6 +291,17 @@ export async function understandTurn(input: {
   }
   await take('sudah_tf', () => (result.paidClaim = yes(answers.sudah_tf)))
   await take('lanjut', () => (result.follow = choiceOf(answers.lanjut) as TurnUnderstanding['follow']))
+  for (const key of ['seri', 'barang'] as const) {
+    const answer = answers[key]
+    if (!answer) continue
+    const sure = confident('harga_konteks', answer)
+    const choice = choiceOf(answer)
+    if (sure && choice !== 'belum') {
+      if (key === 'seri') result.series = choice as TurnUnderstanding['series']
+      else result.item = choice as TurnUnderstanding['item']
+    }
+    await logDecision({ jid: input.jid, decision: 'harga_konteks', answer, used: sure, detail: key })
+  }
   if (answers.urgensi && answers.urgensi.type === 'score') {
     const sure = confident('urgensi', answers.urgensi)
     if (sure) result.urgency = Math.min(5, Math.max(1, Math.round(answers.urgensi.score)))

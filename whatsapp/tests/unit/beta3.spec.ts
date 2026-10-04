@@ -1141,3 +1141,80 @@ test.group('beta3 · topik dari Jev (v3.5.11)', () => {
     assert.isTrue(ctx({ custom: true }).spec)
   })
 })
+
+test.group('beta3 · pola harga per seri (v3.5.12)', () => {
+  let id = 0
+  const item = (product: string, category: string, price: number, big: number, material: string, color = 'Black') =>
+    row({ id: ++id, product, category, price, note: `XXL-3XL ${big.toLocaleString('id-ID')}`, material, color })
+  const rows = [
+    item('Basic Suit', 'Suits', 485000, 585000, 'Maximotion'),
+    item('Tuxedo', 'Suits', 485000, 585000, 'Maximotion'),
+    item('Pants', 'Pants', 220000, 270000, 'Maximotion'),
+    item('Setelan Basic Suit', 'Setelan', 705000, 855000, 'Maximotion'),
+    item('Vest', 'Vest', 175000, 200000, 'Maximotion'),
+    item('Basic Suit', 'Suits', 500000, 600000, 'Scuro', 'Signature Brown'),
+    item('Pants Signature', 'Pants', 220000, 270000, 'Scuro'),
+    item('Setelan Basic Suit Signature', 'Setelan', 725000, 875000, 'Scuro'),
+    item('Premium Basic Suit', 'Suits', 685000, 785000, 'Black Label', 'Green Emerald'),
+    item('Premium Lo Suit', 'Suits', 685000, 785000, 'Portofino', 'Blue'),
+    item('Pants Premium', 'Pants', 270000, 320000, 'Black Label', 'Gray'),
+    item('Setelan Premium Basic Suit', 'Setelan', 955000, 1105000, 'Black Label', 'Gray'),
+    item('Double Breasted Premium', 'Suits', 735000, 835000, 'Black Label', 'Gray'),
+    item('Setelan Double Breasted Premium', 'Setelan', 1055000, 1205000, 'Black Label', 'Gray'),
+    item('Vest Premium', 'Vest', 200000, 225000, 'Black Label', 'Gray'),
+  ]
+
+  test('tabel dihitung dari katalog: seri × barang × model, ukuran besar ikut', async ({ assert }) => {
+    const { pricePattern, renderPricePattern } = await import('#beta3/price_pattern')
+    const pattern = pricePattern(rows)
+    assert.deepEqual(pattern.series.premium?.cells['setelan:standar'], { price: 955000, big: 1105000 })
+    assert.deepEqual(pattern.series.premium?.cells['celana:standar'], { price: 270000, big: 320000 })
+    assert.deepEqual(pattern.series.signature?.cells['jas:standar'], { price: 500000, big: 600000 })
+    assert.deepEqual(pattern.series.reguler?.cells['setelan:standar'], { price: 705000, big: 855000 })
+    const text = renderPricePattern(pattern)
+    assert.include(text, 'Premium (bahan Black Label, Portofino): jas 685.000 (XXL+ 785.000) · celana 270.000')
+    assert.include(text, 'Double Breasted: jas 735.000')
+  })
+
+  test('kasus chat premium: setelan 685.000 → 955.000, celana 220.000 → 270.000; perbandingan tidak diubah', async ({ assert }) => {
+    const { pricePattern, fixContextPrices, seriesMentioned } = await import('#beta3/price_pattern')
+    const pattern = pricePattern(rows)
+    const series = seriesMentioned(['Premium Basic Suit - Green Emerald', 'Set berapa ya'])
+    assert.equal(series, 'premium')
+    const result = fixContextPrices(
+      [
+        'Untuk setelan premium harganya 685.000 bos. Mau yang Premium Basic atau Premium Lo?',
+        '685.000 itu jasnya saja bos, belum termasuk celana. Kalau sekalian celana mulai 220.000 ya, mau sekalian celana?',
+        'Harga jas mulai 485.000 bos, untuk model premium mulai 685.000. Mau model apa?',
+      ],
+      pattern,
+      series
+    )
+    assert.deepEqual(result.pesan, [
+      'Untuk setelan premium harganya 955.000 bos. Mau yang Premium Basic atau Premium Lo?',
+      '685.000 itu jasnya saja bos, belum termasuk celana. Kalau sekalian celana mulai 270.000 ya, mau sekalian celana?',
+      'Harga jas mulai 485.000 bos, untuk model premium mulai 685.000. Mau model apa?',
+    ])
+    assert.lengthOf(result.changes, 2)
+    // Seri reguler: harga yang benar tidak disentuh; tanpa seri jelas → tidak ada perubahan.
+    assert.lengthOf(fixContextPrices(['Setelannya 705.000 bos'], pattern, 'reguler').changes, 0)
+    assert.lengthOf(fixContextPrices(['Setelannya 685.000 bos'], pattern, null).changes, 0)
+  })
+
+  test('katalog fokus: "celana" ikut Pants, seri premium ikut semua barangnya', async ({ assert }) => {
+    const { focusCatalog } = await import('#beta3/token_saver')
+    const many = [...rows, ...Array.from({ length: 30 }, (_, i) => row({ id: 900 + i, product: `Model ${i}`, category: 'Suits', color: 'Navy' }))]
+    const at = new Date()
+    const focus = focusCatalog(many, {
+      text: 'Kalo sekalian celana',
+      history: [{ direction: 'out', body: 'Premium Basic Suit - Green Emerald', createdAt: at }],
+      spec: '',
+      chatNote: '',
+      imageCount: 0,
+    })!
+    const names = new Set(focus.rows.map((r) => r.product))
+    assert.isTrue(names.has('Pants Premium'))
+    assert.isTrue(names.has('Setelan Premium Basic Suit'))
+    assert.isTrue(names.has('Vest Premium'))
+  })
+})

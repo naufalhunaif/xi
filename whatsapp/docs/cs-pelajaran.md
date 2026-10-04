@@ -271,3 +271,17 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 3. Harga mengikuti produk yang benar-benar punya warna itu (mis. Broken White di seri Signature).
 4. (v3.5.9) Screenshot postingan IG yang sama sempat terbaca "cream": jas di foto redup (lebih gelap dari dinding) dan ukuran lama mengambil bagian dinding/manekin. Sekarang area foto dipisah dari bar aplikasi, dinding & manekin dibuang, warna dikoreksi terhadap dinding dan terang foto → terbaca broken white.
 
+---
+
+## #10 · 6 Okt 2026 · harga setelan & celana premium (diterapkan v3.5.12)
+
+**Ringkasan chat (uji pemilik)**
+- Premium dibahas → "Set berapa ya" → AI: "setelan premium 685.000" (itu harga jas premium; setelan premium 955.000).
+- "Itu jas saja atau sama celana" → AI: "celana mulai 220.000" (itu celana reguler; celana premium 270.000).
+- "Bahannya sama kan?" → jawaban mengambang.
+
+**Pelajaran**
+1. Harga mengikuti SERI bahan: reguler / signature / premium. Setelan = harga produk setelan seri itu, bukan harga jas.
+2. Pola harga dihitung sistem dari katalog dan dipakai AI + pemeriksa harga (angka salah seri dibetulkan otomatis).
+3. "Bahannya sama?" dijawab tegas dengan nama bahan seri itu.
+

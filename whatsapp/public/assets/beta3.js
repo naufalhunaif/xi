@@ -130,6 +130,7 @@
       ? [t('{0} varian', result.rows.length), t('≈{0} token', result.tokens), result.version ? t('versi {0}', String(result.version).slice(0, 8)) : '', when].filter(Boolean).join(' · ')
       : t('Belum ada katalog — tekan Sync katalog.')
     byId('beta3CatalogDigest').textContent = result.digest
+    byId('beta3PricePattern').textContent = result.pricePattern || t('Belum ada katalog — tekan Sync katalog.')
   }
 
   let examples = []

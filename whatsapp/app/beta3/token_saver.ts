@@ -3,6 +3,7 @@
 import type { LeanHistoryRow } from '#beta3/prompt'
 import type { LeanCatalogRow } from '#beta3/catalog_service'
 import { catalogColorSearchHints } from '#services/color_semantics'
+import { seriesOf } from '#beta3/price_pattern'
 
 const OPENER_WORD =
   /^(?:halo+|hallo+|hai+|hay|hi|hei|p+|ping|permisi|punten|pagi|siang|sore|malam|met\s+(?:pagi|siang|sore|malam)|selamat\s+(?:pagi|siang|sore|malam)|ass?alamu'?\s*alaikum(?:\s+wr\.?\s*wb\.?)?|assalamualaikum|salam|kak|kakak|bos|boss|min|admin|gan|om|mas|mbak|sis)$/i
@@ -215,12 +216,20 @@ export function focusCatalog(
     input.chatNote,
   ].join('\n')
   const words = new Set(fold(context).split(' '))
+  // Sebutan pelanggan → nama di katalog.
+  for (const [said, catalog] of [['celana', 'pants'], ['rompi', 'vest'], ['beskap', 'bescap'], ['jas', 'suit']] as const)
+    if ([...words].some((word) => word.startsWith(said))) words.add(catalog)
+  // Seri yang dibahas (premium/signature): semua barangnya ikut (jas, celana, setelan, rompi).
+  const series = new Set(
+    (['premium', 'signature'] as const).filter((name) => [...words].some((word) => word.startsWith(name)))
+  )
   // Produk disebut: kata khas pertama nama produk ("tuxedo", "basic", "peak", "beskap").
   const keyOf = (product: string) => fold(product).split(' ').find((word) => word.length >= 3 && !GENERIC.has(word)) || ''
   const products = new Set(active.map((row) => keyOf(row.product)).filter((key) => key && words.has(key)))
   const colors = colorKeys(context)
   const picked = active.filter((row) => {
     if (products.has(keyOf(row.product))) return true
+    if (series.size && series.has(seriesOf(row) as 'premium' | 'signature')) return true
     if (!colors.size) return false
     for (const key of colorKeys(row.color)) if (colors.has(key)) return true
     return false

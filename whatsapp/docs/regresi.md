@@ -46,6 +46,7 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Ada foto: urutan jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah) | `beta3.spec` · review chat jas hitam |
 | "Mau custom bisa?" dijawab sendiri ("Bisa bos, untuk custom nanti di sesuaikan ukuran ya" + tanya custom apa), tidak diserahkan ke CS; custom + warna/bahan/diskon tetap ke CS | `beta3.spec` · review chat jas hitam |
 | Warna produk di gambar pelanggan diukur dari piksel dan dibandingkan dengan foto katalog (putih bersih ≠ broken white ≠ krem); screenshot (bar aplikasi gelap), latar dinding, manekin, dan foto redup tidak mengacaukan hasil (contoh asli: `tests/fixtures/ig_broken_white.jpg`); Jev memilih warnanya bila yakin, selain itu warna terdekat yang jelas | `beta3.spec` · warna dari piksel, `jev.spec` · warna gambar |
+| Pola harga per seri (reguler/signature/premium × jas/celana/setelan/rompi, Double Breasted, XXL+) dihitung dari katalog dan selalu ikut prompt; "setelan premium 685.000" dibetulkan jadi 955.000, celana premium 270.000; kalimat perbandingan tidak diubah | `beta3.spec` · pola harga per seri, `jev.spec` · seri & barang |
 | Kebijakan tukar size dari Pengaturan masuk prompt dan dikirim apa adanya | `beta3.spec` · pelajaran chat CS |
 | Pertanyaan yang baru ditanyakan tidak diulang | `beta3.spec` · form order |
 | Prompt lengkap tetap di bawah 10 ribu token | `beta3.spec` · prompt dan keluaran |

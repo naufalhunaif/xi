@@ -70,6 +70,7 @@ import {
 } from '#beta3/mcp'
 import { describeCatalogPhotos } from '#beta3/catalog_vision'
 import { measureCatalogColors } from '#beta3/image_color'
+import { pricePattern, renderPricePattern } from '#beta3/price_pattern'
 import { attachOrderPhotos } from '#beta3/order_photos'
 import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '#beta3/weights'
 import env from '#start/env'
@@ -95,6 +96,7 @@ export default class Beta3Controller {
     return response.json({
       rows: digest.rows,
       digest: digest.text,
+      pricePattern: renderPricePattern(pricePattern(digest.rows)),
       tokens: estimateTokens(digest.text),
       updatedAt: new Date(digest.at).toISOString(),
       version: await readLeanState('catalog_version_sf2'),

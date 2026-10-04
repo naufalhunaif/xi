@@ -148,6 +148,25 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
     assert.equal(result.urgency, 5)
   })
 
+  test('seri & barang yang ditanya harganya (v3.5.12)', async ({ assert }) => {
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    setJevFetcher(
+      reply({
+        seri: { type: 'choice', choice: 'premium', probabilities: {}, confidence: 0.93 },
+        barang: { type: 'choice', choice: 'setelan', probabilities: {}, confidence: 0.9 },
+      })
+    )
+    const result = await understandTurn({
+      jid: 'jevtest@s.whatsapp.net',
+      text: 'Set berapa ya',
+      history: [{ direction: 'out', body: 'Premium Basic Suit - Green Emerald' }],
+      services: [],
+      offerPending: false,
+    })
+    assert.equal(result.series, 'premium')
+    assert.equal(result.item, 'setelan')
+  })
+
   test('tujuan baru & dana masuk: Jev yakin dipakai, ragu = tidak tahu', async ({ assert }) => {
     await saveJevConfig({ apiKey: 'ts_x', enabled: true })
     setJevFetcher(reply({ tujuan_baru: { type: 'noul', noul: 0.03 } }))

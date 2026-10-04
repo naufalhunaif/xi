@@ -32,6 +32,7 @@ export const JEV_DECISIONS = {
   dana_masuk: 'Toko menyatakan dana masuk',
   lanjut: 'Pelanggan menunda / membatalkan',
   urgensi: 'Prioritas chat di kotak masuk',
+  harga_konteks: 'Seri & barang yang ditanya harganya',
 } as const
 export type JevDecision = keyof typeof JEV_DECISIONS
 
@@ -56,6 +57,7 @@ export const JEV_THRESHOLD: Record<JevDecision, number> = {
   dana_masuk: 0.9,
   lanjut: 0.9,
   urgensi: 0.7,
+  harga_konteks: 0.8,
 }
 
 export type JevNoul = {

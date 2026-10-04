@@ -62,6 +62,7 @@ import { keepCustomInChat, questionAfterPhotos } from '#beta3/reply_guards'
 import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
+import { fixContextPrices, pricePattern, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -1007,6 +1008,19 @@ export async function createLeanReply(input: {
   const store = await readLeanState('store_profile')
   const policy = await readExchangePolicy()
   const activeOrder = await renderActiveOrder(jid).catch(() => '')
+  // Pola harga per seri (dihitung dari katalog): selalu ikut, dan dipakai pemeriksa harga sesudah balasan.
+  const prices = pricePattern(digest.rows)
+  const priceText = renderPricePattern(prices)
+  const priceSeries: PriceSeries | null =
+    understanding.series ||
+    seriesMentioned([...rows.slice(-6).map((row) => String(row.body || '')), input.text])
+  let priceNote = ''
+  if (understanding.item && priceSeries) {
+    const cell =
+      prices.series[priceSeries]?.cells[`${understanding.item}:standar`]
+    if (cell)
+      priceNote = `\n\nCATATAN SISTEM: pelanggan menanyakan harga ${understanding.item} seri ${priceSeries}: ${cell.price.toLocaleString('id-ID')}${cell.big && cell.big !== cell.price ? ` (XXL ke atas ${cell.big.toLocaleString('id-ID')})` : ''} menurut POLA HARGA. Pakai angka ini.`
+  }
   // Bagian prompt yang tidak dibutuhkan giliran ini tidak dikirim (hemat token).
   const needs = promptNeeds({
     stage,
@@ -1063,11 +1077,16 @@ export async function createLeanReply(input: {
       : sizeCharts
         ? 'SIZE CHART: tidak dimuat di giliran ini (tidak ada pertanyaan ukuran). Ditanya ukuran → jawab dari size ready di KATALOG.'
         : '',
-    catalog: needs.catalog
-      ? focus
-        ? `${renderCatalogDigest(focus.rows).replace(/^KATALOG \(/, 'KATALOG (produk yang sedang dibahas; ')}${focus.otherLine ? `\n${focus.otherLine}` : ''}`
-        : digest.text
-      : 'KATALOG: tidak dimuat di giliran ini (pesanan sudah berjalan, pelanggan tidak menanyakan produk). Ditanya produk/harga baru → "saya cek dulu ya bos".',
+    catalog: [
+      priceText,
+      needs.catalog
+        ? focus
+          ? `${renderCatalogDigest(focus.rows).replace(/^KATALOG \(/, 'KATALOG (produk yang sedang dibahas; ')}${focus.otherLine ? `\n${focus.otherLine}` : ''}`
+          : digest.text
+        : 'KATALOG: tidak dimuat di giliran ini (pesanan sudah berjalan, pelanggan tidak menanyakan produk). Ditanya produk/harga baru → "saya cek dulu ya bos".',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
     // Koreksi pemilik selalu ikut (12 terbaru); contoh lain dipilih yang paling mirip.
     examples: pickExamples(examples.filter((example) => example.source !== 'koreksi'), input.text, stage),
     corrections: examples.filter((example) => example.source === 'koreksi').slice(-12),
@@ -1078,7 +1097,7 @@ export async function createLeanReply(input: {
     spec,
     history: rows,
     context: collectContext({ history: rows, catalog: digest.rows, text: input.text }),
-    message: `${replyContext(rows)}${acceptedOffer(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}${input.note ? `\n\nCATATAN SISTEM: ${input.note}` : ''}`,
+    message: `${replyContext(rows)}${acceptedOffer(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}${priceNote}${input.note ? `\n\nCATATAN SISTEM: ${input.note}` : ''}`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
     production: settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : '',
     imageCount: input.imagePaths?.length || 0,
@@ -1144,6 +1163,17 @@ export async function createLeanReply(input: {
   decision.pesan = decision.pesan.map(tidyLists)
   // Perapian sistem: gaya CS tanpa bertanya ulang ke AI.
   decision.pesan = tidyReply(decision.pesan, { address: style?.address || 'bos', verbatim: [policy.text] })
+  // Harga sesuai konteks: "setelan premium 685.000" → harga setelan premium dari POLA HARGA.
+  const priceFix = fixContextPrices(decision.pesan, prices, priceSeries)
+  if (priceFix.changes.length) {
+    decision.pesan = priceFix.pesan
+    onTrace?.({
+      key: 'beta3-price-context',
+      label: `Harga dibetulkan · ${priceFix.changes.map((c) => `${c.item} ${c.from.toLocaleString('id-ID')} → ${c.to.toLocaleString('id-ID')}`).join(', ')}`,
+      status: 'completed',
+      detail: { series: priceSeries, changes: priceFix.changes },
+    })
+  }
   if (decision.susulan) decision.susulan = tidyReply([decision.susulan], { address: style?.address || 'bos' })[0] || ''
   // "Mau custom bisa?" bukan alasan serah CS: jawab bisa + tanya custom apa.
   const custom = keepCustomInChat(decision, input.text)
