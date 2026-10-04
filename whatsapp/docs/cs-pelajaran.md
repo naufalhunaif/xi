@@ -244,3 +244,18 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. "Seperti apa?" setelah model disebut → kirim foto model yang dibahas ("ini fotonya bos"), jangan mengulang daftar/harga. Pertanyaan lanjutan dikirim sesudah foto.
 3. Custom bukan alasan serah CS: "Bisa bos, untuk custom nanti di sesuaikan ukuran ya" → "Mau custom ukurannya atau ada detail model yang mau diubah bos?". Tetap ke CS bila menyangkut warna/bahan di luar katalog, diskon/seragam, atau tanggal kirim.
 
+---
+
+## #8 · 5 Okt 2026 · setelan Basic Suit, ongkir per desa, alamat tanpa label (diterapkan v3.5.7)
+
+**Ringkasan chat (uji pemilik)**
+- Jas hitam → foto model → "yang ini sama celana" 705.000 → size dari TB/BB (S, celana 30) → ukuran per size (sudah benar).
+- "Ke cinyawang" → ongkir tampil "Ongkir ke tujuan" dan "YES (1-1 hari)".
+- "Reg aja" → AI malah menanyakan kecamatan & kabupaten lagi (sistem mengira "reg" nama tempat).
+- Pelanggan mengirim nama + alamat tanpa label ("…, cinyawang patimuan cilacap 53264") + HP → "ongkir dan totalnya saya kabari" — total tidak terkirim karena kecamatan/kabupaten tidak terbaca.
+
+**Pelajaran**
+1. Ongkir selalu menyebut kecamatan & kota tujuan; estimasi "1 hari", bukan "1-1 hari".
+2. Jawaban memilih layanan (REG/YES) bukan alamat baru — lanjut minta data pengiriman.
+3. Alamat tanpa label tetap dipakai: tujuan yang sudah dicek di chat, atau dicari dari kode pos, lalu total + rekening dikirim.
+

@@ -23,6 +23,9 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Form order (berlabel atau alamat tempelan) dibaca jadi order; ongkir dicek dari kecamatan + kota | `beta3.spec` · form order |
 | Total + rekening dikirim otomatis hanya bila rincian cocok KATALOG dan subtotal benar | `beta3.spec` · total otomatis |
 | Lebih dari satu layanan ongkir → harus dipilih pelanggan, AI tidak memilihkan | `beta3.spec` · total otomatis |
+| Ongkir menyebut kecamatan & kota ("Ongkir ke Patimuan, Cilacap"), estimasi "1-1 hari" ditulis "1 hari" | `beta3.spec` · review chat ongkir cinyawang |
+| Memilih layanan ("reg aja", "yang yes") bukan nama tempat: tujuan tetap, tidak ditanya kecamatan lagi | `beta3.spec` · review chat ongkir cinyawang |
+| Alamat tempelan tanpa label kecamatan/kabupaten: ongkir dari tujuan yang tadi dicek di chat, atau dicari dari kode pos → total tetap terkirim | `beta3.spec` · review chat ongkir cinyawang (+ cek manual) |
 | Hanya satu layanan (JTR tidak ditawarkan untuk < 8 kg) → langsung dipakai, tidak ditanya | `beta3.spec` · ongkir ditulis ringkas |
 | Setelan tanpa nomor celana → total ditahan, tanya "celana menyesuaikan kah atau pakai No. berapa" | `beta3.spec` · pelajaran chat CS |
 | Form yang terkirim saat CS membalas tetap diproses di giliran berikutnya (sekali saja) | `beta3_flow.spec` · form terlewat |

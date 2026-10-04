@@ -661,7 +661,7 @@ export async function createLeanReply(input: {
   const loose = form ? null : parseLooseAddress(input.text)
   if (loose && mcp.url) {
     try {
-      const rates = await ratesForAddress(loose, last?.resolved || null, mcp, orderGrams)
+      const rates = await ratesForAddress(loose, last?.resolved || null, mcp, orderGrams, input.text)
       const rateText = rates ? renderShippingRates(rates, orderGrams) : ''
       if (rateText) {
         toolNotes.push(rateText)
@@ -690,6 +690,7 @@ export async function createLeanReply(input: {
       let pending = false
       let choices: DestinationArea[] = []
       let resolved: DestinationArea | null = null
+      let kept = false
       // Jawaban atas pilihan yang tadi ditanyakan: cocokkan dulu, tanpa cari ulang.
       if (followUp && last?.pending && last.choices?.length)
         resolved = pickArea(input.text, last.choices)
@@ -697,7 +698,15 @@ export async function createLeanReply(input: {
         let areas = groupDestinations(await findDestinations(place, mcp))
         if (!areas.length && last?.pending && last.place && !place.includes(last.place))
           areas = groupDestinations(await findDestinations(`${place} ${last.place}`, mcp))
-        if (!areas.length) {
+        if (!areas.length && followUp && last?.resolved && !last.pending && !/ongkir|kirim/i.test(input.text)) {
+          // Tujuan sudah jelas sebelumnya; jawaban ini bukan nama tempat baru (mis. "reg aja").
+          onTrace?.({ key: 'beta3-rates', label: `Bukan tujuan baru · tetap ${last.resolved.label}`, status: 'completed', detail: { place } })
+          kept = true
+          note = `TUJUAN tetap ${last.resolved.label}; ongkirnya sudah disebut di chat. Pesan ini bukan tujuan baru (mis. memilih layanan) — jangan tanya kecamatan/ongkir lagi, lanjut tahap berikutnya.`
+        }
+        if (kept) {
+          // tetap memakai tujuan sebelumnya
+        } else if (!areas.length) {
           pending = true
           note = `TUJUAN "${place}" tidak ditemukan di data ekspedisi. Tanyakan kecamatan dan kabupatennya (satu pertanyaan).`
         } else if (areas.length > 4) {
@@ -712,7 +721,7 @@ export async function createLeanReply(input: {
         }
       }
       if (resolved) {
-        const cacheKey = `ongkir3:${resolved.code}:${orderGrams}:${new Date().toISOString().slice(0, 10)}`
+        const cacheKey = `ongkir4:${resolved.code}:${orderGrams}:${new Date().toISOString().slice(0, 10)}`
         note = await readLeanState(cacheKey)
         if (!note) {
           const rates = await callLeanTool<ShippingRates>(
@@ -720,14 +729,16 @@ export async function createLeanReply(input: {
             { destination: resolved.code, weight_grams: orderGrams },
             mcp
           )
-          note = rates ? renderShippingRates(rates, orderGrams) : ''
+          // Nama kecamatan & kota dari hasil cari tujuan ("Ongkir ke Patimuan, Cilacap", bukan "ke tujuan").
+          note = rates ? renderShippingRates(withArea(rates, resolved), orderGrams) : ''
           if (note) await writeLeanState(cacheKey, note)
         }
       }
-      await writeLeanState(
-        lastKey,
-        JSON.stringify({ place, pending, at: Date.now(), choices, resolved } satisfies LastShipping)
-      )
+      if (!kept)
+        await writeLeanState(
+          lastKey,
+          JSON.stringify({ place, pending, at: Date.now(), choices, resolved } satisfies LastShipping)
+        )
       if (note) {
         toolNotes.push(note)
         onTrace?.({
@@ -796,7 +807,8 @@ export async function createLeanReply(input: {
           { district: form.district, regency: form.regency, postalCode: form.postalCode },
           lastResolved || null,
           mcp,
-          orderGrams
+          orderGrams,
+          formText || input.text
         )
         // Alamat tempelan dirapikan ulang dengan nama resmi tujuan dari cek ongkir.
         const tidy = pasted ? tidyLooseAddress(formText, rates?.destination || null) : null
@@ -871,7 +883,8 @@ export async function createLeanReply(input: {
             },
             lastResolved || null,
             mcp,
-            orderGrams
+            orderGrams,
+            String(pending.address || '')
           )
           if (rates?.prices?.length) await updatePendingOrderRates(orderId, rates)
         } catch (error) {
@@ -1444,11 +1457,63 @@ async function findDestinations(q: string, mcp: LeanMcpConfig): Promise<Destinat
  * Tarif untuk alamat form: kode tujuan dari obrolan (bila kecamatannya sama) →
  * nama kecamatan + kota → nama kecamatan saja. Null bila semuanya gagal.
  */
+/** Lengkapi nama kecamatan & kota hasil tarif dari tujuan yang sudah dicari. */
+export function withArea(rates: ShippingRates, area: DestinationArea | null): ShippingRates {
+  if (!area) return rates
+  const destination = rates.destination || {}
+  return {
+    ...rates,
+    destination: {
+      ...destination,
+      code: destination.code || area.code,
+      district: destination.district || area.district,
+      city: destination.city || area.city,
+    },
+  }
+}
+
+const ADDRESS_STOP = new Set(['jalan', 'desa', 'dusun', 'kecamatan', 'kabupaten', 'kelurahan', 'provinsi', 'perumahan', 'komplek', 'kompleks', 'nomor', 'blok', 'gang', 'jawa', 'tengah', 'barat', 'timur', 'utara', 'selatan', 'indonesia'])
+
+/**
+ * Alamat tanpa label kecamatan/kabupaten ("…, cinyawang patimuan cilacap 53264"): cari tujuan
+ * dari kata-kata alamat (dari belakang) dan ambil yang kode posnya sama. Maks 4 pencarian.
+ */
+async function areaFromPostal(text: string, postal: string, mcp: LeanMcpConfig): Promise<DestinationArea | null> {
+  if (!postal || !text) return null
+  const words = [
+    ...new Set(
+      text
+        .toLowerCase()
+        .replace(/(?:\+?62|0)8[\d\s-]{7,16}/g, ' ')
+        .replace(/[^a-z\s]/g, ' ')
+        .split(/\s+/)
+        .filter((word) => word.length >= 5 && !ADDRESS_STOP.has(word))
+    ),
+  ]
+    .reverse()
+    .slice(0, 4)
+  for (const word of words) {
+    const rows = await findDestinations(word, mcp).catch(() => [] as DestinationRow[])
+    const hit = rows.find((row) => String(row.zip_code || '') === postal && row.code && row.district)
+    if (hit)
+      return {
+        code: String(hit.code),
+        district: String(hit.district || ''),
+        city: String(hit.city || ''),
+        label: [hit.district, hit.city].filter(Boolean).join(', '),
+        terms: String(hit.subdistrict || '').toLowerCase(),
+      }
+  }
+  return null
+}
+
 async function ratesForAddress(
   address: { district: string; regency: string; postalCode: string },
   lastResolved: DestinationArea | null,
   mcp: LeanMcpConfig,
-  grams = DEFAULT_ITEM_GRAMS
+  grams = DEFAULT_ITEM_GRAMS,
+  /** Teks alamat asli: dipakai bila kecamatan/kabupaten tidak berlabel. */
+  text = ''
 ): Promise<ShippingRates | null> {
   const city = address.regency ? normalizeCity(address.regency) : ''
   const districtMatchesLast =
@@ -1499,6 +1564,24 @@ async function ratesForAddress(
       if (area) {
         const rates = await callLeanTool<ShippingRates>('check_shipping_rates', { destination: area.code, weight_grams: grams }, mcp)
         if (rates?.prices?.length) return { ...rates, destination: { ...(rates.destination || {}), code: area.code, district: area.district, city: area.city } }
+      }
+    } catch (error) {
+      lastError = lastError || error
+    }
+  }
+  // Alamat tanpa label: tujuan yang tadi dicek di chat (namanya ada di alamat), atau cari dari kode pos.
+  if (!address.district && !address.regency && text) {
+    const hay = text.toLowerCase().replace(/[^a-z]/g, '')
+    const mentioned =
+      lastResolved &&
+      [lastResolved.district, lastResolved.city, ...lastResolved.terms.split(' ')]
+        .map((value) => squash(value))
+        .some((value) => value.length >= 4 && hay.includes(value))
+    try {
+      const area = mentioned ? lastResolved : await areaFromPostal(text, address.postalCode, mcp)
+      if (area) {
+        const rates = await callLeanTool<ShippingRates>('check_shipping_rates', { destination: area.code, weight_grams: grams }, mcp)
+        if (rates?.prices?.length) return withArea(rates, area)
       }
     } catch (error) {
       lastError = lastError || error

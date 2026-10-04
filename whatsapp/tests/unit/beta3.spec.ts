@@ -1038,3 +1038,39 @@ test.group('beta3 · prompt ramping (v3.5.6)', () => {
     assert.isNull(ask('yang ini', { imageCount: 1 }))
   })
 })
+
+test.group('beta3 · review chat ongkir cinyawang (v3.5.7)', () => {
+  const rates = {
+    destination: {},
+    prices: [
+      { service: 'REG23', price: 9000, etd: '3-6 day' },
+      { service: 'YES23', price: 11000, etd: '1-1 day' },
+    ],
+  }
+
+  test('"reg aja" bukan nama tempat; nama tempat tetap dicari', async ({ assert }) => {
+    const { extractShippingQuery } = await import('#beta3/mcp')
+    assert.isNull(extractShippingQuery('Reg aja', true))
+    assert.isNull(extractShippingQuery('yang yes', true))
+    assert.equal(extractShippingQuery('Ke cinyawang', true), 'cinyawang')
+  })
+
+  test('ongkir menyebut kecamatan & kota, estimasi "1-1 hari" jadi "1 hari"', async ({ assert }) => {
+    const { etdText } = await import('#beta3/mcp')
+    const { withArea } = await import('#beta3/reply_service')
+    assert.equal(etdText('1-1 day'), '1 hari')
+    assert.equal(etdText('3-6 days'), '3-6 hari')
+    const note = renderShippingRates(
+      withArea(rates as any, { code: 'X1', district: 'Patimuan', city: 'Cilacap', label: 'Patimuan, Cilacap', terms: 'cinyawang' }),
+      1000
+    )
+    assert.include(note, 'Ongkir ke Patimuan, Cilacap:')
+    assert.include(note, 'YES 11.000 (1 hari)')
+    assert.notInclude(note, 'tujuan')
+  })
+
+  test('alamat tanpa label kecamatan/kabupaten tetap terbaca kode posnya', ({ assert }) => {
+    const loose = parseLooseAddress('Budi\nJl patimuan kedungreja, cinyawang patimuan cilacap 53264\n081234567890')
+    assert.deepEqual(loose, { district: '', regency: '', postalCode: '53264' })
+  })
+})

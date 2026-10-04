@@ -213,7 +213,9 @@ const NOT_A_PLACE = new Set(
     'mau jadi ready ada size ukuran warna harga foto total transfer tf bayar rekening bukti ' +
     'jas celana setelan tuxedo suit beskap vest kemeja navy black hitam putih white army abu grey ' +
     's m l xl xxl xxxl pcs order pesan kirim resi nomor no bos kak gan min ya dong berapa brp ini itu nya ' +
-    'saya aku kamu kita dia mereka tinggi berat cm kg custom'
+    'saya aku kamu kita dia mereka tinggi berat cm kg custom ' +
+    // Pilihan layanan ongkir ("reg aja", "yang yes") bukan nama tempat.
+    'reg reguler regular yes jtr jne pakai pake yang ambil biasa murah cepat kilat ekonomi aja saja'
   ).split(' ')
 )
 
@@ -404,14 +406,22 @@ export function shippingBlock(rates: ShippingRates, weightKg = 1) {
   // Satu layanan saja: bukan pilihan, sebut langsung.
   if (prices.length === 1) {
     const only = prices[0]
-    const etd = only.etd ? `, estimasi ${only.etd.replace(/days?/i, 'hari').trim()}` : ''
+    const etd = only.etd ? `, estimasi ${etdText(only.etd)}` : ''
     return `Untuk pengiriman ke ${where || 'tujuan'} ongkirnya ${only.price.toLocaleString('id-ID')}${etd}`
   }
   const lines = prices.map(
     (row) =>
-      `${serviceLabel(row.service.replace(/\d+$/, ''))} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${row.etd.replace(/days?/i, 'hari').trim()})` : ''}`
+      `${serviceLabel(row.service.replace(/\d+$/, ''))} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${etdText(row.etd)})` : ''}`
   )
   return `Ongkir ke ${where || 'tujuan'}:\n${lines.join('\n')}`
+}
+
+/** Estimasi ekspedisi rapi: "1-1 day" → "1 hari", "2-3 days" → "2-3 hari". */
+export function etdText(etd: string) {
+  const clean = String(etd || '').replace(/\s*(?:days?|hari)\s*/gi, '').trim()
+  const same = clean.match(/^(\d+)\s*-\s*(\d+)$/)
+  const value = same && same[1] === same[2] ? same[1] : clean
+  return value ? `${value} hari` : ''
 }
 
 export function renderShippingRates(rates: ShippingRates, grams = DEFAULT_ITEM_GRAMS) {
@@ -429,7 +439,7 @@ export function renderShippingRates(rates: ShippingRates, grams = DEFAULT_ITEM_G
     const only = offered[0]
     return `${rule}\nONGKIR ke ${where || 'tujuan'} (berat pesanan ${gramsToKgText(grams)}): hanya satu layanan, ${serviceLabel(only.service.replace(/\d+$/, ''))} ${only.price.toLocaleString('id-ID')}. Ini BUKAN pilihan: sebut langsung dengan kalimat di blok ini, JANGAN tanya mau pakai layanan yang mana. Layanan untuk field order otomatis = ${only.service.replace(/\d+$/, '')}; total = harga barang + ongkir ini.\n<<<ONGKIR\n${shippingBlock(rates, kg)}\nONGKIR>>>`
   }
-  return `${rule}\nONGKIR ke ${where || 'tujuan'} (berat pesanan ${gramsToKgText(grams)}): ${prices.map((row) => `${row.service.replace(/\d+$/, '')} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${row.etd.replace('day', 'hari')})` : ''}`).join(', ')}. Kode layanan untuk field order: ${codes}. Tanyakan mau pakai yang mana; total = harga barang + ongkir yang dipilih.\nTulis ongkir ke pelanggan PERSIS dengan blok ini (satu layanan per baris, nama REG/YES/JTR, bukan kode CTC), lalu tanya mau pakai yang mana:\n<<<ONGKIR\n${shippingBlock(rates, kg)}\nONGKIR>>>`
+  return `${rule}\nONGKIR ke ${where || 'tujuan'} (berat pesanan ${gramsToKgText(grams)}): ${prices.map((row) => `${row.service.replace(/\d+$/, '')} ${row.price.toLocaleString('id-ID')}${row.etd ? ` (${etdText(row.etd)})` : ''}`).join(', ')}. Kode layanan untuk field order: ${codes}. Tanyakan mau pakai yang mana; total = harga barang + ongkir yang dipilih.\nTulis ongkir ke pelanggan PERSIS dengan blok ini (satu layanan per baris, nama REG/YES/JTR, bukan kode CTC), lalu tanya mau pakai yang mana:\n<<<ONGKIR\n${shippingBlock(rates, kg)}\nONGKIR>>>`
 }
 
 export type AwbTracking = {
