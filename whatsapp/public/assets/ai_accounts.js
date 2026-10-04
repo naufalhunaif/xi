@@ -143,10 +143,31 @@
     if (account.limitedUntil)
       lines.push(t('Kuota habis atau dibatasi; dipakai lagi otomatis sekitar {0}.', time(account.limitedUntil)))
     if (account.modelBlocked)
-      lines.push(t('Model {0} tidak tersedia di akun ini, memakai model bawaan', account.modelBlocked))
+      lines.push(t('Model {0} tidak ada di paket akun ini; otomatis memakai model yang tersedia', account.modelBlocked))
     if (account.enabled && !account.connected)
       lines.push(account.provider === 'gemini' ? t('API key belum diisi atau tidak valid.') : t('Akun perlu login ulang.'))
     return lines
+  }
+
+  // Sisa kuota per jendela: hijau aman, kuning menipis, merah hampir habis, abu belum terbaca.
+  const shortWindow = (w) => {
+    const m = Number(w.minutes || 0)
+    return !m ? '' : m % 1440 === 0 ? t('{0}hr', m / 1440) : m % 60 === 0 ? t('{0}j', m / 60) : `${m}m`
+  }
+  function quotaChips(account) {
+    const windows = (account.windows || []).filter((w) => !['overage', 'seven_day_overage_included'].includes(w.key)).slice(0, 3)
+    if (!windows.length) return null
+    const box = el('div', 'wa-quota-chips')
+    for (const w of windows) {
+      const expired = w.expired || (w.resetsAt && w.resetsAt * 1000 <= Date.now())
+      const stale = w.stale || Date.now() - Number(w.observedAt || 0) > 600000
+      const left = expired ? 100 : typeof w.remainingPercent === 'number' ? Math.max(0, Math.min(100, w.remainingPercent)) : null
+      const level = left === null || stale ? 'stale' : left <= 10 ? 'low' : left <= 30 ? 'warn' : 'ok'
+      const chip = el('span', `wa-quota-chip ${level}`, `${shortWindow(w)} ${left === null ? '—' : `${Math.round(left)}%`}`)
+      chip.title = `${t('Sisa kuota')} ${shortWindow(w)}${left === null ? '' : ` · ${Math.round(left)}%`}${w.resetsAt ? ` · ${t('reset')} ${time(w.resetsAt * 1000)}` : ''}`
+      box.append(chip)
+    }
+    return box
   }
 
   // ---- Tabel ----
@@ -185,6 +206,8 @@
       nameBox.append(dot, el('strong', '', account.name))
       const provider = el('small', `wa-provider ${account.provider}`, PROVIDERS[account.provider] || account.provider)
       name.append(nameBox, provider)
+      const quota = quotaChips(account)
+      if (quota) name.append(quota)
 
       const model = el('td')
       model.append(modelPicker(account))
@@ -393,7 +416,10 @@
     }
     try {
       const data = await call('/api/ai/accounts')
-      render(data.accounts || [])
+      // Sisa kuota akun (dari layanan) ikut di tabel: 5 jam / 7 hari / 30 hari sebagai persen berwarna.
+      const quotas = await call('/api/ai/quotas').catch(() => null)
+      const windowsOf = new Map((quotas?.accounts || []).map((q) => [q.id, q.windows || []]))
+      render((data.accounts || []).map((account) => ({ ...account, windows: windowsOf.get(account.id) || [] })))
       showSpread(data.spread || 'order')
       const advanced = document.querySelector('.wa-ai-advanced')
       if (advanced) advanced.hidden = !(data.accounts || []).some((a) => a.legacy)

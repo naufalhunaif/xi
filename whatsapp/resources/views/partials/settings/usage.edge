@@ -1,11 +1,4 @@
-<div class="wa-usage-toolbar">
-  <strong data-i18n="Sisa kuota akun">Sisa kuota akun</strong>
-  <span class="wa-quota-help" tabindex="0" role="note" aria-label="Info" data-i18n-title="Kuota akun dari layanan AI, bukan token aplikasi atau kapasitas konteks." title="Kuota akun dari layanan AI, bukan token aplikasi atau kapasitas konteks.">ⓘ</span>
-</div>
-<div id="quotaCards" class="wa-usage-cards" aria-busy="true"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
-<p id="quotaStatus" class="wa-usage-caption" role="status"></p>
-<div class="wa-usage-toolbar">
-  <strong data-i18n="Pemakaian token">Pemakaian token</strong>
+<div class="wa-usage-toolbar wa-usage-toolbar--end">
   <button id="usageRefresh" class="button small" type="button" data-i18n="Perbarui">Perbarui</button>
 </div>
 <div id="usageStatus" class="wa-usage-caption" role="status"></div>
@@ -26,6 +19,10 @@
   <button id="usageDay" class="wa-usage-day" type="button" hidden></button>
 </div>
 <div id="usageCards" class="wa-usage-stats"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+<section class="wa-trend" aria-label="Tren token per hari" data-i18n-aria-label="Tren token per hari">
+  <svg id="usageTrend" viewBox="0 0 600 160" preserveAspectRatio="none" role="img"></svg>
+  <div id="usageTrendLegend" class="wa-trend-legend" aria-hidden="true"></div>
+</section>
 <p id="usageProviders" class="wa-usage-caption"></p>
 <div id="usageTabs" class="wa-segmented wa-usage-tabs" role="group" aria-label="Rincian" data-i18n-aria-label="Rincian">
   <button type="button" data-usage-show="models" aria-pressed="true" data-i18n="Per model">Per model</button>
@@ -37,18 +34,14 @@
     <caption data-i18n="Token per model">Token per model</caption>
     <thead>
       <tr>
-        <th>AI / Model</th>
+        <th>Model</th>
         <th data-i18n="Proses">Proses</th>
-        <th>Input</th>
-        <th data-i18n="Cache dibaca">Cache dibaca</th>
-        <th>Output</th>
+        <th>Token</th>
+        <th data-i18n="Porsi">Porsi</th>
       </tr>
     </thead>
-    <tbody id="usageModels"><tr><td colspan="5"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
+    <tbody id="usageModels"><tr><td colspan="4"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
   </table>
-  <p class="wa-usage-caption" data-i18n="Model Otomatis: ringan untuk salam, standar untuk balasan biasa, utama untuk order, pembayaran, komplain.">
-    Model Otomatis dipilih per tugas: ringan untuk salam/terima kasih, menengah untuk balasan biasa, utama untuk foto, order, pembayaran, komplain dan analisis.
-  </p>
 </div>
 <div class="wa-usage-table-wrap" data-usage-tab="phases" hidden>
   <table class="wa-usage-table">

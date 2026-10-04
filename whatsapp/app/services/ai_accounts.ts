@@ -485,6 +485,8 @@ export async function lastAccountByJid(jids: string[], sinceMs: number) {
     .from('whatsapp_ai_events')
     .whereIn('jid', jids)
     .where('kind', 'ok')
+    // Akun 0 = Jev (pembantu keputusan), bukan yang membalas.
+    .whereNot('account_id', 0)
     .where('created_at', '>=', new Date(sinceMs))
     .orderBy('id', 'asc')
     .select('jid', 'account_id')

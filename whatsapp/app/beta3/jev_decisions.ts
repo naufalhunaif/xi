@@ -251,7 +251,8 @@ export async function understandTurn(input: {
         String([...input.history].reverse().find((row) => row.direction === 'out')?.body || '')
       ).slice(0, 600),
     },
-    questions
+    questions,
+    { jid: input.jid }
   )
   if (!answers) return {}
   const result: TurnUnderstanding = {}

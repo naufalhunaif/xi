@@ -435,8 +435,8 @@
     kick()
   }
 
-  function addLog(text, kind, at) {
-    logItems.unshift({ text, kind, at })
+  function addLog(text, kind, at, jid = '') {
+    logItems.unshift({ text, kind, at, jid })
     logItems.length = Math.min(logItems.length, 6)
     logList.replaceChildren(
       ...logItems.map((item) => {
@@ -447,6 +447,20 @@
         const span = document.createElement('span')
         span.textContent = item.text
         li.append(time, span)
+        // Baris aktivitas chat bisa diklik → membuka chat pelanggan (seperti simpul pelanggan).
+        if (item.jid) {
+          li.classList.add('clickable')
+          li.tabIndex = 0
+          li.title = t('Klik untuk membuka chat')
+          const open = () => (location.href = `${base}/?jid=${encodeURIComponent(item.jid)}`)
+          li.addEventListener('click', open)
+          li.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              open()
+            }
+          })
+        }
         return li
       })
     )
@@ -478,21 +492,28 @@
         } else pulse(hub, node, 'start', provider)
       }
     } else if (event.kind === 'ok') {
+      if (node?.account?.provider === 'jev') {
+        // Jev: hanya denyut (keputusan kecil terjadi tiap giliran, tidak memenuhi log).
+        if (animate) pulse(node, person || hub, 'start', 'jev')
+        return
+      }
       addLog(
         who ? t('{0} membalas {1}', name, who) : t('{0} menyelesaikan {1}', name, phaseLabel(event.phase)),
         'ok',
-        event.at
+        event.at,
+        event.jid || ''
       )
       if (animate && node) pulse(node, person || hub, 'ok', node.account?.provider)
       if (animate && person) flash(person, 'ok')
     } else {
-      lastTrouble = { id: event.accountId, at: event.at, kind: event.kind }
+      if (node?.account?.provider !== 'jev') lastTrouble = { id: event.accountId, at: event.at, kind: event.kind }
       addLog(
         event.kind === 'limited'
           ? t('{0} habis kuota / perlu login', name)
           : t('{0} gagal ({1})', name, (event.detail || '-').replace(/^[A-Z_]+: /, '').slice(0, 90)),
         event.kind,
-        event.at
+        event.at,
+        event.jid || ''
       )
       if (animate && node) flash(node, event.kind)
     }

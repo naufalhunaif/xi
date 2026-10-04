@@ -379,3 +379,61 @@ html[data-theme='dark'] .workspace-ui dialog.wa-settings-dialog {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* Sisa kuota di tabel akun AI: chip kecil berwarna. */
+.workspace-ui .wa-quota-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+.workspace-ui .wa-quota-chip {
+  font-size: 10.5px;
+  line-height: 16px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--wa-subtle);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.workspace-ui .wa-quota-chip.ok { background: var(--wa-ok-bg); color: var(--wa-ok); }
+.workspace-ui .wa-quota-chip.warn { background: var(--wa-warn-bg); color: var(--wa-warn); }
+.workspace-ui .wa-quota-chip.low { background: var(--wa-err-bg); color: var(--wa-err); }
+/* Grafik tren token per penyedia. */
+.workspace-ui .wa-trend {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+.workspace-ui .wa-trend[hidden] { display: none; }
+.workspace-ui #usageTrend {
+  width: 100%;
+  height: 160px;
+  --orc-chatgpt: #10a37f; --orc-claude: #d97757; --orc-gemini: #4f7df3; --orc-jev: #8b5cf6;
+}
+html[data-theme='dark'] .workspace-ui #usageTrend {
+  --orc-chatgpt: #3ccf9f; --orc-claude: #f09a78; --orc-gemini: #7fa3ff; --orc-jev: #b79cff;
+}
+.workspace-ui #usageTrend .grid { stroke: var(--line); stroke-width: 1; }
+.workspace-ui #usageTrend .axis { fill: var(--muted); font-size: 10px; }
+.workspace-ui .wa-trend-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.workspace-ui .wa-trend-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.workspace-ui .wa-trend-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.workspace-ui .wa-provider-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--muted);
+  vertical-align: 0;
+  margin-right: 2px;
+}
+.workspace-ui .wa-provider-dot.chatgpt { background: #10a37f; }
+.workspace-ui .wa-provider-dot.claude { background: #d97757; }
+.workspace-ui .wa-provider-dot.gemini { background: #4285f4; }
+.workspace-ui .wa-provider-dot.typesafe { background: #8b5cf6; }
+.workspace-ui .wa-usage-toolbar--end { justify-content: flex-end; }

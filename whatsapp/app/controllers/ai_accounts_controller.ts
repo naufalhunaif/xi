@@ -112,6 +112,12 @@ async function orchestraCustomers(now: number) {
   return customers
 }
 
+/** Waktu keputusan Jev terakhir (event akun 0). */
+async function lastJevEventAt() {
+  const row = await db.from('whatsapp_ai_events').where('account_id', 0).orderBy('id', 'desc').first()
+  return row ? new Date(row.created_at).getTime() : 0
+}
+
 /** Banyak akun AI: daftar, urutan cadangan, login per akun, API key Gemini. */
 export default class AiAccountsController {
   async index({ response }: HttpContext) {
@@ -141,21 +147,30 @@ export default class AiAccountsController {
       aiSpreadMode(),
     ])
     const customers = await orchestraCustomers(now)
+    // Jev (pembantu keputusan) ikut tampil sebagai simpul bila kuncinya terpasang.
+    const { readJevConfig, JEV_ACCOUNT_ID } = await import('#beta3/jev')
+    const jev = await readJevConfig().catch(() => null)
+    const jevLast = jev?.apiKey ? await lastJevEventAt().catch(() => 0) : 0
     return response.json({
       now,
       busy,
-      events,
+      events: jev?.apiKey ? events : events.filter((e) => e.accountId !== JEV_ACCOUNT_ID),
       spread,
       customers,
-      accounts: accounts.map((a) => ({
-        id: a.id,
-        provider: a.provider,
-        name: a.label || `${NAMES[a.provider]}${a.legacy ? ' utama' : ` #${a.id}`}`,
-        enabled: a.enabled,
-        limitedUntil: a.limitedUntil > now ? a.limitedUntil : 0,
-        lastUsedAt: a.lastUsedAt ? a.lastUsedAt.getTime() : 0,
-        tokens5h: used.get(a.id) || 0,
-      })),
+      accounts: [
+        ...accounts.map((a) => ({
+          id: a.id,
+          provider: a.provider,
+          name: a.label || `${NAMES[a.provider]}${a.legacy ? ' utama' : ` #${a.id}`}`,
+          enabled: a.enabled,
+          limitedUntil: a.limitedUntil > now ? a.limitedUntil : 0,
+          lastUsedAt: a.lastUsedAt ? a.lastUsedAt.getTime() : 0,
+          tokens5h: used.get(a.id) || 0,
+        })),
+        ...(jev?.apiKey
+          ? [{ id: JEV_ACCOUNT_ID, provider: 'jev', name: 'Jev', enabled: jev.enabled, limitedUntil: 0, lastUsedAt: jevLast, tokens5h: used.get(JEV_ACCOUNT_ID) || 0 }]
+          : []),
+      ],
     })
   }
 

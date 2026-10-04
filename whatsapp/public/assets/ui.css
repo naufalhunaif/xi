@@ -239,11 +239,11 @@ html[data-theme='dark'] .workspace-ui {
   .workspace-ui .wa-orchestra {
     display: grid; gap: 10px; position: sticky; top: 20px; margin-top: 52px; padding: 14px;
     border: 1px solid var(--line); border-radius: 10px; background: var(--wa-surface, #fff);
-    --orc-chatgpt: #10a37f; --orc-claude: #d97757; --orc-gemini: #4f7df3; --orc-hub: var(--text);
+    --orc-chatgpt: #10a37f; --orc-claude: #d97757; --orc-gemini: #4f7df3; --orc-jev: #8b5cf6; --orc-hub: var(--text);
     --orc-edge: color-mix(in srgb, var(--muted) 35%, transparent);
   }
 }
-html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --orc-claude: #f09a78; --orc-gemini: #7fa3ff; }
+html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --orc-claude: #f09a78; --orc-gemini: #7fa3ff; --orc-jev: #b79cff; }
 .workspace-ui .wa-orchestra-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .workspace-ui .wa-orchestra-head > div { display: grid; gap: 2px; min-width: 0; }
 .workspace-ui .wa-orchestra-head strong { font-size: 13px; font-weight: 600; color: var(--text); }
@@ -261,6 +261,7 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-edge.s-busy.p-chatgpt { stroke: var(--orc-chatgpt); }
 .workspace-ui .orc-edge.s-busy.p-claude { stroke: var(--orc-claude); }
 .workspace-ui .orc-edge.s-busy.p-gemini { stroke: var(--orc-gemini); }
+.workspace-ui .orc-edge.s-busy.p-jev { stroke: var(--orc-jev); }
 .workspace-ui .orc-edge.s-off, .workspace-ui .orc-edge.s-paused { stroke-dasharray: 3 4; }
 .workspace-ui .orc-node { cursor: grab; outline: none; }
 .workspace-ui .orc-node .core { stroke: var(--wa-surface, #fff); stroke-width: 1.2; transition: r .3s, opacity .3s; }
@@ -268,6 +269,7 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-node.p-chatgpt { color: var(--orc-chatgpt); }
 .workspace-ui .orc-node.p-claude { color: var(--orc-claude); }
 .workspace-ui .orc-node.p-gemini { color: var(--orc-gemini); }
+.workspace-ui .orc-node.p-jev { color: var(--orc-jev); }
 .workspace-ui .orc-node .core { fill: currentColor; }
 .workspace-ui .orc-hub { color: var(--orc-hub); cursor: default; }
 .workspace-ui .orc-hub .halo { opacity: .12; }
@@ -285,6 +287,7 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .orc-pulse.p-chatgpt { color: var(--orc-chatgpt); }
 .workspace-ui .orc-pulse.p-claude { color: var(--orc-claude); }
 .workspace-ui .orc-pulse.p-gemini { color: var(--orc-gemini); }
+.workspace-ui .orc-pulse.p-jev { color: var(--orc-jev); }
 .workspace-ui .orc-pulse.k-ok { color: var(--orc-hub); }
 .workspace-ui .orc-arc { fill: none; stroke: var(--wa-warn); stroke-width: 1.2; stroke-dasharray: 5 4; animation: orc-dash 1s linear infinite; }
 .workspace-ui .orc-arrow { fill: var(--wa-warn); }
@@ -298,10 +301,13 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-orchestra-legend .dot { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; vertical-align: 0; }
 .workspace-ui .wa-orchestra-legend .dot.chatgpt { background: var(--orc-chatgpt); }
 .workspace-ui .wa-orchestra-legend .dot.claude { background: var(--orc-claude); }
+.workspace-ui .wa-orchestra-legend .dot.jev { background: var(--orc-jev); }
 .workspace-ui .wa-orchestra-legend .dot.gemini { background: var(--orc-gemini); }
 .workspace-ui .wa-orchestra-log { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 11px; }
 .workspace-ui .wa-orchestra-log li { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; color: var(--muted); }
 .workspace-ui .wa-orchestra-log li span { color: var(--text); overflow-wrap: anywhere; }
+.workspace-ui .wa-orchestra-log li.clickable { cursor: pointer; border-radius: 4px; }
+.workspace-ui .wa-orchestra-log li.clickable:hover span, .workspace-ui .wa-orchestra-log li.clickable:focus-visible span { text-decoration: underline; text-underline-offset: 2px; }
 .workspace-ui .wa-orchestra-log li.k-switch span { color: var(--wa-warn); font-weight: 600; }
 .workspace-ui .wa-orchestra-log li.k-limited span { color: var(--wa-warn); }
 .workspace-ui .wa-orchestra-log li.k-fail span { color: var(--wa-err); }

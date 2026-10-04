@@ -101,6 +101,69 @@
     calendarKey = ''
     renderCalendar(lastCalendar)
   })
+  // Grafik naik-turun: token per hari per penyedia untuk rentang yang dipilih (SVG sederhana).
+  const PROVIDER_LINES = [
+    ['chatgpt', 'ChatGPT', 'var(--orc-chatgpt, #10a37f)'],
+    ['claude', 'Claude', 'var(--orc-claude, #d97757)'],
+    ['gemini', 'Gemini', 'var(--orc-gemini, #4f7df3)'],
+    ['typesafe', 'Jev', 'var(--orc-jev, #8b5cf6)'],
+  ]
+  function renderTrend(calendar) {
+    const svg = byId('usageTrend')
+    const legend = byId('usageTrendLegend')
+    if (!svg || !legend) return
+    const days = usageState.date ? 7 : Math.min(usageState.days, 365)
+    const end = usageState.date ? new Date(`${usageState.date}T00:00:00Z`) : todayWib()
+    const dates = []
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(end)
+      d.setUTCDate(d.getUTCDate() - i)
+      dates.push(isoOf(d))
+    }
+    const byDate = new Map(calendar.map((row) => [row.date, row]))
+    const series = PROVIDER_LINES.map(([key, label, color]) => ({
+      key,
+      label,
+      color,
+      values: dates.map((date) => Number(byDate.get(date)?.by?.[key] || 0)),
+    })).filter((line) => line.values.some((v) => v > 0))
+    const W = 600
+    const H = 160
+    const pad = { l: 36, r: 8, t: 10, b: 22 }
+    const max = Math.max(1, ...series.flatMap((line) => line.values))
+    const x = (i) => pad.l + (dates.length === 1 ? 0 : (i / (dates.length - 1)) * (W - pad.l - pad.r))
+    const y = (v) => pad.t + (1 - v / max) * (H - pad.t - pad.b)
+    const parts = []
+    // Garis bantu & label sumbu (3 tingkat).
+    for (const q of [0, 0.5, 1]) {
+      const yy = y(max * q).toFixed(1)
+      parts.push(`<line x1="${pad.l}" x2="${W - pad.r}" y1="${yy}" y2="${yy}" class="grid"/>`)
+      parts.push(`<text x="${pad.l - 6}" y="${(Number(yy) + 3.5).toFixed(1)}" text-anchor="end" class="axis">${compact(max * q)}</text>`)
+    }
+    const labelEvery = Math.max(1, Math.ceil(dates.length / 6))
+    dates.forEach((date, i) => {
+      if (i % labelEvery === 0 || i === dates.length - 1)
+        parts.push(`<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" class="axis">${dayLabel(date, { day: 'numeric', month: 'short' })}</text>`)
+    })
+    for (const line of series) {
+      const d = line.values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+      parts.push(`<path d="${d}" fill="none" stroke="${line.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`)
+      line.values.forEach((v, i) => {
+        if (v > 0 && dates.length <= 31) parts.push(`<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2.2" fill="${line.color}"><title>${line.label} · ${dayLabel(dates[i])} · ${number(v)}</title></circle>`)
+      })
+    }
+    svg.innerHTML = parts.join('')
+    legend.replaceChildren(
+      ...series.map((line) => {
+        const item = document.createElement('span')
+        const dot = document.createElement('i')
+        dot.style.background = line.color
+        item.append(dot, line.label)
+        return item
+      })
+    )
+    svg.closest('.wa-trend')?.toggleAttribute('hidden', !series.length)
+  }
   function renderCalendar(calendar) {
     const box = byId('usageHeatmap')
     if (!box) return
@@ -367,6 +430,7 @@
         throw new Error(t('Usage belum dapat dimuat. Coba perbarui.'))
       const data = await response.json()
       renderCalendar(data.calendar || [])
+      renderTrend(data.calendar || [])
       renderSummary(data)
       const phases = byId('usagePhases')
       if (phases) {
@@ -400,14 +464,19 @@
       const models = byId('usageModels')
       if (models) {
         models.replaceChildren()
+        // Ringkas: satu angka token (input + output) dan porsinya; cache tidak dihitung.
+        const totalTokens = (data.models || []).reduce((sum, row) => sum + row.input + row.output, 0) || 1
         for (const row of data.models || []) {
           const line = document.createElement('tr')
+          const name = textElement('td', '')
+          const dot = document.createElement('i')
+          dot.className = `wa-provider-dot ${row.provider}`
+          name.append(dot, ` ${row.model.replace(' (otomatis)', ` (${t('otomatis')})`)}`)
+          line.append(name)
           for (const [value, className] of [
-            [`${({ claude: 'Claude', gemini: 'Gemini', typesafe: 'Jev' })[row.provider] || 'ChatGPT'} / ${row.model.replace(' (otomatis)', ` (${t('otomatis')})`)}`, ''],
             [number(row.runs), 'wa-usage-number'],
-            [number(row.input), 'wa-usage-number'],
-            [number(row.cached), 'wa-usage-number'],
-            [number(row.output), 'wa-usage-number'],
+            [compact(row.input + row.output), 'wa-usage-number'],
+            [`${Math.round(((row.input + row.output) / totalTokens) * 100)}%`, 'wa-usage-number'],
           ])
             line.append(textElement('td', value, className))
           line.dataset.filterModel = row.model
@@ -418,7 +487,7 @@
         if (!(data.models || []).length) {
           const line = document.createElement('tr')
           const cell = textElement('td', t('Belum ada penggunaan tercatat'))
-          cell.colSpan = 5
+          cell.colSpan = 4
           line.append(cell)
           models.append(line)
         }

@@ -1792,4 +1792,10 @@ window.waLocales.en = {
   "Satu pesan bisa memicu beberapa fase": "One message can trigger several phases",
   "Skill CS": "CS skill",
   "Berat per jenis barang (gram)": "Weight per item type (grams)",
+  "Model {0} tidak ada di paket akun ini; otomatis memakai model yang tersedia": "Model {0} is not included in this account’s plan; the available model is used automatically",
+  "Sisa kuota": "Remaining quota",
+  "reset": "reset",
+  "Tren token per hari": "Daily token trend",
+  "{0}hr": "{0}d",
+  "{0}j": "{0}h",
 }

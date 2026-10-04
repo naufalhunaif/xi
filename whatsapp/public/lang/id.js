@@ -1792,4 +1792,10 @@ window.waLocales.id = {
   "Satu pesan bisa memicu beberapa fase": "Satu pesan bisa memicu beberapa fase",
   "Skill CS": "Skill CS",
   "Berat per jenis barang (gram)": "Berat per jenis barang (gram)",
+  "Model {0} tidak ada di paket akun ini; otomatis memakai model yang tersedia": "Model {0} tidak ada di paket akun ini; otomatis memakai model yang tersedia",
+  "Sisa kuota": "Sisa kuota",
+  "reset": "reset",
+  "Tren token per hari": "Tren token per hari",
+  "{0}hr": "{0}hr",
+  "{0}j": "{0}j",
 }

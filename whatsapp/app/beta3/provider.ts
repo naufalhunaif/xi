@@ -147,7 +147,16 @@ export async function runLeanProvider(
         ''
       // Jev menilai maksud pesan (mis. hanya salam) → tingkat model; tanpa Jev: pola kata.
       const tier = !fixed && account.provider !== 'gemini' ? meta.tier || autoTier(phase, prompt, imagePaths.length) : null
-      const wanted = fixed || (tier ? autoModels(account.provider === 'claude' ? 'claude' : 'chatgpt')[tier] : '')
+      // Model tingkat ini tidak tersedia di akun (mis. akun gratis tanpa model utama) → turun satu
+      // tingkat (berat → standar → ringan) sebelum memakai model bawaan akun.
+      const blocked = blockedList(account.modelBlocked)
+      const ladder = tier
+        ? (['heavy', 'standard', 'light'] as AutoTier[])
+            .slice(['heavy', 'standard', 'light'].indexOf(tier))
+            .map((level) => autoModels(account.provider === 'claude' ? 'claude' : 'chatgpt')[level])
+            .filter((model, index, all) => all.indexOf(model) === index)
+        : []
+      const wanted = fixed || ladder.find((model) => !blocked.includes(model)) || ''
       // Tugas ringan pada mode otomatis: penalaran rendah (kecuali pemilik mengatur sendiri).
       const tuned =
         tier === 'light'
@@ -174,15 +183,27 @@ export async function runLeanProvider(
       // Model yang tidak tersedia untuk langganan akun ini (mis. akun ChatGPT lain paketnya
       // berbeda) → pakai model bawaan akun tersebut, bukan pindah/menjeda akun.
       let result: LeanProviderResult
-      if (account.provider !== 'gemini' && wanted && blockedList(account.modelBlocked).includes(wanted))
-        result = await attempt(true)
+      if (account.provider !== 'gemini' && wanted && blocked.includes(wanted)) result = await attempt(true)
       else {
         try {
           result = await attempt(false)
         } catch (error) {
           if (account.provider === 'gemini' || !wanted || !modelUnavailable(error)) throw error
-          result = await attempt(true)
-          await blockAiModel(account.id, [...blockedList(account.modelBlocked), wanted].slice(-4).join(',')).catch(() => {})
+          await blockAiModel(account.id, [...blocked, wanted].slice(-4).join(',')).catch(() => {})
+          const next = ladder.find((model) => model !== wanted && !blocked.includes(model))
+          if (next) {
+            const fallback = runLeanOnce(
+              { ...tuned, chatgptModel: '', claudeModel: '' },
+              account.provider,
+              { model: next, apiKey: account.apiKey, auto: true },
+              prompt,
+              imagePaths,
+              phase,
+              schema,
+              quota
+            )
+            result = await withAiAccount(aiAccountRef(account), () => fallback)
+          } else result = await attempt(true)
         }
       }
       await saveQuota()

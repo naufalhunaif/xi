@@ -4,6 +4,10 @@ import encryption from '@adonisjs/core/services/encryption'
 import db from '#services/workspace_database'
 import { ensureLeanTables, readLeanState, writeLeanState } from '#beta3/tables'
 import { recordUsage } from '#services/usage_service'
+import { recordAiEvent } from '#services/ai_accounts'
+
+/** Id akun semu Jev di whatsapp_ai_events (untuk orkestra); bukan akun AI sungguhan. */
+export const JEV_ACCOUNT_ID = 0
 import { workspaceScope } from '#services/workspace_context'
 
 export const JEV_URL = 'https://api.typesafe.ai/v1/systemone'
@@ -224,7 +228,7 @@ export async function askJev<K extends string>(
   phase: string,
   state: unknown,
   questions: Record<K, JevQuestion>,
-  options: { timeoutMs?: number } = {}
+  options: { timeoutMs?: number; jid?: string } = {}
 ): Promise<Partial<Record<K, JevAnswer>> | null> {
   if (!Object.keys(questions).length) return null
   const config = await readJevConfig()
@@ -256,6 +260,15 @@ export async function askJev<K extends string>(
       },
       durationMs: Date.now() - started,
     }).catch(() => {})
+    // Orkestra: Jev tampil sebagai simpul sendiri; tiap keputusan = satu denyut ke pelanggan.
+    await recordAiEvent(
+      JEV_ACCOUNT_ID,
+      'ok',
+      `jev-${phase}`,
+      '',
+      Number(data.usage?.input_tokens || 0) + Number(data.usage?.output_tokens || 0),
+      options.jid || ''
+    ).catch(() => {})
     const answers: Partial<Record<K, JevAnswer>> = {}
     for (const key of Object.keys(questions) as K[]) {
       const raw = data.answers?.[key]
@@ -291,6 +304,7 @@ export async function askJev<K extends string>(
       usage: null,
       durationMs: Date.now() - started,
     }).catch(() => {})
+    await recordAiEvent(JEV_ACCOUNT_ID, 'fail', `jev-${phase}`, message.slice(0, 120), null, options.jid || '').catch(() => {})
     return null
   }
 }

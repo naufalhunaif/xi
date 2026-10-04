@@ -156,7 +156,8 @@ export async function readUsage(options: { days?: number; date?: string } = {}) 
 }
 
 /** Token per hari (WIB) 1 tahun terakhir; dihitung per jam lalu digeser ke WIB. Cache 10 menit. */
-const calendarCache = new Map<string, { at: number; data: Array<{ date: string; tokens: number; runs: number }> }>()
+type CalendarDay = { date: string; tokens: number; runs: number; by: Record<string, number> }
+const calendarCache = new Map<string, { at: number; data: CalendarDay[] }>()
 export async function usageCalendar() {
   const key = workspaceScope().prefix || 'default'
   const cached = calendarCache.get(key)
@@ -165,19 +166,23 @@ export async function usageCalendar() {
   const rows = (await db
     .from('whatsapp_ai_usage')
     .where('created_at', '>=', since)
-    .select(db.raw("DATE_FORMAT(created_at, '%Y-%m-%d %H') as hour"))
+    .select(db.raw("DATE_FORMAT(created_at, '%Y-%m-%d %H') as hour"), 'provider')
     .count('* as runs')
     .select(db.raw('SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) as tokens'))
-    .groupBy('hour')) as any[]
-  const byDate = new Map<string, { date: string; tokens: number; runs: number }>()
+    .groupBy('hour', 'provider')) as any[]
+  const byDate = new Map<string, CalendarDay>()
   for (const row of rows) {
     // created_at tersimpan dalam zona waktu server (mysql2 "local").
     const [date, hour] = String(row.hour).split(' ')
     const local = new Date(`${date}T${hour}:00:00`)
     const wib = DateTime.fromJSDate(local).setZone(ZONE).toISODate() || date
-    const entry = byDate.get(wib) || { date: wib, tokens: 0, runs: 0 }
-    entry.tokens += Number(row.tokens || 0)
+    const entry = byDate.get(wib) || { date: wib, tokens: 0, runs: 0, by: {} }
+    const tokens = Number(row.tokens || 0)
+    entry.tokens += tokens
     entry.runs += Number(row.runs || 0)
+    // Per penyedia (ChatGPT, Claude, Gemini, Jev) untuk grafik naik-turun.
+    const provider = String(row.provider || 'lain')
+    entry.by[provider] = (entry.by[provider] || 0) + tokens
     byDate.set(wib, entry)
   }
   const data = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
