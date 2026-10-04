@@ -660,14 +660,12 @@
               <form id="settingsForm">
                 <div class="wa-settings-view" data-settings-view="connect" hidden>
                   <h2 class="wa-settings-view-title" data-i18n="Koneksi">Koneksi</h2>
-                  <p class="wa-settings-view-desc" data-i18n="Hubungkan WhatsApp, Instagram, akun AI, dan Jev. Semua tersimpan otomatis.">Hubungkan WhatsApp, Instagram, akun AI, dan Jev. Semua tersimpan otomatis.</p>
                 <section id="settings-numbers" data-settings-panel="numbers" aria-labelledby="settings-title-numbers">
                   <h3 class="wa-settings-section-title" id="settings-title-numbers">WhatsApp</h3>
                   <div class="wa-card" id="linesCard">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
-                        <strong data-i18n="Nomor terhubung">Nomor terhubung</strong>
-                        <small data-i18n="Chat dari semua nomor masuk ke satu inbox. Balasan keluar dari nomor yang dihubungi pelanggan.">Chat dari semua nomor masuk ke satu inbox. Balasan keluar dari nomor yang dihubungi pelanggan.</small>
+                        <strong>WhatsApp</strong>
                       </div>
                       <div class="actions"><button type="button" class="button primary" id="lineAdd" data-i18n="Tambah nomor">Tambah nomor</button></div>
                     </div>
@@ -693,15 +691,15 @@
                     <div class="wa-card-head">
                       <div class="wa-card-title">
                         <strong>Jev</strong>
-                        <small data-i18n="Pembantu keputusan kecil (TypeSafe AI). Tempel kunci API, tersimpan otomatis. Tanpa Jev, aplikasi tetap jalan dengan cara lama.">Pembantu keputusan kecil (TypeSafe AI). Tempel kunci API, tersimpan otomatis. Tanpa Jev, aplikasi tetap jalan dengan cara lama.</small>
+                        <small data-i18n="Pembantu keputusan kecil (TypeSafe AI)">Pembantu keputusan kecil (TypeSafe AI)</small>
                       </div>
                       <div class="actions"><span id="jevState" class="wa-pill"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></span></div>
                     </div>
                     <div class="wa-form-grid">
-                      <label class="wa-span-full"><span data-i18n="Kunci API TypeSafe">Kunci API TypeSafe</span><input id="jevKey" type="password" autocomplete="off" data-settings-ignore /></label>
+                      <label class="wa-span-full"><span data-i18n="Kunci API">Kunci API</span><input id="jevKey" type="password" autocomplete="off" data-settings-ignore /></label>
                     </div>
                     <div class="wa-toggle-row">
-                      <span data-i18n="Aktifkan Jev">Aktifkan Jev</span>
+                      <span data-i18n="Aktif">Aktif</span>
                       <button id="jevEnabled" type="button" class="wa-switch" role="switch" aria-checked="false" aria-label="Aktifkan Jev" data-i18n-aria-label="Aktifkan Jev" disabled></button>
                     </div>
                     <div class="actions wa-actions-start">
@@ -711,15 +709,13 @@
                     </div>
                   </div>
                   <details class="wa-card wa-advanced-inline">
-                    <summary data-i18n="Lanjutan: keputusan yang dipegang Jev">Lanjutan: keputusan yang dipegang Jev</summary>
-                    <p class="wa-note" data-i18n="Matikan keputusan yang sering salah. Persen = benar dalam 30 hari.">Matikan keputusan yang sering salah. Persen = benar dalam 30 hari.</p>
-                    <ul id="jevDecisionList" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
+                    <summary data-i18n="Keputusan">Keputusan</summary>
+                                        <ul id="jevDecisionList" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
                   </details>
                 </section>
                 </div>
                 <div class="wa-settings-view" data-settings-view="store" hidden>
                   <h2 class="wa-settings-view-title" data-i18n="Toko">Toko</h2>
-                  <p class="wa-settings-view-desc" data-i18n="Data toko yang dipakai AI: pembayaran, ongkir, produksi, dan sumber data.">Data toko yang dipakai AI: pembayaran, ongkir, produksi, dan sumber data.</p>
                 <section
                   id="settings-payments"
                   data-settings-panel="payments"
@@ -733,7 +729,7 @@
                     <div class="wa-card-head">
                       <div class="wa-card-title">
                         <strong data-i18n="Berat per jenis barang">Berat per jenis barang</strong>
-                        <small data-i18n="Dipakai menghitung ongkir, termasuk model custom. Belum ada barang dipilih = 1 kg.">Dipakai menghitung ongkir, termasuk model custom. Belum ada barang dipilih = 1 kg.</small>
+                        <small data-i18n="Untuk menghitung ongkir">Untuk menghitung ongkir</small>
                       </div>
                     </div>
                     <div id="weightFields" class="wa-form-grid"><div class="wa-loading wa-span-full" data-i18n="Memuat…">Memuat…</div></div>
@@ -760,7 +756,6 @@
                 </div>
                 <div class="wa-settings-view" data-settings-view="reply" hidden>
                   <h2 class="wa-settings-view-title" data-i18n="Cara AI membalas">Cara AI membalas</h2>
-                  <p class="wa-settings-view-desc" data-i18n="Kapan AI bekerja dan siapa yang tidak dibalas. Pengaturan rinci ada di Lanjutan.">Kapan AI bekerja dan siapa yang tidak dibalas. Pengaturan rinci ada di Lanjutan.</p>
                 <section id="settings-work-hours" data-settings-panel="work-hours" aria-labelledby="settings-title-work-hours">
                   <h3 class="wa-settings-section-title" id="settings-title-work-hours" data-i18n="Jam kerja AI">Jam kerja AI</h3>
                   @include('partials/settings/work_hours')
@@ -782,7 +777,7 @@
                       </div>
                       <div class="actions"><button type="button" class="button primary" id="skillUpdate" data-i18n="Update skill">Update skill</button></div>
                     </div>
-                    <p class="wa-note"><span data-i18n="Skill dicek otomatis tiap 30 menit dari rilis online. Tekan tombol untuk mengambil sekarang.">Skill dicek otomatis tiap 30 menit dari rilis online. Tekan tombol untuk mengambil sekarang.</span> <small id="skillStatus" role="status" aria-live="polite"></small></p>
+                    <p class="wa-note"><small id="skillStatus" role="status" aria-live="polite"></small></p>
                     <details><summary data-i18n="Lihat isi skill">Lihat isi skill</summary><pre id="skillContent" class="wa-b3-spec"></pre></details>
                   </div>
                 </section>
@@ -794,7 +789,7 @@
                     <div class="wa-card-head">
                       <div class="wa-card-title">
                         <strong data-i18n="Aturan Toko">Aturan Toko</strong>
-                        <small data-i18n="Berlaku untuk semua akun & model AI. Tulis singkat, satu aturan per baris.">Berlaku untuk semua akun & model AI. Tulis singkat, satu aturan per baris.</small>
+                        <small data-i18n="Satu aturan per baris">Satu aturan per baris</small>
                       </div>
                     </div>
                     <ul id="rulesList" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
@@ -808,7 +803,7 @@
                     <div class="wa-card-head">
                       <div class="wa-card-title">
                         <strong data-i18n="Kasus uji">Kasus uji</strong>
-                        <small data-i18n="Dibuat otomatis dari setiap Koreksi. Jalankan setelah update atau ganti model (memakai ChatGPT/Claude).">Dibuat otomatis dari setiap Koreksi. Jalankan setelah update atau ganti model (memakai ChatGPT/Claude).</small>
+                        <small data-i18n="Dari koreksi CS; jalankan setelah update">Dari koreksi CS; jalankan setelah update</small>
                       </div>
                       <div class="actions"><button type="button" class="button primary" id="testsRun" data-i18n="Jalankan semua">Jalankan semua</button></div>
                     </div>
@@ -827,7 +822,6 @@
                 </div>
                 <div class="wa-settings-view" data-settings-view="usage" hidden>
                   <h2 class="wa-settings-view-title" data-i18n="Pemakaian">Pemakaian</h2>
-                  <p class="wa-settings-view-desc" data-i18n="Token per model dan fase, sisa kuota akun, serta akurasi keputusan Jev.">Token per model dan fase, sisa kuota akun, serta akurasi keputusan Jev.</p>
                 <section
                   id="settings-usage"
                   data-settings-panel="usage"
@@ -837,8 +831,8 @@
                   <div class="wa-card">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
-                        <strong data-i18n="Akurasi">Akurasi</strong>
-                        <small data-i18n="Keputusan Jev terbaru. Tandai yang salah supaya diperbaiki di rilis berikutnya.">Keputusan Jev terbaru. Tandai yang salah supaya diperbaiki di rilis berikutnya.</small>
+                        <strong data-i18n="Akurasi Jev">Akurasi Jev</strong>
+                        <small data-i18n="Tandai keputusan yang salah">Tandai keputusan yang salah</small>
                       </div>
                       <div class="actions"><select id="jevFilter" data-settings-ignore aria-label="Saring keputusan" data-i18n-aria-label="Saring keputusan"><option value="" data-i18n="Semua keputusan">Semua keputusan</option></select></div>
                     </div>
@@ -848,7 +842,6 @@
                 </div>
                 <div class="wa-settings-view" data-settings-view="app" hidden>
                   <h2 class="wa-settings-view-title" data-i18n="Aplikasi & data">Aplikasi & data</h2>
-                  <p class="wa-settings-view-desc" data-i18n="Tampilan, alamat akses, backup, dan reset data.">Tampilan, alamat akses, backup, dan reset data.</p>
                 <section id="settings-general" data-settings-panel="general" aria-labelledby="settings-title-general">
                   <h3 class="wa-settings-section-title" id="settings-title-general" data-i18n="Tampilan & akses">Tampilan & akses</h3>
                   @if(!bundle)
@@ -874,8 +867,7 @@
                       <option value="id">Bahasa Indonesia</option>
                     </select>
                   </label>
-                  <p class="wa-usage-caption" data-i18n="Bahasa antarmuka di browser ini. Tidak mengubah pesan atau skill AI.">Bahasa antarmuka di browser ini. Tidak mengubah pesan atau skill AI.</p>
-                </section>
+                                  </section>
                 <section id="settings-backup" data-settings-panel="backup" aria-labelledby="settings-title-backup">
                   <h3 class="wa-settings-section-title" id="settings-title-backup">Backup</h3>
                   <p id="backupAlert" class="wa-alert" role="alert"></p>
@@ -883,7 +875,7 @@
                     <div class="wa-card-head">
                       <div class="wa-card-title">
                         <strong>Google Drive</strong>
-                        <small data-i18n="Semua data (chat, akun AI, nomor, skill, kualitas, order) dicadangkan ke Drive Anda.">Semua data (chat, akun AI, nomor, skill, kualitas, order) dicadangkan ke Drive Anda.</small>
+                        <small data-i18n="Cadangan semua data ke Drive Anda">Cadangan semua data ke Drive Anda</small>
                       </div>
                       <div class="actions"><span id="backupDriveState" class="wa-pill"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></span></div>
                     </div>
@@ -914,18 +906,18 @@
                       </div>
                       <div class="actions"><button type="button" class="button primary" id="backupNow" data-i18n="Backup sekarang">Backup sekarang</button></div>
                     </div>
-                    <label class="wa-toggle-row"><span data-i18n="Backup otomatis harian (03.00 WIB, simpan 14 terakhir)">Backup otomatis harian (03.00 WIB, simpan 14 terakhir)</span>
+                    <label class="wa-toggle-row"><span data-i18n="Backup otomatis tiap hari">Backup otomatis tiap hari</span>
                       <button class="wa-switch" type="button" role="switch" id="backupAuto" aria-checked="true" value="true" aria-label="Backup otomatis"></button></label>
-                    <label class="wa-toggle-row"><span><span data-i18n="Sertakan foto &amp; media chat">Sertakan foto &amp; media chat</span><small class="wa-note" data-i18n="Hanya file baru yang diunggah tiap backup (tidak disalin ulang), jadi tetap ringan walau data makin banyak.">Hanya file baru yang diunggah tiap backup (tidak disalin ulang), jadi tetap ringan walau data makin banyak.</small></span>
+                    <label class="wa-toggle-row"><span><span data-i18n="Sertakan foto &amp; media chat">Sertakan foto &amp; media chat</span></span>
                       <button class="wa-switch" type="button" role="switch" id="backupMedia" aria-checked="true" value="true" aria-label="Sertakan media"></button></label>
-                    <label class="wa-toggle-row"><span><span data-i18n="Simpan media jadwal Instagram di Google Drive">Simpan media jadwal Instagram di Google Drive</span><small class="wa-note" data-i18n="Jadwal lebih dari 1 hari ke depan disimpan di Drive, diambil kembali 2 jam sebelum terbit. Hemat ruang server.">Jadwal lebih dari 1 hari ke depan disimpan di Drive, diambil kembali 2 jam sebelum terbit. Hemat ruang server.</small></span>
+                    <label class="wa-toggle-row"><span><span data-i18n="Simpan media jadwal Instagram di Google Drive">Simpan media jadwal Instagram di Google Drive</span></span>
                       <button class="wa-switch" type="button" role="switch" id="backupIgMedia" aria-checked="false" value="false" aria-label="Simpan media jadwal Instagram di Google Drive" data-i18n-aria-label="Simpan media jadwal Instagram di Google Drive"></button></label>
                   </div>
                   <div class="wa-card" id="backupRestoreCard">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
                         <strong data-i18n="Pulihkan">Pulihkan</strong>
-                        <small data-i18n="Menimpa semua data di server ini dengan isi backup. Login memakai akun dari backup.">Menimpa semua data di server ini dengan isi backup. Login memakai akun dari backup.</small>
+                        <small data-i18n="Menimpa data di server ini">Menimpa data di server ini</small>
                       </div>
                       <div class="actions"><button type="button" class="button" id="backupList" data-i18n="Lihat backup">Lihat backup</button></div>
                     </div>
@@ -943,8 +935,7 @@
                   </div>
                   <div class="wa-data-reset">
                     <div class="wa-data-reset-heading"><strong data-i18n="Reset data">Reset data</strong><span id="dataResetPhone"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></span></div>
-                    <p data-i18n="Hapus percakapan, media, pesanan, pembayaran, saldo, alamat tersimpan, dan ingatan AI pada nomor aktif.">Hapus percakapan, media, pesanan, pembayaran, saldo, alamat tersimpan, dan ingatan AI pada nomor aktif.</p>
-                    <p data-i18n="Kontak dasar, skill, pengaturan, akun AI, dan koneksi nomor tetap ada. Tidak menghapus data di Orion/MCP.">Kontak dasar, skill, pengaturan, akun AI, dan koneksi nomor tetap ada. Tidak menghapus data di Orion/MCP.</p>
+                    <p data-i18n="Hapus chat, media, pesanan, dan ingatan AI pada nomor aktif. Pengaturan dan akun tetap ada.">Hapus chat, media, pesanan, dan ingatan AI pada nomor aktif. Pengaturan dan akun tetap ada.</p>
                     <strong class="wa-data-reset-warning" data-i18n="Permanen. Cadangkan data penting sebelum melanjutkan.">Permanen. Cadangkan data penting sebelum melanjutkan.</strong>
                     <button id="dataResetButton" type="button" class="button danger" disabled data-i18n="Hapus data & mulai dari nol">Hapus data & mulai dari nol</button>
                     <small id="dataResetStatus" role="status" aria-live="polite"></small>

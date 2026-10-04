@@ -41,9 +41,12 @@
       Object.assign(row.dataset, { paymentId: method.id, name: method.name, destination: method.destination,
         accountName: method.accountName, enabled: String(method.enabled) })
       const details = node('div', '', 'wa-payment-details')
-      details.append(node('strong', method.name), node('span', method.destination))
+      const title = node('strong', '')
+      const dot = node('span', '', `wa-dot ${method.enabled ? 'ok' : ''}`)
+      dot.title = method.enabled ? t('Aktif') : t('Nonaktif')
+      title.append(dot, ` ${method.name}`)
+      details.append(title, node('span', method.destination))
       if (method.accountName) details.append(node('span', method.accountName))
-      details.append(node('small', method.enabled ? t('Aktif') : t('Nonaktif')))
       const actions = node('div', '', 'wa-payment-actions')
       for (const [action, label] of [['paymentEdit', 'Edit'], ['paymentDelete', t('Hapus')]]) {
         const button = node('button', label, 'button')

@@ -245,3 +245,48 @@ html[data-theme='dark'] .workspace-ui dialog.wa-settings-dialog {
 .workspace-ui #settings-payments #paymentEditor {
   order: initial;
 }
+/* Status sebagai titik warna (bukan kolom teks). */
+.workspace-ui .wa-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 0;
+  padding: 0;
+  flex: none;
+}
+.workspace-ui .wa-dot.ok { background: var(--wa-ok); }
+.workspace-ui .wa-dot.warn { background: var(--wa-warn); }
+.workspace-ui .wa-dot.err { background: var(--wa-err); cursor: pointer; }
+.workspace-ui .wa-ai-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Tanpa tanda panah di "Lanjutan"; cukup teks redup yang bisa diklik. */
+.workspace-ui details.wa-advanced > summary::before,
+.workspace-ui details.wa-advanced-inline > summary::before,
+.workspace-ui details.wa-ai-advanced > summary::before,
+.workspace-ui details.wa-ig-setup > summary::before,
+.workspace-ui details.wa-ig-meta > summary::before {
+  content: none;
+}
+.workspace-ui details.wa-ai-advanced > summary,
+.workspace-ui details.wa-ig-setup > summary,
+.workspace-ui details.wa-ig-meta > summary,
+.workspace-ui #skillCard details > summary,
+.workspace-ui details.wa-production-history > summary,
+.workspace-ui #backupSetup details > summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.workspace-ui details > summary::-webkit-details-marker {
+  display: none;
+}
+.workspace-ui details[open] > summary {
+  color: var(--text);
+}

@@ -155,8 +155,8 @@
     list.replaceChildren()
     if (!accounts.length) {
       const row = el('tr')
-      const cell = el('td', 'wa-note', t('Belum ada akun AI. Klik Tambah akun.'))
-      cell.colSpan = 8
+      const cell = el('td', 'wa-note', t('Belum ada akun AI'))
+      cell.colSpan = 6
       row.append(cell)
       list.append(row)
       return
@@ -167,37 +167,29 @@
       const order = el('td', 'wa-ai-order')
       const handle = el('button', 'wa-drag-handle', '⠿')
       handle.type = 'button'
-      handle.title = t('Seret untuk mengubah urutan')
-      handle.setAttribute('aria-label', handle.title)
+      handle.setAttribute('aria-label', t('Urutan'))
       handle.addEventListener('pointerdown', (event) => startDrag(event, row))
       order.append(handle, el('span', '', String(index + 1)))
 
+      // Status = titik warna di depan nama (hijau siap, kuning jeda, merah perlu login, abu nonaktif).
       const name = el('td', 'wa-ai-acct')
-      name.append(el('strong', '', account.name), el('small', '', PROVIDERS[account.provider] || account.provider))
+      const [label, tone] = state(account)
+      const dot = el(account.enabled && !account.connected ? 'button' : 'span', `wa-dot ${tone}`)
+      dot.title = label
+      dot.setAttribute('aria-label', label)
+      if (dot.tagName === 'BUTTON') {
+        dot.type = 'button'
+        dot.addEventListener('click', () => openLogin(account))
+      }
+      const nameBox = el('div', 'wa-ai-name')
+      nameBox.append(dot, el('strong', '', account.name))
+      name.append(nameBox, el('small', '', PROVIDERS[account.provider] || account.provider))
 
       const model = el('td')
       model.append(modelPicker(account))
       const scope = el('td')
       scope.append(scopePicker(account))
 
-      const tokens = Number(account.tokens5h || 0)
-      const usage = el(
-        'td',
-        'wa-order-amount',
-        tokens ? (tokens >= 1000 ? `${(tokens / 1000).toFixed(tokens >= 100000 ? 0 : 1)}rb` : String(tokens)) : '—'
-      )
-
-      const stateCell = el('td')
-      const box = el('div', 'wa-ai-state')
-      const [label, tone] = state(account)
-      // "Perlu login" / "Isi API key" bisa diklik langsung.
-      if (account.enabled && !account.connected) {
-        const pill = el('button', `wa-pill ${tone} wa-ai-pill-action`, label)
-        pill.type = 'button'
-        pill.title = account.provider === 'gemini' ? t('Isi API key') : t('Login')
-        pill.addEventListener('click', () => openLogin(account))
-        box.append(pill)
-      } else box.append(el('span', `wa-pill ${tone}`, label))
       const issues = problems(account)
       if (issues.length) {
         const warn = el('button', `wa-ai-warn ${tone === 'err' || account.lastError ? 'err' : 'warn'}`)
@@ -233,9 +225,8 @@
             )
           openPop(warn, account.name, issues, actions)
         })
-        box.append(warn)
+        nameBox.append(warn)
       }
-      stateCell.append(box)
 
       const active = el('td')
       const toggle = el('button', 'wa-switch')
@@ -278,7 +269,7 @@
           'wa-ai-icon danger'
         )
       )
-      row.append(order, name, model, scope, usage, stateCell, active, actions)
+      row.append(order, name, model, scope, active, actions)
       list.append(row)
     })
   }
