@@ -6,6 +6,7 @@
  */
 .workspace-ui {
   --wa-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --wa-sans: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 html:not([data-theme='dark']) .workspace-ui {
   --sidebar: #e9e7e0;
@@ -313,4 +314,211 @@ html:not([data-theme='dark']) .workspace-ui .wa-messages .message.out.source-cs 
 .workspace-ui .wa-message-list:has(> .wa-empty-moment) {
   min-height: 100%;
   justify-content: center;
+}
+
+/* ---------- Pengaturan (Koneksi, Toko, Cara AI membalas, Aplikasi & data) ----------
+   Panel luar transparan; tiap bagian = kartu putih; kartu di dalam bagian diratakan
+   (dipisah garis tipis); judul bagian = label monospace. Pemakaian sudah berupa ubin → bagiannya tetap polos. */
+.workspace-ui .wa-settings-heading {
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.workspace-ui .wa-settings-header small,
+.workspace-ui .wa-settings-header .wa-muted {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.workspace-ui .wa-panel.wa-settings-panel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+html:not([data-theme='dark']) .workspace-ui .wa-panel.wa-settings-panel {
+  background: transparent;
+}
+.workspace-ui .wa-settings-panel form {
+  padding: 0;
+}
+.workspace-ui .wa-settings-view {
+  gap: 10px;
+}
+.workspace-ui .wa-settings-view-title {
+  margin: 2px 2px 4px;
+  font-size: 21px;
+  font-weight: 500;
+}
+.workspace-ui .wa-settings-view [data-settings-panel] {
+  background: var(--wa-surface, #fff);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px 16px;
+  gap: 12px;
+}
+.workspace-ui .wa-settings-view[data-settings-view='usage'] [data-settings-panel] {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.workspace-ui .wa-settings-view[data-settings-view='connect'] [data-settings-panel] {
+  padding-top: 14px;
+}
+.workspace-ui .wa-settings-section-title {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.workspace-ui .wa-settings-section-title .wa-i {
+  width: 14px;
+  height: 14px;
+}
+.workspace-ui .wa-settings-view [data-settings-panel] > .wa-card,
+.workspace-ui .wa-settings-view [data-settings-panel] > details.wa-card,
+.workspace-ui .wa-settings-view [data-settings-panel] > .wa-connect-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+html:not([data-theme='dark']) .workspace-ui .wa-settings-view [data-settings-panel] > .wa-card {
+  background: transparent;
+}
+.workspace-ui .wa-settings-view [data-settings-panel] > .wa-card + .wa-card,
+.workspace-ui .wa-settings-view [data-settings-panel] > .wa-card + details.wa-card,
+.workspace-ui .wa-settings-view [data-settings-panel] > details.wa-card + .wa-card,
+.workspace-ui .wa-settings-view [data-settings-panel] > .wa-card + .wa-toggle-row,
+.workspace-ui .wa-settings-view [data-settings-panel] > .wa-toggle-row + .wa-card {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.workspace-ui .wa-card-title strong {
+  font-weight: 500;
+}
+.workspace-ui .wa-card-title small {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+}
+.workspace-ui .wa-settings-panel label {
+  font-family: var(--wa-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.workspace-ui .wa-settings-panel label.wa-toggle-row,
+.workspace-ui .wa-settings-panel label.wa-check,
+.workspace-ui .wa-settings-panel .wa-toggle-row > span,
+.workspace-ui .wa-settings-panel .wa-check > span {
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.workspace-ui .wa-settings-panel .wa-toggle-row {
+  border-bottom-color: var(--line);
+}
+.workspace-ui .wa-settings-panel :is(input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']), select, textarea) {
+  border-radius: 6px;
+  border-color: var(--line);
+  font-family: var(--wa-sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.workspace-ui .wa-settings-panel :is(input, select, textarea):focus {
+  outline: 1px solid var(--text);
+  outline-offset: 0;
+  border-color: var(--text);
+}
+.workspace-ui .wa-pill {
+  font-family: var(--wa-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+.workspace-ui details.wa-advanced {
+  border-top: 0;
+  padding-top: 0;
+  display: grid;
+  gap: 10px;
+}
+.workspace-ui details.wa-advanced > summary,
+.workspace-ui details.wa-advanced-inline > summary,
+.workspace-ui .wa-settings-panel details > summary,
+.workspace-ui .wa-settings-panel #skillCard details > summary,
+.workspace-ui .wa-settings-panel #backupSetup details > summary,
+.workspace-ui .wa-settings-panel details.wa-ig-setup > summary,
+.workspace-ui .wa-settings-panel details.wa-ig-meta > summary,
+.workspace-ui .wa-settings-panel details.wa-ai-advanced > summary,
+.workspace-ui .wa-settings-panel details.wa-production-history > summary {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.workspace-ui details.wa-advanced > summary {
+  padding: 6px 2px;
+}
+.workspace-ui .wa-settings-panel table th,
+.workspace-ui .wa-ai-table th {
+  font-family: var(--wa-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.workspace-ui .wa-segmented button {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.workspace-ui .wa-switch[aria-checked='true'] {
+  background: var(--text);
+}
+html:not([data-theme='dark']) .workspace-ui .wa-account-bar {
+  background: #fff;
+  border: 1px solid var(--line);
+}
+.workspace-ui .wa-account-info small,
+.workspace-ui .wa-app-version {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+}
+html:not([data-theme='dark']) .workspace-ui .wa-orchestra {
+  border-radius: 8px;
+}
+
+/* Produksi: aturan = blok bergaris tipis tanpa warna latar; pre-order aktif ditandai garis kiri. */
+html:not([data-theme='dark']) .workspace-ui .wa-production-rule,
+html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
+  background: transparent;
+  border-radius: 8px;
+  border-color: var(--line);
+}
+.workspace-ui .wa-production-rules {
+  margin: 8px 0;
+  gap: 10px;
+}
+.workspace-ui .wa-production-rule h3 {
+  font-weight: 500;
+}
+.workspace-ui .wa-skill-empty {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }

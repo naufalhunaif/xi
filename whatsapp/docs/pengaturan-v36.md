@@ -122,3 +122,11 @@ Perubahan v3.6.6:
 - Momen kosong "Pilih kontak": ikon gelombang kawat 3D + label monospace (`.wa-empty-moment`), dirender di SSR (`dashboard.edge`) dan di `app.js` saat daftar pesan kosong (`window.waWire.mount`).
 - `public/assets/wire_icon.js` menggantikan `auth_wire.js`: dipasang ke setiap `svg.wire-icon` (login & chat), `data-wire-host` menentukan area hover. Ikon kawat hanya untuk momen (login, kosong), bukan di tiap kartu.
 - Bersinggungan: warna hijau pada tab filter/badge/akun tidak dipakai lagi di mode terang — skrip yang mengandalkan kelas tetap jalan, hanya tampilannya berubah. `theme.css` aturan warna per filter (`[data-inbox-filter="cs"] span`) tetap berlaku untuk angka. Halaman lain ikut berubah latar & radius; pemeriksaan tampilan tiap halaman dilanjutkan di versi berikut (Koneksi → Toko → Cara AI membalas → Aplikasi & data → Beta3/Instagram).
+
+## v3.6.8 — Pengaturan gaya Wireframe (Koneksi, Toko, Cara AI membalas, Aplikasi & data)
+
+- Panel luar `.wa-settings-panel` transparan (tanpa kartu besar); tiap `section[data-settings-panel]` jadi kartu putih radius 8 (di Pemakaian tetap polos karena isinya sudah ubin). Kartu di dalam bagian (`.wa-card`, `details.wa-card`, kartu koneksi) diratakan — tanpa garis & latar — dan dipisah garis tipis antar kartu/baris sakelar.
+- Judul bagian (`.wa-settings-section-title`), label isian, ringkasan `details`, kepala tabel, pil status, tombol segmented: monospace huruf besar kecil. Judul halaman & judul tampilan tipis (weight 500, 21px). Sakelar aktif hitam-teks (mode terang).
+- Isian: radius 6, garis tipis, fokus = outline 1px hitam; font isian dipaksa sans (`--wa-sans`) karena label monospace (selektor berspesifisitas sama dengan `forms.css`).
+- Produksi: blok aturan tanpa warna latar; teks "belum ada" monospace.
+- Bersinggungan: `calm.css` aturan "Koneksi tanpa judul bagian" tetap; skrip yang membaca kelas tidak terpengaruh. `details > summary` khusus (#skillCard, #backupSetup, wa-ig-setup, wa-ai-advanced, wa-production-history) ditimpa dengan selektor berspesifisitas lebih tinggi di `wire.css`. Halaman Order/Beta 3/Instagram/Kontak baru menerima token dasar (latar, radius); penataan khususnya menyusul.
