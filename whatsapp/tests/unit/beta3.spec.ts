@@ -947,3 +947,32 @@ test.group('beta3 · perapian jawaban oleh sistem (v3.5.4)', () => {
     assert.deepEqual(tidyReply(['Ada kak'], { address: 'kak' }), ['Ada kak'])
   })
 })
+
+test.group('beta3 · daftar mudah dibaca (v3.5.5)', () => {
+  test('pilihan jadi daftar berpoin, satu baris kosong sesudah daftar', async ({ assert }) => {
+    const { tidyReply } = await import('#beta3/reply_tidy')
+    const { tidyLists } = await import('#beta3/list_tidy')
+    const listed = tidyLists('Ini pilihan jas hitamnya bos, Basic Suit, Tuxedo, dan Peak Suit masing-masing 485.000. Yang cocok yang mana bos?')
+    assert.deepEqual(tidyReply([listed]), [
+      'Ini pilihan jas hitamnya bos, masing-masing 485.000:\n- Basic Suit\n- Tuxedo\n- Peak Suit\n\nYang cocok yang mana?',
+    ])
+    // Poin "*" / "•" dari model diseragamkan; daftar langsung disambung kalimat → diberi baris kosong.
+    assert.deepEqual(tidyReply(['Warna ready:\n* Black\n• Navy\nMau yang mana bos?']), [
+      'Warna ready:\n- Black\n- Navy\n\nMau yang mana bos?',
+    ])
+    assert.deepEqual(tidyReply(['ukuran size L seperti ini bos\nLingkar dada 104 cm\nPanjang 72 cm']), [
+      'ukuran size L seperti ini bos\n- Lingkar dada 104 cm\n- Panjang 72 cm',
+    ])
+  })
+
+  test('kalimat biasa, daftar bernomor, ongkir satu layanan, dan form tidak diberi poin', async ({ assert }) => {
+    const { tidyReply } = await import('#beta3/reply_tidy')
+    assert.deepEqual(tidyReply(['Siap bos\nnanti saya kabari ya']), ['Siap bos\nnanti saya kabari ya'])
+    assert.deepEqual(tidyReply(['Caranya:\n1. Isi form\n2. Transfer']), ['Caranya:\n1. Isi form\n2. Transfer'])
+    assert.deepEqual(tidyReply(['Untuk pengiriman ke Ngawi ongkirnya 20.000, estimasi 2-3 hari']), [
+      'Untuk pengiriman ke Ngawi ongkirnya 20.000, estimasi 2-3 hari',
+    ])
+    const form = 'Bisa di bantu isi order formatnya bos\n\nNama :\nAlamat lengkap :\nKecamatan :'
+    assert.deepEqual(tidyReply([form]), [form])
+  })
+})

@@ -84,6 +84,43 @@ export function bubblesFromText(text: string): string[] | null {
   return parts.length > 2 ? [parts[0], parts.slice(1).join('\n')] : parts
 }
 
+const BULLET = /^\s*(?:[-*•●▪·])\s+/
+const NUMBERED = /^\s*\d+[.)]\s+/
+const INTRO = /(?::|\b(?:seperti ini|berikut\w*)(?:\s+(?:ya\s+)?(?:bos|kak))?[.!]?)\s*$/i
+
+/**
+ * Daftar mudah dibaca: setiap pilihan satu baris berawalan "- " (tampil sebagai daftar di WhatsApp),
+ * dan satu baris kosong sesudah daftar sebelum kalimat berikutnya.
+ * Daftar = minimal 2 baris pendek berurutan sesudah baris pembuka ("…:" / "seperti ini") atau yang
+ * sudah berpoin. Daftar bernomor dibiarkan.
+ */
+export function bulletLists(text: string) {
+  const lines = text.split('\n').map((line) => line.replace(/\s+$/, ''))
+  const itemLike = (line: string) =>
+    Boolean(line.trim()) && line.trim().length <= 80 && !line.trim().endsWith('?') && !INTRO.test(line.trim())
+  const out: string[] = []
+  let index = 0
+  while (index < lines.length) {
+    const line = lines[index]
+    const startsList =
+      BULLET.test(line) || (index > 0 && INTRO.test(lines[index - 1].trim()) && !NUMBERED.test(line))
+    if (startsList && itemLike(line)) {
+      let end = index
+      while (end + 1 < lines.length && itemLike(lines[end + 1]) && !NUMBERED.test(lines[end + 1])) end++
+      const block = lines.slice(index, end + 1)
+      if (block.length >= 2 || BULLET.test(line)) {
+        out.push(...block.map((item) => `- ${item.replace(BULLET, '').trim()}`))
+        if (end + 1 < lines.length && lines[end + 1].trim()) out.push('')
+        index = end + 1
+        continue
+      }
+    }
+    out.push(line)
+    index++
+  }
+  return out.join('\n')
+}
+
 const ADDRESS = /\b(?:bapak\s*\/\s*ibu|bpk\s*\/\s*ibu|kakak|kak|anda|kamu|bapak|ibu|sis|gan|mas|mbak)\b/gi
 const FORMAL_OPENERS = [
   /^(?:terima\s*kasih|makasih)\s+(?:telah|sudah)\s+menghubungi[^.!?\n]*[.!?]?\s*/i,
@@ -110,7 +147,6 @@ export function tidyReply(pesan: string[], options: { address?: string; verbatim
       text = text
         .replace(/\*\*(.+?)\*\*/g, '*$1*')
         .replace(/^#{1,6}\s+/gm, '')
-        .replace(/^\s*[•●▪]\s*/gm, '- ')
         .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️‍]/gu, '')
       for (const pattern of FORMAL_OPENERS) text = text.replace(pattern, '')
       if (address === 'bos')
@@ -138,7 +174,7 @@ export function tidyReply(pesan: string[], options: { address?: string; verbatim
         .trim()
       // "oke,siap" → "oke, siap" (bukan angka "1,5" dan bukan link).
       if (!/https?:\/\/|www\./i.test(text)) text = text.replace(/([A-Za-z]),(?=[A-Za-z])/g, '$1, ')
-      text = text
+      text = bulletLists(text)
         .replace(/[ \t]{2,}/g, ' ')
         .replace(/\n{3,}/g, '\n\n')
         .trim()
