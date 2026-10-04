@@ -301,3 +301,20 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 3. Susulan dijadwalkan setiap kali AI menulisnya (kecuali selesai/serah CS), termasuk saat pelanggan masih tanya-tanya.
 4. Semua ulasan diputar ulang otomatis di `tests/unit/review_chats.spec.ts` supaya perbaikan baru tidak merusak ulasan lama.
 
+## #12 · Okt 2026 · model murah dipakai hampir terus (diterapkan v3.5.14)
+
+**Laporan pemilik**
+- Token Jev ±2.700 per giliran; prompt Claude 12–15 ribu (kadang 21 ribu).
+- Balasan hampir selalu memakai model murah, bukan sesuai kapasitas yang diputuskan Jev.
+
+**Penyebab**
+- Skor Jev dimulai dari 0 (tiga tingkat = 0 … 2). Sistem membacanya mulai 1, jadi "Biasa" terbaca
+  "Sederhana" (model ringan) dan "Rumit" terbaca "Biasa" (standar). Model berat tidak pernah dipilih.
+- Skor urgensi juga bergeser satu tingkat: "Mendesak" tidak memunculkan badge "Penting".
+
+**Pelajaran**
+1. Skor Jev selalu lewat `scoreLevel` (0 → tingkat 1), jangan dibulatkan langsung.
+2. Model ringan hanya untuk salam/tanda terima dan pertanyaan sederhana tanpa ongkir, catatan sistem, custom, atau pembayaran.
+3. Trace balasan menampilkan "Tingkat model: … · alasan" supaya pilihan model bisa dicek.
+4. Jev cukup 6 baris percakapan terakhir; data lain hanya dikirim bila pertanyaannya ditanyakan.
+

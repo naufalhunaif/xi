@@ -36,7 +36,7 @@ Jev (TypeSafe AI, `app/beta3/jev.ts` + `jev_decisions.ts`) menjawab keputusan ke
 | `komentar_ig` | Komentar Instagram perlu dijawab | `isQuestionComment` |
 | `tanggapan` (v3.5.11) | "oke/siap" yang cukup tanda terima → tidak dibalas, AI tidak dipanggil (0 token) | AI menilai sendiri |
 | `topik` (v3.5.11) | Ongkir/ukuran/bayar/custom/warna → bagian skill & data yang dikirim | Pola kata `token_saver` |
-| `kesulitan` (v3.5.11) | Model ringan/standar/berat (mode "Otomatis") | `autoTier` |
+| `kesulitan` (v3.5.11) | Model ringan/standar/berat (mode "Otomatis") lewat `model_tier.ts`: sederhana → ringan (standar bila ada ongkir/catatan sistem/custom/bayar), biasa → standar, rumit/komplain → berat; alasan di trace "Tingkat model" | `autoTier` |
 | `tujuan_baru` (v3.5.11) | Lanjutan obrolan ongkir: nama tempat baru atau bukan ("reg aja") | Daftar kata `NOT_A_PLACE` |
 | `sudah_tf` (v3.5.11) | "Sudah tf" tanpa foto → tahap bukti_dikirim, masuk filter Pembayaran | AI menilai sendiri |
 | `dana_masuk` (v3.5.11) | Pemeriksa kedua sebelum order ditandai lunas dari chat (AI & Jev harus sama) | AI saja |
@@ -45,6 +45,7 @@ Jev (TypeSafe AI, `app/beta3/jev.ts` + `jev_decisions.ts`) menjawab keputusan ke
 | `harga_konteks` (v3.5.12) | Seri (reguler/signature/premium) & barang yang ditanya → angka dari POLA HARGA + pemeriksa harga sesuai konteks (`price_pattern.ts`) | Seri terakhir yang disebut di chat |
 | `warna_gambar` (v3.5.8) | Warna produk di gambar pelanggan dari hasil ukur piksel (`app/beta3/image_color.ts`) vs foto katalog | Warna terdekat bila selisihnya jelas, selain itu kandidat ke AI |
 
+Skor Jev dimulai dari 0 (tiga tingkat = 0 … 2); selalu dibaca lewat `scoreLevel` (v3.5.14).
 Batas waktu 800 ms per panggilan; ambang yakin per keputusan di `JEV_THRESHOLD`. Setiap keputusan
 dicatat; pemilik menandai yang salah di Pengaturan → Jev (Akurasi 30 hari) dan bisa mematikan
 keputusan satu per satu.

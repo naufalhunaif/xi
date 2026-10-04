@@ -6,6 +6,7 @@ import {
   jevOn,
   logDecision,
   maskPii,
+  scoreLevel,
   type JevAnswer,
   type JevQuestion,
 } from '#beta3/jev'
@@ -13,13 +14,13 @@ import {
 type Line = { direction: string; body?: string | null; mediaType?: string | null }
 
 /** Percakapan terakhir sebagai baris "Pelanggan: …" / "Toko: …", disamarkan. */
-export function conversationLines(rows: Line[], limit = 10) {
+export function conversationLines(rows: Line[], limit = 10, chars = 500) {
   return rows
     .slice(-limit)
     .map((row) => {
       const text = String(row.body || '').trim() || (row.mediaType ? `[${row.mediaType}]` : '')
       return text
-        ? `${row.direction === 'in' ? 'Pelanggan' : 'Toko'}: ${maskPii(text).slice(0, 500)}`
+        ? `${row.direction === 'in' ? 'Pelanggan' : 'Toko'}: ${maskPii(text).slice(0, chars)}`
         : ''
     })
     .filter(Boolean)
@@ -182,9 +183,9 @@ export async function understandTurn(input: {
       type: 'score',
       instructions: 'Seberapa sulit membalas pesan_terbaru dengan benar?',
       criteria: [
-        'Sederhana: sapaan, ya/tidak, satu pertanyaan stok/harga/foto yang jelas',
-        'Biasa: beberapa pertanyaan, saran size, ongkir, langkah order',
-        'Rumit: komplain, custom, negosiasi, banyak syarat, atau perlu menimbang riwayat panjang',
+        'Sederhana: salam, terima kasih, oke/ya/tidak, atau satu pertanyaan stok/foto/harga satu produk yang jawabannya langsung ada di katalog',
+        'Biasa: beberapa pertanyaan, membandingkan model/seri, saran size, ongkir, langkah order, atau perlu melihat percakapan sebelumnya',
+        'Rumit: komplain, custom, negosiasi, banyak syarat, pembayaran bermasalah, atau perlu menimbang riwayat panjang',
       ],
     }
   if (on.sudah_tf)
@@ -240,13 +241,18 @@ export async function understandTurn(input: {
   if (!Object.keys(questions).length) return {}
   const answers = await askJev(
     'pahami',
+    // Hemat token Jev: 6 baris terakhir (300 huruf), data lain hanya bila pertanyaannya ditanyakan.
     {
-      pesan_terbaru: maskPii(input.text).slice(0, 2000),
-      percakapan: conversationLines(input.history),
-      layanan_tersedia: input.services,
-      pesan_toko_terakhir: maskPii(
-        String([...input.history].reverse().find((row) => row.direction === 'out')?.body || '')
-      ).slice(0, 600),
+      pesan_terbaru: maskPii(input.text).slice(0, 1200),
+      percakapan: conversationLines(input.history, 6, 300),
+      ...(on.layanan ? { layanan_tersedia: input.services } : {}),
+      ...(on.tanggapan || on.setuju
+        ? {
+            pesan_toko_terakhir: maskPii(
+              String([...input.history].reverse().find((row) => row.direction === 'out')?.body || '')
+            ).slice(0, 400),
+          }
+        : {}),
     },
     questions
   )
@@ -286,7 +292,7 @@ export async function understandTurn(input: {
   if (Object.keys(topics).length) result.topics = topics
   if (answers.kesulitan && answers.kesulitan.type === 'score') {
     const sure = confident('kesulitan', answers.kesulitan)
-    if (sure) result.difficulty = Math.min(3, Math.max(1, Math.round(answers.kesulitan.score)))
+    if (sure) result.difficulty = scoreLevel(answers.kesulitan, 3)
     await logDecision({ jid: input.jid, decision: 'kesulitan', answer: answers.kesulitan, used: sure })
   }
   await take('sudah_tf', () => (result.paidClaim = yes(answers.sudah_tf)))
@@ -304,7 +310,7 @@ export async function understandTurn(input: {
   }
   if (answers.urgensi && answers.urgensi.type === 'score') {
     const sure = confident('urgensi', answers.urgensi)
-    if (sure) result.urgency = Math.min(5, Math.max(1, Math.round(answers.urgensi.score)))
+    if (sure) result.urgency = scoreLevel(answers.urgensi, 5)
     await logDecision({ jid: input.jid, decision: 'urgensi', answer: answers.urgensi, used: sure })
   }
   return result
@@ -393,7 +399,7 @@ export async function answeredByStore(jid: string, customer: string[], store: st
   if (!answer || answer.type !== 'score') return undefined
   const sure = confident('terjawab', answer)
   await logDecision({ jid, decision: 'terjawab', answer, used: sure })
-  return sure ? Math.round(answer.score) >= 2 : undefined
+  return sure ? scoreLevel(answer, 3) === 3 : undefined
 }
 
 /** Warna katalog yang dimaksud pelanggan untuk satu produk. null = bukan warna katalog (custom). */

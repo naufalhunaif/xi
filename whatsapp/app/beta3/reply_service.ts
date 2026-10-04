@@ -31,7 +31,8 @@ import {
   type LeanDecision,
   type LeanHistoryRow,
 } from '#beta3/prompt'
-import { runLeanProvider, type AutoTier, type LeanProviderSettings } from '#beta3/provider'
+import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
+import { chooseReplyTier, TIER_LABEL } from '#beta3/model_tier'
 import { normalizeStyle, storeStyle, styleGuide } from '#beta3/style_service'
 import {
   callLeanTool,
@@ -1111,17 +1112,22 @@ export async function createLeanReply(input: {
     detail: { ...prompt.size, skillName: skill.name, catalogRows: digest.rows.length },
   })
 
+  // Tingkat model dari Jev (sederhana → ringan, biasa → standar, rumit → berat); alasan tampil di trace.
+  const tierChoice = chooseReplyTier(understanding, {
+    imageCount: input.imagePaths?.length || 0,
+    systemNote,
+    toolNotes: toolNotes.length,
+  })
+  onTrace?.({
+    key: 'beta3-tier',
+    label: `Tingkat model: ${tierChoice.tier ? TIER_LABEL[tierChoice.tier] : 'otomatis'} · ${tierChoice.reason}`,
+    status: 'completed',
+    detail: { ...tierChoice, difficulty: understanding.difficulty ?? null },
+  })
   onTrace?.({ key: 'beta3-ai', label: 'Menyusun balasan · tanpa tool', status: 'running' })
   const result = await runLeanProvider(settings, prompt, input.imagePaths || [], undefined, undefined, {
     jid,
-    // Tingkat model dari Jev: salam/pertanyaan sederhana → ringan, rumit → berat. Ada gambar → aturan lama.
-    ...(input.imagePaths?.length
-      ? {}
-      : understanding.intent === 'sapaan' && !systemNote
-        ? { tier: 'light' as const }
-        : understanding.difficulty
-          ? { tier: (understanding.difficulty === 1 && !systemNote ? 'light' : understanding.difficulty === 3 ? 'heavy' : 'standard') as AutoTier }
-          : {}),
+    ...(tierChoice.tier ? { tier: tierChoice.tier } : {}),
   })
   let decision: LeanDecision
   try {

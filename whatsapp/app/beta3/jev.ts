@@ -201,11 +201,19 @@ export function answerConfidence(answer: JevAnswer | undefined | null) {
     : Number(answer.confidence) || 0
 }
 
+/**
+ * Skor Jev dimulai dari 0 (tiga tingkat → 0 … 2, bisa di antara dua tingkat). Diubah ke tingkat
+ * 1 … n sesuai urutan kriteria: tingkat 1 = kriteria pertama.
+ */
+export function scoreLevel(answer: { score: number }, levels: number) {
+  return Math.min(levels, Math.max(1, Math.round(Number(answer.score) || 0) + 1))
+}
+
 export function answerText(answer: JevAnswer | undefined | null) {
   if (!answer) return ''
   if (answer.type === 'noul') return answer.noul >= 0.5 ? 'ya' : 'tidak'
   if (answer.type === 'choice') return answer.choice
-  return String(Math.round(answer.score))
+  return `tingkat ${scoreLevel(answer, 10)}`
 }
 
 /**

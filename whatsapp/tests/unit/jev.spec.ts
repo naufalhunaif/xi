@@ -11,6 +11,7 @@ import {
   readJevConfig,
   resetJevCache,
   saveJevConfig,
+  scoreLevel,
   setJevFetcher,
 } from '#beta3/jev'
 import {
@@ -126,10 +127,10 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
         topik_ongkir: { type: 'noul', noul: 0.04 },
         topik_ukuran: { type: 'noul', noul: 0.97 },
         topik_bayar: { type: 'noul', noul: 0.5 },
-        kesulitan: { type: 'score', score: 1.1, confidence: 0.9 },
+        kesulitan: { type: 'score', score: 0.1, confidence: 0.9 },
         sudah_tf: { type: 'noul', noul: 0.96 },
         lanjut: { type: 'choice', choice: 'tunda', probabilities: {}, confidence: 0.95 },
-        urgensi: { type: 'score', score: 4.6, confidence: 0.8 },
+        urgensi: { type: 'score', score: 3.8, confidence: 0.8 },
       })
     )
     const result = await understandTurn({
@@ -146,6 +147,49 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
     assert.isTrue(result.paidClaim)
     assert.equal(result.follow, 'tunda')
     assert.equal(result.urgency, 5)
+  })
+
+  test('skor Jev mulai 0: tiga tingkat 0…2 → tingkat 1…3 (v3.5.14)', async ({ assert }) => {
+    // Sebelumnya skor 1 ("Biasa") dibaca tingkat 1 → model ringan; skor 2 ("Rumit") → standar.
+    assert.equal(scoreLevel({ score: 0 }, 3), 1)
+    assert.equal(scoreLevel({ score: 0.4 }, 3), 1)
+    assert.equal(scoreLevel({ score: 1 }, 3), 2)
+    assert.equal(scoreLevel({ score: 1.43 }, 3), 2)
+    assert.equal(scoreLevel({ score: 2 }, 3), 3)
+    assert.equal(scoreLevel({ score: 3 }, 5), 4)
+    assert.equal(scoreLevel({ score: 9 }, 5), 5)
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    let sent: any = null
+    setJevFetcher((async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body))
+      return new Response(
+        JSON.stringify({
+          answers: {
+            kesulitan: { type: 'score', score: 1.02, confidence: 0.9 },
+            urgensi: { type: 'score', score: 3.1, confidence: 0.9 },
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    }) as unknown as typeof fetch)
+    const history = Array.from({ length: 12 }, (_, index) => ({
+      direction: index % 2 ? 'out' : 'in',
+      body: `baris ${index} ${'x'.repeat(600)}`,
+    }))
+    const result = await understandTurn({
+      jid: 'jevtest@s.whatsapp.net',
+      text: 'Bedanya premium sama signature apa ya, terus ongkir ke bandung berapa?',
+      history,
+      services: ['reg'],
+      offerPending: false,
+    })
+    assert.equal(result.difficulty, 2)
+    assert.equal(result.urgency, 4)
+    // Hemat token: 6 baris × 300 huruf, tanpa data yang tidak ditanyakan.
+    assert.lengthOf(sent.state.percakapan, 6)
+    assert.isAtMost(Math.max(...sent.state.percakapan.map((line: string) => line.length)), 320)
+    assert.notProperty(sent.state, 'layanan_tersedia')
+    assert.notProperty(sent.state, 'pesan_toko_terakhir')
   })
 
   test('seri & barang yang ditanya harganya (v3.5.12)', async ({ assert }) => {

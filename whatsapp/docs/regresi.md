@@ -53,6 +53,8 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | "Seperti apa?" + foto → pengantar "Ini fotonya bos" (+ harga sekali), nama produk/warna cukup di caption foto | `review_chats.spec` · #7, #11 |
 | Pemeriksa harga tidak mengubah daftar harga (≥ 2 baris) dan angka yang memang harga produk yang disebut ("Basic Suit 485.000" di konteks premium) | `review_chats.spec` · #10 |
 | Susulan tetap terjadwal bila AI menulisnya walau tahap "lain"; tahap mirip ("tanya_harga") dipetakan; "oke" tanda terima tidak menghapus susulan yang sudah direncanakan | `review_chats.spec` · #11 |
+| Tingkat model mengikuti Jev: skor Jev mulai 0 (`scoreLevel`), sederhana → ringan, biasa → standar, rumit/komplain → berat; sederhana + ongkir/catatan sistem/custom/bayar → standar; alasan tampil di trace "Tingkat model" | `review_chats.spec` · #12, `jev.spec` · skor Jev mulai 0 |
+| Jev hemat token: percakapan 6 baris × 300 huruf; layanan & pesan toko terakhir hanya bila ditanyakan | `jev.spec` · skor Jev mulai 0 |
 | Kebijakan tukar size dari Pengaturan masuk prompt dan dikirim apa adanya | `beta3.spec` · pelajaran chat CS |
 | Pertanyaan yang baru ditanyakan tidak diulang | `beta3.spec` · form order |
 | Prompt lengkap tetap di bawah 10 ribu token | `beta3.spec` · prompt dan keluaran |

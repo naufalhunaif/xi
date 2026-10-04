@@ -9,6 +9,8 @@ import { keepCustomInChat, CUSTOM_REPLY } from '#beta3/reply_guards'
 import { normalizeStage, type LeanDecision } from '#beta3/prompt'
 import { goalStatus } from '#beta3/reply_service'
 import { extractShippingQuery, etdText } from '#beta3/mcp'
+import { chooseReplyTier } from '#beta3/model_tier'
+import { scoreLevel } from '#beta3/jev'
 import type { LeanCatalogRow } from '#beta3/catalog_service'
 
 let id = 0
@@ -140,5 +142,26 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.equal(goalStatus(decision('lain', '')), 'completed')
     assert.equal(goalStatus(decision('selesai', 'ada lagi?')), 'completed')
     assert.equal(goalStatus({ ...decision('tanya_model', 'x'), serah_cs: true }), 'paused')
+  })
+
+  test('#12 model mengikuti keputusan Jev: biasa → standar, rumit → berat, ringan hanya untuk yang sederhana', ({ assert }) => {
+    const base = { imageCount: 0, systemNote: '', toolNotes: 0 }
+    // Jev menjawab skor mulai 0; "Biasa" (skor 1) dulu terbaca tingkat 1 → model murah.
+    const tier = (score: number, extra: Partial<typeof base> = {}, more = {}) =>
+      chooseReplyTier({ difficulty: scoreLevel({ score }, 3), ...more }, { ...base, ...extra }).tier
+    assert.equal(tier(1), 'standard')
+    assert.equal(tier(1.4), 'standard')
+    assert.equal(tier(2), 'heavy')
+    assert.equal(tier(0.2), 'light')
+    // Sederhana tapi ada ongkir/catatan sistem atau topik custom/bayar → standar.
+    assert.equal(tier(0, { toolNotes: 1 }), 'standard')
+    assert.equal(tier(0, { systemNote: '\n\nCATATAN SISTEM: x' }), 'standard')
+    assert.equal(tier(0, {}, { topics: { custom: true } }), 'standard')
+    // Salam / tanda terima → ringan; komplain → berat; gambar → aturan lama.
+    assert.equal(chooseReplyTier({ intent: 'sapaan' }, base).tier, 'light')
+    assert.equal(chooseReplyTier({ reaction: 'terima', difficulty: 2 }, base).tier, 'light')
+    assert.equal(chooseReplyTier({ csReason: 'komplain', difficulty: 1 }, base).tier, 'heavy')
+    assert.isUndefined(chooseReplyTier({ difficulty: 1 }, { ...base, imageCount: 1 }).tier)
+    assert.isUndefined(chooseReplyTier({}, base).tier)
   })
 })
