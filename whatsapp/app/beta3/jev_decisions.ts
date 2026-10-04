@@ -306,3 +306,46 @@ export async function commentNeedsReply(jid: string, comment: string, caption: s
   if (!sure) return undefined
   return ['calon_pembeli', 'pertanyaan'].includes(answer.choice)
 }
+
+/**
+ * Warna katalog untuk produk di gambar pelanggan. Jev menimbang hasil ukur piksel (selisih ke
+ * tiap warna katalog) dan kata-kata pelanggan. null = bukan warna katalog; undefined = tidak tahu.
+ */
+export async function chooseImageColor(input: {
+  jid: string
+  image: number
+  measured: string
+  candidates: Array<{ color: string; distance: number; products: string[] }>
+  text: string
+  history: Line[]
+}) {
+  if (input.candidates.length < 2 || !(await jevOn('warna_gambar'))) return undefined
+  const criteria: Record<string, string> = {}
+  for (const candidate of input.candidates)
+    criteria[candidate.color] = `Produk di gambar berwarna ${candidate.color} (selisih ukur ${candidate.distance}; contoh: ${candidate.products.join(', ')})`
+  criteria.lain = 'Bukan foto pakaian, atau warnanya tidak cocok dengan pilihan mana pun'
+  const answers = await askJev(
+    'warna-gambar',
+    {
+      hasil_ukur_piksel: `Gambar ${input.image}: ${input.measured}`,
+      kandidat: input.candidates.map((c) => `${c.color} — selisih ${c.distance} (makin kecil makin mirip)`),
+      pesan_pelanggan: maskPii(input.text).slice(0, 600),
+      percakapan: conversationLines(input.history, 8),
+      catatan:
+        'Selisih ukur dihitung dari warna badan pakaian di foto vs foto katalog; selisih < 5 hampir sama. Putih bersih ≠ broken white (kekuningan tipis) ≠ krem. Kata pelanggan ("putih tulang", "gading") ikut menentukan.',
+    },
+    {
+      warna_gambar: {
+        type: 'choice',
+        instructions: 'Warna katalog mana yang paling tepat untuk produk di gambar pelanggan?',
+        criteria,
+      },
+    }
+  )
+  const answer = answers?.warna_gambar
+  if (!answer || answer.type !== 'choice') return undefined
+  const sure = confident('warna_gambar', answer)
+  await logDecision({ jid: input.jid, decision: 'warna_gambar', answer, used: sure, detail: input.measured })
+  if (!sure) return undefined
+  return answer.choice === 'lain' ? null : answer.choice
+}

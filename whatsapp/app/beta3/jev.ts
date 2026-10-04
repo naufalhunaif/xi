@@ -23,6 +23,7 @@ export const JEV_DECISIONS = {
   maksud: 'Maksud pesan (pilih model)',
   serah_cs: 'Perlu diserahkan ke CS',
   komentar_ig: 'Komentar Instagram',
+  warna_gambar: 'Warna produk di gambar pelanggan',
 } as const
 export type JevDecision = keyof typeof JEV_DECISIONS
 
@@ -38,6 +39,7 @@ export const JEV_THRESHOLD: Record<JevDecision, number> = {
   maksud: 0.8,
   serah_cs: 0.85,
   komentar_ig: 0.9,
+  warna_gambar: 0.8,
 }
 
 export type JevNoul = {

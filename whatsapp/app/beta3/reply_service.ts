@@ -60,6 +60,7 @@ import { tidyLists } from '#beta3/list_tidy'
 import { keepCustomInChat, questionAfterPhotos } from '#beta3/reply_guards'
 import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
+import { imageColorNote } from '#beta3/image_color'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -588,6 +589,25 @@ export async function createLeanReply(input: {
   } else if (asksSize) {
     // Pertanyaan size/celana beberapa pesan setelah TB/BB: ulangi rekomendasi yang sama (3 jam).
     if (lastFit?.note && Date.now() - lastFit.at < 3 * 60 * 60_000) toolNotes.push(lastFit.note)
+  }
+  // Warna produk di gambar pelanggan diukur dari piksel (+ Jev), bukan ditebak mata model.
+  if (input.imagePaths?.length) {
+    const colorNote = await imageColorNote({
+      jid,
+      paths: input.imagePaths,
+      rows: digest.rows,
+      text: input.text,
+      history: rows,
+    }).catch(() => null)
+    if (colorNote?.note) {
+      toolNotes.push(colorNote.note)
+      onTrace?.({
+        key: 'beta3-image-color',
+        label: `Warna gambar diukur · ${colorNote.detail.map((item) => item.pick || item.shade).join(', ')}`,
+        status: 'completed',
+        detail: colorNote.detail,
+      })
+    }
   }
   // Ukuran badan (pinggang/dada/…) dibandingkan dengan SIZE CHART oleh kode.
   const sizeCharts = await readLeanState('size_charts')

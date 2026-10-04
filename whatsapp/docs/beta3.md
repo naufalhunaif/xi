@@ -34,6 +34,7 @@ Jev (TypeSafe AI, `app/beta3/jev.ts` + `jev_decisions.ts`) menjawab keputusan ke
 | `varian` | Warna katalog di spesifikasi | `fixCatalogColors` |
 | `terjawab` | Jawaban setelah CS: lewati bila semua sudah dijawab | AI menilai sendiri |
 | `komentar_ig` | Komentar Instagram perlu dijawab | `isQuestionComment` |
+| `warna_gambar` (v3.5.8) | Warna produk di gambar pelanggan dari hasil ukur piksel (`app/beta3/image_color.ts`) vs foto katalog | Warna terdekat bila selisihnya jelas, selain itu kandidat ke AI |
 
 Batas waktu 800 ms per panggilan; ambang yakin per keputusan di `JEV_THRESHOLD`. Setiap keputusan
 dicatat; pemilik menandai yang salah di Pengaturan → Jev (Akurasi 30 hari) dan bisa mematikan

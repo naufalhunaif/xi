@@ -1074,3 +1074,41 @@ test.group('beta3 · review chat ongkir cinyawang (v3.5.7)', () => {
     assert.deepEqual(loose, { district: '', regency: '', postalCode: '53264' })
   })
 })
+
+test.group('beta3 · warna dari piksel (v3.5.8)', () => {
+  test('putih bersih, broken white, dan krem dibedakan dari angka warna', async ({ assert }) => {
+    const { rgbToLab, describeLab, colorDistance } = await import('#beta3/image_color')
+    assert.match(describeLab(rgbToLab(250, 250, 250)), /putih bersih/)
+    assert.match(describeLab(rgbToLab(240, 234, 220)), /broken white/)
+    assert.match(describeLab(rgbToLab(238, 224, 196)), /krem/)
+    // Broken white lebih dekat ke broken white katalog daripada ke white katalog.
+    const photo = rgbToLab(239, 233, 219)
+    assert.isBelow(colorDistance(photo, rgbToLab(241, 235, 221)), colorDistance(photo, rgbToLab(248, 248, 248)))
+  })
+
+  test('foto diukur dari badan pakaian; kandidat per nama warna', async ({ assert }) => {
+    const sharp = (await import('sharp')).default
+    const { measureImage, describeLab, nearestCatalogColors, rgbToLab } = await import('#beta3/image_color')
+    const image = await sharp({ create: { width: 120, height: 160, channels: 3, background: { r: 240, g: 234, b: 220 } } })
+      .png()
+      .toBuffer()
+    const lab = (await measureImage(image))!
+    assert.match(describeLab(lab), /broken white/)
+    const colors = {
+      'https://x.test/w.jpg': rgbToLab(248, 248, 248),
+      'https://x.test/bw.jpg': rgbToLab(241, 235, 221),
+      'https://x.test/bw2.jpg': rgbToLab(242, 236, 222),
+      'https://x.test/c.jpg': rgbToLab(236, 222, 190),
+    }
+    const rows = [
+      row({ id: 1, product: 'Tuxedo', color: 'White', photoUrl: 'https://x.test/w.jpg' }),
+      row({ id: 2, product: 'Tuxedo Signature', color: 'Broken White', photoUrl: 'https://x.test/bw.jpg' }),
+      row({ id: 3, product: 'Basic Suit Signature', color: 'Broken White', photoUrl: 'https://x.test/bw2.jpg' }),
+      row({ id: 4, product: 'Beskap', color: 'Cream', photoUrl: 'https://x.test/c.jpg' }),
+    ]
+    const near = nearestCatalogColors(lab, rows, colors)
+    assert.equal(near[0].color, 'Broken White')
+    assert.sameMembers(near[0].products, ['Tuxedo Signature', 'Basic Suit Signature'])
+    assert.equal(near.length, 3)
+  })
+})

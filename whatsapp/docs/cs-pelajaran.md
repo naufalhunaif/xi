@@ -259,3 +259,14 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. Jawaban memilih layanan (REG/YES) bukan alamat baru — lanjut minta data pengiriman.
 3. Alamat tanpa label tetap dipakai: tujuan yang sudah dicek di chat, atau dicari dari kode pos, lalu total + rekening dikirim.
 
+---
+
+## #9 · 5 Okt 2026 · foto produk broken white dikenali "White" (diterapkan v3.5.8)
+
+**Masalah:** pelanggan mengirim foto produk broken white, AI menyebutnya White.
+
+**Pelajaran**
+1. Warna putih bersih, broken white, dan krem tidak bisa diandalkan dari mata model. Sistem mengukur warna badan pakaian dari piksel dan membandingkannya dengan foto katalog.
+2. Jev memilih warna katalog dari hasil ukur + kata pelanggan; bila ragu, warna terdekat yang selisihnya jelas; selain itu AI diberi kandidatnya.
+3. Harga mengikuti produk yang benar-benar punya warna itu (mis. Broken White di seri Signature).
+

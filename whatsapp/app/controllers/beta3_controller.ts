@@ -69,6 +69,7 @@ import {
   syncLeanCatalog,
 } from '#beta3/mcp'
 import { describeCatalogPhotos } from '#beta3/catalog_vision'
+import { measureCatalogColors } from '#beta3/image_color'
 import { attachOrderPhotos } from '#beta3/order_photos'
 import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '#beta3/weights'
 import env from '#start/env'
@@ -109,6 +110,7 @@ export default class Beta3Controller {
         return response.badRequest({ error: 'Sumber data belum dipilih (ikon roda gigi).' })
       // Ciri model dari foto dianalisis di latar; digest berikutnya sudah memuatnya.
       void describeCatalogPhotos().catch(() => {})
+      void catalogDigest(true).then((digest) => measureCatalogColors(digest.rows, 80)).catch(() => {})
       const digest = await catalogDigest(true)
       return response.json({
         ...result,

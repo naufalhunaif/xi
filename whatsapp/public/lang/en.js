@@ -1420,6 +1420,7 @@ window.waLocales.en = {
   "Ubah": "Change",
   "Dikirim sebelum": "Ship by",
   "Komentar Instagram": "Instagram comments",
+  "Warna produk di gambar pelanggan": "Product color in customer photo",
   "Komentar perlu dibalas": "Comments that need a reply",
   "Perlu dibalas": "Needs reply",
   "Sudah dibalas": "Replied",

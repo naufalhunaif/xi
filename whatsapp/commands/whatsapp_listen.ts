@@ -62,6 +62,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import * as beta3Reply from '#beta3/reply_service'
 import * as beta3Order from '#beta3/order_service'
 import * as beta3Tables from '#beta3/tables'
+import { measureCatalogColors } from '#beta3/image_color'
 import * as beta3Mcp from '#beta3/mcp'
 import * as beta3Vision from '#beta3/catalog_vision'
 import * as beta3Examples from '#beta3/examples_service'
@@ -2641,6 +2642,9 @@ export default class WhatsappListen extends BaseCommand {
               if (result.configured && !result.unchanged)
                 this.logger.info(`Katalog disinkronkan (${result.count} varian).`)
               if (result.configured) await beta3.describeCatalogPhotos()
+              // Warna foto katalog diukur sekali per foto (pembanding warna gambar pelanggan).
+              if (result.configured)
+                await measureCatalogColors((await beta3.catalogDigest()).rows, 80).catch(() => {})
               // Update ringan: skill terbaru dari rilis online, tanpa `wa update`.
               await beta3SkillSync.syncRemoteSkills((line) => this.logger.info(line)).catch(() => {})
             } catch (error) {

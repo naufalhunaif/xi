@@ -1220,6 +1220,7 @@ window.waLocales.id = {
   "Dikirim sebelum": "Dikirim sebelum",
   "Komentar": "Komentar",
   "Komentar Instagram": "Komentar Instagram",
+  "Warna produk di gambar pelanggan": "Warna produk di gambar pelanggan",
   "Komentar perlu dibalas": "Komentar perlu dibalas",
   "Perlu dibalas": "Perlu dibalas",
   "Sudah dibalas": "Sudah dibalas",

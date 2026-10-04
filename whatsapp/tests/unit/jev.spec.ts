@@ -13,7 +13,7 @@ import {
   saveJevConfig,
   setJevFetcher,
 } from '#beta3/jev'
-import { promisesTotal, storeSentTotal, understandTurn } from '#beta3/jev_decisions'
+import { chooseImageColor, promisesTotal, storeSentTotal, understandTurn } from '#beta3/jev_decisions'
 import { guardTotalPromise, offeredServices } from '#beta3/reply_service'
 import { matchAutoTotal } from '#beta3/order_service'
 
@@ -88,6 +88,27 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
     assert.notInclude(masked, '677901015573536')
     assert.notInclude(masked, 'a.b@c.id')
     assert.include(masked, '800.000')
+  })
+
+  test('warna gambar: Jev memilih warna katalog dari hasil ukur piksel; ragu → tidak dipakai', async ({ assert }) => {
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    const input = {
+      jid: 'jevtest@s.whatsapp.net',
+      image: 1,
+      measured: 'putih kekuningan tipis (broken white / off white / gading)',
+      candidates: [
+        { color: 'Broken White', distance: 2.1, products: ['Tuxedo Signature'] },
+        { color: 'White', distance: 9.4, products: ['Tuxedo'] },
+      ],
+      text: 'yang ini ada?',
+      history: [],
+    }
+    setJevFetcher(reply({ warna_gambar: { type: 'choice', choice: 'Broken White', probabilities: {}, confidence: 0.93 } }))
+    assert.equal(await chooseImageColor(input), 'Broken White')
+    setJevFetcher(reply({ warna_gambar: { type: 'choice', choice: 'White', probabilities: {}, confidence: 0.55 } }))
+    assert.isUndefined(await chooseImageColor(input))
+    setJevFetcher(reply({ warna_gambar: { type: 'choice', choice: 'lain', probabilities: {}, confidence: 0.9 } }))
+    assert.isNull(await chooseImageColor(input))
   })
 
   test('pemahaman giliran: layanan dari Jev dipakai bila yakin, belum memilih = null', async ({
