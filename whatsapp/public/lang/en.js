@@ -1790,4 +1790,6 @@ window.waLocales.en = {
   "developers.facebook.com → Buat aplikasi (Bisnis) → tambah produk Instagram": "developers.facebook.com → Create app (Business) → add the Instagram product",
   "Model Otomatis: ringan untuk salam, standar untuk balasan biasa, utama untuk order, pembayaran, komplain.": "Automatic model: light for greetings, standard for ordinary replies, main for orders, payments, complaints.",
   "Satu pesan bisa memicu beberapa fase": "One message can trigger several phases",
+  "Skill CS": "CS skill",
+  "Berat per jenis barang (gram)": "Weight per item type (grams)",
 }

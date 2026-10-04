@@ -38,9 +38,8 @@
       input.dataset.weightKey = type.key
       input.dataset.settingsIgnore = ''
       input.setAttribute('aria-label', `${t(type.label)} (gram)`)
-      const unit = document.createElement('small')
-      unit.textContent = 'gram'
-      label.append(name, input, unit)
+      // Satuan ditulis di judul kartu (gram), bukan diulang di tiap kolom.
+      label.append(name, input)
       box.append(label)
     }
   }

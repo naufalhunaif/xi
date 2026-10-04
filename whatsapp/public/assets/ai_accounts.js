@@ -183,7 +183,8 @@
       }
       const nameBox = el('div', 'wa-ai-name')
       nameBox.append(dot, el('strong', '', account.name))
-      name.append(nameBox, el('small', '', PROVIDERS[account.provider] || account.provider))
+      const provider = el('small', `wa-provider ${account.provider}`, PROVIDERS[account.provider] || account.provider)
+      name.append(nameBox, provider)
 
       const model = el('td')
       model.append(modelPicker(account))

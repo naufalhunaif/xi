@@ -290,3 +290,92 @@ html[data-theme='dark'] .workspace-ui dialog.wa-settings-dialog {
 .workspace-ui details[open] > summary {
   color: var(--text);
 }
+/* Ikon pengaturan (sprite di partials/settings/icons.edge). */
+.workspace-ui .wa-i {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -3px;
+}
+.workspace-ui .wa-settings-menu a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.workspace-ui .wa-settings-menu a .wa-i {
+  width: 17px;
+  height: 17px;
+  opacity: 0.75;
+}
+.workspace-ui .wa-settings-menu a[aria-current='page'] .wa-i {
+  opacity: 1;
+}
+.workspace-ui .wa-settings-section-title,
+.workspace-ui .wa-card-title > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.workspace-ui .wa-card-title > strong .wa-i,
+.workspace-ui .wa-settings-section-title .wa-i {
+  color: var(--muted);
+}
+.workspace-ui .wa-danger-title .wa-i {
+  color: var(--wa-urgent);
+}
+.workspace-ui .button .wa-i,
+.workspace-ui a.button .wa-i {
+  width: 15px;
+  height: 15px;
+  margin-right: 6px;
+}
+/* Penyedia AI: warna sama dengan legenda orkestra. */
+.workspace-ui .wa-provider {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.workspace-ui .wa-provider::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--muted);
+}
+.workspace-ui .wa-provider.chatgpt::before { background: #10a37f; }
+.workspace-ui .wa-provider.claude::before { background: #d97757; }
+.workspace-ui .wa-provider.gemini::before { background: #4285f4; }
+/* Lebih padat. */
+.workspace-ui .wa-settings-panel .wa-card {
+  padding: 12px 14px;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.workspace-ui .wa-settings-view [data-settings-panel] {
+  padding: 8px 8px 10px;
+  gap: 12px;
+}
+.workspace-ui .wa-settings-panel form {
+  gap: 8px;
+}
+.workspace-ui .wa-ai-table th,
+.workspace-ui .wa-ai-table td {
+  padding: 7px 8px;
+}
+.workspace-ui .wa-payment-actions {
+  display: flex;
+  gap: 2px;
+}
+.workspace-ui #weightFields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 600px) {
+  .workspace-ui #weightFields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

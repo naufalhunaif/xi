@@ -48,11 +48,13 @@
       details.append(title, node('span', method.destination))
       if (method.accountName) details.append(node('span', method.accountName))
       const actions = node('div', '', 'wa-payment-actions')
-      for (const [action, label] of [['paymentEdit', 'Edit'], ['paymentDelete', t('Hapus')]]) {
-        const button = node('button', label, 'button')
+      for (const [action, label, icon] of [['paymentEdit', 'Edit', 'edit'], ['paymentDelete', t('Hapus'), 'trash']]) {
+        const button = node('button', '', action === 'paymentDelete' ? 'wa-ai-icon danger' : 'wa-ai-icon')
         button.type = 'button'
         button.dataset[action] = ''
+        button.title = label
         button.setAttribute('aria-label', `${label} ${method.name}`)
+        button.innerHTML = `<svg class="wa-i" aria-hidden="true"><use href="#i-${icon}"/></svg>`
         actions.append(button)
       }
       row.append(details, actions)

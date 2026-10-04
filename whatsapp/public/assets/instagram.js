@@ -35,7 +35,8 @@
     pill.textContent = state.connected ? `@${state.username}` : t('Belum terhubung')
     pill.className = `wa-pill ${state.connected ? 'ok' : ''}`
     byId('igConnect').href = `${base}/instagram/connect`
-    byId('igConnect').textContent = state.connected ? t('Hubungkan ulang') : t('Hubungkan Instagram')
+    const connectLabel = byId('igConnect').querySelector('span') || byId('igConnect')
+    connectLabel.textContent = state.connected ? t('Hubungkan ulang') : t('Hubungkan Instagram')
     const ready = Boolean(state.appId && state.hasSecret)
     byId('igConnect').classList.toggle('disabled', !ready)
     byId('igDisconnect').hidden = !state.connected

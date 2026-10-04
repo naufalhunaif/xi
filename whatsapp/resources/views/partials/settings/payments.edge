@@ -1,5 +1,5 @@
 <div class="wa-section-actions">
-  <button id="paymentAddOpen" class="button primary" type="button" data-i18n="Tambah metode">Tambah metode</button>
+  <button id="paymentAddOpen" class="button primary" type="button"><svg class="wa-i" aria-hidden="true"><use href="#i-plus"/></svg><span data-i18n="Tambah metode">Tambah metode</span></button>
 </div>
 <div id="paymentList" class="wa-payment-list">
   @if(!settings.paymentMethods.length)
@@ -22,17 +22,8 @@
         @end
       </div>
       <div class="wa-payment-actions">
-        <button class="button" type="button" data-payment-edit aria-label="Edit {{ method.name }}">
-          Edit
-        </button>
-        <button
-          class="button"
-          type="button"
-          data-payment-delete
-          aria-label="Hapus {{ method.name }}"
-         data-i18n="Hapus">
-          Hapus
-        </button>
+        <button class="wa-ai-icon" type="button" data-payment-edit aria-label="Edit {{ method.name }}" title="Edit"><svg class="wa-i" aria-hidden="true"><use href="#i-edit"/></svg></button>
+        <button class="wa-ai-icon danger" type="button" data-payment-delete aria-label="Hapus {{ method.name }}" title="Hapus" data-i18n-title="Hapus"><svg class="wa-i" aria-hidden="true"><use href="#i-trash"/></svg></button>
       </div>
     </div>
   @end

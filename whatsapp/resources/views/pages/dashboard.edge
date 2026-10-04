@@ -647,13 +647,14 @@
             </form>
           </div>
           <div class="wa-settings-layout">
+            @include('partials/settings/icons')
             <nav class="wa-settings-menu" aria-label="Menu pengaturan" data-i18n-aria-label="Menu pengaturan">
               <div class="wa-settings-block">
-                <a href="#connect" data-settings-menu="connect" aria-current="page" data-i18n="Koneksi">Koneksi</a>
-                <a href="#store" data-settings-menu="store" data-i18n="Toko">Toko</a>
-                <a href="#reply" data-settings-menu="reply" data-i18n="Cara AI membalas">Cara AI membalas</a>
-                <a href="#usage" data-settings-menu="usage" data-i18n="Pemakaian">Pemakaian</a>
-                <a href="#app" data-settings-menu="app" data-i18n="Aplikasi & data">Aplikasi & data</a>
+                <a href="#connect" data-settings-menu="connect" aria-current="page"><svg class="wa-i" aria-hidden="true"><use href="#i-plug"/></svg><span data-i18n="Koneksi">Koneksi</span></a>
+                <a href="#store" data-settings-menu="store"><svg class="wa-i" aria-hidden="true"><use href="#i-store"/></svg><span data-i18n="Toko">Toko</span></a>
+                <a href="#reply" data-settings-menu="reply"><svg class="wa-i" aria-hidden="true"><use href="#i-chat"/></svg><span data-i18n="Cara AI membalas">Cara AI membalas</span></a>
+                <a href="#usage" data-settings-menu="usage"><svg class="wa-i" aria-hidden="true"><use href="#i-chart"/></svg><span data-i18n="Pemakaian">Pemakaian</span></a>
+                <a href="#app" data-settings-menu="app"><svg class="wa-i" aria-hidden="true"><use href="#i-sliders"/></svg><span data-i18n="Aplikasi & data">Aplikasi & data</span></a>
               </div>
             </nav>
             <div class="wa-panel wa-settings-panel">
@@ -665,9 +666,9 @@
                   <div class="wa-card" id="linesCard">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
-                        <strong>WhatsApp</strong>
+                        <strong><svg class="wa-i" aria-hidden="true"><use href="#i-whatsapp"/></svg>WhatsApp</strong>
                       </div>
-                      <div class="actions"><button type="button" class="button primary" id="lineAdd" data-i18n="Tambah nomor">Tambah nomor</button></div>
+                      <div class="actions"><button type="button" class="button primary" id="lineAdd"><svg class="wa-i" aria-hidden="true"><use href="#i-plus"/></svg><span data-i18n="Tambah nomor">Tambah nomor</span></button></div>
                     </div>
                     <div class="wa-kv" id="linesList"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
                     <small id="linesStatus" role="status" aria-live="polite"></small>
@@ -690,7 +691,7 @@
                   <div class="wa-card">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
-                        <strong>Jev</strong>
+                        <strong><svg class="wa-i" aria-hidden="true"><use href="#i-bolt"/></svg>Jev</strong>
                         <small data-i18n="Pembantu keputusan kecil (TypeSafe AI)">Pembantu keputusan kecil (TypeSafe AI)</small>
                       </div>
                       <div class="actions"><span id="jevState" class="wa-pill"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></span></div>
@@ -720,17 +721,16 @@
                   id="settings-payments"
                   data-settings-panel="payments"
                   aria-labelledby="settings-title-payments">
-                  <h3 class="wa-settings-section-title" id="settings-title-payments" data-i18n="Pembayaran">Pembayaran</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-payments"><svg class="wa-i" aria-hidden="true"><use href="#i-card"/></svg><span data-i18n="Pembayaran">Pembayaran</span></h3>
                   @include('partials/settings/payments')
                 </section>
                 <section id="settings-weights" data-settings-panel="weights" aria-labelledby="settings-title-weights">
-                  <h3 class="wa-settings-section-title" id="settings-title-weights" data-i18n="Berat & ongkir">Berat & ongkir</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-weights"><svg class="wa-i" aria-hidden="true"><use href="#i-scale"/></svg><span data-i18n="Berat & ongkir">Berat & ongkir</span></h3>
                   <div class="wa-card">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
-                        <strong data-i18n="Berat per jenis barang">Berat per jenis barang</strong>
-                        <small data-i18n="Untuk menghitung ongkir">Untuk menghitung ongkir</small>
-                      </div>
+                        <strong data-i18n="Berat per jenis barang (gram)">Berat per jenis barang (gram)</strong>
+                                              </div>
                     </div>
                     <div id="weightFields" class="wa-form-grid"><div class="wa-loading wa-span-full" data-i18n="Memuat…">Memuat…</div></div>
                     <div class="actions wa-actions-start">
@@ -740,7 +740,7 @@
                   </div>
                 </section>
                 <section id="settings-production" data-settings-panel="production" aria-labelledby="settings-title-production">
-                  <h3 class="wa-settings-section-title" id="settings-title-production" data-i18n="Produksi & Pre-order">Produksi & Pre-order</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-production"><svg class="wa-i" aria-hidden="true"><use href="#i-factory"/></svg><span data-i18n="Produksi & Pre-order">Produksi & Pre-order</span></h3>
                   @include('partials/settings/production')
                 </section>
                   <details class="wa-advanced" data-settings-advanced="store">
@@ -749,7 +749,7 @@
                   id="settings-business"
                   data-settings-panel="business"
                   aria-labelledby="settings-title-business">
-                  <h3 class="wa-settings-section-title" id="settings-title-business" data-i18n="Sumber data toko (MCP)">Sumber data toko (MCP)</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-business"><svg class="wa-i" aria-hidden="true"><use href="#i-database"/></svg><span data-i18n="Sumber data toko (MCP)">Sumber data toko (MCP)</span></h3>
                   @include('partials/settings/business')
                 </section>
                   </details>
@@ -757,25 +757,25 @@
                 <div class="wa-settings-view" data-settings-view="reply" hidden>
                   <h2 class="wa-settings-view-title" data-i18n="Cara AI membalas">Cara AI membalas</h2>
                 <section id="settings-work-hours" data-settings-panel="work-hours" aria-labelledby="settings-title-work-hours">
-                  <h3 class="wa-settings-section-title" id="settings-title-work-hours" data-i18n="Jam kerja AI">Jam kerja AI</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-work-hours"><svg class="wa-i" aria-hidden="true"><use href="#i-clock"/></svg><span data-i18n="Jam kerja AI">Jam kerja AI</span></h3>
                   @include('partials/settings/work_hours')
                 </section>
                 <section
                   id="settings-behavior"
                   data-settings-panel="behavior"
                   aria-labelledby="settings-title-behavior">
-                  <h3 class="wa-settings-section-title" id="settings-title-behavior" data-i18n="Perilaku balasan">Perilaku balasan</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-behavior"><svg class="wa-i" aria-hidden="true"><use href="#i-ban"/></svg><span data-i18n="Perilaku balasan">Perilaku balasan</span></h3>
                   @include('partials/settings/behavior')
                 </section>
                 <section id="settings-skill" data-settings-panel="skill" aria-labelledby="settings-title-skill">
-                  <h3 class="wa-settings-section-title" id="settings-title-skill" data-i18n="Skill CS (cara AI melayani)">Skill CS (cara AI melayani)</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-skill"><svg class="wa-i" aria-hidden="true"><use href="#i-book"/></svg><span data-i18n="Skill CS">Skill CS</span></h3>
                   <div class="wa-card" id="skillCard">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
                         <strong><span id="skillName"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></span> <span id="skillSource" class="wa-note"></span></strong>
                         <small><span data-i18n="Terakhir diperbarui">Terakhir diperbarui</span>: <span id="skillUpdated">…</span> · <span data-i18n="Dicek">Dicek</span>: <span id="skillChecked">…</span></small>
                       </div>
-                      <div class="actions"><button type="button" class="button primary" id="skillUpdate" data-i18n="Update skill">Update skill</button></div>
+                      <div class="actions"><button type="button" class="button primary" id="skillUpdate"><svg class="wa-i" aria-hidden="true"><use href="#i-refresh"/></svg><span data-i18n="Update skill">Update skill</span></button></div>
                     </div>
                     <p class="wa-note"><small id="skillStatus" role="status" aria-live="polite"></small></p>
                     <details><summary data-i18n="Lihat isi skill">Lihat isi skill</summary><pre id="skillContent" class="wa-b3-spec"></pre></details>
@@ -784,7 +784,7 @@
                   <details class="wa-advanced" data-settings-advanced="reply">
                     <summary data-i18n="Lanjutan">Lanjutan</summary>
                 <section id="settings-quality" data-settings-panel="quality" aria-labelledby="settings-title-quality">
-                  <h3 class="wa-settings-section-title" id="settings-title-quality" data-i18n="Aturan toko & kasus uji">Aturan toko & kasus uji</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-quality"><svg class="wa-i" aria-hidden="true"><use href="#i-shield"/></svg><span data-i18n="Aturan toko & kasus uji">Aturan toko & kasus uji</span></h3>
                   <div class="wa-card" id="rulesCard">
                     <div class="wa-card-head">
                       <div class="wa-card-title">
@@ -805,7 +805,7 @@
                         <strong data-i18n="Kasus uji">Kasus uji</strong>
                         <small data-i18n="Dari koreksi CS; jalankan setelah update">Dari koreksi CS; jalankan setelah update</small>
                       </div>
-                      <div class="actions"><button type="button" class="button primary" id="testsRun" data-i18n="Jalankan semua">Jalankan semua</button></div>
+                      <div class="actions"><button type="button" class="button primary" id="testsRun"><svg class="wa-i" aria-hidden="true"><use href="#i-play"/></svg><span data-i18n="Jalankan semua">Jalankan semua</span></button></div>
                     </div>
                     <p id="testsSummary" class="wa-note"></p>
                     <ul id="testsList" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
@@ -815,7 +815,7 @@
                   id="settings-skills"
                   data-settings-panel="skills"
                   aria-labelledby="settings-title-skills">
-                  <h3 class="wa-settings-section-title" id="settings-title-skills" data-i18n="Editor skill">Editor skill</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-skills"><svg class="wa-i" aria-hidden="true"><use href="#i-pen"/></svg><span data-i18n="Editor skill">Editor skill</span></h3>
                   @include('partials/settings/skills')
                 </section>
                   </details>
@@ -826,7 +826,7 @@
                   id="settings-usage"
                   data-settings-panel="usage"
                   aria-labelledby="settings-title-usage">
-                  <h3 class="wa-settings-section-title" id="settings-title-usage" data-i18n="Pemakaian token">Pemakaian token</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-usage"><svg class="wa-i" aria-hidden="true"><use href="#i-chart"/></svg><span data-i18n="Pemakaian token">Pemakaian token</span></h3>
                   @include('partials/settings/usage')
                   <div class="wa-card">
                     <div class="wa-card-head">
@@ -843,7 +843,7 @@
                 <div class="wa-settings-view" data-settings-view="app" hidden>
                   <h2 class="wa-settings-view-title" data-i18n="Aplikasi & data">Aplikasi & data</h2>
                 <section id="settings-general" data-settings-panel="general" aria-labelledby="settings-title-general">
-                  <h3 class="wa-settings-section-title" id="settings-title-general" data-i18n="Tampilan & akses">Tampilan & akses</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-general"><svg class="wa-i" aria-hidden="true"><use href="#i-palette"/></svg><span data-i18n="Tampilan & akses">Tampilan & akses</span></h3>
                   @if(!bundle)
                     <div class="wa-access-card" id="accessCard" data-app-url="{{ appUrl }}">
                       <strong data-i18n="Alamat akses & domain">Alamat akses & domain</strong>
@@ -869,7 +869,7 @@
                   </label>
                                   </section>
                 <section id="settings-backup" data-settings-panel="backup" aria-labelledby="settings-title-backup">
-                  <h3 class="wa-settings-section-title" id="settings-title-backup">Backup</h3>
+                  <h3 class="wa-settings-section-title" id="settings-title-backup"><svg class="wa-i" aria-hidden="true"><use href="#i-cloud"/></svg><span>Backup</span></h3>
                   <p id="backupAlert" class="wa-alert" role="alert"></p>
                   <div class="wa-card" id="backupDriveCard">
                     <div class="wa-card-head">
@@ -894,8 +894,8 @@
                       </details>
                     </div>
                     <div class="actions wa-actions-start">
-                      <button type="button" class="button primary" id="backupConnect" hidden data-i18n="Hubungkan Google Drive">Hubungkan Google Drive</button>
-                      <button type="button" class="button" id="backupDisconnect" hidden data-i18n="Putuskan">Putuskan</button>
+                      <button type="button" class="button primary" id="backupConnect" hidden><svg class="wa-i" aria-hidden="true"><use href="#i-link"/></svg><span data-i18n="Hubungkan Google Drive">Hubungkan Google Drive</span></button>
+                      <button type="button" class="button" id="backupDisconnect" hidden><svg class="wa-i" aria-hidden="true"><use href="#i-unlink"/></svg><span data-i18n="Putuskan">Putuskan</span></button>
                     </div>
                   </div>
                   <div class="wa-card" id="backupRunCard">
@@ -904,7 +904,7 @@
                         <strong data-i18n="Cadangkan">Cadangkan</strong>
                         <small id="backupLast"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></small>
                       </div>
-                      <div class="actions"><button type="button" class="button primary" id="backupNow" data-i18n="Backup sekarang">Backup sekarang</button></div>
+                      <div class="actions"><button type="button" class="button primary" id="backupNow"><svg class="wa-i" aria-hidden="true"><use href="#i-upload"/></svg><span data-i18n="Backup sekarang">Backup sekarang</span></button></div>
                     </div>
                     <label class="wa-toggle-row"><span data-i18n="Backup otomatis tiap hari">Backup otomatis tiap hari</span>
                       <button class="wa-switch" type="button" role="switch" id="backupAuto" aria-checked="true" value="true" aria-label="Backup otomatis"></button></label>
@@ -919,7 +919,7 @@
                         <strong data-i18n="Pulihkan">Pulihkan</strong>
                         <small data-i18n="Menimpa data di server ini">Menimpa data di server ini</small>
                       </div>
-                      <div class="actions"><button type="button" class="button" id="backupList" data-i18n="Lihat backup">Lihat backup</button></div>
+                      <div class="actions"><button type="button" class="button" id="backupList"><svg class="wa-i" aria-hidden="true"><use href="#i-restore"/></svg><span data-i18n="Lihat backup">Lihat backup</span></button></div>
                     </div>
                     <ul id="backupItems" class="wa-quality-list"></ul>
                     <small id="backupStatus" role="status" aria-live="polite"></small>
@@ -928,7 +928,7 @@
                   <details class="wa-advanced" data-settings-advanced="app">
                     <summary data-i18n="Lanjutan">Lanjutan</summary>
                 <section id="settings-danger" data-settings-panel="danger" aria-labelledby="settings-title-danger">
-                  <h3 class="wa-settings-section-title wa-danger-title" id="settings-title-danger" data-i18n="Hapus data">Hapus data</h3>
+                  <h3 class="wa-settings-section-title wa-danger-title" id="settings-title-danger"><svg class="wa-i" aria-hidden="true"><use href="#i-trash"/></svg><span data-i18n="Hapus data">Hapus data</span></h3>
                   <div class="wa-chat-cleanup">
                     <button id="chatCleanupButton" type="button" class="button wa-chat-cleanup-button" data-i18n="Hapus chat & media">Hapus chat & media</button>
                     <small id="chatCleanupStatus" role="status" aria-live="polite"></small>
