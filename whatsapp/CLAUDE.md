@@ -50,7 +50,7 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 - **Jev memutuskan, kode bertindak.** Jev hanya menjawab pertanyaan pilihan/ya-tidak/skor; teks balasan tetap dari model AI.
 - Setiap keputusan Jev punya **cadangan cara lama** (regex/aturan). Jev mati, gagal, lambat (> 800 ms), atau ragu (di bawah ambang `JEV_THRESHOLD`) → cara lama dipakai.
 - Semua panggilan lewat `askJev` (fetch langsung, tanpa SDK); data pelanggan disamarkan `maskPii` dulu. Setiap keputusan dicatat ke `whatsapp_beta3_decisions` (halaman Akurasi).
-- Skor Jev dimulai dari 0 (tiga tingkat = 0 … 2): selalu baca lewat `scoreLevel`, jangan `Math.round` langsung. Tingkat model balasan dipilih di `app/beta3/model_tier.ts`.
+- Skor Jev dimulai dari 0 (tiga tingkat = 0 … 2): selalu baca lewat `scoreLevel`, jangan `Math.round` langsung. Tingkat model balasan dipilih di `app/beta3/model_tier.ts`: dasar pola kata (`autoTier`), Jev hanya menaikkan. Topik Jev hanya menambah bagian prompt.
 - Tes memakai `setJevFetcher` (tanpa jaringan) dan mengosongkan config Jev sesudahnya. Kunci API hanya diisi pemilik di Pengaturan → Jev.
 
 ## Aturan UI

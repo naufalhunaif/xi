@@ -95,8 +95,12 @@ export function promptNeeds(input: {
     sizeCharts:
       images ||
       input.hasFit ||
-      (topics.ukuran ?? (SIZE.test(text) || SIZE.test(recentOut) || input.intent === 'ukuran')),
-    fabrics: images || (topics.warna ?? (EARLY.includes(input.stage) || COLOR.test(text) || input.intent === 'produk')),
+      // Topik Jev hanya MENAMBAH bagian; pola kata tetap berlaku (Jev salah → bagian tidak hilang).
+      topics.ukuran === true ||
+      SIZE.test(text) ||
+      SIZE.test(recentOut) ||
+      input.intent === 'ukuran',
+    fabrics: images || topics.warna === true || EARLY.includes(input.stage) || COLOR.test(text) || input.intent === 'produk',
   }
 }
 
@@ -158,8 +162,10 @@ export function skillContext(input: {
     shipping:
       input.shippingNotes ||
       ['minta_alamat', 'kirim_form', 'tunggu_form', 'tunggu_cs', 'tunggu_bayar'].includes(input.stage) ||
-      (topics.ongkir ?? (SHIPPING.test(text) || SHIPPING.test(recent))),
-    paid: LATE.includes(input.stage) || (topics.bayar ?? (input.hasOrder || PAID.test(text))),
+      topics.ongkir === true ||
+      SHIPPING.test(text) ||
+      SHIPPING.test(recent),
+    paid: LATE.includes(input.stage) || topics.bayar === true || input.hasOrder || PAID.test(text),
     photo:
       input.imageCount > 0 ||
       instagram ||

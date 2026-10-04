@@ -31,7 +31,7 @@ import {
   type LeanDecision,
   type LeanHistoryRow,
 } from '#beta3/prompt'
-import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
+import { autoTier, runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
 import { chooseReplyTier, TIER_LABEL } from '#beta3/model_tier'
 import { normalizeStyle, storeStyle, styleGuide } from '#beta3/style_service'
 import {
@@ -965,39 +965,10 @@ export async function createLeanReply(input: {
   if (understanding.urgency) await saveChatPriority(jid, understanding.urgency).catch(() => {})
   // Maksud "status pesanan" yang tidak tertangkap pola kata → lacak resi juga.
   if (understanding.intent === 'status_pesanan') await trackParcel()
-  // "oke/siap" yang cukup tanda terima: tidak perlu dibalas, AI tidak dipanggil (0 token).
-  if (
-    understanding.reaction === 'terima' &&
-    !input.imagePaths?.length &&
-    !input.note &&
-    !systemNote &&
-    !toolNotes.length &&
-    !form &&
-    !loose
-  ) {
-    onTrace?.({ key: 'beta3-quick', label: 'Cukup tanda terima (Jev) · tidak dibalas, 0 token', status: 'completed', detail: { text: input.text } })
-    return {
-      decision: {
-        pesan: [],
-        foto: [],
-        catatan: chatNote,
-        tahap: (stage || 'lain') as LeanDecision['tahap'],
-        serah_cs: false,
-        alasan: '',
-        // "oke" tanda terima: susulan yang sudah direncanakan sebelumnya tetap dikirim bila pelanggan diam.
-        susulan: await previousNudge(jid),
-        spesifikasi: String(spec || ''),
-      },
-      autoTotal: null,
-      photos: [],
-      promptTokens: 0,
-      promptSections: [],
-      usage: null,
-      durationMs: 0,
-      orderId: null,
-      skillName: skill.name,
-    }
-  }
+  // "oke/siap" tanda terima tetap dibalas singkat oleh AI (seperti v3.5.7); diam membuat chat terasa putus.
+  if (understanding.reaction === 'terima' && !systemNote && !toolNotes.length && !form && !loose)
+    // Bukan "CATATAN SISTEM" supaya tidak memaksa model berat untuk sekadar "oke".
+    systemNote += '\n\n(Pesan ini hanya tanda terima: balas satu kalimat singkat yang nyambung, tanpa pertanyaan baru; isi susulan langkah berikutnya.)'
   if (understanding.paidClaim && pendingForJev?.status === 'awaiting_payment')
     systemNote +=
       '\n\nCATATAN SISTEM: pelanggan menyatakan SUDAH transfer. Balas "siap bos, kami cek dulu ya" (minta bukti transfernya bila belum dikirim); jangan bilang sudah diterima. tahap = bukti_dikirim.'
@@ -1014,11 +985,12 @@ export async function createLeanReply(input: {
   // Pola harga per seri (dihitung dari katalog): selalu ikut, dan dipakai pemeriksa harga sesudah balasan.
   const prices = pricePattern(digest.rows)
   const priceText = renderPricePattern(prices)
-  const priceSeries: PriceSeries | null =
-    understanding.series ||
-    seriesMentioned([...rows.slice(-6).map((row) => String(row.body || '')), input.text])
+  // Seri dari teks chat lebih dipercaya; tebakan Jev dipakai bila teks tidak menyebut seri.
+  const textSeries = seriesMentioned([...rows.slice(-6).map((row) => String(row.body || '')), input.text])
+  const priceSeries: PriceSeries | null = textSeries || understanding.series || null
+  const seriesAgree = !understanding.series || !textSeries || understanding.series === textSeries
   let priceNote = ''
-  if (understanding.item && priceSeries) {
+  if (understanding.item && priceSeries && seriesAgree) {
     const cell =
       prices.series[priceSeries]?.cells[`${understanding.item}:standar`]
     if (cell)
@@ -1112,22 +1084,18 @@ export async function createLeanReply(input: {
     detail: { ...prompt.size, skillName: skill.name, catalogRows: digest.rows.length },
   })
 
-  // Tingkat model dari Jev (sederhana → ringan, biasa → standar, rumit → berat); alasan tampil di trace.
-  const tierChoice = chooseReplyTier(understanding, {
-    imageCount: input.imagePaths?.length || 0,
-    systemNote,
-    toolNotes: toolNotes.length,
-  })
+  // Tingkat model: aturan pola kata (v3.5.7) sebagai dasar; Jev hanya menaikkan. Alasan tampil di trace.
+  const tierChoice = chooseReplyTier(understanding, autoTier('beta3-reply', prompt, input.imagePaths?.length || 0))
   onTrace?.({
     key: 'beta3-tier',
-    label: `Tingkat model: ${tierChoice.tier ? TIER_LABEL[tierChoice.tier] : 'otomatis'} · ${tierChoice.reason}`,
+    label: `Tingkat model: ${TIER_LABEL[tierChoice.tier]} · ${tierChoice.reason}`,
     status: 'completed',
     detail: { ...tierChoice, difficulty: understanding.difficulty ?? null },
   })
   onTrace?.({ key: 'beta3-ai', label: 'Menyusun balasan · tanpa tool', status: 'running' })
   const result = await runLeanProvider(settings, prompt, input.imagePaths || [], undefined, undefined, {
     jid,
-    ...(tierChoice.tier ? { tier: tierChoice.tier } : {}),
+    tier: tierChoice.tier,
   })
   let decision: LeanDecision
   try {

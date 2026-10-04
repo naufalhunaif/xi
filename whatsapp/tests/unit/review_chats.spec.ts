@@ -144,23 +144,20 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.equal(goalStatus({ ...decision('tanya_model', 'x'), serah_cs: true }), 'paused')
   })
 
-  test('#12 model mengikuti keputusan Jev: pertanyaan apa pun minimal standar, rumit → berat, ringan hanya salam', ({ assert }) => {
-    const base = { imageCount: 0, systemNote: '', toolNotes: 0 }
-    // Jev menjawab skor mulai 0; "Biasa" (skor 1) dulu terbaca tingkat 1 → model murah.
-    const tier = (score: number, extra: Partial<typeof base> = {}) =>
-      chooseReplyTier({ difficulty: scoreLevel({ score }, 3) }, { ...base, ...extra }).tier
+  test('#12/#14 tingkat model: dasar pola kata v3.5.7, Jev hanya menaikkan (skor Jev mulai 0)', ({ assert }) => {
+    const tier = (score: number, base: 'light' | 'standard' | 'heavy' = 'standard') =>
+      chooseReplyTier({ difficulty: scoreLevel({ score }, 3) }, base).tier
+    // "Biasa" (skor 1) dulu terbaca tingkat 1 → model murah; kini tidak pernah di bawah dasar.
     assert.equal(tier(1), 'standard')
-    assert.equal(tier(1.4), 'standard')
-    assert.equal(tier(2), 'heavy')
-    // "Sederhana" (satu pertanyaan harga/stok) tetap standar: model murah jawabannya kurang tepat (v3.5.17).
     assert.equal(tier(0.2), 'standard')
-    assert.equal(tier(0, { toolNotes: 1 }), 'standard')
-    // Salam / tanda terima → ringan; komplain → berat; gambar → aturan lama.
-    assert.equal(chooseReplyTier({ intent: 'sapaan' }, base).tier, 'light')
-    assert.equal(chooseReplyTier({ reaction: 'terima', difficulty: 2 }, base).tier, 'light')
-    assert.equal(chooseReplyTier({ csReason: 'komplain', difficulty: 1 }, base).tier, 'heavy')
-    assert.isUndefined(chooseReplyTier({ difficulty: 1 }, { ...base, imageCount: 1 }).tier)
-    assert.isUndefined(chooseReplyTier({}, base).tier)
+    assert.equal(tier(2), 'heavy')
+    // Dasar berat (ongkir, ukuran, custom, catatan sistem) tidak diturunkan walau Jev bilang sederhana.
+    assert.equal(tier(0, 'heavy'), 'heavy')
+    // Salam (dasar ringan) tetap ringan; Jev "biasa" menaikkan ke standar; komplain → berat.
+    assert.equal(chooseReplyTier({}, 'light').tier, 'light')
+    assert.equal(tier(1, 'light'), 'standard')
+    assert.equal(chooseReplyTier({ csReason: 'komplain', difficulty: 1 }, 'light').tier, 'heavy')
+    assert.match(chooseReplyTier({ difficulty: 3 }, 'standard').reason, /dinaikkan dari standar/)
   })
 
   test('#13 daftar model dengan harga berbeda tidak diringkas jadi "Ini fotonya" (informasi dipertahankan)', ({ assert }) => {

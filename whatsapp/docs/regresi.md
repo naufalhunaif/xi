@@ -53,9 +53,10 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | "Seperti apa?" + foto → pengantar "Ini fotonya bos" (+ harga sekali), nama produk/warna cukup di caption foto | `review_chats.spec` · #7, #11 |
 | Pemeriksa harga tidak mengubah daftar harga (≥ 2 baris) dan angka yang memang harga produk yang disebut ("Basic Suit 485.000" di konteks premium) | `review_chats.spec` · #10 |
 | Susulan tetap terjadwal bila AI menulisnya walau tahap "lain"; tahap mirip ("tanya_harga") dipetakan; "oke" tanda terima tidak menghapus susulan yang sudah direncanakan | `review_chats.spec` · #11 |
-| Tingkat model mengikuti Jev: skor Jev mulai 0 (`scoreLevel`); ringan hanya salam/tanda terima, pertanyaan apa pun minimal standar, rumit/komplain → berat; alasan tampil di trace "Tingkat model" | `review_chats.spec` · #12, `jev.spec` · skor Jev mulai 0 |
+| Tingkat model: dasar pola kata v3.5.7 (`autoTier`), Jev hanya menaikkan (rumit/komplain → berat), skor Jev mulai 0 (`scoreLevel`); alasan di trace "Tingkat model" | `review_chats.spec` · #12/#14, `beta3.spec` · model otomatis, `jev.spec` · skor Jev mulai 0 |
 | Susulan selalu dari AI (tanpa kalimat bawaan); "oke" yang tidak dibalas tetap mengirim susulan AI yang sudah direncanakan | `beta3_flow.spec` · susulan menuju pembelian |
 | Daftar model dengan harga berbeda tidak diringkas jadi "Ini fotonya"; pengantar singkat hanya bila harganya satu | `review_chats.spec` · #13 |
+| Catatan harga dari seri Jev hanya bila cocok dengan seri yang disebut di chat; teks chat lebih dipercaya | `beta3.spec` · pola harga |
 | Jev menerima konteks penuh (10 baris × 500 huruf, layanan & pesan toko terakhir) — tidak dipotong demi token | `jev.spec` · skor Jev mulai 0 |
 | Kebijakan tukar size dari Pengaturan masuk prompt dan dikirim apa adanya | `beta3.spec` · pelajaran chat CS |
 | Pertanyaan yang baru ditanyakan tidak diulang | `beta3.spec` · form order |
@@ -68,7 +69,7 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 |---|---|
 | Jev mati / tanpa kunci / gagal / lewat batas waktu → tidak ada keputusan, cara lama dipakai | `jev.spec` · tanpa kunci / gagal-timeout |
 | Jawaban Jev di bawah ambang yakin tidak dipakai, tetap dicatat (used = 0) | `jev.spec` · pemahaman giliran |
-| v3.5.11: tanda terima → diam tanpa AI; topik Jev menggantikan pola kata untuk bagian prompt (gambar & tahap tetap memaksa); "sudah tf" tanpa foto → bukti_dikirim; tunda/batal → tanpa susulan, batal menutup order belum dibayar; dana masuk butuh AI + Jev | `jev.spec` · keputusan tambahan, `beta3.spec` · topik dari Jev |
+| v3.5.11: tanda terima → dibalas singkat oleh AI (v3.5.18); topik Jev hanya menambah bagian prompt, pola kata/gambar/tahap tetap berlaku (v3.5.18); "sudah tf" tanpa foto → bukti_dikirim; tunda/batal → tanpa susulan, batal menutup order belum dibayar; dana masuk butuh AI + Jev | `jev.spec` · keputusan tambahan, `beta3.spec` · topik dari Jev |
 | Prioritas Jev ≥ 4 → badge "Penting" di daftar chat (24 jam, masih menunggu balasan atau mode CS) | `beta3_flow.spec` · prioritas chat |
 | Data pelanggan (telepon, rekening, email) disamarkan sebelum dikirim ke Jev | `jev.spec` · disamarkan |
 | Layanan ongkir pilihan Jev dipakai untuk total; "belum memilih" = total ditahan | `jev.spec` · layanan pilihan Jev |

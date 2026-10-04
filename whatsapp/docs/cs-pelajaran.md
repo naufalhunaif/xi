@@ -350,3 +350,21 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 - Jangan menambah perapian otomatis yang membuang isi jawaban; perapian hanya merapikan bentuk.
 - Perubahan yang tidak diminta pemilik tidak dimasukkan ke rilis perbaikan ulasan.
 
+## #15 · Okt 2026 · perbandingan v3.5.7 (akurat) vs v3.5.17 (diterapkan v3.5.18)
+
+**Temuan**
+- v3.5.7 akurat terutama karena pola kata mengirim pesan serius (ukuran, custom, ongkir, transfer, catatan sistem) ke model paling kuat; sejak v3.5.11 Jev menggantikannya dan hampir semua turun ke standar.
+- Topik Jev bisa membuang bagian prompt (size chart, ongkir, pembayaran) bila Jev salah menilai.
+- Catatan harga dari tebakan seri Jev bisa memaksa angka yang salah bila seri keliru.
+- "Oke" tidak dibalas sama sekali sejak v3.5.11 — chat terasa putus.
+
+**Perubahan**
+1. Tingkat model: dasar = aturan pola kata v3.5.7; Jev hanya boleh menaikkan (rumit/komplain → berat), tidak pernah menurunkan (`model_tier.ts`).
+2. Topik Jev hanya menambah bagian prompt; pola kata tetap berlaku.
+3. Catatan harga dipakai hanya bila seri dari Jev cocok dengan seri yang disebut di chat (teks lebih dipercaya).
+4. "Oke" dibalas satu kalimat singkat oleh AI lagi, dengan susulan langkah berikutnya.
+
+**Pelajaran**
+- Jev untuk menambah sinyal, bukan menggantikan aturan yang sudah terbukti.
+- Biaya model boleh naik; akurasi jawaban yang diutamakan pemilik.
+
