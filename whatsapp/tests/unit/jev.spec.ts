@@ -13,7 +13,14 @@ import {
   saveJevConfig,
   setJevFetcher,
 } from '#beta3/jev'
-import { chooseImageColor, promisesTotal, storeSentTotal, understandTurn } from '#beta3/jev_decisions'
+import {
+  chooseImageColor,
+  isNewDestination,
+  promisesTotal,
+  storeConfirmedPayment,
+  storeSentTotal,
+  understandTurn,
+} from '#beta3/jev_decisions'
 import { guardTotalPromise, offeredServices } from '#beta3/reply_service'
 import { matchAutoTotal } from '#beta3/order_service'
 
@@ -109,6 +116,48 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
     assert.isUndefined(await chooseImageColor(input))
     setJevFetcher(reply({ warna_gambar: { type: 'choice', choice: 'lain', probabilities: {}, confidence: 0.9 } }))
     assert.isNull(await chooseImageColor(input))
+  })
+
+  test('keputusan tambahan v3.5.11: tanda terima, topik, kesulitan, sudah tf, tunda, prioritas', async ({ assert }) => {
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    setJevFetcher(
+      reply({
+        tanggapan: { type: 'choice', choice: 'terima', probabilities: {}, confidence: 0.95 },
+        topik_ongkir: { type: 'noul', noul: 0.04 },
+        topik_ukuran: { type: 'noul', noul: 0.97 },
+        topik_bayar: { type: 'noul', noul: 0.5 },
+        kesulitan: { type: 'score', score: 1.1, confidence: 0.9 },
+        sudah_tf: { type: 'noul', noul: 0.96 },
+        lanjut: { type: 'choice', choice: 'tunda', probabilities: {}, confidence: 0.95 },
+        urgensi: { type: 'score', score: 4.6, confidence: 0.8 },
+      })
+    )
+    const result = await understandTurn({
+      jid: 'jevtest@s.whatsapp.net',
+      text: 'oke kak',
+      history: [{ direction: 'out', body: 'Ukuran size L seperti ini bos' }],
+      services: [],
+      offerPending: false,
+      awaitingPayment: true,
+    })
+    assert.equal(result.reaction, 'terima')
+    assert.deepEqual(result.topics, { ongkir: false, ukuran: true })
+    assert.equal(result.difficulty, 1)
+    assert.isTrue(result.paidClaim)
+    assert.equal(result.follow, 'tunda')
+    assert.equal(result.urgency, 5)
+  })
+
+  test('tujuan baru & dana masuk: Jev yakin dipakai, ragu = tidak tahu', async ({ assert }) => {
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    setJevFetcher(reply({ tujuan_baru: { type: 'noul', noul: 0.03 } }))
+    assert.isFalse(await isNewDestination('jevtest@s.whatsapp.net', 'reg aja', 'reg', 'Patimuan, Cilacap'))
+    setJevFetcher(reply({ tujuan_baru: { type: 'noul', noul: 0.6 } }))
+    assert.isUndefined(await isNewDestination('jevtest@s.whatsapp.net', 'kalo cilacap', 'cilacap', 'Patimuan, Cilacap'))
+    setJevFetcher(reply({ dana_masuk: { type: 'noul', noul: 0.02 } }))
+    assert.isFalse(await storeConfirmedPayment('jevtest@s.whatsapp.net', ['Totalnya 705.000 bos, transfer ke BCA 1234567890']))
+    setJevFetcher(reply({ dana_masuk: { type: 'noul', noul: 0.97 } }))
+    assert.isTrue(await storeConfirmedPayment('jevtest@s.whatsapp.net', ['Sudah masuk ya bos, terimakasih prosess ya']))
   })
 
   test('pemahaman giliran: layanan dari Jev dipakai bila yakin, belum memilih = null', async ({

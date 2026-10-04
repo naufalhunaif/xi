@@ -92,6 +92,11 @@ export const LEAN_TABLE_STATEMENTS = [
     note TEXT NOT NULL,
     updated_at DATETIME NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS whatsapp_beta3_priority (
+    jid VARCHAR(190) NOT NULL PRIMARY KEY,
+    score TINYINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_shipments (
     message_id VARCHAR(190) NOT NULL PRIMARY KEY,
     jid VARCHAR(190) NOT NULL,
@@ -182,6 +187,7 @@ export async function deleteLeanChatData(trx: any, jids?: string[]) {
     'whatsapp_beta3_orders',
     'whatsapp_beta3_chats',
     'whatsapp_beta3_refs',
+    'whatsapp_beta3_priority',
   ]) {
     const query = trx.from(table)
     if (jids) query.whereIn('jid', jids)
@@ -219,5 +225,15 @@ export async function writeBeta3ChatNote(jid: string, note: string) {
     `INSERT INTO whatsapp_beta3_chats (jid, note, updated_at) VALUES (?, ?, ?)
      ON DUPLICATE KEY UPDATE note = VALUES(note), updated_at = VALUES(updated_at)`,
     [jid, value, new Date()]
+  )
+}
+
+/** Prioritas chat dari Jev (1–5), ditampilkan sebagai "Penting" di kotak masuk selama 24 jam. */
+export async function saveChatPriority(jid: string, score: number) {
+  await ensureLeanTables()
+  await db.rawQuery(
+    `INSERT INTO whatsapp_beta3_priority (jid, score, created_at) VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE score = VALUES(score), created_at = VALUES(created_at)`,
+    [jid, Math.min(5, Math.max(1, Math.round(score))), new Date()]
   )
 }

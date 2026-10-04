@@ -57,6 +57,8 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 |---|---|
 | Jev mati / tanpa kunci / gagal / lewat batas waktu → tidak ada keputusan, cara lama dipakai | `jev.spec` · tanpa kunci / gagal-timeout |
 | Jawaban Jev di bawah ambang yakin tidak dipakai, tetap dicatat (used = 0) | `jev.spec` · pemahaman giliran |
+| v3.5.11: tanda terima → diam tanpa AI; topik Jev menggantikan pola kata untuk bagian prompt (gambar & tahap tetap memaksa); "sudah tf" tanpa foto → bukti_dikirim; tunda/batal → tanpa susulan, batal menutup order belum dibayar; dana masuk butuh AI + Jev | `jev.spec` · keputusan tambahan, `beta3.spec` · topik dari Jev |
+| Prioritas Jev ≥ 4 → badge "Penting" di daftar chat (24 jam, masih menunggu balasan atau mode CS) | `beta3_flow.spec` · prioritas chat |
 | Data pelanggan (telepon, rekening, email) disamarkan sebelum dikirim ke Jev | `jev.spec` · disamarkan |
 | Layanan ongkir pilihan Jev dipakai untuk total; "belum memilih" = total ditahan | `jev.spec` · layanan pilihan Jev |
 | Janji total dari Jev ikut menahan janji tanpa order | `jev.spec` · janji total |

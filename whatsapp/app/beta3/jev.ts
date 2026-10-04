@@ -24,6 +24,14 @@ export const JEV_DECISIONS = {
   serah_cs: 'Perlu diserahkan ke CS',
   komentar_ig: 'Komentar Instagram',
   warna_gambar: 'Warna produk di gambar pelanggan',
+  tanggapan: 'Pesan singkat cukup tanda terima',
+  topik: 'Topik pesan (bagian prompt)',
+  kesulitan: 'Tingkat kesulitan (pilih model)',
+  tujuan_baru: 'Pesan berisi tujuan pengiriman baru',
+  sudah_tf: 'Pelanggan bilang sudah transfer',
+  dana_masuk: 'Toko menyatakan dana masuk',
+  lanjut: 'Pelanggan menunda / membatalkan',
+  urgensi: 'Prioritas chat di kotak masuk',
 } as const
 export type JevDecision = keyof typeof JEV_DECISIONS
 
@@ -40,6 +48,14 @@ export const JEV_THRESHOLD: Record<JevDecision, number> = {
   serah_cs: 0.85,
   komentar_ig: 0.9,
   warna_gambar: 0.8,
+  tanggapan: 0.85,
+  topik: 0.8,
+  kesulitan: 0.8,
+  tujuan_baru: 0.85,
+  sudah_tf: 0.85,
+  dana_masuk: 0.9,
+  lanjut: 0.9,
+  urgensi: 0.7,
 }
 
 export type JevNoul = {

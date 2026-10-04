@@ -875,6 +875,14 @@
         meta.append(badge)
       }
       if (contact.needs_payment) meta.append(coin)
+      // Jev menilai chat ini penting/mendesak (komplain, butuh cepat) dan masih menunggu balasan.
+      if (Number(contact.priority) >= 4 && (Number(contact.unanswered_count) > 0 || contact.handling_mode === 'cs')) {
+        const urgent = document.createElement('span')
+        urgent.className = 'wa-contact-mode urgent'
+        urgent.textContent = t('Penting')
+        urgent.title = t('Prioritas chat di kotak masuk')
+        meta.append(urgent)
+      }
       if (contact.handling_mode === 'cs') meta.append(mode)
       link.append(avatar, content, meta)
       contacts.append(link)

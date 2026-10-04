@@ -258,3 +258,19 @@ test.group('akun AI · tugas latar (v3.5.10)', () => {
     }
   })
 })
+
+test.group('prioritas chat · kotak masuk (v3.5.11)', () => {
+  test('skor Jev tersimpan per chat dan dibatasi 1–5', async ({ assert }) => {
+    const db = (await import('#services/workspace_database')).default
+    const { saveChatPriority } = await import('#beta3/tables')
+    const jid = 'prioritas-uji@s.whatsapp.net'
+    try {
+      await saveChatPriority(jid, 7)
+      assert.equal(Number((await db.from('whatsapp_beta3_priority').where('jid', jid).first()).score), 5)
+      await saveChatPriority(jid, 2)
+      assert.equal(Number((await db.from('whatsapp_beta3_priority').where('jid', jid).first()).score), 2)
+    } finally {
+      await db.from('whatsapp_beta3_priority').where('jid', jid).delete()
+    }
+  })
+})

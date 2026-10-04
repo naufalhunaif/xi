@@ -77,7 +77,10 @@ export function promptNeeds(input: {
   rows: LeanHistoryRow[]
   intent?: string
   hasFit: boolean
+  /** Topik dari Jev (yakin); menggantikan pola kata bila ada. */
+  topics?: Partial<Record<'ongkir' | 'ukuran' | 'bayar' | 'custom' | 'warna', boolean>>
 }) {
+  const topics = input.topics || {}
   const recentOut = input.rows
     .filter((row) => !row.current && row.direction === 'out')
     .slice(-2)
@@ -89,8 +92,10 @@ export function promptNeeds(input: {
   return {
     catalog: !late || images || PRODUCT.test(text) || input.intent === 'produk' || input.intent === 'harga',
     sizeCharts:
-      images || SIZE.test(text) || SIZE.test(recentOut) || input.intent === 'ukuran' || input.hasFit,
-    fabrics: images || EARLY.includes(input.stage) || COLOR.test(text) || input.intent === 'produk',
+      images ||
+      input.hasFit ||
+      (topics.ukuran ?? (SIZE.test(text) || SIZE.test(recentOut) || input.intent === 'ukuran')),
+    fabrics: images || (topics.warna ?? (EARLY.includes(input.stage) || COLOR.test(text) || input.intent === 'produk')),
   }
 }
 
@@ -131,7 +136,9 @@ export function skillContext(input: {
   needs: { catalog: boolean; sizeCharts: boolean }
   shippingNotes: boolean
   hasOrder: boolean
+  topics?: Partial<Record<'ongkir' | 'ukuran' | 'bayar' | 'custom' | 'warna', boolean>>
 }): SkillContext {
+  const topics = input.topics || {}
   const recent = input.rows
     .slice(-4)
     .map((row) => String(row.body || ''))
@@ -141,6 +148,7 @@ export function skillContext(input: {
   return {
     size: input.needs.sizeCharts || ['tanya_size', 'tawar_celana'].includes(input.stage),
     spec:
+      topics.custom === true ||
       Boolean(input.spec.trim()) ||
       !['', 'lain', 'tanya_model'].includes(input.stage) ||
       input.imageCount > 0 ||
@@ -148,10 +156,9 @@ export function skillContext(input: {
     catalog: input.needs.catalog,
     shipping:
       input.shippingNotes ||
-      SHIPPING.test(text) ||
-      SHIPPING.test(recent) ||
-      ['minta_alamat', 'kirim_form', 'tunggu_form', 'tunggu_cs', 'tunggu_bayar'].includes(input.stage),
-    paid: input.hasOrder || LATE.includes(input.stage) || PAID.test(text),
+      ['minta_alamat', 'kirim_form', 'tunggu_form', 'tunggu_cs', 'tunggu_bayar'].includes(input.stage) ||
+      (topics.ongkir ?? (SHIPPING.test(text) || SHIPPING.test(recent))),
+    paid: LATE.includes(input.stage) || (topics.bayar ?? (input.hasOrder || PAID.test(text))),
     photo:
       input.imageCount > 0 ||
       instagram ||

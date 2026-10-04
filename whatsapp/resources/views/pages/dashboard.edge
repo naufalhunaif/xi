@@ -261,6 +261,9 @@
                     @if(contact.needs_payment)
                       <span class="wa-contact-coin" title="Pembayaran perlu dikonfirmasi" aria-label="Pembayaran perlu dikonfirmasi" data-i18n-title="Pembayaran perlu dikonfirmasi" data-i18n-aria-label="Pembayaran perlu dikonfirmasi"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.8-2.5 1.9 0 2.6 5 1.4 5 4.1 0 1.1-1.1 2-2.5 2-1.1 0-2.1-.5-2.6-1.3M12 6.5V8m0 8v1.5"/></svg></span>
                     @end
+                    @if(Number(contact.priority) >= 4 && (contact.unanswered_count > 0 || contact.handling_mode === 'cs'))
+                      <span class="wa-contact-mode urgent" title="Prioritas chat di kotak masuk" data-i18n="Penting" data-i18n-title="Prioritas chat di kotak masuk">Penting</span>
+                    @end
                     @if(contact.handling_mode === 'cs')
                       <span class="wa-contact-mode cs">CS</span>
                     @end

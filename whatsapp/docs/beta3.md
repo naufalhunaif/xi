@@ -34,6 +34,14 @@ Jev (TypeSafe AI, `app/beta3/jev.ts` + `jev_decisions.ts`) menjawab keputusan ke
 | `varian` | Warna katalog di spesifikasi | `fixCatalogColors` |
 | `terjawab` | Jawaban setelah CS: lewati bila semua sudah dijawab | AI menilai sendiri |
 | `komentar_ig` | Komentar Instagram perlu dijawab | `isQuestionComment` |
+| `tanggapan` (v3.5.11) | "oke/siap" yang cukup tanda terima → tidak dibalas, AI tidak dipanggil (0 token) | AI menilai sendiri |
+| `topik` (v3.5.11) | Ongkir/ukuran/bayar/custom/warna → bagian skill & data yang dikirim | Pola kata `token_saver` |
+| `kesulitan` (v3.5.11) | Model ringan/standar/berat (mode "Otomatis") | `autoTier` |
+| `tujuan_baru` (v3.5.11) | Lanjutan obrolan ongkir: nama tempat baru atau bukan ("reg aja") | Daftar kata `NOT_A_PLACE` |
+| `sudah_tf` (v3.5.11) | "Sudah tf" tanpa foto → tahap bukti_dikirim, masuk filter Pembayaran | AI menilai sendiri |
+| `dana_masuk` (v3.5.11) | Pemeriksa kedua sebelum order ditandai lunas dari chat (AI & Jev harus sama) | AI saja |
+| `lanjut` (v3.5.11) | Tunda → susulan dibatalkan; batal → order belum dibayar ditutup | AI mengosongkan susulan |
+| `urgensi` (v3.5.11) | Skor 1–5 → badge "Penting" di kotak masuk (24 jam, chat belum dibalas/CS) | — |
 | `warna_gambar` (v3.5.8) | Warna produk di gambar pelanggan dari hasil ukur piksel (`app/beta3/image_color.ts`) vs foto katalog | Warna terdekat bila selisihnya jelas, selain itu kandidat ke AI |
 
 Batas waktu 800 ms per panggilan; ambang yakin per keputusan di `JEV_THRESHOLD`. Setiap keputusan

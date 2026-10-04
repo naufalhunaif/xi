@@ -17,6 +17,8 @@ type InboxMessage = {
   needs_payment: boolean
   has_order: boolean
   done_order: boolean
+  /** Prioritas dari Jev (1–5) dalam 24 jam terakhir; 0 = tidak ada. */
+  priority: number
 }
 
 /** Workspace read state is separate from WhatsApp delivery/read receipts. */
@@ -108,7 +110,9 @@ export async function latestInboxMessages() {
           OR (u.created_at = r.created_at AND u.id > r.id))) AS unanswered_count,
       (${paymentSql}) AS needs_payment,
       (${orderSql}) AS has_order,
-      (${doneSql}) AS done_order
+      (${doneSql}) AS done_order,
+      (SELECT pr.score FROM whatsapp_beta3_priority pr WHERE pr.jid = m.jid
+        AND pr.created_at >= NOW() - INTERVAL 1 DAY) AS priority
     FROM whatsapp_messages m
     JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages) ranked ON ranked.id = m.id AND ranked.position = 1
@@ -123,5 +127,6 @@ export async function latestInboxMessages() {
     needs_payment: Boolean(Number(message.needs_payment)),
     has_order: Boolean(Number(message.has_order)),
     done_order: Boolean(Number(message.done_order)),
+    priority: Number(message.priority) || 0,
   }))
 }

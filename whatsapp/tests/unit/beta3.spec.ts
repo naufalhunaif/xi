@@ -1124,3 +1124,20 @@ test.group('beta3 · warna dari piksel (v3.5.8)', () => {
     assert.sameMembers(near[0].products, ['Tuxedo Signature', 'Basic Suit Signature'])
   })
 })
+
+test.group('beta3 · topik dari Jev (v3.5.11)', () => {
+  test('topik Jev menggantikan pola kata untuk bagian prompt; gambar & tahap tetap memaksa', async ({ assert }) => {
+    const { promptNeeds, skillContext } = await import('#beta3/token_saver')
+    const rows = [{ direction: 'in' as const, body: 'ongkir ke cilacap berapa', createdAt: new Date(), current: true }]
+    const base = { stage: '', text: 'ongkir ke cilacap berapa', imageCount: 0, rows, hasFit: false }
+    assert.isTrue(promptNeeds({ ...base, topics: { ukuran: true } }).sizeCharts)
+    assert.isFalse(promptNeeds({ ...base, text: 'size L ada?', topics: { ukuran: false } }).sizeCharts)
+    assert.isTrue(promptNeeds({ ...base, imageCount: 1, topics: { ukuran: false } }).sizeCharts)
+    const ctx = (topics: Record<string, boolean>, stage = '') =>
+      skillContext({ ...base, stage, spec: '', needs: { catalog: true, sizeCharts: false }, shippingNotes: false, hasOrder: true, topics })
+    assert.isFalse(ctx({ ongkir: false }).shipping)
+    assert.isTrue(ctx({ ongkir: false }, 'minta_alamat').shipping)
+    assert.isFalse(ctx({ bayar: false }).paid)
+    assert.isTrue(ctx({ custom: true }).spec)
+  })
+})

@@ -41,6 +41,27 @@ export type TurnUnderstanding = {
   agreed?: boolean
   /** Layanan ongkir yang dipilih (alias huruf kecil), null = belum memilih, undefined = tidak tahu. */
   service?: string | null
+  /** Pesan singkat ("oke", "siap"): terima = cukup tanda terima (tidak perlu dibalas). */
+  reaction?: 'terima' | 'setuju' | 'jawab' | 'tanya' | 'lain'
+  /** Topik yang dibahas pesan ini (untuk memilih bagian prompt). */
+  topics?: Partial<Record<TurnTopic, boolean>>
+  /** 1 = sederhana, 2 = biasa, 3 = rumit (untuk memilih model). */
+  difficulty?: number
+  /** Pelanggan menyatakan sudah transfer/bayar. */
+  paidClaim?: boolean
+  /** Lanjut, menunda (nanti/pikir-pikir), atau membatalkan. */
+  follow?: 'lanjut' | 'tunda' | 'batal'
+  /** 1–5: seberapa penting/mendesak chat ini untuk ditangani toko. */
+  urgency?: number
+}
+
+export type TurnTopic = 'ongkir' | 'ukuran' | 'bayar' | 'custom' | 'warna'
+const TOPICS: Record<TurnTopic, string> = {
+  ongkir: 'ongkir, alamat/tujuan pengiriman, ekspedisi, atau kapan sampai',
+  ukuran: 'size, ukuran badan, tinggi/berat, atau nomor celana',
+  bayar: 'pembayaran, DP, rekening, bukti transfer, atau status pesanan yang sudah dibayar',
+  custom: 'permintaan custom (ukuran sendiri, kerah, saku, kancing, detail model)',
+  warna: 'warna, bahan/kain, atau foto produk',
 }
 
 /**
@@ -53,13 +74,22 @@ export async function understandTurn(input: {
   history: Line[]
   services: string[]
   offerPending: boolean
+  /** Ada order menunggu pembayaran (pertanyaan "sudah transfer?" relevan). */
+  awaitingPayment?: boolean
 }): Promise<TurnUnderstanding> {
+  const short = input.text.trim().length <= 30
   const on = {
     maksud: await jevOn('maksud'),
     form: await jevOn('form'),
     serah_cs: await jevOn('serah_cs'),
     setuju: input.offerPending && (await jevOn('setuju')),
     layanan: input.services.length > 1 && (await jevOn('layanan')),
+    tanggapan: short && (await jevOn('tanggapan')),
+    topik: await jevOn('topik'),
+    kesulitan: await jevOn('kesulitan'),
+    sudah_tf: Boolean(input.awaitingPayment) && (await jevOn('sudah_tf')),
+    lanjut: await jevOn('lanjut'),
+    urgensi: await jevOn('urgensi'),
   }
   const questions: Record<string, JevQuestion> = {}
   if (on.maksud)
@@ -122,6 +152,61 @@ export async function understandTurn(input: {
       criteria,
     }
   }
+  if (on.tanggapan)
+    questions.tanggapan = {
+      type: 'choice',
+      instructions: 'Pesan_terbaru pelanggan singkat. Apa fungsinya terhadap pesan toko terakhir di percakapan?',
+      criteria: {
+        terima: 'Hanya tanda terima/oke atas info toko; tidak menyetujui tawaran, tidak memilih, tidak bertanya — tidak perlu dibalas',
+        setuju: 'Menyetujui tawaran, total, atau langkah yang ditawarkan toko',
+        jawab: 'Menjawab pertanyaan toko (memilih opsi, menyebut size/warna/jumlah)',
+        tanya: 'Bertanya atau meminta sesuatu',
+        lain: 'Selain itu',
+      },
+    }
+  if (on.topik)
+    for (const [key, description] of Object.entries(TOPICS))
+      questions[`topik_${key}`] = {
+        type: 'noul',
+        instructions: `Apakah pesan_terbaru membahas ${description}?`,
+      }
+  if (on.kesulitan)
+    questions.kesulitan = {
+      type: 'score',
+      instructions: 'Seberapa sulit membalas pesan_terbaru dengan benar?',
+      criteria: [
+        'Sederhana: sapaan, ya/tidak, satu pertanyaan stok/harga/foto yang jelas',
+        'Biasa: beberapa pertanyaan, saran size, ongkir, langkah order',
+        'Rumit: komplain, custom, negosiasi, banyak syarat, atau perlu menimbang riwayat panjang',
+      ],
+    }
+  if (on.sudah_tf)
+    questions.sudah_tf = {
+      type: 'noul',
+      instructions: 'Apakah pesan_terbaru menyatakan pelanggan SUDAH transfer/membayar (bukan bertanya rekening atau berjanji nanti)?',
+    }
+  if (on.lanjut)
+    questions.lanjut = {
+      type: 'choice',
+      instructions: 'Apakah pesan_terbaru menunda atau membatalkan rencana membeli?',
+      criteria: {
+        lanjut: 'Masih lanjut / tidak menyinggung penundaan',
+        tunda: 'Menunda: nanti dulu, pikir-pikir, kabari lagi, belum gajian',
+        batal: 'Membatalkan: tidak jadi, cancel, cari di tempat lain',
+      },
+    }
+  if (on.urgensi)
+    questions.urgensi = {
+      type: 'score',
+      instructions: 'Seberapa penting/mendesak pesan_terbaru untuk segera ditangani toko?',
+      criteria: [
+        'Biasa: tanya-tanya, basa-basi',
+        'Calon pembeli serius: tanya size/ongkir/cara order',
+        'Siap bayar atau sudah bayar, menunggu konfirmasi',
+        'Mendesak: butuh cepat (acara dekat), pesanan terlambat, belum ada kabar',
+        'Komplain, marah, barang rusak/salah, minta refund',
+      ],
+    }
   if (!Object.keys(questions).length) return {}
   const answers = await askJev(
     'pahami',
@@ -129,13 +214,16 @@ export async function understandTurn(input: {
       pesan_terbaru: maskPii(input.text).slice(0, 2000),
       percakapan: conversationLines(input.history),
       layanan_tersedia: input.services,
+      pesan_toko_terakhir: maskPii(
+        String([...input.history].reverse().find((row) => row.direction === 'out')?.body || '')
+      ).slice(0, 600),
     },
     questions
   )
   if (!answers) return {}
   const result: TurnUnderstanding = {}
   const take = async (
-    key: 'maksud' | 'form' | 'serah_cs' | 'setuju' | 'layanan',
+    key: 'maksud' | 'form' | 'serah_cs' | 'setuju' | 'layanan' | 'sudah_tf' | 'lanjut',
     apply: () => void
   ) => {
     const answer = answers[key]
@@ -152,6 +240,32 @@ export async function understandTurn(input: {
     const chosen = choiceOf(answers.layanan)
     result.service = chosen === 'belum' ? null : chosen
   })
+  if (answers.tanggapan) {
+    const sure = confident('tanggapan', answers.tanggapan)
+    if (sure) result.reaction = choiceOf(answers.tanggapan) as TurnUnderstanding['reaction']
+    await logDecision({ jid: input.jid, decision: 'tanggapan', answer: answers.tanggapan, used: sure, detail: input.text })
+  }
+  const topics: Partial<Record<TurnTopic, boolean>> = {}
+  for (const key of Object.keys(TOPICS) as TurnTopic[]) {
+    const answer = answers[`topik_${key}`]
+    if (!answer) continue
+    const sure = confident('topik', answer)
+    if (sure) topics[key] = yes(answer)
+    await logDecision({ jid: input.jid, decision: 'topik', answer, used: sure, detail: key })
+  }
+  if (Object.keys(topics).length) result.topics = topics
+  if (answers.kesulitan && answers.kesulitan.type === 'score') {
+    const sure = confident('kesulitan', answers.kesulitan)
+    if (sure) result.difficulty = Math.min(3, Math.max(1, Math.round(answers.kesulitan.score)))
+    await logDecision({ jid: input.jid, decision: 'kesulitan', answer: answers.kesulitan, used: sure })
+  }
+  await take('sudah_tf', () => (result.paidClaim = yes(answers.sudah_tf)))
+  await take('lanjut', () => (result.follow = choiceOf(answers.lanjut) as TurnUnderstanding['follow']))
+  if (answers.urgensi && answers.urgensi.type === 'score') {
+    const sure = confident('urgensi', answers.urgensi)
+    if (sure) result.urgency = Math.min(5, Math.max(1, Math.round(answers.urgensi.score)))
+    await logDecision({ jid: input.jid, decision: 'urgensi', answer: answers.urgensi, used: sure })
+  }
   return result
 }
 
@@ -348,4 +462,47 @@ export async function chooseImageColor(input: {
   await logDecision({ jid: input.jid, decision: 'warna_gambar', answer, used: sure, detail: input.measured })
   if (!sure) return undefined
   return answer.choice === 'lain' ? null : answer.choice
+}
+
+/** Pesan lanjutan obrolan ongkir menyebut tujuan pengiriman BARU? undefined = tidak tahu. */
+export async function isNewDestination(jid: string, text: string, place: string, lastPlace: string) {
+  if (!(await jevOn('tujuan_baru'))) return undefined
+  const answers = await askJev(
+    'tujuan-baru',
+    { pesan_pelanggan: maskPii(text).slice(0, 300), kata_yang_dikira_tempat: place, tujuan_sebelumnya: lastPlace },
+    {
+      tujuan_baru: {
+        type: 'noul',
+        instructions:
+          'Apakah pesan_pelanggan menyebut nama tempat/tujuan pengiriman BARU (kecamatan, kota, daerah)? Memilih layanan (REG/YES), menjawab oke, atau menyebut produk/size BUKAN tujuan baru.',
+      },
+    }
+  )
+  const answer = answers?.tujuan_baru
+  if (!answer) return undefined
+  const sure = confident('tujuan_baru', answer)
+  await logDecision({ jid, decision: 'tujuan_baru', answer, used: sure, detail: `${text} → ${place}` })
+  return sure ? yes(answer) : undefined
+}
+
+/** Pesan toko (CS) menyatakan dana sudah masuk/diterima? undefined = tidak tahu. */
+export async function storeConfirmedPayment(jid: string, storeMessages: string[]) {
+  const recent = storeMessages.filter((body) => body.trim()).slice(-5)
+  if (!recent.length || !(await jevOn('dana_masuk'))) return undefined
+  const answers = await askJev(
+    'dana-masuk',
+    { pesan_toko: recent.map((body) => maskPii(body).slice(0, 400)) },
+    {
+      dana_masuk: {
+        type: 'noul',
+        instructions:
+          'Apakah salah satu pesan_toko MENYATAKAN dana/pembayaran pelanggan sudah masuk atau diterima (mis. "sudah masuk ya", "dana diterima", "terimakasih, prosess ya" setelah transfer)? Mengirim rekening, total, atau "kami cek dulu" BUKAN.',
+      },
+    }
+  )
+  const answer = answers?.dana_masuk
+  if (!answer) return undefined
+  const sure = confident('dana_masuk', answer)
+  await logDecision({ jid, decision: 'dana_masuk', answer, used: sure, detail: recent.join(' | ').slice(0, 300) })
+  return sure ? yes(answer) : undefined
 }

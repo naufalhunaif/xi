@@ -81,3 +81,17 @@ html:not([data-theme='dark']) .workspace-ui .wa-settings-menu a[aria-current='pa
 .workspace-ui .wa-card-title small {
   color: var(--muted);
 }
+
+/* Badge "Penting" (prioritas dari Jev) di daftar chat. */
+.workspace-ui {
+  --wa-urgent-bg: #fbe9e7;
+  --wa-urgent: #a3321f;
+}
+html[data-theme='dark'] .workspace-ui {
+  --wa-urgent-bg: var(--wa-red-bg);
+  --wa-urgent: var(--wa-red);
+}
+.workspace-ui .wa-contact-mode.urgent {
+  background: var(--wa-urgent-bg);
+  color: var(--wa-urgent);
+}

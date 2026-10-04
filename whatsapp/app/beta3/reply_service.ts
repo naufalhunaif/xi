@@ -16,6 +16,7 @@ import {
   saveLeanOrder,
   updatePendingOrderSpec,
   latestLeanOrder,
+  cancelLeanOrder,
   readLeanOrder,
   noteAutoTotalReason,
   verifyAutoTotal,
@@ -30,7 +31,7 @@ import {
   type LeanDecision,
   type LeanHistoryRow,
 } from '#beta3/prompt'
-import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
+import { runLeanProvider, type AutoTier, type LeanProviderSettings } from '#beta3/provider'
 import { normalizeStyle, storeStyle, styleGuide } from '#beta3/style_service'
 import {
   callLeanTool,
@@ -54,7 +55,7 @@ import {
 } from '#beta3/mcp'
 import { DEFAULT_ITEM_GRAMS, orderWeightGrams } from '#beta3/weights'
 import { detectAwb } from '#beta3/shipments'
-import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
+import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { keepCustomInChat, questionAfterPhotos } from '#beta3/reply_guards'
@@ -69,6 +70,8 @@ import {
   promisesTotal,
   storeSentTotal,
   understandTurn,
+  isNewDestination,
+  storeConfirmedPayment,
   type TurnUnderstanding,
 } from '#beta3/jev_decisions'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
@@ -715,10 +718,15 @@ export async function createLeanReply(input: {
       if (followUp && last?.pending && last.choices?.length)
         resolved = pickArea(input.text, last.choices)
       if (!resolved) {
-        let areas = groupDestinations(await findDestinations(place, mcp))
-        if (!areas.length && last?.pending && last.place && !place.includes(last.place))
+        // Lanjutan obrolan ongkir tanpa kata "ongkir": Jev memastikan ini memang tujuan baru.
+        const ambiguous = Boolean(followUp && last?.resolved && !last.pending && !/ongkir|kirim/i.test(input.text))
+        const fresh = ambiguous
+          ? await isNewDestination(jid, input.text, place, last!.resolved!.label).catch(() => undefined)
+          : undefined
+        let areas = fresh === false ? [] : groupDestinations(await findDestinations(place, mcp))
+        if (!areas.length && fresh !== false && last?.pending && last.place && !place.includes(last.place))
           areas = groupDestinations(await findDestinations(`${place} ${last.place}`, mcp))
-        if (!areas.length && followUp && last?.resolved && !last.pending && !/ongkir|kirim/i.test(input.text)) {
+        if (!areas.length && ambiguous && last?.resolved) {
           // Tujuan sudah jelas sebelumnya; jawaban ini bukan nama tempat baru (mis. "reg aja").
           onTrace?.({ key: 'beta3-rates', label: `Bukan tujuan baru · tetap ${last.resolved.label}`, status: 'completed', detail: { place } })
           kept = true
@@ -784,7 +792,11 @@ export async function createLeanReply(input: {
     /\b(resi|paket|lacak|tracking|posisi|sampai mana|sampe mana|nyampe|sudah sampai|udah sampai|belum sampai|belum datang|kapan sampai|kapan datang|kapan tiba|dikirim|sudah kirim|udah kirim|sdh dikirim)\b/i.test(
       input.text
     )
-  if (asksTracking && mcp.url) {
+  // Dipanggil lagi sesudah Jev bila maksud pesannya "status pesanan" tapi pola kata tidak menangkapnya.
+  let tracked = false
+  const trackParcel = async () => {
+    if (tracked || !mcp.url) return
+    tracked = true
     let awb = extractAwb(input.text)
     if (!awb)
       for (const row of [...rows].reverse()) {
@@ -817,6 +829,7 @@ export async function createLeanReply(input: {
       }
     }
   }
+  if (asksTracking) await trackParcel()
 
   if (form) {
     let rates: ShippingRates | null = null
@@ -943,7 +956,47 @@ export async function createLeanReply(input: {
     history: rows.map((row) => ({ direction: row.direction, body: row.body, mediaType: row.mediaType })),
     services: offeredServices(pendingForJev?.status === 'pending' ? pendingForJev.shipping_options : null),
     offerPending: rows.some((row, index) => index >= rows.length - 4 && row.direction === 'out' && /total|\d{1,3}(?:\.\d{3})+/i.test(String(row.body || ''))),
+    awaitingPayment: pendingForJev?.status === 'awaiting_payment',
   }).catch(() => ({}) as TurnUnderstanding)
+  // Prioritas chat untuk kotak masuk ("Penting").
+  if (understanding.urgency) await saveChatPriority(jid, understanding.urgency).catch(() => {})
+  // Maksud "status pesanan" yang tidak tertangkap pola kata → lacak resi juga.
+  if (understanding.intent === 'status_pesanan') await trackParcel()
+  // "oke/siap" yang cukup tanda terima: tidak perlu dibalas, AI tidak dipanggil (0 token).
+  if (
+    understanding.reaction === 'terima' &&
+    !input.imagePaths?.length &&
+    !input.note &&
+    !systemNote &&
+    !toolNotes.length &&
+    !form &&
+    !loose
+  ) {
+    onTrace?.({ key: 'beta3-quick', label: 'Cukup tanda terima (Jev) · tidak dibalas, 0 token', status: 'completed', detail: { text: input.text } })
+    return {
+      decision: {
+        pesan: [],
+        foto: [],
+        catatan: chatNote,
+        tahap: (stage || 'lain') as LeanDecision['tahap'],
+        serah_cs: false,
+        alasan: '',
+        susulan: '',
+        spesifikasi: String(spec || ''),
+      },
+      autoTotal: null,
+      photos: [],
+      promptTokens: 0,
+      promptSections: [],
+      usage: null,
+      durationMs: 0,
+      orderId: null,
+      skillName: skill.name,
+    }
+  }
+  if (understanding.paidClaim && pendingForJev?.status === 'awaiting_payment')
+    systemNote +=
+      '\n\nCATATAN SISTEM: pelanggan menyatakan SUDAH transfer. Balas "siap bos, kami cek dulu ya" (minta bukti transfernya bila belum dikirim); jangan bilang sudah diterima. tahap = bukti_dikirim.'
   if (understanding.hasShippingData && !form && !loose)
     systemNote +=
       '\n\nCATATAN SISTEM: pelanggan sepertinya mengirim data pengiriman, tapi belum lengkap terbaca. Minta bagian yang kurang (nama, alamat lengkap, kecamatan, kota, no HP) dalam satu pesan.'
@@ -962,6 +1015,7 @@ export async function createLeanReply(input: {
     rows,
     intent: understanding.intent,
     hasFit: toolNotes.some((note) => /fit advisor|rekomendasi size|size chart/i.test(note)),
+    topics: understanding.topics,
   })
   // Skill hanya bagian yang dibutuhkan; katalog hanya produk/warna yang sedang dibahas.
   const skillNeed = skillContext({
@@ -973,6 +1027,7 @@ export async function createLeanReply(input: {
     needs,
     shippingNotes: Boolean(systemNote) || toolNotes.some((note) => /ONGKIR|TUJUAN/.test(note)),
     hasOrder: Boolean(activeOrder) || Boolean(pendingForJev),
+    topics: understanding.topics,
   })
   const trimmedSkill = trimSkill(skill.content, skillNeed)
   const focus = needs.catalog
@@ -1038,8 +1093,14 @@ export async function createLeanReply(input: {
   onTrace?.({ key: 'beta3-ai', label: 'Menyusun balasan · tanpa tool', status: 'running' })
   const result = await runLeanProvider(settings, prompt, input.imagePaths || [], undefined, undefined, {
     jid,
-    // Hanya salam/terima kasih (menurut Jev) → model ringan.
-    ...(understanding.intent === 'sapaan' && !input.imagePaths?.length && !systemNote ? { tier: 'light' as const } : {}),
+    // Tingkat model dari Jev: salam/pertanyaan sederhana → ringan, rumit → berat. Ada gambar → aturan lama.
+    ...(input.imagePaths?.length
+      ? {}
+      : understanding.intent === 'sapaan' && !systemNote
+        ? { tier: 'light' as const }
+        : understanding.difficulty
+          ? { tier: (understanding.difficulty === 1 && !systemNote ? 'light' : understanding.difficulty === 3 ? 'heavy' : 'standard') as AutoTier }
+          : {}),
   })
   let decision: LeanDecision
   try {
@@ -1098,6 +1159,26 @@ export async function createLeanReply(input: {
       detail: { alasan: decision.alasan },
     })
     decision.alasan = ''
+  }
+  // Pelanggan menunda / membatalkan (Jev): tidak ada susulan; batal → order yang belum dibayar ditutup.
+  if (understanding.follow === 'tunda' || understanding.follow === 'batal') decision.susulan = ''
+  if (
+    understanding.follow === 'batal' &&
+    pendingForJev &&
+    ['pending', 'awaiting_payment'].includes(String(pendingForJev.status)) &&
+    !Number(pendingForJev.paid_amount || 0)
+  ) {
+    await cancelLeanOrder(Number(pendingForJev.id), 'Pelanggan membatalkan di chat (dibaca Jev)').catch(() => {})
+    onTrace?.({ key: 'beta3-cancel', label: `Order ${pendingForJev.order_number || `#${pendingForJev.id}`} dibatalkan · pelanggan tidak jadi`, status: 'completed', detail: {} })
+  }
+  // "Sudah tf" tanpa foto (Jev): chat masuk filter Pembayaran supaya CS mengecek mutasi.
+  if (understanding.paidClaim && pendingForJev?.status === 'awaiting_payment' && !input.imagePaths?.length && !decision.serah_cs) {
+    decision.tahap = 'bukti_dikirim'
+    const base = decision.catatan || chatNote
+    decision.catatan = /tahap\s*[:=]/i.test(base)
+      ? base.replace(/tahap\s*[:=]\s*\w+/i, 'tahap: bukti_dikirim')
+      : `${base}\ntahap: bukti_dikirim`.trim()
+    onTrace?.({ key: 'beta3-paid-claim', label: 'Pelanggan bilang sudah transfer (Jev) · menunggu dicek', status: 'completed', detail: {} })
   }
   // Pemeriksa sebelum kirim: harga yang tidak ada di katalog/ongkir/chat tidak dikirim.
   if (!decision.serah_cs && decision.pesan.length) {
@@ -1272,6 +1353,17 @@ export async function createLeanReply(input: {
     }
   }
   // Total/pembayaran yang dikerjakan CS langsung di chat ikut tercatat di order.
+  // Dana masuk = soal uang: AI dan Jev harus sama-sama yakin toko sudah menyatakannya.
+  if (decision.pembayaran?.dikonfirmasi) {
+    const storeSays = await storeConfirmedPayment(
+      jid,
+      rows.filter((row) => row.direction === 'out').map((row) => String(row.body || ''))
+    ).catch(() => undefined)
+    if (storeSays === false) {
+      decision.pembayaran.dikonfirmasi = false
+      onTrace?.({ key: 'beta3-paid-check', label: 'Dana masuk belum dinyatakan toko (Jev) · tidak ditandai lunas', status: 'completed', detail: {} })
+    }
+  }
   if (!autoTotal && decision.pembayaran) {
     const synced = await syncOrderFromChat(jid, decision.pembayaran).catch(() => null)
     if (synced)
