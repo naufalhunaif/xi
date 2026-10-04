@@ -1,0 +1,144 @@
+// Ulasan chat dari pemilik, diputar ulang lewat JALUR PERAPIAN YANG SAMA dengan balasan asli
+// (reply_polish, quick reply, penjaga custom, tahap & susulan). Setiap ulasan baru → tambah kasus
+// di sini, supaya perbaikan yang saling bersinggungan tidak merusak ulasan sebelumnya.
+import { test } from '@japa/runner'
+import { polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
+import { quickReply } from '#beta3/token_saver'
+import { keepCustomInChat, CUSTOM_REPLY } from '#beta3/reply_guards'
+import { normalizeStage, type LeanDecision } from '#beta3/prompt'
+import { goalStatus } from '#beta3/reply_service'
+import { extractShippingQuery, etdText } from '#beta3/mcp'
+import type { LeanCatalogRow } from '#beta3/catalog_service'
+
+let id = 0
+const row = (product: string, category: string, price: number, big: number, material: string, color = 'Black'): LeanCatalogRow => ({
+  id: ++id,
+  product,
+  color,
+  category,
+  price,
+  sizesReady: 'S M L XL',
+  sizesAll: 'S M L XL XXL 3XL',
+  photoUrl: null,
+  materialAvailable: true,
+  features: '',
+  featuresAi: '',
+  material,
+  sizeGroup: '',
+  fit: '',
+  note: `XXL-3XL ${big.toLocaleString('id-ID')}`,
+  active: true,
+  updatedAt: new Date().toISOString(),
+})
+const catalog = [
+  row('Basic Suit', 'Suits', 485000, 585000, 'Maximotion', 'Black 2.0'),
+  row('Tuxedo', 'Suits', 485000, 585000, 'Maximotion'),
+  row('Peak Suit', 'Suits', 485000, 585000, 'Maximotion'),
+  row('Bescap Cross Placket', 'Suits', 485000, 585000, 'Maximotion'),
+  row('Pants', 'Pants', 220000, 270000, 'Maximotion'),
+  row('Setelan Basic Suit', 'Setelan', 705000, 855000, 'Maximotion'),
+  row('Premium Basic Suit', 'Suits', 685000, 785000, 'Black Label', 'Green Emerald'),
+  row('Premium Lo Suit', 'Suits', 685000, 785000, 'Portofino', 'Blue'),
+  row('Pants Premium', 'Pants', 270000, 320000, 'Black Label', 'Gray'),
+  row('Setelan Premium Basic Suit', 'Setelan', 955000, 1105000, 'Black Label', 'Gray'),
+]
+const prices = pricePattern(catalog)
+const productPrices = productPriceMap(catalog)
+const at = new Date()
+
+/** Jalur lengkap seperti di reply_service: teks → (pemeriksa katalog) → foto. */
+function polish(raw: string[], customerText: string, history: string[] = [], photos: string[] = []) {
+  const series = seriesMentioned([...history, customerText])
+  const text = polishText(raw, { customerText, prices, series, productPrices })
+  return polishWithPhotos(text.pesan, photos.map((caption) => ({ caption })), customerText)
+}
+
+test.group('Ulasan chat pemilik (diputar ulang)', () => {
+  test('#7 jas hitam: "seperti apa?" → foto dengan pengantar singkat, pertanyaan sesudah foto', ({ assert }) => {
+    assert.deepEqual(
+      polish(
+        ['Ini pilihan jas hitamnya bos, Basic Suit, Tuxedo, dan Peak Suit masing-masing 485.000. Yang cocok yang mana bos?'],
+        'Seperti apa ya?',
+        ['Ada bos, jas hitam mulai 485.000. Mau model Basic Suit, Tuxedo, atau Peak Suit?'],
+        ['Basic Suit - Black 2.0', 'Tuxedo - Black', 'Peak Suit - Black']
+      ),
+      ['Ini fotonya bos, harganya 485.000', 'Yang cocok yang mana?']
+    )
+  })
+
+  test('#7 sapaan tanpa AI; "mau custom bisa" tidak diserahkan ke CS', ({ assert }) => {
+    assert.deepEqual(
+      quickReply({ text: 'Halo', imageCount: 0, stage: '', rows: [{ direction: 'in', body: 'Halo', createdAt: at, current: true }] }),
+      ['Halo bos, ada yang bisa kami bantu']
+    )
+    assert.deepEqual(
+      keepCustomInChat({ serah_cs: true, alasan: 'Pelanggan meminta custom tanpa detail', pesan: [] }, 'Mau custkm bisa'),
+      { pesan: CUSTOM_REPLY }
+    )
+  })
+
+  test('#8 ongkir: "reg aja" bukan tempat, estimasi "1 hari"', ({ assert }) => {
+    assert.isNull(extractShippingQuery('Reg aja', true))
+    assert.equal(etdText('1-1 day'), '1 hari')
+  })
+
+  test('#10/#11 premium: daftar model tanpa "Ada bos", harga daftar tidak diubah', ({ assert }) => {
+    const [bubble] = polish(
+      ['Ada bos, model jas yang tersedia: Basic Suit mulai 485.000, Tuxedo mulai 485.000, Bescap Cross Placket 485.000, Peak Suit 485.000, Premium Basic Suit 685.000'],
+      'Ada model apa aja'
+    )
+    assert.match(bubble, /^Model jas yang tersedia:/)
+    assert.include(bubble, '- Basic Suit mulai 485.000')
+    assert.include(bubble, '- Premium Basic Suit 685.000')
+    // Sama bila model sudah menulis daftar berbaris.
+    const [lined] = polish(['Ada bos, model jas yang tersedia:\n- Basic Suit mulai 485.000\n- Premium Basic Suit 685.000'], 'Ada model apa aja')
+    assert.equal(lined, 'Model jas yang tersedia:\n- Basic Suit mulai 485.000\n- Premium Basic Suit 685.000')
+    // "ada X?" tetap boleh dijawab "Ada bos".
+    assert.deepEqual(polish(['Ada bos, jas hitam mulai 485.000'], 'Jas hitam ada?'), ['Ada bos, jas hitam mulai 485.000'])
+  })
+
+  test('#11 "yang premium seperti apa" → "Ini fotonya bos, harganya 685.000" + foto + pertanyaan', ({ assert }) => {
+    assert.deepEqual(
+      polish(
+        [
+          'Premium ada Premium Basic Suit warna Green Emerald/Sage Green dengan kerah notch satu kancing, dan Premium Lo Suit warna Blue dengan kerah hitam kontras. Harganya 685.000 bos',
+          'Mau yang warna mana bos?',
+        ],
+        'Yang premium seperti apa',
+        ['Model jas yang tersedia: Premium Basic Suit 685.000'],
+        ['Premium Basic Suit - Green Emerald', 'Premium Basic Suit - Sage Green', 'Premium Lo Suit - Blue']
+      ),
+      ['Ini fotonya bos, harganya 685.000', 'Mau yang warna mana bos?']
+    )
+  })
+
+  test('#10 setelan & celana premium dibetulkan; daftar reguler di konteks premium tidak diubah', ({ assert }) => {
+    const history = ['Premium Basic Suit - Green Emerald']
+    assert.deepEqual(polish(['Untuk setelan premium harganya 685.000 bos'], 'Set berapa ya', history), [
+      'Untuk setelan premium harganya 955.000 bos',
+    ])
+    assert.deepEqual(
+      polish(['685.000 itu jasnya saja bos, belum termasuk celana. Kalau sekalian celana mulai 220.000 ya'], 'Itu jas saja atau sama celana', history),
+      ['685.000 itu jasnya saja bos, belum termasuk celana. Kalau sekalian celana mulai 270.000 ya']
+    )
+    assert.deepEqual(polish(['Kalau yang biasa Basic Suit 485.000 bos'], 'kalau yang biasa?', history), [
+      'Kalau yang biasa Basic Suit 485.000 bos',
+    ])
+    assert.deepEqual(polish(['Setelannya 955.000 bos untuk size S-XL'], 'Kalo set berapa', history), [
+      'Setelannya 955.000 bos untuk size S-XL',
+    ])
+  })
+
+  test('#11 susulan tetap terjadwal walau tahap "lain"; tahap mirip dipetakan', ({ assert }) => {
+    const decision = (tahap: string, susulan: string) =>
+      ({ serah_cs: false, tahap: normalizeStage(tahap), susulan }) as Pick<LeanDecision, 'serah_cs' | 'tahap' | 'susulan'>
+    assert.equal(normalizeStage('tanya_harga'), 'tanya_model')
+    assert.equal(normalizeStage('tunggu_pembayaran'), 'tunggu_bayar')
+    assert.equal(normalizeStage('aneh'), 'lain')
+    assert.equal(goalStatus(decision('lain', 'Mau sekalian dengan celananya bos?')), 'waiting')
+    assert.equal(goalStatus(decision('lain', '')), 'completed')
+    assert.equal(goalStatus(decision('selesai', 'ada lagi?')), 'completed')
+    assert.equal(goalStatus({ ...decision('tanya_model', 'x'), serah_cs: true }), 'paused')
+  })
+})

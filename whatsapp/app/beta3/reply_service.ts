@@ -57,12 +57,12 @@ import { DEFAULT_ITEM_GRAMS, orderWeightGrams } from '#beta3/weights'
 import { detectAwb } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
-import { tidyLists } from '#beta3/list_tidy'
-import { keepCustomInChat, questionAfterPhotos } from '#beta3/reply_guards'
+import { keepCustomInChat } from '#beta3/reply_guards'
 import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
-import { fixContextPrices, pricePattern, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
+import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
+import { polishText, polishWithPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -519,7 +519,8 @@ export async function createLeanReply(input: {
         tahap: (stage || 'lain') as LeanDecision['tahap'],
         serah_cs: false,
         alasan: '',
-        susulan: '',
+        // Diam ("makasih" sesudah "sama-sama"): susulan yang sudah direncanakan tetap jalan.
+        susulan: quick.length ? '' : await previousNudge(jid),
         spesifikasi: String(spec || ''),
       },
       autoTotal: null,
@@ -982,7 +983,8 @@ export async function createLeanReply(input: {
         tahap: (stage || 'lain') as LeanDecision['tahap'],
         serah_cs: false,
         alasan: '',
-        susulan: '',
+        // "oke" tanda terima: susulan yang sudah direncanakan sebelumnya tetap dikirim bila pelanggan diam.
+        susulan: await previousNudge(jid),
         spesifikasi: String(spec || ''),
       },
       autoTotal: null,
@@ -1159,14 +1161,18 @@ export async function createLeanReply(input: {
   }
   // Ongkir selalu tampil rapi (satu layanan per baris), model apa pun yang menulis.
   decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
-  // Deretan pilihan/harga/produk dalam satu kalimat → satu per baris (semua model).
-  decision.pesan = decision.pesan.map(tidyLists)
-  // Perapian sistem: gaya CS tanpa bertanya ulang ke AI.
-  decision.pesan = tidyReply(decision.pesan, { address: style?.address || 'bos', verbatim: [policy.text] })
-  // Harga sesuai konteks: "setelan premium 685.000" → harga setelan premium dari POLA HARGA.
-  const priceFix = fixContextPrices(decision.pesan, prices, priceSeries)
+  // Satu jalur perapian (sama dengan tes ulasan chat): daftar, gaya CS, harga sesuai seri, pembuka.
+  const polished = polishText(decision.pesan, {
+    customerText: input.text,
+    address: style?.address || 'bos',
+    verbatim: [policy.text],
+    prices,
+    series: priceSeries,
+    productPrices: productPriceMap(digest.rows),
+  })
+  decision.pesan = polished.pesan
+  const priceFix = { changes: polished.priceChanges }
   if (priceFix.changes.length) {
-    decision.pesan = priceFix.pesan
     onTrace?.({
       key: 'beta3-price-context',
       label: `Harga dibetulkan · ${priceFix.changes.map((c) => `${c.item} ${c.from.toLocaleString('id-ID')} → ${c.to.toLocaleString('id-ID')}`).join(', ')}`,
@@ -1413,7 +1419,7 @@ export async function createLeanReply(input: {
   })
   const photos = resolvePhotos(digest.rows, decision.foto)
   // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
-  if (!decision.serah_cs) decision.pesan = questionAfterPhotos(decision.pesan, photos.length)
+  if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')
   return {
     decision,
     autoTotal,
@@ -1457,6 +1463,34 @@ export function nudgeTime(stage: string, now = Date.now()) {
  * dijadwalkan sekali (tanpa panggilan AI) dan hanya terkirim bila pelanggan
  * diam; pesan baru apa pun membatalkannya.
  */
+/**
+ * Status chat sesudah balasan. Menunggu = ada langkah yang ditunggu dari pelanggan; juga bila AI
+ * menulis susulan (mis. tahap "lain" saat pelanggan tanya-tanya model/harga), supaya susulan tetap
+ * terkirim. Selesai/serah CS tidak pernah disusul.
+ */
+/** Susulan yang terakhir direncanakan untuk chat ini (policy_json), atau kosong. */
+async function previousNudge(jid: string) {
+  const goal = await db.from('whatsapp_chat_goals').where('jid', jid).first().catch(() => null)
+  try {
+    const policy = JSON.parse(String(goal?.policy_json || 'null')) as { nudge?: string } | null
+    return String(policy?.nudge || '').slice(0, 300)
+  } catch {
+    return ''
+  }
+}
+
+export function goalStatus(decision: Pick<LeanDecision, 'serah_cs' | 'tahap' | 'susulan'>) {
+  if (decision.serah_cs) return 'paused' as const
+  if (decision.tahap === 'selesai') return 'completed' as const
+  const waitingStage =
+    decision.tahap.startsWith('tunggu') ||
+    decision.tahap.startsWith('tanya') ||
+    decision.tahap === 'minta_alamat' ||
+    decision.tahap === 'tawar_celana' ||
+    decision.tahap === 'kirim_form'
+  return waitingStage || Boolean(decision.susulan) ? ('waiting' as const) : ('completed' as const)
+}
+
 export async function finishLeanGoal(
   run: { jid: string; version: string; anchor_id: number },
   decision: LeanDecision
@@ -1472,15 +1506,7 @@ export async function finishLeanGoal(
   const lastNudge = previous?.last_followup_at ? new Date(previous.last_followup_at).getTime() : 0
   const nudges =
     lastIn && new Date(lastIn.created_at).getTime() > lastNudge ? 0 : Number(previous?.followup_count || 0)
-  const status = decision.serah_cs
-    ? 'paused'
-    : decision.tahap.startsWith('tunggu') ||
-        decision.tahap.startsWith('tanya') ||
-        decision.tahap === 'minta_alamat' ||
-        decision.tahap === 'tawar_celana' ||
-        decision.tahap === 'kirim_form'
-      ? 'waiting'
-      : 'completed'
+  const status = goalStatus(decision)
   const nudge =
     status === 'waiting' && decision.susulan && nudges < LEAN_NUDGE_MAX_PER_CHAT
       ? decision.susulan

@@ -330,6 +330,25 @@ export function renderCorrections(corrections: LeanExample[]) {
   ].join('\n')
 }
 
+/**
+ * Tahap dari model: nama yang mirip (mis. "tanya_harga", "tunggu_pembayaran") dipetakan ke tahap
+ * resmi supaya susulan & filter kotak masuk tetap jalan; benar-benar asing → "lain".
+ */
+export function normalizeStage(value: unknown): LeanStage {
+  const raw = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+  if (LEAN_STAGES.includes(raw as LeanStage)) return raw as LeanStage
+  if (/bukti|sudah_?tf|sudah_?bayar/.test(raw)) return 'bukti_dikirim'
+  if (/bayar|transfer|dp|lunas/.test(raw)) return 'tunggu_bayar'
+  if (/cs|admin|manusia/.test(raw)) return 'tunggu_cs'
+  if (/form/.test(raw)) return /tunggu|isi/.test(raw) ? 'tunggu_form' : 'kirim_form'
+  if (/alamat|ongkir|kirim/.test(raw)) return 'minta_alamat'
+  if (/celana|setelan/.test(raw)) return 'tawar_celana'
+  if (/size|ukuran/.test(raw)) return 'tanya_size'
+  if (/selesai|done|tutup/.test(raw)) return 'selesai'
+  if (/tanya|model|harga|warna|produk|foto/.test(raw)) return 'tanya_model'
+  return 'lain'
+}
+
 export function parseLeanDecision(text: string): LeanDecision {
   // JSON rusak (koma berlebih, terpotong, pagar ```) diperbaiki sistem, tanpa bertanya ulang ke AI.
   const raw = repairJson(text)
@@ -344,7 +363,7 @@ export function parseLeanDecision(text: string): LeanDecision {
     .map((item) => String(item || '').trim())
     .filter(Boolean)
     .slice(0, 3)
-  const tahap = LEAN_STAGES.includes(raw.tahap as LeanStage) ? (raw.tahap as LeanStage) : 'lain'
+  const tahap = normalizeStage(raw.tahap)
   return {
     pesan,
     foto,

@@ -5,6 +5,8 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 
 ## Aturan kerja
 
+0. **Ulasan chat pemilik** diputar ulang di `tests/unit/review_chats.spec.ts` lewat jalur yang sama dengan balasan asli (`reply_polish`). Ulasan baru = kasus baru di file itu, di commit yang sama dengan perbaikannya.
+
 1. **Sebelum mengubah**: cari bagian terkait di daftar ini. Perubahan yang menyentuh bagian itu
    harus tetap memenuhi semua barisnya.
 2. **Bug diperbaiki** → tambah tes yang menangkap bug itu + satu baris di daftar ini (commit yang sama).
@@ -47,6 +49,10 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | "Mau custom bisa?" dijawab sendiri ("Bisa bos, untuk custom nanti di sesuaikan ukuran ya" + tanya custom apa), tidak diserahkan ke CS; custom + warna/bahan/diskon tetap ke CS | `beta3.spec` · review chat jas hitam |
 | Warna produk di gambar pelanggan diukur dari piksel dan dibandingkan dengan foto katalog (putih bersih ≠ broken white ≠ krem); screenshot (bar aplikasi gelap), latar dinding, manekin, dan foto redup tidak mengacaukan hasil (contoh asli: `tests/fixtures/ig_broken_white.jpg`); Jev memilih warnanya bila yakin, selain itu warna terdekat yang jelas | `beta3.spec` · warna dari piksel, `jev.spec` · warna gambar |
 | Pola harga per seri (reguler/signature/premium × jas/celana/setelan/rompi, Double Breasted, XXL+) dihitung dari katalog dan selalu ikut prompt; "setelan premium 685.000" dibetulkan jadi 955.000, celana premium 270.000; kalimat perbandingan tidak diubah | `beta3.spec` · pola harga per seri, `jev.spec` · seri & barang |
+| "Ada bos," hanya untuk "ada X?"; pertanyaan "apa aja / seperti apa / berapa" dijawab langsung | `review_chats.spec` · #10/#11 |
+| "Seperti apa?" + foto → pengantar "Ini fotonya bos" (+ harga sekali), nama produk/warna cukup di caption foto | `review_chats.spec` · #7, #11 |
+| Pemeriksa harga tidak mengubah daftar harga (≥ 2 baris) dan angka yang memang harga produk yang disebut ("Basic Suit 485.000" di konteks premium) | `review_chats.spec` · #10 |
+| Susulan tetap terjadwal bila AI menulisnya walau tahap "lain"; tahap mirip ("tanya_harga") dipetakan; "oke" tanda terima tidak menghapus susulan yang sudah direncanakan | `review_chats.spec` · #11 |
 | Kebijakan tukar size dari Pengaturan masuk prompt dan dikirim apa adanya | `beta3.spec` · pelajaran chat CS |
 | Pertanyaan yang baru ditanyakan tidak diulang | `beta3.spec` · form order |
 | Prompt lengkap tetap di bawah 10 ribu token | `beta3.spec` · prompt dan keluaran |

@@ -121,7 +121,7 @@ const ITEM_WORDS: Array<[PriceItem, RegExp]> = [
 /** Seri yang disebut paling akhir di teks (premium/signature/reguler), atau null. */
 export function seriesMentioned(texts: string[]): PriceSeries | null {
   for (const text of [...texts].reverse()) {
-    const hits = [...String(text || '').matchAll(/\b(premium|signature|reguler|regular|black label|portofino|scuro|maximotion)\b/gi)]
+    const hits = [...String(text || '').matchAll(/\b(premium|signature|reguler|regular|biasa|standar|standard|black label|portofino|scuro|maximotion)\b/gi)]
     const last = hits.pop()?.[1]?.toLowerCase()
     if (!last) continue
     if (/premium|black label|portofino/.test(last)) return 'premium'
@@ -137,7 +137,13 @@ export function seriesMentioned(texts: string[]): PriceSeries | null {
  * harga tapi milik barang/seri lain diganti angka yang benar. Kalimat campuran (jas & celana)
  * atau angka di luar pola tidak diubah.
  */
-export function fixContextPrices(pesan: string[], pattern: PricePattern, series: PriceSeries | null) {
+export function fixContextPrices(
+  pesan: string[],
+  pattern: PricePattern,
+  series: PriceSeries | null,
+  /** Nama produk katalog (huruf kecil) → harga sah; "Basic Suit 485.000" tidak pernah diubah. */
+  productPrices?: Map<string, Set<number>>
+) {
   const changes: Array<{ from: number; to: number; item: PriceItem }> = []
   if (!series || !pattern.series[series]) return { pesan, changes }
   const known = new Set<number>()
@@ -148,7 +154,10 @@ export function fixContextPrices(pesan: string[], pattern: PricePattern, series:
     }
   const DOT = '\u2024'
   const fixed = pesan.map((bubble) =>
-    bubble
+    // Daftar harga (≥ 2 baris berharga) = rincian katalog, bukan jawaban konteks → tidak diubah.
+    bubble.split('\n').filter((line) => /\d{1,3}\.\d{3}/.test(line)).length >= 2
+      ? bubble
+      : bubble
       // Titik ribuan (485.000) dilindungi supaya tidak dianggap akhir kalimat.
       .replace(/(\d)\.(?=\d{3}\b)/g, `$1${DOT}`)
       .split(/(?<=[.!?\n])/)
@@ -168,9 +177,13 @@ export function fixContextPrices(pesan: string[], pattern: PricePattern, series:
         const cell = target.cells[`${item}:${model}`] || target.cells[`${item}:standar`]
         if (!cell) return sentence
         const big = /\b(xxl|[2-5]xl|jumbo|ukuran besar)\b/i.test(sentence)
+        const lower = sentence.toLowerCase()
         return sentence.replace(PRICE, (raw) => {
           const value = Number(raw.replace(/\./g, ''))
           if (value === cell.price || value === cell.big || !known.has(value)) return raw
+          // Nama produk disebut dan angkanya memang harga produk itu → benar, biarkan.
+          for (const [name, valid] of productPrices || [])
+            if (valid.has(value) && lower.includes(name)) return raw
           const to = big && cell.big ? cell.big : cell.price
           changes.push({ from: value, to, item })
           return money(to)
@@ -179,4 +192,20 @@ export function fixContextPrices(pesan: string[], pattern: PricePattern, series:
       .join('')
   )
   return { pesan: fixed, changes }
+}
+
+/** Nama produk katalog (huruf kecil, ≥ 4 huruf) → harga sah (S–XL & ukuran besar). */
+export function productPriceMap(rows: LeanCatalogRow[]) {
+  const map = new Map<string, Set<number>>()
+  for (const row of rows) {
+    if (!row.active || !row.price) continue
+    const name = row.product.trim().toLowerCase()
+    if (name.length < 4) continue
+    const set = map.get(name) || new Set<number>()
+    set.add(row.price)
+    const big = bigOf(row)
+    if (big) set.add(big)
+    map.set(name, set)
+  }
+  return map
 }

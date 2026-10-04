@@ -65,6 +65,7 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 
 ## Pengujian sebelum rilis
 
+0. **Ulasan chat pemilik** → tambah kasus di `tests/unit/review_chats.spec.ts` (diputar ulang lewat jalur perapian yang sama, `app/beta3/reply_polish.ts`). Semua perapian/pemeriksa balasan baru masuk `reply_polish`, bukan langsung di `reply_service`, supaya ulasan lama ikut teruji.
 0. **Jangan merusak yang sudah settle.** Baca `docs/regresi.md` sebelum mengubah fitur yang bersinggungan.
    Bug diperbaiki → tambah tes + baris di `docs/regresi.md`. Perilaku sengaja diubah → ubah tes & barisnya
    di commit yang sama; jangan melonggarkan tes supaya lulus.

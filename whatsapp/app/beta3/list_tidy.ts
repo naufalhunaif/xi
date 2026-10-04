@@ -14,6 +14,18 @@ export function tidyLists(text: string): string {
 function tidySentence(sentence: string): string {
   const end = sentence.match(/[.!?]$/)?.[0] || ''
   const body = end ? sentence.slice(0, -1) : sentence
+  // "pembuka: A, B, C" → pembuka lalu satu pilihan per baris.
+  const colon = body.search(/:\s/)
+  if (colon > 0) {
+    const head = body.slice(0, colon).trim()
+    const items = body
+      .slice(colon + 1)
+      .split(/,\s+(?:atau\s+|dan\s+)?|\s+(?:atau|dan)\s+(?=\S)/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+    if (items.length >= 3 && items.every((item) => item.split(/\s+/).length <= 8))
+      return `\n${head}:\n${items.join('\n')}\n\n`
+  }
   const parts = body.split(/,\s+(?:atau\s+|dan\s+)?|\s+(?:atau|dan)\s+(?=\S)/)
   if (parts.length < 3) return sentence
   const priced = parts.filter((part) => PRICE.test(part)).length

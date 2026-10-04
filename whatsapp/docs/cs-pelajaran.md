@@ -285,3 +285,19 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. Pola harga dihitung sistem dari katalog dan dipakai AI + pemeriksa harga (angka salah seri dibetulkan otomatis).
 3. "Bahannya sama?" dijawab tegas dengan nama bahan seri itu.
 
+---
+
+## #11 · 6 Okt 2026 · daftar model, "premium seperti apa", susulan tidak muncul (diterapkan v3.5.13)
+
+**Ringkasan chat (uji pemilik)**
+- "Ada model apa aja" → dibuka "Ada bos," (tidak pas untuk pertanyaan "apa aja").
+- "Yang premium seperti apa" → kalimat panjang berisi nama produk, warna, kerah, kancing, padahal foto sudah dikirim dengan caption.
+- "Kalo set berapa" → 955.000 (sudah benar sejak v3.5.12).
+- Susulan tidak muncul setelah percakapan berhenti.
+
+**Pelajaran**
+1. "Ada bos" hanya untuk menjawab "ada X?". Pertanyaan "apa aja / seperti apa / berapa" langsung dijawab.
+2. Kirim foto → pengantar cukup "Ini fotonya bos" (+ harga sekali); ciri model hanya bila ditanya bedanya.
+3. Susulan dijadwalkan setiap kali AI menulisnya (kecuali selesai/serah CS), termasuk saat pelanggan masih tanya-tanya.
+4. Semua ulasan diputar ulang otomatis di `tests/unit/review_chats.spec.ts` supaya perbaikan baru tidak merusak ulasan lama.
+
