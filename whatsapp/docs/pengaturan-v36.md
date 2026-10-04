@@ -75,3 +75,9 @@ Bersinggungan: `payments.js` tetap memakai id lama dan `panel.querySelectorAll('
 - Berat barang: satuan "gram" pindah ke judul kartu, 3 kolom (2 di layar sempit).
 - Lebih padat: padding kartu 12/14, jarak bagian 8, sel tabel AI 7/8.
 - Bersinggungan: `instagram.js` mengganti teks tombol lewat `<span>` di dalam tombol (bukan `textContent` tombol) supaya ikon tidak hilang.
+
+## v3.6.3 — bahasa
+
+- Ganti bahasa tampilan kini memuat ulang halaman (`i18n.js`): bagian yang dirender skrip (daftar nomor, pilihan model/tugas akun AI, tabel) ikut berganti; sebelumnya tetap di bahasa lama sampai reload manual.
+- Terjemahan id yang masih Inggris dibetulkan: "Update skill" → "Perbarui skill", "Ready stock" → "Stok siap", "Rollback" → "Kembalikan".
+- Istilah teknis sengaja tetap sama di kedua bahasa: App ID/Secret, Webhook, Verify token, Redirect URI, Client ID, Model, Status, Edit, Instagram, Backup.

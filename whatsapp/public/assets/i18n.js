@@ -118,6 +118,10 @@
     sync()
     document
       .getElementById('uiLanguage')
-      ?.addEventListener('change', (event) => setLanguage(event.target.value))
+      ?.addEventListener('change', (event) => {
+        setLanguage(event.target.value)
+        // Bagian yang dirender skrip (daftar nomor, pilihan model, tabel) ikut berganti bahasa: muat ulang.
+        window.setTimeout(() => window.location.reload(), 150)
+      })
   })
 })()
