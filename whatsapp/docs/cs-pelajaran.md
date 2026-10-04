@@ -269,4 +269,5 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 1. Warna putih bersih, broken white, dan krem tidak bisa diandalkan dari mata model. Sistem mengukur warna badan pakaian dari piksel dan membandingkannya dengan foto katalog.
 2. Jev memilih warna katalog dari hasil ukur + kata pelanggan; bila ragu, warna terdekat yang selisihnya jelas; selain itu AI diberi kandidatnya.
 3. Harga mengikuti produk yang benar-benar punya warna itu (mis. Broken White di seri Signature).
+4. (v3.5.9) Screenshot postingan IG yang sama sempat terbaca "cream": jas di foto redup (lebih gelap dari dinding) dan ukuran lama mengambil bagian dinding/manekin. Sekarang area foto dipisah dari bar aplikasi, dinding & manekin dibuang, warna dikoreksi terhadap dinding dan terang foto → terbaca broken white.
 

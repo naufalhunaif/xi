@@ -24,60 +24,143 @@ export function rgbToLab(r: number, g: number, b: number): Lab {
   return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)].map((v) => Math.round(v * 10) / 10) as Lab
 }
 
-/** Selisih warna; kekuningan (b) diberi bobot lebih karena itu pembeda putih ↔ broken white ↔ krem. */
+/**
+ * Selisih warna pada ciri ternormalisasi [L, a, b]: terang (L) dibobot rendah karena pencahayaan
+ * foto berbeda-beda; kekuningan (b) dibobot tinggi — pembeda putih ↔ broken white ↔ krem.
+ */
 export function colorDistance(a: Lab, b: Lab) {
-  return Math.round(Math.sqrt((a[0] - b[0]) ** 2 * 0.6 + (a[1] - b[1]) ** 2 + ((a[2] - b[2]) * 1.6) ** 2) * 10) / 10
+  return Math.round(Math.sqrt((a[0] - b[0]) ** 2 * 0.05 + (a[1] - b[1]) ** 2 + ((a[2] - b[2]) * 1.6) ** 2) * 10) / 10
 }
 
 const median = (values: number[]) => {
   const sorted = [...values].sort((x, y) => x - y)
   return sorted[Math.floor(sorted.length / 2)] ?? 0
 }
+const medianLab = (items: Lab[]): Lab => [median(items.map((v) => v[0])), median(items.map((v) => v[1])), median(items.map((v) => v[2]))]
+const delta = (p: Lab, q: Lab) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])
 
-/**
- * Warna badan pakaian: dua jalur vertikal kiri & kanan tengah foto (bukan kemeja/kerah di tengah),
- * piksel paling terang & paling gelap (pantulan, bayangan) dibuang, lalu median Lab.
- */
-export function garmentLab(pixels: Uint8Array | Buffer, width: number, height: number, channels = 3): Lab | null {
-  const samples: Lab[] = []
-  for (let y = Math.floor(height * 0.35); y < Math.floor(height * 0.8); y++) {
-    for (let x = 0; x < width; x++) {
-      const rel = x / width
-      if (!((rel >= 0.22 && rel <= 0.38) || (rel >= 0.62 && rel <= 0.78))) continue
-      const index = (y * width + x) * channels
-      samples.push(rgbToLab(pixels[index], pixels[index + 1], pixels[index + 2]))
-    }
-  }
-  if (samples.length < 20) return null
-  const byLight = samples.sort((a, b) => a[0] - b[0])
-  const kept = byLight.slice(Math.floor(byLight.length * 0.15), Math.ceil(byLight.length * 0.85))
-  return [median(kept.map((s) => s[0])), median(kept.map((s) => s[1])), median(kept.map((s) => s[2]))]
+export type GarmentColor = {
+  /** Warna badan pakaian apa adanya. */
+  raw: Lab
+  /** Latar (dinding) dari tepi foto. */
+  background: Lab
+  /** Ciri pembanding: [L, a, b] dengan a/b dikoreksi warna latar & diskalakan ke terang normal. */
+  feature: Lab
+  /** Pakaian terang (putih/broken white/krem) menurut terang relatif terhadap latar. */
+  light: boolean
 }
 
-export async function measureImage(input: string | Buffer): Promise<Lab | null> {
+/**
+ * Warna pakaian di foto, tahan terhadap screenshot & pencahayaan:
+ * 1. baris layar gelap (bar aplikasi Instagram/WhatsApp) dibuang → area foto;
+ * 2. latar = median tepi foto; piksel yang mirip latar dibuang;
+ * 3. sisa piksel di tengah dikelompokkan (k-means 3), kelompok terbesar = badan pakaian
+ *    (kelompok sangat gelap seperti manekin hanya dipilih bila memang terbesar);
+ * 4. a/b dikoreksi warna latar (white balance) lalu diskalakan dengan terang (foto redup).
+ */
+export function garmentColor(pixels: Uint8Array | Buffer, width: number, height: number, channels = 3): GarmentColor | null {
+  const at = (x: number, y: number) => {
+    const index = (y * width + x) * channels
+    return rgbToLab(pixels[index], pixels[index + 1], pixels[index + 2])
+  }
+  const rowLight: number[] = []
+  for (let y = 0; y < height; y++) {
+    let sum = 0
+    for (let x = 0; x < width; x++) sum += at(x, y)[0]
+    rowLight.push(sum / width)
+  }
+  let top = 0
+  let bottom = height - 1
+  let bestLength = 0
+  for (let y = 0, start = -1; y <= height; y++) {
+    if (y < height && rowLight[y] > 28) {
+      if (start < 0) start = y
+    } else if (start >= 0) {
+      if (y - start > bestLength) {
+        bestLength = y - start
+        top = start
+        bottom = y - 1
+      }
+      start = -1
+    }
+  }
+  if (bestLength < height * 0.25) {
+    top = 0
+    bottom = height - 1
+  }
+  const photoHeight = bottom - top + 1
+  const border: Lab[] = []
+  for (let y = top; y <= bottom; y++)
+    for (let x = 0; x < width; x++)
+      if (x < width * 0.08 || x > width * 0.92 || y < top + photoHeight * 0.06) border.push(at(x, y))
+  if (!border.length) return null
+  const background = medianLab(border)
+  const center: Lab[] = []
+  for (let y = Math.floor(top + photoHeight * 0.25); y < top + photoHeight * 0.8; y++)
+    for (let x = Math.floor(width * 0.2); x < width * 0.8; x++) center.push(at(x, y))
+  if (center.length < 20) return null
+  const candidates = center.filter((pixel) => delta(pixel, background) > 6)
+  let raw: Lab
+  if (candidates.length < center.length * 0.08) raw = medianLab(center)
+  else {
+    // k-means sederhana (3 kelompok, titik awal: tergelap, tengah, terterang).
+    const sorted = [...candidates].sort((p, q) => p[0] - q[0])
+    let centers: Lab[] = [sorted[0], sorted[Math.floor(sorted.length / 2)], sorted[sorted.length - 1]]
+    let groups: Lab[][] = [[], [], []]
+    for (let round = 0; round < 10; round++) {
+      groups = [[], [], []]
+      for (const pixel of candidates) {
+        let best = 0
+        for (let i = 1; i < 3; i++) if (delta(pixel, centers[i]) < delta(pixel, centers[best])) best = i
+        groups[best].push(pixel)
+      }
+      centers = groups.map((group, i) => (group.length ? medianLab(group) : centers[i]))
+    }
+    const order = groups.map((group, i) => ({ size: group.length, center: centers[i] })).sort((p, q) => q.size - p.size)
+    const largest = order[0]
+    // Kelompok sangat gelap (manekin/bayangan) kalah dari kelompok terang yang cukup besar.
+    const pick = largest.center[0] < 20 && order[1] && order[1].size > largest.size * 0.5 ? order[1] : largest
+    raw = pick.center
+  }
+  const light = raw[0] >= 70 || raw[0] >= background[0] * 0.75
+  const neutralBackground = Math.abs(background[1]) < 6 && Math.abs(background[2]) < 8
+  const a = raw[1] - (neutralBackground ? background[1] : 0)
+  const b = raw[2] - (neutralBackground ? background[2] : 0)
+  const scale = raw[0] > 25 ? Math.min(2, 85 / raw[0]) : 1
+  const round = (value: number) => Math.round(value * 10) / 10
+  return {
+    raw: raw.map(round) as Lab,
+    background: background.map(round) as Lab,
+    feature: [round(raw[0]), round(a * scale), round(b * scale)],
+    light,
+  }
+}
+
+export async function measureImage(input: string | Buffer): Promise<GarmentColor | null> {
   const { data, info } = await sharp(input)
     .rotate()
-    .resize(48, 64, { fit: 'cover' })
+    .resize({ width: 90 })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
-  return garmentLab(data, info.width, info.height, info.channels)
+  return garmentColor(data, info.width, info.height, info.channels)
 }
 
-/** Sebutan warna terang yang sering tertukar, dari angka Lab (untuk catatan ke AI & Jev). */
-export function describeLab(lab: Lab) {
-  const [l, a, b] = lab
-  if (l >= 80 && Math.abs(a) < 4) {
-    if (b < 4) return 'putih bersih (netral, tidak kekuningan)'
-    if (b < 10) return 'putih kekuningan tipis (broken white / off white / gading)'
-    if (b < 18) return 'krem muda (kekuningan jelas)'
+/** Sebutan warna dari ciri ternormalisasi (untuk catatan ke AI & Jev). */
+export function describeColor(color: Pick<GarmentColor, 'feature' | 'light'>) {
+  const [l, a, b] = color.feature
+  if (color.light && Math.abs(a) < 5) {
+    if (b < 2.5) return 'putih bersih (netral, tidak kekuningan)'
+    if (b < 9) return 'putih kekuningan tipis (broken white / off white / gading)'
+    if (b < 16) return 'krem muda (kekuningan jelas)'
     return 'krem / beige'
   }
   if (l < 25) return 'sangat gelap (hitam / navy gelap)'
   return `L ${l}, a ${a}, b ${b}`
 }
 
-const STATE_KEY = 'catalog_colors'
+// v2: ciri ternormalisasi (latar & pencahayaan); nilai lama tidak dipakai lagi.
+const STATE_KEY = 'catalog_colors_v2'
 type ColorMap = Record<string, Lab>
 
 export async function readCatalogColors(): Promise<ColorMap> {
@@ -98,9 +181,9 @@ export async function measureCatalogColors(rows: LeanCatalogRow[], limit = 40) {
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(15_000) })
       if (!response.ok) throw new Error(String(response.status))
-      const lab = await measureImage(Buffer.from(await response.arrayBuffer()))
-      if (lab) {
-        map[url] = lab
+      const measured = await measureImage(Buffer.from(await response.arrayBuffer()))
+      if (measured) {
+        map[url] = measured.feature
         done++
       }
     } catch {
@@ -152,10 +235,10 @@ export async function imageColorNote(input: {
   const lines: string[] = []
   const detail: Array<Record<string, unknown>> = []
   for (const [index, path] of input.paths.slice(0, 3).entries()) {
-    const lab = await measureImage(path).catch(() => null)
-    if (!lab) continue
-    const shade = describeLab(lab)
-    const candidates = nearestCatalogColors(lab, input.rows, colors)
+    const measured = await measureImage(path).catch(() => null)
+    if (!measured) continue
+    const shade = describeColor(measured)
+    const candidates = nearestCatalogColors(measured.feature, input.rows, colors)
     const clear = candidates.length > 1 && candidates[0].distance <= 8 && candidates[1].distance - candidates[0].distance >= 4
     const chosen = await chooseImageColor({
       jid: input.jid,
@@ -181,7 +264,7 @@ export async function imageColorNote(input: {
               ? ` Kandidat warna katalog: ${candidates.map((c) => `${c.color} (selisih ${c.distance})`).join(', ')}.`
               : '')
     )
-    detail.push({ image: index + 1, lab, shade, candidates: candidates.map(({ lab: _lab, ...rest }) => rest), chosen, pick })
+    detail.push({ image: index + 1, measured, shade, candidates: candidates.map(({ lab: _lab, ...rest }) => rest), chosen, pick })
   }
   if (!lines.length) return { note: '', detail }
   return {

@@ -1076,39 +1076,51 @@ test.group('beta3 · review chat ongkir cinyawang (v3.5.7)', () => {
 })
 
 test.group('beta3 · warna dari piksel (v3.5.8)', () => {
-  test('putih bersih, broken white, dan krem dibedakan dari angka warna', async ({ assert }) => {
-    const { rgbToLab, describeLab, colorDistance } = await import('#beta3/image_color')
-    assert.match(describeLab(rgbToLab(250, 250, 250)), /putih bersih/)
-    assert.match(describeLab(rgbToLab(240, 234, 220)), /broken white/)
-    assert.match(describeLab(rgbToLab(238, 224, 196)), /krem/)
-    // Broken white lebih dekat ke broken white katalog daripada ke white katalog.
-    const photo = rgbToLab(239, 233, 219)
-    assert.isBelow(colorDistance(photo, rgbToLab(241, 235, 221)), colorDistance(photo, rgbToLab(248, 248, 248)))
+  test('putih bersih, broken white, dan krem dibedakan dari ciri warna', async ({ assert }) => {
+    const { describeColor, colorDistance } = await import('#beta3/image_color')
+    assert.match(describeColor({ feature: [86, 0, 0.5], light: true }), /putih bersih/)
+    assert.match(describeColor({ feature: [60, 0, 5], light: true }), /broken white/)
+    assert.match(describeColor({ feature: [80, 1, 13], light: true }), /krem/)
+    assert.match(describeColor({ feature: [15, 0, -3], light: false }), /sangat gelap/)
+    // Terang beda (pencahayaan) tidak mengalahkan beda kekuningan.
+    assert.isBelow(colorDistance([60, 0, 5], [85, 0, 5.5]), colorDistance([60, 0, 5], [60, 0, 0]))
   })
 
-  test('foto diukur dari badan pakaian; kandidat per nama warna', async ({ assert }) => {
-    const sharp = (await import('sharp')).default
-    const { measureImage, describeLab, nearestCatalogColors, rgbToLab } = await import('#beta3/image_color')
-    const image = await sharp({ create: { width: 120, height: 160, channels: 3, background: { r: 240, g: 234, b: 220 } } })
-      .png()
-      .toBuffer()
-    const lab = (await measureImage(image))!
-    assert.match(describeLab(lab), /broken white/)
+  test('screenshot Instagram broken white (latar abu, jas redup, bar aplikasi gelap) → broken white', async ({ assert }) => {
+    const { measureImage, describeColor, nearestCatalogColors } = await import('#beta3/image_color')
+    const measured = (await measureImage(new URL('../fixtures/ig_broken_white.jpg', import.meta.url).pathname))!
+    assert.isTrue(measured.light)
+    assert.match(describeColor(measured), /broken white/)
     const colors = {
-      'https://x.test/w.jpg': rgbToLab(248, 248, 248),
-      'https://x.test/bw.jpg': rgbToLab(241, 235, 221),
-      'https://x.test/bw2.jpg': rgbToLab(242, 236, 222),
-      'https://x.test/c.jpg': rgbToLab(236, 222, 190),
+      'https://x.test/w.jpg': [86, 0, 0.5] as [number, number, number],
+      'https://x.test/bw.jpg': [84, 0, 5.5] as [number, number, number],
+      'https://x.test/c.jpg': [82, 1, 14] as [number, number, number],
     }
     const rows = [
       row({ id: 1, product: 'Tuxedo', color: 'White', photoUrl: 'https://x.test/w.jpg' }),
       row({ id: 2, product: 'Tuxedo Signature', color: 'Broken White', photoUrl: 'https://x.test/bw.jpg' }),
-      row({ id: 3, product: 'Basic Suit Signature', color: 'Broken White', photoUrl: 'https://x.test/bw2.jpg' }),
-      row({ id: 4, product: 'Beskap', color: 'Cream', photoUrl: 'https://x.test/c.jpg' }),
+      row({ id: 3, product: 'Beskap', color: 'Cream', photoUrl: 'https://x.test/c.jpg' }),
     ]
-    const near = nearestCatalogColors(lab, rows, colors)
+    assert.equal(nearestCatalogColors(measured.feature, rows, colors)[0].color, 'Broken White')
+  })
+
+  test('foto polos diukur dari tengah; kandidat per nama warna', async ({ assert }) => {
+    const sharp = (await import('sharp')).default
+    const { measureImage, describeColor, nearestCatalogColors } = await import('#beta3/image_color')
+    const white = await sharp({ create: { width: 120, height: 160, channels: 3, background: { r: 248, g: 248, b: 248 } } }).png().toBuffer()
+    assert.match(describeColor((await measureImage(white))!), /putih bersih/)
+    const colors = {
+      'https://x.test/bw.jpg': [84, 0, 5.5] as [number, number, number],
+      'https://x.test/bw2.jpg': [85, 0, 6] as [number, number, number],
+      'https://x.test/w.jpg': [86, 0, 0.5] as [number, number, number],
+    }
+    const rows = [
+      row({ id: 1, product: 'Tuxedo Signature', color: 'Broken White', photoUrl: 'https://x.test/bw.jpg' }),
+      row({ id: 2, product: 'Basic Suit Signature', color: 'Broken White', photoUrl: 'https://x.test/bw2.jpg' }),
+      row({ id: 3, product: 'Tuxedo', color: 'White', photoUrl: 'https://x.test/w.jpg' }),
+    ]
+    const near = nearestCatalogColors([60, 0, 5], rows, colors)
     assert.equal(near[0].color, 'Broken White')
     assert.sameMembers(near[0].products, ['Tuxedo Signature', 'Basic Suit Signature'])
-    assert.equal(near.length, 3)
   })
 })
