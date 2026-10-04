@@ -239,3 +239,22 @@ test.group('beta3 · warna katalog', () => {
     )
   })
 })
+
+test.group('akun AI · tugas latar (v3.5.10)', () => {
+  test('akun "latar saja" (Gemini) didahulukan untuk tugas latar, dicadangkan untuk balasan pelanggan', async ({ assert }) => {
+    const { createAiAccount, deleteAiAccount, usableAiAccounts } = await import('#services/ai_accounts')
+    const claude = await createAiAccount({ provider: 'claude', label: 'uji-claude' })
+    const gemini = await createAiAccount({ provider: 'gemini', label: 'uji-gemini', apiKey: 'uji-bukan-kunci-asli' })
+    try {
+      const order = async (phase: string) =>
+        (await usableAiAccounts(Date.now(), phase)).map((a) => a.id).filter((id) => id === claude || id === gemini)
+      assert.deepEqual(await order('beta3-ciri'), [gemini, claude])
+      assert.deepEqual(await order('ig-analysis'), [gemini, claude])
+      assert.deepEqual(await order('beta3-reply'), [claude, gemini])
+      assert.deepEqual(await order('beta3-test'), [claude, gemini])
+    } finally {
+      await deleteAiAccount(claude)
+      await deleteAiAccount(gemini)
+    }
+  })
+})

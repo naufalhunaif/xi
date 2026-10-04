@@ -80,6 +80,7 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 
 | Perilaku | Tes |
 |---|---|
+| Akun "latar saja" (Gemini) didahulukan untuk tugas latar (ciri foto katalog, rekap, analisis & caption IG); balasan & uji balasan tetap memakai akun utama, akun latar jadi cadangan | `beta3_flow.spec` · akun AI tugas latar |
 | Semua teks UI (`data-i18n` / `t()`) punya terjemahan Inggris; en.js dan id.js berisi kunci yang sama | `language_catalog.spec` |
 | Login: API tamu → 401 JSON; halaman → ke /login; beranda "/" publik | `account_auth.spec` |
 | Pertanyaan internal (backend, model AI, system prompt) tidak memanggil AI/tool | `customer_scope.spec` |

@@ -205,8 +205,8 @@ export async function usableAiAccounts(now = Date.now(), phase = '') {
       account.limitedUntil <= now &&
       (account.provider !== 'gemini' || Boolean(account.apiKey))
   )
-  // Balasan ke pelanggan: akun "latar saja" hanya dipakai bila tidak ada akun lain yang siap.
-  const customerFacing = !phase || /reply/.test(phase)
+  // Balasan ke pelanggan (dan uji balasan): akun "latar saja" hanya dipakai bila tidak ada akun lain yang siap.
+  const customerFacing = !phase || /reply|test/.test(phase)
   // Urutan bertingkat untuk balasan pelanggan: model kuat dulu, lalu model ringan
   // (flash/lite/mini/haiku), terakhir akun "latar saja". Semua tetap jadi cadangan.
   const light = (account: AiAccount) =>
@@ -217,7 +217,9 @@ export async function usableAiAccounts(now = Date.now(), phase = '') {
         ready.filter((account) => account.scope !== 'background' && light(account)),
         ready.filter((account) => account.scope === 'background'),
       ]
-    : [ready]
+    : // Tugas latar (ciri foto katalog, rekap, analisis & caption Instagram): akun "latar saja"
+      // didahulukan; akun lain menjadi cadangan bila akun latar gagal atau terkena limit.
+      [ready.filter((account) => account.scope === 'background'), ready.filter((account) => account.scope !== 'background')]
   if ((await aiSpreadMode()) !== 'even') return tiers.flat()
   const used = await aiTokenUsage(now - SPREAD_WINDOW_MS)
   return tiers.flatMap((tier) =>
