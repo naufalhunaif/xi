@@ -39,6 +39,15 @@ Batas waktu 800 ms per panggilan; ambang yakin per keputusan di `JEV_THRESHOLD`.
 dicatat; pemilik menandai yang salah di Pengaturan → Jev (Akurasi 30 hari) dan bisa mematikan
 keputusan satu per satu.
 
+## Hemat token (v3.5.3)
+
+- `app/beta3/token_saver.ts`: sapaan/terima kasih dijawab tanpa AI (`quickReply`); size chart, bahan, dan katalog
+  hanya masuk prompt bila dibutuhkan giliran itu (`promptNeeds`, dibantu maksud dari Jev). Trace menampilkan
+  "Balasan cepat tanpa AI" atau "Hemat token · tanpa …".
+- Skill tetap utuh di system prompt supaya cache penyedia (Claude/ChatGPT) tetap kena.
+- Claude: JSON lewat instruksi dalam satu panggilan (mode skema CLI memakai tool StructuredOutput = dua panggilan);
+  keluaran tidak valid → diulang dengan skema.
+
 ## CS membalas sebagian & chat yang menunggu CS
 
 - **CS membalas sebagian** (mis. menjawab DP & estimasi, tapi form order terlewat): sapuan memeriksa chat yang pesan terakhirnya dari CS/pemilik (≥ 3 menit, `AI_AFTER_HUMAN_MS`). Pesan pelanggan sejak balasan AI terakhir dikirim ke AI dengan catatan "jawab hanya poin yang belum dijawab CS; kosongkan bila semua sudah". Sekali per balasan CS.

@@ -479,6 +479,23 @@ async function runCodexLean(
   )
 }
 
+/** Objek JSON pertama-terakhir di teks ("```json …```" atau teks pengantar diabaikan); null bila tidak valid. */
+export function extractJsonObject(text: string) {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  try {
+    const value = JSON.parse(text.slice(start, end + 1))
+    return value && typeof value === 'object' && !Array.isArray(value) ? JSON.stringify(value) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Claude: JSON lewat instruksi dalam SATU panggilan. Mode skema CLI (--json-schema) memakai tool
+ * StructuredOutput sehingga prompt lengkap terkirim dua kali. Keluaran tidak valid → ulang dengan skema.
+ */
 async function runClaudeLean(
   settings: LeanProviderSettings,
   prompt: { system: string; user: string },
@@ -487,9 +504,31 @@ async function runClaudeLean(
   imagePaths: string[],
   onEvent: (event: Record<string, any>) => void
 ) {
+  const plain = await spawnClaude(
+    settings,
+    {
+      system: `${prompt.system}\n\nKELUARAN: balas HANYA satu objek JSON (tanpa teks lain, tanpa \`\`\`) yang sesuai skema ini:\n${JSON.stringify(outputSchema)}`,
+      user: prompt.user,
+    },
+    workingDirectory,
+    null,
+    imagePaths,
+    onEvent
+  )
+  const json = extractJsonObject(plain)
+  if (json) return json
+  return spawnClaude(settings, prompt, workingDirectory, outputSchema, imagePaths, onEvent)
+}
+
+async function spawnClaude(
+  settings: LeanProviderSettings,
+  prompt: { system: string; user: string },
+  workingDirectory: string,
+  outputSchema: Record<string, unknown> | null,
+  imagePaths: string[],
+  onEvent: (event: Record<string, any>) => void
+) {
   const executable = await claudeBinary(settings.claudeBin)
-  // Skema sesuai pemanggil (balasan, rekap, dll.), bukan selalu skema balasan.
-  const schema = JSON.stringify(outputSchema)
   const user = imagePaths.length
     ? `${prompt.user}\n\nLampiran gambar pelanggan (baca dengan tool Read):\n${imagePaths.map((path, index) => `${index + 1}. ${path}`).join('\n')}`
     : prompt.user
@@ -501,8 +540,8 @@ async function runClaudeLean(
       '--output-format',
       'stream-json',
       '--verbose',
-      '--json-schema',
-      schema,
+      // Skema sesuai pemanggil (balasan, rekap, dll.), bukan selalu skema balasan.
+      ...(outputSchema ? ['--json-schema', JSON.stringify(outputSchema)] : []),
       '--no-session-persistence',
       '--permission-mode',
       'dontAsk',

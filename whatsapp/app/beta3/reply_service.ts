@@ -58,6 +58,7 @@ import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { keepCustomInChat, questionAfterPhotos } from '#beta3/reply_guards'
+import { promptNeeds, quickReply } from '#beta3/token_saver'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -488,6 +489,42 @@ export async function createLeanReply(input: {
     listRules(),
   ])
   const stage = stageFromNote(chatNote)
+  // Sapaan / terima kasih: jawabannya selalu sama → tanpa memanggil AI (0 token).
+  const quick = quickReply({
+    text: input.text,
+    imageCount: input.imagePaths?.length || 0,
+    note: input.note,
+    stage,
+    rows,
+  })
+  if (quick) {
+    onTrace?.({
+      key: 'beta3-quick',
+      label: quick.length ? 'Balasan cepat tanpa AI (0 token)' : 'Tidak perlu dibalas (0 token)',
+      status: 'completed',
+      detail: { pesan: quick },
+    })
+    return {
+      decision: {
+        pesan: quick,
+        foto: [],
+        catatan: chatNote,
+        tahap: (stage || 'lain') as LeanDecision['tahap'],
+        serah_cs: false,
+        alasan: '',
+        susulan: '',
+        spesifikasi: String(spec || ''),
+      },
+      autoTotal: null,
+      photos: [],
+      promptTokens: 0,
+      promptSections: [],
+      usage: null,
+      durationMs: 0,
+      orderId: null,
+      skillName: skill.name,
+    }
+  }
   // Berat pesanan dari spesifikasi × berat produk (MCP toko): ongkir dicek sesuai berat asli.
   const orderGrams = await orderWeightGrams(String(spec || '')).catch(() => DEFAULT_ITEM_GRAMS)
   // Gaya balasan toko: sama untuk ChatGPT, Claude, dan Gemini.
@@ -882,14 +919,34 @@ export async function createLeanReply(input: {
   const store = await readLeanState('store_profile')
   const policy = await readExchangePolicy()
   const activeOrder = await renderActiveOrder(jid).catch(() => '')
+  // Bagian prompt yang tidak dibutuhkan giliran ini tidak dikirim (hemat token).
+  const needs = promptNeeds({
+    stage,
+    text: input.text,
+    imageCount: input.imagePaths?.length || 0,
+    rows,
+    intent: understanding.intent,
+    hasFit: toolNotes.some((note) => /fit advisor|rekomendasi size|size chart/i.test(note)),
+  })
+  const skipped = Object.entries(needs).filter(([, needed]) => !needed).map(([key]) => key)
+  if (skipped.length)
+    onTrace?.({ key: 'beta3-trim', label: `Hemat token · tanpa ${skipped.join(', ')}`, status: 'completed', detail: needs })
   const prompt = buildLeanPrompt({
     policy: renderExchangePolicy(policy.text),
     activeOrder,
     skill: skill.content,
     store,
-    fabrics: await readLeanState('fabrics'),
-    sizeCharts,
-    catalog: digest.text,
+    fabrics: needs.fabrics
+      ? await readLeanState('fabrics')
+      : 'BAHAN TERSEDIA: tidak dimuat di giliran ini (tidak ada pertanyaan warna/bahan).',
+    sizeCharts: needs.sizeCharts
+      ? sizeCharts
+      : sizeCharts
+        ? 'SIZE CHART: tidak dimuat di giliran ini (tidak ada pertanyaan ukuran). Ditanya ukuran → jawab dari size ready di KATALOG.'
+        : '',
+    catalog: needs.catalog
+      ? digest.text
+      : 'KATALOG: tidak dimuat di giliran ini (pesanan sudah berjalan, pelanggan tidak menanyakan produk). Ditanya produk/harga baru → "saya cek dulu ya bos".',
     // Koreksi pemilik selalu ikut (12 terbaru); contoh lain dipilih yang paling mirip.
     examples: pickExamples(examples.filter((example) => example.source !== 'koreksi'), input.text, stage),
     corrections: examples.filter((example) => example.source === 'koreksi').slice(-12),

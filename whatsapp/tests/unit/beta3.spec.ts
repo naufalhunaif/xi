@@ -825,3 +825,74 @@ test.group('beta3 · review chat jas hitam (v3.5.1)', () => {
     assert.isNull(keepCustomInChat({ ...handoff, serah_cs: false }, 'mau custom'))
   })
 })
+
+test.group('beta3 · hemat token (v3.5.3)', () => {
+  const at = new Date()
+  const out = (body: string) => ({ direction: 'out' as const, senderType: 'ai', body, createdAt: at })
+  const inn = (body: string, current = false) => ({ direction: 'in' as const, body, createdAt: at, current })
+
+  test('sapaan & terima kasih dijawab tanpa AI', async ({ assert }) => {
+    const { quickReply } = await import('#beta3/token_saver')
+    const base = { imageCount: 0, stage: '', rows: [inn('Halo', true)] }
+    assert.deepEqual(quickReply({ ...base, text: 'Halo' }), ['Halo bos, ada yang bisa kami bantu'])
+    assert.deepEqual(quickReply({ ...base, text: 'P' }), ['Halo bos, ada yang bisa kami bantu'])
+    assert.deepEqual(quickReply({ ...base, text: 'Assalamualaikum kak' }), [
+      'Waalaikumsalam bos, ada yang bisa kami bantu',
+    ])
+    assert.deepEqual(quickReply({ ...base, text: 'pagi min' }), ['Pagi bos, ada yang bisa kami bantu'])
+    const after = { imageCount: 0, stage: 'tunggu_bayar', rows: [out('Pesanan sudah di kirim bos'), inn('makasih', true)] }
+    assert.deepEqual(quickReply({ ...after, text: 'makasih kak' }), ['Siap sama sama bos'])
+    assert.deepEqual(
+      quickReply({ ...after, rows: [out('Siap sama sama bos'), inn('makasih', true)], text: 'makasih' }),
+      []
+    )
+  })
+
+  test('selain sapaan murni tetap pakai AI', async ({ assert }) => {
+    const { quickReply } = await import('#beta3/token_saver')
+    const base = { imageCount: 0, stage: '', rows: [inn('x', true)] }
+    assert.isNull(quickReply({ ...base, text: 'Halo\nJas hitam ada?' }))
+    assert.isNull(quickReply({ ...base, text: 'Halo kak mau tanya' }))
+    assert.isNull(quickReply({ ...base, text: 'oke' }))
+    assert.isNull(quickReply({ ...base, imageCount: 1, text: 'Halo' }))
+    assert.isNull(quickReply({ ...base, text: 'Halo', note: 'CS sudah menjawab sebagian' }))
+    // Tahap order berjalan / pesan sebelumnya belum dijawab / ada form → AI.
+    assert.isNull(quickReply({ ...base, stage: 'tanya_size', text: 'Halo' }))
+    assert.isNull(quickReply({ ...base, rows: [inn('Jas hitam ada?'), inn('P', true)], text: 'P' }))
+    assert.isNull(
+      quickReply({
+        ...base,
+        rows: [inn('Nama : Budi\nAlamat : Jl. Mawar'), out('Siap bos'), inn('makasih', true)],
+        text: 'makasih',
+      })
+    )
+  })
+
+  test('bagian prompt dikirim sesuai kebutuhan', async ({ assert }) => {
+    const { promptNeeds } = await import('#beta3/token_saver')
+    const rows = [inn('x', true)]
+    const ask = (stage: string, text: string, extra: Record<string, unknown> = {}) =>
+      promptNeeds({ stage, text, imageCount: 0, rows, hasFit: false, ...extra })
+    assert.deepEqual(ask('', 'Jas hitam ada?'), { catalog: true, sizeCharts: false, fabrics: true })
+    assert.isTrue(ask('tanya_size', 'tinggi 170 berat 65').sizeCharts)
+    assert.deepEqual(ask('tunggu_bayar', 'sudah jadi belum kak?'), {
+      catalog: false,
+      sizeCharts: false,
+      fabrics: false,
+    })
+    assert.isTrue(ask('tunggu_bayar', 'kalau tambah celana berapa?').catalog)
+    assert.deepEqual(ask('selesai', 'ini', { imageCount: 1 }), { catalog: true, sizeCharts: true, fabrics: true })
+    // AI baru menanyakan size → jawaban pendek "M" tetap dapat size chart.
+    assert.isTrue(
+      promptNeeds({ stage: 'tanya_size', text: 'M', imageCount: 0, rows: [out('Biasanya pakai size apa bos?'), inn('M', true)], hasFit: false }).sizeCharts
+    )
+  })
+
+  test('Claude: JSON dari teks biasa dibaca, teks tanpa JSON → null (ulang dengan skema)', async ({ assert }) => {
+    const { extractJsonObject } = await import('#beta3/provider')
+    assert.equal(extractJsonObject('```json\n{"pesan":["Siap bos"],"tahap":"lain"}\n```'), '{"pesan":["Siap bos"],"tahap":"lain"}')
+    assert.isNull(extractJsonObject('Siap bos'))
+    assert.isNull(extractJsonObject('{"pesan": [}'))
+    assert.isNull(extractJsonObject('[1,2]'))
+  })
+})
