@@ -33,7 +33,6 @@ import {
 } from '#beta3/prompt'
 import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
 import { chooseReplyTier, TIER_LABEL } from '#beta3/model_tier'
-import { purchaseNudge, SHOPPING_TALK } from '#beta3/nudge_plan'
 import { normalizeStyle, storeStyle, styleGuide } from '#beta3/style_service'
 import {
   callLeanTool,
@@ -524,8 +523,6 @@ export async function createLeanReply(input: {
         // Diam ("makasih" sesudah "sama-sama"): susulan yang sudah direncanakan tetap jalan.
         susulan: quick.length ? '' : await previousNudge(jid),
         spesifikasi: String(spec || ''),
-        // Salam / terima kasih yang dijawab cepat tidak diberi susulan bawaan.
-        noNudge: quick.length > 0,
       },
       autoTotal: null,
       photos: [],
@@ -1206,10 +1203,7 @@ export async function createLeanReply(input: {
     decision.alasan = ''
   }
   // Pelanggan menunda / membatalkan (Jev): tidak ada susulan; batal → order yang belum dibayar ditutup.
-  if (understanding.follow === 'tunda' || understanding.follow === 'batal') {
-    decision.susulan = ''
-    decision.noNudge = true
-  }
+  if (understanding.follow === 'tunda' || understanding.follow === 'batal') decision.susulan = ''
   if (
     understanding.follow === 'batal' &&
     pendingForJev &&
@@ -1498,23 +1492,6 @@ async function previousNudge(jid: string) {
   }
 }
 
-/** Susulan bawaan menuju pembelian untuk keputusan ini (kosong bila tidak perlu). */
-async function defaultNudge(jid: string, decision: LeanDecision) {
-  if (decision.susulan || decision.noNudge || decision.serah_cs) return ''
-  const recent = await db
-    .from('whatsapp_messages')
-    .where('jid', jid)
-    .where('created_at', '>=', new Date(Date.now() - 24 * 60 * 60_000))
-    .orderBy('id', 'desc')
-    .limit(8)
-    .select('direction', 'body')
-    .catch(() => [] as Array<{ direction: string; body: string | null }>)
-  const lastOut = decision.pesan.at(-1) || String(recent.find((row) => row.direction === 'out')?.body || '')
-  const shopping = recent.some((row) => SHOPPING_TALK.test(String(row.body || '')))
-  const address = (await storeStyle().catch(() => null))?.address || 'bos'
-  return purchaseNudge(decision.tahap, lastOut, shopping, address)
-}
-
 export function goalStatus(decision: Pick<LeanDecision, 'serah_cs' | 'tahap' | 'susulan'>) {
   if (decision.serah_cs) return 'paused' as const
   if (decision.tahap === 'selesai') return 'completed' as const
@@ -1542,12 +1519,10 @@ export async function finishLeanGoal(
   const lastNudge = previous?.last_followup_at ? new Date(previous.last_followup_at).getTime() : 0
   const nudges =
     lastIn && new Date(lastIn.created_at).getTime() > lastNudge ? 0 : Number(previous?.followup_count || 0)
-  // Goal = pembelian: AI tidak menulis susulan → kalimat bawaan per tahap (tanpa token).
-  const planned = { ...decision, susulan: decision.susulan || (await defaultNudge(run.jid, decision)) }
-  const status = goalStatus(planned)
+  const status = goalStatus(decision)
   const nudge =
-    status === 'waiting' && planned.susulan && nudges < LEAN_NUDGE_MAX_PER_CHAT
-      ? planned.susulan
+    status === 'waiting' && decision.susulan && nudges < LEAN_NUDGE_MAX_PER_CHAT
+      ? decision.susulan
       : ''
   // Tidak dibalas ("oke" tanda terima): pesan terakhir di room milik pelanggan; susulan tetap boleh.
   const quietAfter = decision.pesan.length ? undefined : run.anchor_id
@@ -1558,7 +1533,7 @@ export async function finishLeanGoal(
     waiting_for: status === 'waiting' ? decision.tahap : '',
     next_action: nudge,
     policy_json: nudge
-      ? JSON.stringify({ lean: true, nudge, stage: decision.tahap, auto: !decision.susulan, ...(quietAfter ? { quietAfter } : {}) })
+      ? JSON.stringify({ lean: true, nudge, stage: decision.tahap, ...(quietAfter ? { quietAfter } : {}) })
       : null,
     skill_hash: null,
     ...(nudges === 0 && Number(previous?.followup_count || 0) ? { followup_count: 0 } : {}),

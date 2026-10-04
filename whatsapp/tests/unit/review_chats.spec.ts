@@ -3,7 +3,6 @@
 // di sini, supaya perbaikan yang saling bersinggungan tidak merusak ulasan sebelumnya.
 import { test } from '@japa/runner'
 import { photosToShow, polishText, polishWithPhotos } from '#beta3/reply_polish'
-import { purchaseNudge } from '#beta3/nudge_plan'
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
 import { keepCustomInChat, CUSTOM_REPLY } from '#beta3/reply_guards'
@@ -180,21 +179,5 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     // Tanya detail (beda/bahan) atau hanya satu produk disebut → tidak ditambah foto.
     assert.deepEqual(photosToShow(raw, 'Bedanya apa', catalog), [])
     assert.deepEqual(photosToShow(['Premium Basic Suit 685.000 bos'], 'Premium seperti apa', catalog), [])
-  })
-
-  test('#13 goal pembelian: "oke" sesudah harga setelan tetap disusul langkah menuju order', ({ assert }) => {
-    const priceReply = 'Setelan premium 955.000 bos, sudah jas + celana'
-    assert.equal(
-      purchaseNudge('tanya_model', priceReply, true),
-      'Kalau sudah ada yang cocok, kirim tinggi & berat badannya ya bos, nanti saya bantu pilihkan size-nya'
-    )
-    // Tahap "lain" disusul hanya bila obrolannya belanja.
-    assert.equal(purchaseNudge('lain', priceReply, true), purchaseNudge('tanya_model', priceReply, true))
-    assert.equal(purchaseNudge('lain', 'Jam buka 09.00 bos', false), '')
-    // Pertanyaan balasan terakhir tidak diulang.
-    assert.notInclude(purchaseNudge('tanya_size', 'Boleh kirim nama & alamat lengkapnya bos?', true), 'alamat lengkapnya ya')
-    assert.include(purchaseNudge('tunggu_bayar', 'Totalnya 1.005.000 bos', true), 'bukti')
-    // Selesai / menunggu CS / bukti dikirim → tanpa susulan.
-    for (const stage of ['selesai', 'tunggu_cs', 'bukti_dikirim']) assert.equal(purchaseNudge(stage, '', true), '')
   })
 })

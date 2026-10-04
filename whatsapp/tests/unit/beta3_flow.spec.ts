@@ -275,8 +275,8 @@ test.group('prioritas chat · kotak masuk (v3.5.11)', () => {
   })
 })
 
-test.group('susulan menuju pembelian (v3.5.15)', () => {
-  test('"oke" tidak dibalas → susulan bawaan dijadwalkan dan tetap terkirim walau pesan terakhir milik pelanggan', async ({ assert }) => {
+test.group('susulan menuju pembelian (v3.5.16)', () => {
+  test('"oke" tidak dibalas → susulan AI yang sudah direncanakan tetap terkirim walau pesan terakhir milik pelanggan', async ({ assert }) => {
     const jid = 'susulan-uji@s.whatsapp.net'
     const clean = async () => {
       await db.from('whatsapp_messages').where('jid', jid).delete()
@@ -305,7 +305,16 @@ test.group('susulan menuju pembelian (v3.5.15)', () => {
       })
       const goal = await finishLeanGoal(
         { jid, version: 'uji-susulan', anchor_id: Number(oke.id) },
-        { pesan: [], foto: [], catatan: '', tahap: 'tanya_model', serah_cs: false, alasan: '', susulan: '', spesifikasi: '' }
+        {
+          pesan: [],
+          foto: [],
+          catatan: '',
+          tahap: 'tanya_model',
+          serah_cs: false,
+          alasan: '',
+          susulan: 'Mau sekalian saya bantu cek size setelan premiumnya bos? Cukup info tinggi & berat badannya',
+          spesifikasi: '',
+        }
       )
       assert.equal(goal?.status, 'waiting')
       assert.include(String(goal?.next_action), 'tinggi & berat badannya')
@@ -313,10 +322,10 @@ test.group('susulan menuju pembelian (v3.5.15)', () => {
       const nudge = await claimLeanNudge(jid)
       assert.include(String(nudge?.text), 'tinggi & berat badannya')
 
-      // Pelanggan menunda (noNudge) → tidak ada susulan bawaan.
+      // AI tidak menulis susulan → tidak ada kalimat bawaan (susulan selalu dari AI, nyambung konteks).
       const later = await finishLeanGoal(
         { jid, version: 'uji-susulan', anchor_id: Number(oke.id) },
-        { pesan: ['Siap bos'], foto: [], catatan: '', tahap: 'lain', serah_cs: false, alasan: '', susulan: '', spesifikasi: '', noNudge: true }
+        { pesan: ['Siap bos'], foto: [], catatan: '', tahap: 'lain', serah_cs: false, alasan: '', susulan: '', spesifikasi: '' }
       )
       assert.equal(later?.next_action, '')
     } finally {

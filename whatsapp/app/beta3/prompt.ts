@@ -121,7 +121,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     susulan: {
       type: 'string',
       description:
-        'Satu kalimat susulan yang MEMBANTU, bukan menagih. TIDAK dikirim sekarang; sistem mengirimnya hanya bila pelanggan diam (waktu mengikuti tahap, tidak di malam hari). Isi dengan bantuan konkret sesuai tahap: tawarkan foto warna/model lain, bantu size dari tinggi & berat, sebut estimasi jadi, atau ingatkan total/rekening dengan sopan. Goal = pembelian: selama belum order/bayar SELALU isi satu langkah berikutnya menuju order. Jangan "jadi gimana bos?" atau mengulang pertanyaan pesan utama. Kosong hanya bila pelanggan bilang nanti/pikir-pikir dulu, pesanan selesai, atau diserahkan ke CS.',
+        'Satu kalimat susulan yang MEMBANTU, bukan menagih. TIDAK dikirim sekarang; sistem mengirimnya hanya bila pelanggan diam (waktu mengikuti tahap, tidak di malam hari). Isi dengan bantuan konkret sesuai tahap: tawarkan foto warna/model lain, bantu size dari tinggi & berat, sebut estimasi jadi, atau ingatkan total/rekening dengan sopan. Goal = pembelian: selama belum order/bayar isi satu langkah berikutnya menuju order yang nyambung dengan produk/harga yang barusan dibahas. Jangan "jadi gimana bos?" atau mengulang pertanyaan pesan utama. Kosong hanya bila pelanggan bilang nanti/pikir-pikir dulu, pesanan selesai, atau diserahkan ke CS.',
     },
     order: {
       anyOf: [
@@ -190,8 +190,6 @@ export type LeanDecision = {
   alasan: string
   susulan: string
   spesifikasi: string
-  /** Diisi sistem (bukan AI): jangan pakai susulan bawaan (pelanggan menunda/batal, salam/terima kasih). */
-  noNudge?: boolean
 }
 
 export type LeanHistoryRow = {
