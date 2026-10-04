@@ -94,6 +94,12 @@
   let postsLoaded = false
   let mediaLoaded = false
   let filter = 'all'
+  // v3.6.11: filter jenis (Semua/Postingan/Reels/Story) & tampilan (daftar/grid), diingat per browser.
+  let kindFilter = 'all'
+  let view = 'list'
+  try {
+    view = localStorage.getItem(`${base}:ig-view`) === 'grid' ? 'grid' : 'list'
+  } catch {}
   let selectedKey = ''
   const kindOfMedia = (item) =>
     item.product === 'REELS'
@@ -166,6 +172,12 @@
     story: (row) => row.kind === 'story',
     failed: (row) => groupOf(row) === 'failed',
   }
+  const KINDS = {
+    all: () => true,
+    posts: (row) => row.kind === 'feed' || row.kind === 'carousel',
+    reels: (row) => row.kind === 'reels',
+    story: (row) => row.kind === 'story',
+  }
   const stamp = (row) => new Date(row.time || 0).getTime()
   function sorted(rows) {
     const upcoming = rows.filter((row) => groupOf(row) === 'upcoming').sort((a, b) => stamp(a) - stamp(b))
@@ -215,7 +227,12 @@
       if (badge) badge.textContent = count ? num(count) : ''
     }
     const query = byId('igpSearch').value.trim().toLowerCase()
-    const rows = sorted(all.filter(FILTERS[filter]).filter((row) => !query || row.caption.toLowerCase().includes(query)))
+    const rows = sorted(
+      all.filter(FILTERS[filter]).filter(KINDS[kindFilter]).filter((row) => !query || row.caption.toLowerCase().includes(query))
+    )
+    byId('igpTableWrap').hidden = view === 'grid'
+    byId('igpGrid').hidden = view !== 'grid'
+    if (view === 'grid') return renderGrid(rows)
     const list = byId('igpList')
     list.replaceChildren()
     const loadingRow = () => {
@@ -302,6 +319,90 @@
     render()
     continueMore()
   })
+  byId('igpKinds').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-kind]')
+    if (!button) return
+    kindFilter = button.dataset.kind
+    byId('igpKinds').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)))
+    render()
+    continueMore()
+  })
+  byId('igpView').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-view]')
+    if (!button) return
+    view = button.dataset.view
+    try {
+      localStorage.setItem(`${base}:ig-view`, view)
+    } catch {}
+    byId('igpView').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)))
+    render()
+    continueMore()
+  })
+  byId('igpView').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)))
+
+  /* ───── Grid ala Instagram: ubin 3 kolom, angka suka · komentar · bagikan · simpan di bawah ───── */
+  const ICON = {
+    heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z',
+    comment: 'M4 5h16v11h-9l-5 4V5Z',
+    share: 'M21 3 3 10l8 2 2 8 8-17Z',
+    save: 'M6 3h12v18l-6-4-6 4V3Z',
+    play: 'M8 5l11 7-11 7z',
+    layers: 'M8 4h12v12M4 8h12v12H4z',
+  }
+  const icon = (name) => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('aria-hidden', 'true')
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path.setAttribute('d', ICON[name])
+    svg.append(path)
+    return svg
+  }
+  function renderGrid(rows) {
+    const grid = byId('igpGrid')
+    grid.replaceChildren()
+    const pageable = filter === 'all' || filter === 'published'
+    const needsMedia = pageable || filter === 'story'
+    byId('igpMoreButton').hidden = !pageable || !nextCursor || moreLoading || !mediaLoaded
+    const skeleton = () => {
+      for (let i = 0; i < 6; i++) grid.append(el('div', undefined, 'wa-igp-tile-card is-skeleton'))
+    }
+    if (!rows.length && !(postsLoaded && (mediaLoaded || !needsMedia))) return skeleton()
+    if (!rows.length) return grid.append(el('div', mediaError ? t(mediaError) : t('Tidak ada postingan.'), 'wa-order-empty'))
+    for (const row of rows) {
+      const card = el('button', undefined, 'wa-igp-tile-card')
+      card.type = 'button'
+      card.setAttribute('role', 'listitem')
+      card.dataset.orderId = row.key
+      card.dataset.selected = String(row.key === selectedKey)
+      card.dataset.kind = row.kind
+      card.dataset.status = row.status
+      card.title = row.caption ? row.caption.replace(/\s+/g, ' ').slice(0, 160) : ''
+      card.append(thumbOf(row, 'wa-igp-tile-img'))
+      if (row.kind === 'reels' || row.video) card.append(Object.assign(icon('play'), { className: 'wa-igp-tile-type' }))
+      else if (row.kind === 'carousel' || row.count > 1) card.append(Object.assign(icon('layers'), { className: 'wa-igp-tile-type' }))
+      if (row.status === 'published') {
+        const bar = el('span', undefined, 'wa-igp-tile-stats')
+        const labels = { likes: t('Suka'), comments: t('Komentar'), shares: t('Bagikan'), saved: t('Simpan') }
+        for (const [key, name] of [['likes', 'heart'], ['comments', 'comment'], ['shares', 'share'], ['saved', 'save']]) {
+          const stat = el('span', undefined, 'wa-igp-tile-stat')
+          stat.title = labels[key]
+          const value = row.stats?.[key]
+          stat.append(icon(name), el('b', refreshing && row.key.startsWith('m') ? '…' : value === undefined || value === null ? '—' : num(value)))
+          bar.append(stat)
+        }
+        card.append(bar)
+      } else {
+        const [label, tone] = STATUS()[row.status] || [row.status, '']
+        const tag = el('span', `${label} · ${when(row.time)}`, 'wa-igp-tile-label')
+        tag.dataset.tone = tone
+        card.append(tag)
+      }
+      card.addEventListener('click', () => openDetail(row))
+      grid.append(card)
+    }
+    if ((needsMedia && !mediaLoaded) || (pageable && moreLoading)) skeleton()
+  }
   byId('igpSearch').addEventListener('input', render)
 
   /* ───── Muat data ───── */
@@ -336,7 +437,10 @@
     }
     try {
       const data = await api(`/api/instagram/performance${fresh ? '?fresh=1' : ''}`)
-      media = data.posts || []
+      // Halaman pertama diganti, halaman lama yang sudah dimuat (gulir) tetap dipertahankan.
+      const incoming = data.posts || []
+      const ids = new Set(incoming.map((item) => String(item.id)))
+      media = incoming.concat(media.filter((item) => !ids.has(String(item.id))))
       stories = data.stories || []
       mediaError = data.error || ''
       nextCursor = data.next || ''
@@ -393,6 +497,11 @@
     loadPosts()
     loadMedia(true)
   })
+  // Angka performa disegarkan sendiri tiap menit selama halaman terlihat (server mengambil ulang yang sudah usang).
+  window.setInterval(() => {
+    if (document.hidden || activeTab() !== 'content' || refreshing || moreLoading || drawer.open) return
+    loadMedia()
+  }, 60_000)
 
   /* ───── Dialog kanan: detail, form, ringkasan ───── */
   const drawer = byId('igpDrawer')

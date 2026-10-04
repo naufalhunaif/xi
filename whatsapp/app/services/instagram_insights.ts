@@ -141,19 +141,22 @@ async function saveStats(media: any, product: string, stats: Record<string, numb
   )
 }
 
-/** Umur data performa sebelum diambil ulang: postingan baru angkanya masih naik cepat. */
+/**
+ * Umur data performa sebelum diambil ulang: postingan baru angkanya masih naik cepat.
+ * v3.6.11: lebih pendek (2 mnt < 1 hari, 5 mnt < 3 hari, 15 mnt < 14 hari, 30 mnt sisanya) —
+ * suka & komentar selalu segar karena ikut daftar media, ini hanya untuk jangkauan/tayangan/bagikan/simpan.
+ */
 function statsTtl(timestamp: unknown) {
   const age = Date.now() - new Date(String(timestamp || 0)).getTime()
-  if (age < 2 * 86_400_000) return 5 * 60_000
-  if (age < 7 * 86_400_000) return 15 * 60_000
+  if (age < 86_400_000) return 2 * 60_000
+  if (age < 3 * 86_400_000) return 5 * 60_000
+  if (age < 14 * 86_400_000) return 15 * 60_000
   return TTL_MS
 }
 
 /**
  * Postingan profil + performanya, per halaman 24.
- * Data disimpan sementara: postingan < 2 hari 5 menit, < 7 hari 15 menit, lebih lama 30 menit.
- * Halaman pertama: maks 8 diambil ulang per permintaan (semua bila `fresh`, dari tombol Perbarui).
- * Halaman lama (`after`): semua yang perlu diambil, 6 sekaligus.
+ * Semua yang usang diambil ulang (6 sekaligus); `fresh` (tombol Perbarui) mengambil ulang semuanya.
  */
 export async function mediaPerformance(config: IgConfig, after = '', fresh = false) {
   // Halaman pertama juga mengambil jumlah total postingan di profil (untuk hitungan tab).
@@ -172,7 +175,7 @@ export async function mediaPerformance(config: IgConfig, after = '', fresh = fal
     if (row) statsOf.set(String(item.id), JSON.parse(row.stats || '{}'))
     if (fresh || !row || Date.now() - new Date(row.fetched_at).getTime() > statsTtl(item.timestamp)) stale.push(item)
   }
-  const refresh = after || fresh ? stale : stale.slice(0, 8)
+  const refresh = stale
   for (let index = 0; index < refresh.length; index += 6) {
     await Promise.all(
       refresh.slice(index, index + 6).map(async (item) => {

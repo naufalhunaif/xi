@@ -7,11 +7,24 @@
       <button type="button" data-filter="story" aria-pressed="false"><span data-i18n="Story">Story</span> <b class="wa-tab-count" data-count="story"></b></button>
       <button type="button" data-filter="failed" aria-pressed="false"><span data-i18n="Gagal">Gagal</span> <b class="wa-tab-count" data-count="failed"></b></button>
     </div>
-    <div class="wa-order-filters"><input id="igpSearch" type="search" placeholder="Cari caption" data-i18n-placeholder="Cari caption" aria-label="Cari caption" data-i18n-aria-label="Cari caption"></div>
+    <div class="wa-order-filters wa-igp-filters">
+      <div id="igpKinds" class="wa-segmented wa-igp-kind-tabs" role="group" aria-label="Jenis" data-i18n-aria-label="Jenis">
+        <button type="button" data-kind="all" aria-pressed="true" data-i18n="Semua">Semua</button>
+        <button type="button" data-kind="posts" aria-pressed="false" title="Postingan" data-i18n-title="Postingan" aria-label="Postingan" data-i18n-aria-label="Postingan"><svg class="wa-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 10h16M4 16h16M10 4v16M16 4v16"/></svg></button>
+        <button type="button" data-kind="reels" aria-pressed="false" title="Reels" data-i18n-title="Reels" aria-label="Reels" data-i18n-aria-label="Reels"><svg class="wa-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18M8 3l3 6M14 3l3 6M10 12.5v5l4-2.5z"/></svg></button>
+        <button type="button" data-kind="story" aria-pressed="false" title="Story" data-i18n-title="Story" aria-label="Story" data-i18n-aria-label="Story"><svg class="wa-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke-dasharray="6 3"/><circle cx="12" cy="12" r="5"/></svg></button>
+      </div>
+      <div id="igpView" class="wa-segmented wa-igp-view" role="group" aria-label="Tampilan" data-i18n-aria-label="Tampilan">
+        <button type="button" data-view="list" aria-pressed="true" title="Tampilan daftar" data-i18n-title="Tampilan daftar" aria-label="Tampilan daftar" data-i18n-aria-label="Tampilan daftar"><svg class="wa-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <button type="button" data-view="grid" aria-pressed="false" title="Tampilan grid" data-i18n-title="Tampilan grid" aria-label="Tampilan grid" data-i18n-aria-label="Tampilan grid"><svg class="wa-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/></svg></button>
+      </div>
+      <input id="igpSearch" type="search" placeholder="Cari caption" data-i18n-placeholder="Cari caption" aria-label="Cari caption" data-i18n-aria-label="Cari caption">
+    </div>
   </div>
   <p id="igpNotice" role="status" aria-live="polite"></p>
   <div class="wa-order-workspace">
-    <div class="wa-order-table-scroll" tabindex="0" role="region" aria-label="Postingan" data-i18n-aria-label="Postingan">
+    <div id="igpGrid" class="wa-igp-grid" role="list" aria-label="Postingan" data-i18n-aria-label="Postingan" hidden></div>
+    <div id="igpTableWrap" class="wa-order-table-scroll" tabindex="0" role="region" aria-label="Postingan" data-i18n-aria-label="Postingan">
       <table class="wa-order-table wa-igp-table">
         <thead><tr>
           <th scope="col" data-i18n="Postingan">Postingan</th>

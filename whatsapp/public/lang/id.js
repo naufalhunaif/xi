@@ -1912,5 +1912,8 @@ window.waLocales.id = {
   "Ukuran file harus 1 byte–16 MB.": "Ukuran file harus 1 byte–16 MB.",
   "Ulangi password tidak sama.": "Ulangi password tidak sama.",
   "diperbarui {0}": "diperbarui {0}",
+  "Tampilan daftar": "Tampilan daftar",
+  "Tampilan grid": "Tampilan grid",
+  "Tampilan": "Tampilan",
   "jid wajib.": "jid wajib.",
 }

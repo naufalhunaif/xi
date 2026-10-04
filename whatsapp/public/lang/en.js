@@ -1912,5 +1912,8 @@ window.waLocales.en = {
   "Ukuran file harus 1 byte–16 MB.": "File size must be 1 byte–16 MB.",
   "Ulangi password tidak sama.": "Repeated password does not match.",
   "diperbarui {0}": "updated {0}",
+  "Tampilan daftar": "List view",
+  "Tampilan grid": "Grid view",
+  "Tampilan": "View",
   "jid wajib.": "jid is required.",
 }
