@@ -228,3 +228,19 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 **Lanjutan (v3.4.179)**
 4. Form terlewat yang totalnya sudah dikirim CS manual tetap dicatat sebagai order "menunggu pembayaran" dengan total dari CS, supaya bukti transfer tampil dan tombol konfirmasi pembayaran muncul.
 5. Warna di spesifikasi mengikuti foto katalog yang ditunjukkan di chat: pelanggan mengirim gambar, AI membalas foto Bescap Cross Placket - Choco, tapi spesifikasi ditulis "Brown" (Brown dan Choco sama-sama ada di katalog). Kode sekarang mengganti warna yang tidak pernah difotokan dan tidak disebut pelanggan dengan warna foto terakhir produk itu.
+
+---
+
+## #7 · 4 Okt 2026 · jas hitam: sapaan, "seperti apa?", "mau custom bisa" (diterapkan v3.5.1)
+
+**Ringkasan chat (uji pemilik)**
+- "Halo" → AI: "Halo bos, ada yang bisa kami bantu" (dilarang skill).
+- "Jas hitam ada?" → "Ada bos, jas hitam mulai 485.000. Mau model Basic Suit, Tuxedo, atau Peak Suit?" (sudah benar).
+- "Seperti apa ya?" → daftar terpotong ("Ini pilihan jas:" / "hitamnya bos" / …), mengulang harga, dan pertanyaan "Yang cocok yang mana bos?" terkirim sebelum foto.
+- "Mau custkm bisa" → diserahkan ke CS tanpa balasan ("custom tanpa detail perlu konfirmasi produksi").
+
+**Pelajaran**
+1. Sapaan cukup "Halo bos" — kalimat "ada yang bisa kami bantu" dibuang sistem.
+2. "Seperti apa?" setelah model disebut → kirim foto model yang dibahas ("ini fotonya bos"), jangan mengulang daftar/harga. Pertanyaan lanjutan dikirim sesudah foto.
+3. Custom bukan alasan serah CS: "Bisa bos, untuk custom nanti di sesuaikan ukuran ya" → "Mau custom ukurannya atau ada detail model yang mau diubah bos?". Tetap ke CS bila menyangkut warna/bahan di luar katalog, diskon/seragam, atau tanggal kirim.
+

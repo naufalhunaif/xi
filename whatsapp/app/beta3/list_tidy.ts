@@ -38,19 +38,38 @@ function tidySentence(sentence: string): string {
     intro = first.slice(0, start).join(' ')
     firstItem = first.slice(start).join(' ')
   } else {
-    const start = Math.max(0, first.length - itemWords)
-    intro = first.slice(0, start).join(' ')
-    firstItem = first.slice(start).join(' ')
+    // Item pertama = kata berhuruf besar di ujung pembuka ("Ada model Basic Suit");
+    // tanpa kata berhuruf besar ("Ini pilihan jas hitamnya bos") seluruhnya pembuka.
+    let caps = 0
+    while (caps < first.length && /^[A-Z0-9]/.test(first[first.length - 1 - caps])) caps++
+    if (!caps) {
+      intro = parts[0].trim()
+      firstItem = ''
+    } else {
+      const start = Math.max(1, first.length - Math.max(caps, Math.min(itemWords, first.length - 1)))
+      intro = first.slice(0, start).join(' ')
+      firstItem = first.slice(start).join(' ')
+    }
   }
   // Kata sapaan di ujung item terakhir ("... (6-7 hari) bos") dipindah ke pembuka.
-  const items = [firstItem, ...parts.slice(1).map((p) => p.trim())]
+  const items = [firstItem, ...parts.slice(1).map((p) => p.trim())].filter(Boolean)
+  if (items.length < 3) return sentence
   let tail = ''
   const lastWords = wordsOf(items[items.length - 1])
   if (lastWords.length > 1 && ADDRESS.test(lastWords[lastWords.length - 1])) {
     tail = lastWords.pop()!
     items[items.length - 1] = lastWords.join(' ')
   }
+  // "Peak Suit masing-masing 485.000" → keterangan bersama pindah ke pembuka.
+  let shared = ''
+  if (!isPriceList) {
+    const common = items[items.length - 1].match(/\s+((?:masing-masing|semuanya|semua|sama-sama)\b.*)$/i)
+    if (common) {
+      shared = common[1].trim()
+      items[items.length - 1] = items[items.length - 1].slice(0, common.index).trim()
+    }
+  }
   if (!intro) return sentence
-  const head = `${intro}${tail ? ` ${tail}` : ''}:`
+  const head = `${intro}${tail ? ` ${tail}` : ''}${shared ? `, ${shared}` : ''}:`
   return `\n${head}\n${items.join('\n')}\n\n`
 }

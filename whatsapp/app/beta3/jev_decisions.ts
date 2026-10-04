@@ -94,7 +94,8 @@ export async function understandTurn(input: {
         ganti_alamat: 'Pelanggan minta ganti alamat setelah membayar',
         ekspedisi_lain: 'Pelanggan minta dikirim dengan ekspedisi selain JNE',
         nego: 'Pelanggan menawar harga atau minta diskon khusus',
-        tidak_perlu: 'Tidak perlu dialihkan ke manusia',
+        tidak_perlu:
+          'Tidak perlu dialihkan ke manusia (termasuk minta custom ukuran/detail model, tanya harga, foto, size, atau stok)',
       },
     }
   if (on.setuju)

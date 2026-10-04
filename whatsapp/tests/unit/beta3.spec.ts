@@ -782,3 +782,56 @@ test.group('beta3 · data pesanan rapi', () => {
     )
   })
 })
+
+test.group('beta3 · review chat jas hitam (v3.5.1)', () => {
+  test('daftar model: pembuka tidak terpotong, "masing-masing" pindah ke pembuka', async ({ assert }) => {
+    const { tidyLists } = await import('#beta3/list_tidy')
+    assert.equal(
+      tidyLists('Ini pilihan jas hitamnya bos, Basic Suit, Tuxedo, dan Peak Suit masing-masing 485.000. Yang cocok yang mana bos?'),
+      'Ini pilihan jas hitamnya bos, masing-masing 485.000:\nBasic Suit\nTuxedo\nPeak Suit\n\nYang cocok yang mana bos?'
+    )
+    assert.equal(
+      tidyLists('Ada model Basic Suit, Tuxedo, Peak Suit, dan Beskap bos'),
+      'Ada model bos:\nBasic Suit\nTuxedo\nPeak Suit\nBeskap'
+    )
+  })
+
+  test('pertanyaan dikirim sesudah foto', async ({ assert }) => {
+    const { questionAfterPhotos } = await import('#beta3/reply_guards')
+    const bubble = 'Ini pilihan jas hitamnya bos, masing-masing 485.000:\nBasic Suit\nTuxedo\nPeak Suit\n\nYang cocok yang mana bos?'
+    assert.deepEqual(questionAfterPhotos([bubble], 3), [
+      'Ini pilihan jas hitamnya bos, masing-masing 485.000:\nBasic Suit\nTuxedo\nPeak Suit',
+      'Yang cocok yang mana bos?',
+    ])
+    assert.deepEqual(questionAfterPhotos(['Ini fotonya bos. Mau yang mana bos?'], 2), ['Ini fotonya bos.', 'Mau yang mana bos?'])
+    assert.deepEqual(questionAfterPhotos([bubble], 0), [bubble])
+    assert.deepEqual(questionAfterPhotos(['Ini fotonya bos'], 2), ['Ini fotonya bos'])
+  })
+
+  test('sapaan tanpa "ada yang bisa kami bantu"; penutup "ada lagi" tetap', async ({ assert }) => {
+    const { stripHelpOffer } = await import('#beta3/reply_guards')
+    assert.deepEqual(stripHelpOffer(['Halo bos, ada yang bisa kami bantu']), ['Halo bos'])
+    assert.deepEqual(stripHelpOffer(['Ada yang bisa di bantu bos?']), ['Iya bos'])
+    assert.deepEqual(stripHelpOffer(['Siap sama sama bos', 'Ada lagi yang bisa di bantu bos?']), [
+      'Siap sama sama bos',
+      'Ada lagi yang bisa di bantu bos?',
+    ])
+  })
+
+  test('"mau custom bisa" tidak diserahkan ke CS; custom + warna di luar katalog tetap diserahkan', async ({ assert }) => {
+    const { keepCustomInChat, CUSTOM_REPLY } = await import('#beta3/reply_guards')
+    const handoff = {
+      serah_cs: true,
+      alasan: 'Pelanggan meminta custom tanpa detail sehingga perlu konfirmasi produksi.',
+      pesan: [],
+    }
+    assert.deepEqual(keepCustomInChat(handoff, 'Mau custkm bisa'), { pesan: CUSTOM_REPLY })
+    assert.deepEqual(
+      keepCustomInChat({ ...handoff, pesan: ['saya tanyakan ke produksi dulu ya bos'] }, 'mau custom'),
+      { pesan: CUSTOM_REPLY }
+    )
+    assert.isNull(keepCustomInChat({ ...handoff, alasan: 'Warna maroon tidak ada di katalog' }, 'custom warna maroon'))
+    assert.isNull(keepCustomInChat({ ...handoff, alasan: 'Diskon seragam 40 pcs' }, 'custom seragam 40 pcs'))
+    assert.isNull(keepCustomInChat({ ...handoff, serah_cs: false }, 'mau custom'))
+  })
+})

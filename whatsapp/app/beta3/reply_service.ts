@@ -57,6 +57,7 @@ import { detectAwb } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
+import { keepCustomInChat, questionAfterPhotos, stripHelpOffer } from '#beta3/reply_guards'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -939,6 +940,22 @@ export async function createLeanReply(input: {
   decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
   // Deretan pilihan/harga/produk dalam satu kalimat → satu per baris (semua model).
   decision.pesan = decision.pesan.map(tidyLists)
+  decision.pesan = stripHelpOffer(decision.pesan)
+  // "Mau custom bisa?" bukan alasan serah CS: jawab bisa + tanya custom apa.
+  const custom = keepCustomInChat(decision, input.text)
+  if (custom) {
+    decision.serah_cs = false
+    decision.pesan = custom.pesan
+    if (decision.tahap === 'tunggu_cs') decision.tahap = 'tanya_size'
+    decision.catatan = decision.catatan.replace(/tahap\s*[:=]\s*tunggu_cs/i, 'tahap: tanya_size')
+    onTrace?.({
+      key: 'beta3-custom',
+      label: 'Custom dijawab sendiri (tidak diserahkan ke CS)',
+      status: 'completed',
+      detail: { alasan: decision.alasan },
+    })
+    decision.alasan = ''
+  }
   // Pemeriksa sebelum kirim: harga yang tidak ada di katalog/ongkir/chat tidak dikirim.
   if (!decision.serah_cs && decision.pesan.length) {
     const allowed = allowedPrices(digest.rows, [
@@ -1129,10 +1146,13 @@ export async function createLeanReply(input: {
       decision,
     },
   })
+  const photos = resolvePhotos(digest.rows, decision.foto)
+  // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
+  if (!decision.serah_cs) decision.pesan = questionAfterPhotos(decision.pesan, photos.length)
   return {
     decision,
     autoTotal,
-    photos: resolvePhotos(digest.rows, decision.foto),
+    photos,
     promptTokens: prompt.size.tokens,
     promptSections: prompt.size.sections,
     usage: result.usage,
