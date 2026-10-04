@@ -1,6 +1,8 @@
 // Beta 3.5 — hemat token: pesan sederhana dijawab tanpa AI, dan bagian prompt yang tidak
 // dibutuhkan giliran ini tidak dikirim. Ragu → bagian tetap dikirim (akurasi didahulukan).
 import type { LeanHistoryRow } from '#beta3/prompt'
+import type { LeanCatalogRow } from '#beta3/catalog_service'
+import { catalogColorSearchHints } from '#services/color_semantics'
 
 const OPENER_WORD =
   /^(?:halo+|hallo+|hai+|hay|hi|hei|p+|ping|permisi|punten|pagi|siang|sore|malam|met\s+(?:pagi|siang|sore|malam)|selamat\s+(?:pagi|siang|sore|malam)|ass?alamu'?\s*alaikum(?:\s+wr\.?\s*wb\.?)?|assalamualaikum|salam|kak|kakak|bos|boss|min|admin|gan|om|mas|mbak|sis)$/i
@@ -61,11 +63,11 @@ export function quickReply(input: {
 const LATE = ['tunggu_bayar', 'bukti_dikirim', 'selesai']
 const EARLY = ['', 'lain', 'tanya_model', 'tanya_size', 'tawar_celana']
 const PRODUCT =
-  /\b(jas|tuxedo|beskap|suit|setelan|celana|rompi|model|warna|harga|berapa|foto|gambar|stok|ready|size|ukuran|bahan|custom|order lagi|pesan lagi|tambah|katalog|produk)\b/i
+  /\b(jas|tuxedo|beskap|suit|setelan|celana|rompi|model|warna|harga|berapa|foto|gambar|stok|ready|size|ukuran|bahan|custom|order lagi|pesan lagi|tambah|katalog|produk)/i
 const SIZE =
   /\b(size|ukuran|tinggi|berat|lingkar|dada|pinggang|panjang|lengan|bahu|cm|kg|celana|nomor|no\.?\s*\d+|muat|pas|kebesaran|kekecilan|ngepress|sempit|longgar|xs|s|m|l|xl|xxl|[2-4]xl)\b|\b\d{2,3}\b/i
 const COLOR =
-  /\b(warna|bahan|kain|custom|buatkan|dibuatkan|seri|motif|putih|hitam|navy|maroon|abu|grey|gray|cream|krem|coklat|choco|brown|hijau|biru|merah|broken|white|black|gold|silver|olive|mocca|khaki|beige)\b/i
+  /\b(warna|bahan|kain|custom|buatkan|dibuatkan|seri|motif|putih|hitam|navy|maroon|abu|grey|gray|cream|krem|coklat|choco|brown|hijau|biru|merah|broken|white|black|gold|silver|olive|mocca|khaki|beige)/i
 
 /** Bagian prompt yang perlu dikirim giliran ini. Tidak yakin → dikirim. */
 export function promptNeeds(input: {
@@ -90,4 +92,142 @@ export function promptNeeds(input: {
       images || SIZE.test(text) || SIZE.test(recentOut) || input.intent === 'ukuran' || input.hasFit,
     fabrics: images || EARLY.includes(input.stage) || COLOR.test(text) || input.intent === 'produk',
   }
+}
+
+const SKILL_RULES: Array<[RegExp, (need: SkillContext) => boolean]> = [
+  [/^Size dari tinggi/i, (need) => need.size],
+  [/^Spesifikasi pesanan/i, (need) => need.spec],
+  [/^Warna, foto, stok/i, (need) => need.catalog],
+  [/^Ongkir/i, (need) => need.shipping],
+  [/^Setelah bayar/i, (need) => need.paid],
+  [/^Pelanggan mengirim foto/i, (need) => need.photo],
+  [/^Komentar di postingan Instagram/i, (need) => need.instagram],
+]
+
+export type SkillContext = {
+  size: boolean
+  spec: boolean
+  catalog: boolean
+  shipping: boolean
+  paid: boolean
+  photo: boolean
+  instagram: boolean
+}
+
+const SHIPPING =
+  /\b(ongkir|ongkos|kirim|dikirim|pengiriman|alamat|kec|kecamatan|kab|kabupaten|kota|ekspedisi|jne|j&t|jnt|sicepat|lion|kurir|sampai|nyampe|tiba|cepat|besok|tgl|tanggal|reg|yes|jtr)/i
+const PAID =
+  /\b(tf|transfer|bayar|dibayar|lunas|dp|resi|sudah jadi|udah jadi|progres|proses|dikirim|ganti alamat|tukar|refund)/i
+const SPEC =
+  /\b(custom|kustom|costum|cust[a-z]?m|kerah|saku|kancing|lis|list|bahan|detail|ukuran|lingkar|panjang|lengan|bahu|celana|rompi|setelan|warna|model|order|pesan)/i
+
+/** Konteks bagian skill yang dibutuhkan giliran ini (ragu → bagian ikut). */
+export function skillContext(input: {
+  stage: string
+  text: string
+  imageCount: number
+  rows: LeanHistoryRow[]
+  spec: string
+  needs: { catalog: boolean; sizeCharts: boolean }
+  shippingNotes: boolean
+  hasOrder: boolean
+}): SkillContext {
+  const recent = input.rows
+    .slice(-4)
+    .map((row) => String(row.body || ''))
+    .join('\n')
+  const text = input.text
+  const instagram = /\[Komentar di postingan Instagram/i.test(text)
+  return {
+    size: input.needs.sizeCharts || ['tanya_size', 'tawar_celana'].includes(input.stage),
+    spec:
+      Boolean(input.spec.trim()) ||
+      !['', 'lain', 'tanya_model'].includes(input.stage) ||
+      input.imageCount > 0 ||
+      SPEC.test(text),
+    catalog: input.needs.catalog,
+    shipping:
+      input.shippingNotes ||
+      SHIPPING.test(text) ||
+      SHIPPING.test(recent) ||
+      ['minta_alamat', 'kirim_form', 'tunggu_form', 'tunggu_cs', 'tunggu_bayar'].includes(input.stage),
+    paid: input.hasOrder || LATE.includes(input.stage) || PAID.test(text),
+    photo:
+      input.imageCount > 0 ||
+      instagram ||
+      input.rows.slice(-4).some((row) => row.direction === 'in' && /image|photo|gambar/i.test(String(row.mediaType || ''))),
+    instagram,
+  }
+}
+
+/**
+ * Skill tanpa bagian yang tidak dibutuhkan giliran ini. Bagian inti (cara bicara, urutan tahap,
+ * batas wewenang, catatan chat) dan bagian yang tidak dikenal (suntingan pemilik) selalu ikut.
+ */
+export function trimSkill(skill: string, need: SkillContext) {
+  const parts = skill.split(/^(?=## )/m)
+  const kept: string[] = []
+  const skipped: string[] = []
+  for (const part of parts) {
+    const heading = part.startsWith('## ') ? part.slice(3).split('\n')[0].trim() : ''
+    const rule = heading ? SKILL_RULES.find(([pattern]) => pattern.test(heading)) : undefined
+    if (rule && !rule[1](need)) skipped.push(heading.split(/[(—]/)[0].trim())
+    else kept.push(part)
+  }
+  return { text: kept.join('').trim(), skipped }
+}
+
+const GENERIC = new Set(['setelan', 'jas', 'premium', 'signature', 'se', 'double', 'breasted', 'set', 'new', 'the', 'and'])
+const fold = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+const colorKeys = (value: string) => {
+  const keys = new Set<string>()
+  for (const hint of catalogColorSearchHints([value])) {
+    keys.add(hint.catalogColor)
+    for (const near of (hint as { nearbyCandidates?: readonly string[] }).nearbyCandidates || [])
+      for (const nearHint of catalogColorSearchHints([near])) keys.add(nearHint.catalogColor)
+  }
+  return keys
+}
+
+/**
+ * Katalog yang dikirim ke AI: hanya produk/warna yang sedang dibahas (dari pesan, 6 pesan terakhir,
+ * spesifikasi, dan catatan) + satu baris nama produk lain. Tidak ada yang cocok, ada gambar,
+ * komentar IG, atau hasilnya hampir seluruh katalog → null (katalog lengkap).
+ */
+export function focusCatalog(
+  rows: LeanCatalogRow[],
+  input: { text: string; history: LeanHistoryRow[]; spec: string; chatNote: string; imageCount: number }
+) {
+  if (input.imageCount > 0 || /\[Komentar di postingan Instagram/i.test(input.text)) return null
+  const active = rows.filter((row) => row.active)
+  if (active.length < 20) return null
+  const context = [
+    input.text,
+    ...input.history.slice(-6).map((row) => String(row.body || '')),
+    input.spec,
+    input.chatNote,
+  ].join('\n')
+  const words = new Set(fold(context).split(' '))
+  // Produk disebut: kata khas pertama nama produk ("tuxedo", "basic", "peak", "beskap").
+  const keyOf = (product: string) => fold(product).split(' ').find((word) => word.length >= 3 && !GENERIC.has(word)) || ''
+  const products = new Set(active.map((row) => keyOf(row.product)).filter((key) => key && words.has(key)))
+  const colors = colorKeys(context)
+  const picked = active.filter((row) => {
+    if (products.has(keyOf(row.product))) return true
+    if (!colors.size) return false
+    for (const key of colorKeys(row.color)) if (colors.has(key)) return true
+    return false
+  })
+  if (!picked.length || picked.length > active.length * 0.6) return null
+  const shown = new Set(picked.map((row) => row.product))
+  const others = new Map<string, number | null>()
+  for (const row of active) {
+    if (shown.has(row.product)) continue
+    const price = others.get(row.product)
+    if (price === undefined || (row.price !== null && (price === null || row.price < price))) others.set(row.product, row.price)
+  }
+  const otherLine = others.size
+    ? `PRODUK LAIN (tidak dirinci di giliran ini; harga mulai): ${[...others].map(([name, price]) => `${name}${price ? ` ${price.toLocaleString('id-ID')}` : ''}`).join(', ')}. Ditanya detail produk lain → jawab singkat dari baris ini, warna/stoknya "saya cek dulu ya bos".`
+    : ''
+  return { rows: picked, otherLine, products: [...products], colors: [...colors] }
 }

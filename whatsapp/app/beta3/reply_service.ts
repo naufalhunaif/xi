@@ -3,7 +3,7 @@ import db from '#services/workspace_database'
 import { phoneFromJid } from '#services/customer_identity_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import type { TraceSink } from '#services/trace_service'
-import { catalogDigest, findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
+import { catalogDigest, findCatalogVariant, renderCatalogDigest, type LeanCatalogRow } from '#beta3/catalog_service'
 import { listLeanExamples, pickExamples, seedLeanExamples } from '#beta3/examples_service'
 import { readCustomerNote, readOrderSpec, writeOrderSpec } from '#beta3/customer_service'
 import {
@@ -58,7 +58,7 @@ import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { keepCustomInChat, questionAfterPhotos } from '#beta3/reply_guards'
-import { promptNeeds, quickReply } from '#beta3/token_saver'
+import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
@@ -78,7 +78,8 @@ import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3
  */
 export const LEAN_SKILL_NAME = 'beta3-cs-inti'
 export const LEAN_SKILL_TOKEN_LIMIT = 7000
-const HISTORY_LIMIT = 30
+// Riwayat 20 pesan; keadaan yang lebih lama tersimpan di CATATAN CHAT & spesifikasi.
+const HISTORY_LIMIT = 20
 
 export type LeanSettings = LeanProviderSettings & {
   production?: Parameters<typeof renderProductionEstimate>[0]
@@ -929,13 +930,42 @@ export async function createLeanReply(input: {
     intent: understanding.intent,
     hasFit: toolNotes.some((note) => /fit advisor|rekomendasi size|size chart/i.test(note)),
   })
-  const skipped = Object.entries(needs).filter(([, needed]) => !needed).map(([key]) => key)
-  if (skipped.length)
-    onTrace?.({ key: 'beta3-trim', label: `Hemat token · tanpa ${skipped.join(', ')}`, status: 'completed', detail: needs })
+  // Skill hanya bagian yang dibutuhkan; katalog hanya produk/warna yang sedang dibahas.
+  const skillNeed = skillContext({
+    stage,
+    text: input.text,
+    imageCount: input.imagePaths?.length || 0,
+    rows,
+    spec: String(spec || ''),
+    needs,
+    shippingNotes: Boolean(systemNote) || toolNotes.some((note) => /ONGKIR|TUJUAN/.test(note)),
+    hasOrder: Boolean(activeOrder) || Boolean(pendingForJev),
+  })
+  const trimmedSkill = trimSkill(skill.content, skillNeed)
+  const focus = needs.catalog
+    ? focusCatalog(digest.rows, {
+        text: input.text,
+        history: rows,
+        spec: String(spec || ''),
+        chatNote,
+        imageCount: input.imagePaths?.length || 0,
+      })
+    : null
+  const skipped = [
+    ...Object.entries(needs).filter(([, needed]) => !needed).map(([key]) => key),
+    ...trimmedSkill.skipped.map((name) => `skill ${name}`),
+  ]
+  if (skipped.length || focus)
+    onTrace?.({
+      key: 'beta3-trim',
+      label: `Hemat token${focus ? ` · katalog ${focus.rows.length} varian` : ''}${skipped.length ? ` · tanpa ${skipped.join(', ')}` : ''}`,
+      status: 'completed',
+      detail: { needs, skill: skillNeed, focus: focus ? { products: focus.products, colors: focus.colors } : null },
+    })
   const prompt = buildLeanPrompt({
     policy: renderExchangePolicy(policy.text),
     activeOrder,
-    skill: skill.content,
+    skill: trimmedSkill.text,
     store,
     fabrics: needs.fabrics
       ? await readLeanState('fabrics')
@@ -946,7 +976,9 @@ export async function createLeanReply(input: {
         ? 'SIZE CHART: tidak dimuat di giliran ini (tidak ada pertanyaan ukuran). Ditanya ukuran → jawab dari size ready di KATALOG.'
         : '',
     catalog: needs.catalog
-      ? digest.text
+      ? focus
+        ? `${renderCatalogDigest(focus.rows).replace(/^KATALOG \(/, 'KATALOG (produk yang sedang dibahas; ')}${focus.otherLine ? `\n${focus.otherLine}` : ''}`
+        : digest.text
       : 'KATALOG: tidak dimuat di giliran ini (pesanan sudah berjalan, pelanggan tidak menanyakan produk). Ditanya produk/harga baru → "saya cek dulu ya bos".',
     // Koreksi pemilik selalu ikut (12 terbaru); contoh lain dipilih yang paling mirip.
     examples: pickExamples(examples.filter((example) => example.source !== 'koreksi'), input.text, stage),

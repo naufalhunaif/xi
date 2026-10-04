@@ -976,3 +976,65 @@ test.group('beta3 · daftar mudah dibaca (v3.5.5)', () => {
     assert.deepEqual(tidyReply([form]), [form])
   })
 })
+
+test.group('beta3 · prompt ramping (v3.5.6)', () => {
+  const at = new Date()
+  const msg = (text: string) => ({ direction: 'in' as const, body: text, createdAt: at, current: true })
+  const need = {
+    size: false,
+    spec: false,
+    catalog: true,
+    shipping: false,
+    paid: false,
+    photo: false,
+    instagram: false,
+  }
+
+  test('skill hanya bagian yang dibutuhkan; bagian inti & bagian buatan pemilik selalu ikut', async ({ assert }) => {
+    const { trimSkill } = await import('#beta3/token_saver')
+    const skill = '# CS\n\n## Cara bicara\nA\n\n## Ongkir\nB\n\n## Pelanggan mengirim foto\nC\n\n## Aturan tambahan pemilik\nD\n'
+    const trimmed = trimSkill(skill, need)
+    assert.include(trimmed.text, '## Cara bicara')
+    assert.include(trimmed.text, '## Aturan tambahan pemilik')
+    assert.notInclude(trimmed.text, '## Ongkir')
+    assert.notInclude(trimmed.text, '## Pelanggan mengirim foto')
+    assert.include(trimSkill(skill, { ...need, shipping: true, photo: true }).text, '## Ongkir')
+  })
+
+  test('konteks skill: ongkir, foto, bayar, custom terbaca', async ({ assert }) => {
+    const { skillContext } = await import('#beta3/token_saver')
+    const base = { stage: '', imageCount: 0, spec: '', needs: { catalog: true, sizeCharts: false }, shippingNotes: false, hasOrder: false }
+    const ask = (text: string, extra: Record<string, unknown> = {}) =>
+      skillContext({ ...base, text, rows: [msg(text)], ...extra })
+    assert.isFalse(ask('Jas hitam ada?').shipping)
+    assert.isTrue(ask('ongkir ke cilacap berapa?').shipping)
+    assert.isTrue(ask('ini', { imageCount: 1 }).photo)
+    assert.isTrue(ask('sudah tf ya').paid)
+    assert.isTrue(ask('Mau custkm bisa, kerahnya beda').spec)
+    assert.isTrue(ask('oke', { stage: 'kirim_form' }).shipping)
+  })
+
+  test('katalog fokus ke produk/warna yang dibahas; ragu → lengkap', async ({ assert }) => {
+    const { focusCatalog } = await import('#beta3/token_saver')
+    const products = ['Tuxedo', 'Tuxedo Signature', 'Basic Suit', 'Peak Suit', 'Beskap Clean Look', 'Rompi']
+    const colors = ['Black', 'White', 'Navy', 'Maroon', 'Choco', 'Brown']
+    let id = 0
+    const rows = products.flatMap((product) =>
+      colors.map((color) => row({ id: ++id, product, color, category: product.split(' ')[0] }))
+    )
+    const ask = (text: string, extra: Record<string, unknown> = {}) =>
+      focusCatalog(rows, { text, history: [msg(text)], spec: '', chatNote: '', imageCount: 0, ...extra })
+    const black = ask('Jas hitam ada?')!
+    assert.deepEqual([...new Set(black.rows.map((r) => r.color))], ['Black'])
+    assert.include(black.otherLine, '')
+    const tux = ask('Tuxedo maroon ready?')!
+    assert.isTrue(tux.rows.some((r) => r.product === 'Tuxedo Signature' && r.color === 'White'))
+    // Produk lain hanya warna yang dibahas (Maroon).
+    assert.deepEqual([...new Set(tux.rows.filter((r) => r.product === 'Basic Suit').map((r) => r.color))], ['Maroon'])
+    assert.include(ask('Basic suit ready size apa?')!.otherLine, 'Beskap Clean Look')
+    // "coklat" ikut menampilkan Choco & Brown (warna berdekatan).
+    assert.sameMembers([...new Set(ask('ada yang coklat?')!.rows.map((r) => r.color))], ['Brown', 'Choco'])
+    assert.isNull(ask('ada model apa aja?'))
+    assert.isNull(ask('yang ini', { imageCount: 1 }))
+  })
+})

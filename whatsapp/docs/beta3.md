@@ -44,7 +44,10 @@ keputusan satu per satu.
 - `app/beta3/token_saver.ts`: sapaan/terima kasih dijawab tanpa AI (`quickReply`); size chart, bahan, dan katalog
   hanya masuk prompt bila dibutuhkan giliran itu (`promptNeeds`, dibantu maksud dari Jev). Trace menampilkan
   "Balasan cepat tanpa AI" atau "Hemat token · tanpa …".
-- Skill tetap utuh di system prompt supaya cache penyedia (Claude/ChatGPT) tetap kena.
+- v3.5.6: skill dikirim per bagian (`trimSkill`): inti (cara bicara, urutan tahap, batas wewenang, catatan chat)
+  selalu; size, spesifikasi, ongkir, setelah bayar, foto pelanggan, komentar IG hanya bila dibutuhkan; bagian
+  buatan pemilik selalu ikut. Katalog fokus ke produk/warna yang dibahas (`focusCatalog`) + satu baris produk lain;
+  ragu/gambar/komentar IG → katalog lengkap. Riwayat 20 pesan. Perkiraan prompt ±10 ribu → ±6–7 ribu token.
 - Claude: JSON lewat instruksi dalam satu panggilan (mode skema CLI memakai tool StructuredOutput = dua panggilan).
 - Perapian oleh sistem (`app/beta3/reply_tidy.ts`, v3.5.4), tanpa bertanya ulang ke AI: JSON rusak diperbaiki
   (`repairJson`), teks biasa untuk pelanggan dipakai sebagai pesan (`bubblesFromText`), gaya bubble dirapikan

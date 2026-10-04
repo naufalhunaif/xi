@@ -65,6 +65,8 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Sapaan murni ("Halo", "P", "Assalamualaikum", "Pagi min") di chat tanpa urusan terbuka dijawab tanpa AI; "makasih" setelah pesan toko → "Siap sama sama bos" (diam bila toko sudah bilang sama-sama) | `beta3.spec` · hemat token |
 | Sapaan + pertanyaan, pesan sebelumnya belum dijawab, ada form order, gambar, catatan CS, atau tahap order berjalan → tetap AI | `beta3.spec` · hemat token |
 | Size chart / bahan / katalog hanya dikirim bila dibutuhkan; ragu → dikirim. Jawaban pendek setelah AI menanyakan size tetap dapat size chart | `beta3.spec` · hemat token |
+| Skill dikirim per bagian sesuai kebutuhan (inti & bagian buatan pemilik selalu ikut); ongkir/foto/bayar/custom terdeteksi dari pesan, tahap, dan 4 pesan terakhir | `beta3.spec` · prompt ramping |
+| Katalog fokus ke produk/warna yang dibahas ("coklat" → Choco & Brown) + baris produk lain; pertanyaan umum, gambar, komentar IG → katalog lengkap | `beta3.spec` · prompt ramping |
 | Claude membalas JSON dalam satu panggilan; JSON rusak diperbaiki sistem, teks biasa untuk pelanggan dipakai sebagai pesan; hanya keluaran tak terbaca yang diulang | `beta3.spec` · hemat token, perapian jawaban |
 | Daftar pilihan (model, warna, ongkir, ukuran) satu baris per item berawalan "- ", satu baris kosong sesudah daftar; kalimat biasa, daftar bernomor, dan template form tidak diberi poin | `beta3.spec` · daftar mudah dibaca |
 | JSON rusak (koma berlebih, terpotong, pagar ```) diperbaiki sistem; teks berisi analisis ("pelanggan", "tahap", JSON) tidak pernah dikirim | `beta3.spec` · perapian jawaban |
