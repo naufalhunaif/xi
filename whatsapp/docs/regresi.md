@@ -65,7 +65,9 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Sapaan murni ("Halo", "P", "Assalamualaikum", "Pagi min") di chat tanpa urusan terbuka dijawab tanpa AI; "makasih" setelah pesan toko → "Siap sama sama bos" (diam bila toko sudah bilang sama-sama) | `beta3.spec` · hemat token |
 | Sapaan + pertanyaan, pesan sebelumnya belum dijawab, ada form order, gambar, catatan CS, atau tahap order berjalan → tetap AI | `beta3.spec` · hemat token |
 | Size chart / bahan / katalog hanya dikirim bila dibutuhkan; ragu → dikirim. Jawaban pendek setelah AI menanyakan size tetap dapat size chart | `beta3.spec` · hemat token |
-| Claude membalas JSON dalam satu panggilan; keluaran bukan JSON → diulang dengan skema | `beta3.spec` · hemat token |
+| Claude membalas JSON dalam satu panggilan; JSON rusak diperbaiki sistem, teks biasa untuk pelanggan dipakai sebagai pesan; hanya keluaran tak terbaca yang diulang | `beta3.spec` · hemat token, perapian jawaban |
+| JSON rusak (koma berlebih, terpotong, pagar ```) diperbaiki sistem; teks berisi analisis ("pelanggan", "tahap", JSON) tidak pernah dikirim | `beta3.spec` · perapian jawaban |
+| Bubble dirapikan sistem: tanpa markdown/emoji/"terima kasih telah menghubungi", Anda/kak → bos, "bos" sekali per bubble, bubble kembar dibuang; template form, link, angka, dan nama rekening tidak diubah | `beta3.spec` · perapian jawaban |
 
 ## Aplikasi umum
 

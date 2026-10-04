@@ -896,3 +896,54 @@ test.group('beta3 · hemat token (v3.5.3)', () => {
     assert.isNull(extractJsonObject('[1,2]'))
   })
 })
+
+test.group('beta3 · perapian jawaban oleh sistem (v3.5.4)', () => {
+  test('JSON rusak diperbaiki tanpa bertanya ulang ke AI', async ({ assert }) => {
+    const { repairJson } = await import('#beta3/reply_tidy')
+    assert.deepEqual(repairJson('```json\n{"pesan":["Siap bos",],"tahap":"lain",}\n```'), { pesan: ['Siap bos'], tahap: 'lain' })
+    assert.deepEqual(repairJson('{"pesan":["Ada bos\nmulai 485.000"]}'), { pesan: ['Ada bos\nmulai 485.000'] })
+    // Terpotong di tengah jalan.
+    assert.deepEqual(repairJson('{"pesan":["Siap bos"],"catatan":"tahap: lain","susulan":"ok'), {
+      pesan: ['Siap bos'],
+      catatan: 'tahap: lain',
+      susulan: 'ok',
+    })
+    assert.deepEqual(repairJson('{"pesan":["Siap bos"],"tahap":'), { pesan: ['Siap bos'] })
+    assert.isNull(repairJson('Siap bos'))
+    assert.deepEqual(parseLeanDecision('{"pesan":["Siap bos",],"tahap":"tanya_size",}').pesan, ['Siap bos'])
+  })
+
+  test('teks biasa dipakai sebagai pesan hanya bila jelas untuk pelanggan', async ({ assert }) => {
+    const { bubblesFromText } = await import('#beta3/reply_tidy')
+    assert.deepEqual(bubblesFromText('Ada bos, mulai 485.000\n\nMau model apa bos?'), [
+      'Ada bos, mulai 485.000',
+      'Mau model apa bos?',
+    ])
+    assert.isNull(bubblesFromText('Pelanggan menanyakan harga, balasan: ...'))
+    assert.isNull(bubblesFromText('{"pesan": ['))
+    assert.isNull(bubblesFromText('x'.repeat(600)))
+  })
+
+  test('bubble dirapikan sesuai gaya CS', async ({ assert }) => {
+    const { tidyReply } = await import('#beta3/reply_tidy')
+    assert.deepEqual(
+      tidyReply([
+        'Terima kasih telah menghubungi Chameleon Cloth. Ada kak, **Tuxedo** hitam 485.000 😊',
+        'Siap bos, dicatat ya bos!!',
+        'Siap bos, dicatat ya bos!!',
+      ]),
+      ['Ada bos, *Tuxedo* hitam 485.000', 'Siap bos, dicatat ya!']
+    )
+    assert.deepEqual(tidyReply(['Anda mau size apa?', 'oke,siap bos']), ['Bos mau size apa?', 'oke, siap bos'])
+    // Template form, link, dan angka tidak diubah.
+    const form = 'Bisa di bantu isi order formatnya bos\n\nNama :\nAlamat lengkap :\nKecamatan :'
+    assert.deepEqual(tidyReply([form]), [form])
+    assert.deepEqual(tidyReply(['lokasi di Cilacap bos, https://maps.app.goo.gl/a,b?x=1']), [
+      'lokasi di Cilacap bos, https://maps.app.goo.gl/a,b?x=1',
+    ])
+    assert.deepEqual(tidyReply(['harganya 1,5 juta bos']), ['harganya 1,5 juta bos'])
+    assert.deepEqual(tidyReply(['transfer ke BRI 1234567890 an Ibu Sari ya bos']), ['transfer ke BRI 1234567890 an Ibu Sari ya bos'])
+    // Sapaan toko lain (mis. "kak") dihormati bila gaya toko memakainya.
+    assert.deepEqual(tidyReply(['Ada kak'], { address: 'kak' }), ['Ada kak'])
+  })
+})

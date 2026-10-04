@@ -45,8 +45,10 @@ keputusan satu per satu.
   hanya masuk prompt bila dibutuhkan giliran itu (`promptNeeds`, dibantu maksud dari Jev). Trace menampilkan
   "Balasan cepat tanpa AI" atau "Hemat token · tanpa …".
 - Skill tetap utuh di system prompt supaya cache penyedia (Claude/ChatGPT) tetap kena.
-- Claude: JSON lewat instruksi dalam satu panggilan (mode skema CLI memakai tool StructuredOutput = dua panggilan);
-  keluaran tidak valid → diulang dengan skema.
+- Claude: JSON lewat instruksi dalam satu panggilan (mode skema CLI memakai tool StructuredOutput = dua panggilan).
+- Perapian oleh sistem (`app/beta3/reply_tidy.ts`, v3.5.4), tanpa bertanya ulang ke AI: JSON rusak diperbaiki
+  (`repairJson`), teks biasa untuk pelanggan dipakai sebagai pesan (`bubblesFromText`), gaya bubble dirapikan
+  (`tidyReply`). Hanya keluaran yang sama sekali tidak terbaca yang diulang.
 
 ## CS membalas sebagian & chat yang menunggu CS
 

@@ -1,4 +1,5 @@
 // Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
+import { repairJson } from '#beta3/reply_tidy'
 import { promptBreakdown } from '#services/prompt_size_service'
 import type { LeanExample } from '#beta3/examples_service'
 import { renderExamples } from '#beta3/examples_service'
@@ -330,10 +331,9 @@ export function renderCorrections(corrections: LeanExample[]) {
 }
 
 export function parseLeanDecision(text: string): LeanDecision {
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) throw new Error('Keluaran AI bukan JSON.')
-  const raw = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>
+  // JSON rusak (koma berlebih, terpotong, pagar ```) diperbaiki sistem, tanpa bertanya ulang ke AI.
+  const raw = repairJson(text)
+  if (!raw) throw new Error('Keluaran AI bukan JSON.')
   const pesan = (
     Array.isArray(raw.pesan) ? raw.pesan : typeof raw.pesan === 'string' ? [raw.pesan] : []
   )

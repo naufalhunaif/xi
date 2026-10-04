@@ -59,6 +59,7 @@ import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
 import { keepCustomInChat, questionAfterPhotos } from '#beta3/reply_guards'
 import { promptNeeds, quickReply } from '#beta3/token_saver'
+import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -975,7 +976,25 @@ export async function createLeanReply(input: {
     // Hanya salam/terima kasih (menurut Jev) → model ringan.
     ...(understanding.intent === 'sapaan' && !input.imagePaths?.length && !systemNote ? { tier: 'light' as const } : {}),
   })
-  const decision = parseLeanDecision(result.text)
+  let decision: LeanDecision
+  try {
+    decision = parseLeanDecision(result.text)
+  } catch (error) {
+    // Model menulis teks biasa: dipakai sebagai pesan, catatan/tahap/spesifikasi tetap yang lama.
+    const bubbles = bubblesFromText(result.text)
+    if (!bubbles) throw error
+    decision = {
+      pesan: bubbles,
+      foto: [],
+      catatan: chatNote,
+      tahap: (stage || 'lain') as LeanDecision['tahap'],
+      serah_cs: false,
+      alasan: '',
+      susulan: '',
+      spesifikasi: String(spec || ''),
+    }
+    onTrace?.({ key: 'beta3-tidy-text', label: 'Jawaban teks biasa dirapikan sistem', status: 'completed', detail: { bubbles } })
+  }
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
   const jevColor = await jevVariantFix(jid, decision.spesifikasi, digest.rows, rows).catch(() => null)
   const colorFix = jevColor || fixCatalogColors(decision.spesifikasi, digest.rows, rows)
@@ -997,6 +1016,9 @@ export async function createLeanReply(input: {
   decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
   // Deretan pilihan/harga/produk dalam satu kalimat → satu per baris (semua model).
   decision.pesan = decision.pesan.map(tidyLists)
+  // Perapian sistem: gaya CS tanpa bertanya ulang ke AI.
+  decision.pesan = tidyReply(decision.pesan, { address: style?.address || 'bos', verbatim: [policy.text] })
+  if (decision.susulan) decision.susulan = tidyReply([decision.susulan], { address: style?.address || 'bos' })[0] || ''
   // "Mau custom bisa?" bukan alasan serah CS: jawab bisa + tanya custom apa.
   const custom = keepCustomInChat(decision, input.text)
   if (custom) {

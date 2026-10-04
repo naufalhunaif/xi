@@ -1,4 +1,5 @@
 // Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
+import { bubblesFromText, repairJson } from '#beta3/reply_tidy'
 import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -479,17 +480,10 @@ async function runCodexLean(
   )
 }
 
-/** Objek JSON pertama-terakhir di teks ("```json …```" atau teks pengantar diabaikan); null bila tidak valid. */
+/** Objek JSON dari teks model, dirapikan sistem bila rusak; null bila tidak ada JSON. */
 export function extractJsonObject(text: string) {
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
-  try {
-    const value = JSON.parse(text.slice(start, end + 1))
-    return value && typeof value === 'object' && !Array.isArray(value) ? JSON.stringify(value) : null
-  } catch {
-    return null
-  }
+  const value = repairJson(text)
+  return value ? JSON.stringify(value) : null
 }
 
 /**
@@ -517,6 +511,9 @@ async function runClaudeLean(
   )
   const json = extractJsonObject(plain)
   if (json) return json
+  // Balasan chat berupa teks biasa → dirapikan sistem di reply_service (tanpa panggilan ulang).
+  const replySchema = Boolean((outputSchema.properties as Record<string, unknown> | undefined)?.pesan)
+  if (replySchema && bubblesFromText(plain)) return plain
   return spawnClaude(settings, prompt, workingDirectory, outputSchema, imagePaths, onEvent)
 }
 
