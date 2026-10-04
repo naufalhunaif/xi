@@ -102,6 +102,7 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 
 ## Belum ada tes otomatis (cek manual saat menyentuh bagiannya)
 
+- v3.6.0: Pengaturan jadi 5 halaman (Koneksi, Toko, Cara AI membalas, Pemakaian, Aplikasi & data) dengan "Lanjutan" dilipat; tautan lama `#ai/#instagram/#numbers/#backup/#jev/#business` dialihkan; id elemen tidak berubah. Rincian & titik bersinggungan: `docs/pengaturan-v36.md`.
 - v3.5.0: Beta 1/2, halaman Evaluasi, dan skill klasik dihapus. Pengaturan lama `beta3_mode`/`lean_mode` diabaikan; tidak ada pilihan mode lagi.
 
 - Setelah CS membalas sebagian, AI menjawab poin yang terlewat ±3 menit kemudian; chat yang

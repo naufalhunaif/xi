@@ -36,8 +36,12 @@
     pill.className = `wa-pill ${state.connected ? 'ok' : ''}`
     byId('igConnect').href = `${base}/instagram/connect`
     byId('igConnect').textContent = state.connected ? t('Hubungkan ulang') : t('Hubungkan Instagram')
-    byId('igConnect').classList.toggle('disabled', !state.appId || !state.hasSecret)
+    const ready = Boolean(state.appId && state.hasSecret)
+    byId('igConnect').classList.toggle('disabled', !ready)
     byId('igDisconnect').hidden = !state.connected
+    // Belum ada App ID/Secret → panduan 3 langkah dibuka; sudah lengkap → dilipat.
+    const setup = byId('igSetup')
+    if (setup && !setup.dataset.touched) setup.open = !ready
     const notice = byId('igNotice')
     const parts = []
     if (state.lastError) parts.push(`⚠ ${t(state.lastError)}`)
@@ -66,11 +70,21 @@
       status(error.message)
     }
   })
+  // Tersimpan otomatis: centang, App ID, dan App Secret disimpan saat berubah.
   byId('igComments').addEventListener('change', () => byId('igSave').click())
+  for (const id of ['igAppId', 'igAppSecret'])
+    byId(id).addEventListener('change', () => {
+      const setup = byId('igSetup')
+      if (setup) setup.dataset.touched = '1'
+      byId('igSave').click()
+    })
   byId('igConnect').addEventListener('click', (event) => {
     if (byId('igConnect').classList.contains('disabled')) {
       event.preventDefault()
-      status(t('Isi App ID dan App Secret lalu simpan dulu.'))
+      const setup = byId('igSetup')
+      if (setup) setup.open = true
+      byId('igAppId').focus()
+      status(t('Isi App ID dan App Secret dulu (3 langkah di bawah).'))
     }
   })
   byId('igDisconnect').addEventListener('click', async () => {
@@ -90,7 +104,7 @@
       cancelled: t('Login Instagram dibatalkan.'),
       failed: t('Gagal menghubungkan Instagram. Lihat pesan di atas.'),
       state: t('Sesi login kedaluwarsa, coba lagi.'),
-      missing: t('Isi App ID dan App Secret lalu simpan dulu.'),
+      missing: t('Isi App ID dan App Secret dulu (3 langkah di bawah).'),
     }
     status(messages[result] || '')
     history.replaceState(null, '', location.pathname + location.hash)

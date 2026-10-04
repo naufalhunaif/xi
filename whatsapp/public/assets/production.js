@@ -265,10 +265,12 @@
     }
   }
   byId('productionReload').addEventListener('click', load)
+  const panel = document.getElementById('settings-production')
   const open = () => {
-    if (location.hash === '#production' && !loaded) void load()
+    if (panel && !panel.hidden && !loaded) void load()
   }
   window.addEventListener('hashchange', open)
+  if (panel) new MutationObserver(open).observe(panel, { attributes: true, attributeFilter: ['hidden'] })
   document.addEventListener('ui-language:change', () => {
     if (loaded && !dirty && !busy) {
       renderRules()

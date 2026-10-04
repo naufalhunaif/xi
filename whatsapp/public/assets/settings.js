@@ -2,8 +2,12 @@
   const t = (value, ...args) => window.waI18n?.t(value, ...args) ?? value.replace(/\{(\d+)\}/g, (match, index) => args[index] ?? match)
   const form = document.getElementById('settingsForm')
   if (!form) return
+  // Lima halaman (Koneksi, Toko, Cara AI membalas, Pemakaian, Aplikasi & data). Bagian lama
+  // (#ai, #backup, #instagram, …) tetap bisa dibuka lewat tautan lama: dialihkan ke halamannya.
+  const views = [...form.querySelectorAll('[data-settings-view]')]
   const panels = [...form.querySelectorAll('[data-settings-panel]')]
   const menu = [...document.querySelectorAll('[data-settings-menu]')]
+  const viewOf = (panel) => panel.closest('[data-settings-view]')?.dataset.settingsView || ''
   const byId = (id) => document.getElementById(id)
   const number = (value) => new Intl.NumberFormat((window.waI18n?.locale || 'id-ID')).format(value)
   const base = document.querySelector('meta[name="app-url"]').content.replace(/\/$/, '')
@@ -35,16 +39,31 @@
   document.addEventListener('skills:updated', refreshRelativeTimes)
   window.setInterval(refreshRelativeTimes, 60_000)
 
+  let lastView = ''
   function selectPanel() {
     const hash = window.location.hash.slice(1)
-    const selected = panels.some((panel) => panel.dataset.settingsPanel === hash) ? hash : 'ai'
-    for (const panel of panels) panel.hidden = panel.dataset.settingsPanel !== selected
+    const section = panels.find((panel) => panel.dataset.settingsPanel === hash)
+    const selected = views.some((view) => view.dataset.settingsView === hash) ? hash : section ? viewOf(section) : 'connect'
+    for (const view of views) {
+      view.hidden = view.dataset.settingsView !== selected
+      // Bagian di dalam halaman: hidden mengikuti halamannya (skrip per bagian memuat data saat tampil).
+      for (const panel of view.querySelectorAll('[data-settings-panel]')) panel.hidden = view.hidden
+    }
     for (const link of menu) {
       if (link.dataset.settingsMenu === selected) link.setAttribute('aria-current', 'page')
       else link.removeAttribute('aria-current')
     }
+    if (section) {
+      // Tautan lama ke satu bagian: buka "Lanjutan" bila perlu, lalu gulir ke bagian itu.
+      const advanced = section.closest('details.wa-advanced')
+      if (advanced) advanced.open = true
+      if (lastView !== selected || hash !== lastHash) section.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    } else if (lastView && lastView !== selected) window.scrollTo({ top: 0 })
+    lastView = selected
+    lastHash = hash
     if (selected === 'usage') updateUsage()
   }
+  let lastHash = ''
   window.addEventListener('hashchange', selectPanel)
   document.addEventListener('ui-language:change', selectPanel)
   form.addEventListener(

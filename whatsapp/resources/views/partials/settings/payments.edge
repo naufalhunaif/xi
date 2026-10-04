@@ -1,33 +1,5 @@
-<div id="paymentEditor" class="wa-payment-editor">
-  <label for="paymentName">
-    <span data-i18n="Bank / metode">Bank / metode</span>
-    <input id="paymentName" type="text" maxlength="120" autocomplete="off" />
-  </label>
-  <label for="paymentDestination">
-    <span data-i18n="Rekening / nomor / tautan">Rekening / nomor / tautan</span>
-    <input id="paymentDestination" type="text" maxlength="1000" autocomplete="off" />
-  </label>
-  <label for="paymentAccountName">
-    <span data-i18n="Atas nama">Atas nama</span>
-    <input id="paymentAccountName" type="text" maxlength="190" autocomplete="off" />
-  </label>
-  <label class="wa-toggle-row" for="paymentEnabled">
-    <span data-i18n="Aktif">Aktif</span>
-    <button
-      id="paymentEnabled"
-      class="wa-switch"
-      type="button"
-      role="switch"
-      aria-label="Metode pembayaran aktif"
-      aria-checked="true"
-      value="true"
-     data-i18n-aria-label="Metode pembayaran aktif"></button>
-  </label>
-  <div class="wa-payment-actions">
-    <button id="paymentSave" class="button primary" type="button" data-i18n-auto data-i18n="Tambah">Tambah</button>
-    <button id="paymentCancel" class="button" type="button" hidden data-i18n="Batal">Batal</button>
-    <span id="paymentStatus" role="status" aria-live="polite" data-i18n-auto></span>
-  </div>
+<div class="wa-section-actions">
+  <button id="paymentAddOpen" class="button primary" type="button" data-i18n="Tambah metode">Tambah metode</button>
 </div>
 <div id="paymentList" class="wa-payment-list">
   @if(!settings.paymentMethods.length)
@@ -67,3 +39,37 @@
     </div>
   @end
 </div>
+<dialog id="paymentDialog" class="wa-settings-dialog" aria-labelledby="paymentDialogTitle">
+  <header class="wa-settings-dialog-head"><strong id="paymentDialogTitle" data-i18n="Metode pembayaran">Metode pembayaran</strong><button type="button" class="shell-icon-button" data-dialog-close aria-label="Tutup" data-i18n-aria-label="Tutup">×</button></header>
+<div id="paymentEditor" class="wa-payment-editor">
+  <label for="paymentName">
+    <span data-i18n="Bank / metode">Bank / metode</span>
+    <input id="paymentName" type="text" maxlength="120" autocomplete="off" />
+  </label>
+  <label for="paymentDestination">
+    <span data-i18n="Rekening / nomor / tautan">Rekening / nomor / tautan</span>
+    <input id="paymentDestination" type="text" maxlength="1000" autocomplete="off" />
+  </label>
+  <label for="paymentAccountName">
+    <span data-i18n="Atas nama">Atas nama</span>
+    <input id="paymentAccountName" type="text" maxlength="190" autocomplete="off" />
+  </label>
+  <label class="wa-toggle-row" for="paymentEnabled">
+    <span data-i18n="Aktif">Aktif</span>
+    <button
+      id="paymentEnabled"
+      class="wa-switch"
+      type="button"
+      role="switch"
+      aria-label="Metode pembayaran aktif"
+      aria-checked="true"
+      value="true"
+     data-i18n-aria-label="Metode pembayaran aktif"></button>
+  </label>
+  <div class="wa-payment-actions">
+    <button id="paymentSave" class="button primary" type="button" data-i18n-auto data-i18n="Tambah">Tambah</button>
+    <button id="paymentCancel" class="button" type="button" hidden data-i18n="Batal">Batal</button>
+    <span id="paymentStatus" role="status" aria-live="polite" data-i18n-auto></span>
+  </div>
+</div>
+</dialog>

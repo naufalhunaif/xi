@@ -175,6 +175,8 @@
       status(error.message)
     }
   })
+  // Tersimpan otomatis saat kunci ditempel/diubah.
+  byId('jevKey').addEventListener('change', () => byId('jevSave').click())
   byId('jevEnabled').addEventListener('click', async () => {
     try {
       state = await call('/api/beta3/jev', 'POST', { enabled: !state.enabled })
@@ -203,5 +205,12 @@
   }
   window.addEventListener('hashchange', watch)
   new MutationObserver(watch).observe(panel, { attributes: true, attributeFilter: ['hidden'] })
+  // Kartu Akurasi ada di halaman Pemakaian.
+  const usagePanel = byId('settings-usage')
+  const watchUsage = () => {
+    if (usagePanel && !usagePanel.hidden) void loadRecent().catch((error) => status(error.message))
+  }
+  if (usagePanel) new MutationObserver(watchUsage).observe(usagePanel, { attributes: true, attributeFilter: ['hidden'] })
   watch()
+  watchUsage()
 })()

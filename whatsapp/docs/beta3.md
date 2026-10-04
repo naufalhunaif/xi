@@ -10,7 +10,7 @@ pesan/kontak, trace, koneksi MCP di Data bisnis, rekening, dan antrean pesan kel
 | Tabel | `whatsapp_beta3_*` (termasuk `whatsapp_beta3_chats`, `whatsapp_beta3_decisions`) |
 | Skill | `skills-beta3/beta3-cs-inti` (terpasang otomatis) |
 | Contoh CS awal | `resources/beta3/cs_examples.json` |
-| Halaman | `/beta3`, Order, Pengaturan → Jev |
+| Halaman | `/beta3`, Order, Pengaturan → Koneksi (Jev), Pemakaian (Akurasi) |
 | API | `/api/beta3/*` |
 | Perintah | `beta3:catalog`, `beta3:mcp` |
 | Fase usage | `beta3-reply`, `beta3-ciri`, `jev-*` |
@@ -47,7 +47,7 @@ Jev (TypeSafe AI, `app/beta3/jev.ts` + `jev_decisions.ts`) menjawab keputusan ke
 
 Skor Jev dimulai dari 0 (tiga tingkat = 0 … 2); selalu dibaca lewat `scoreLevel` (v3.5.14). Konteks Jev tidak dipotong demi token (v3.5.17).
 Batas waktu 800 ms per panggilan; ambang yakin per keputusan di `JEV_THRESHOLD`. Setiap keputusan
-dicatat; pemilik menandai yang salah di Pengaturan → Jev (Akurasi 30 hari) dan bisa mematikan
+dicatat; pemilik menandai yang salah di Pengaturan → Pemakaian → Akurasi (30 hari) dan bisa mematikan
 keputusan satu per satu.
 
 ## Hemat token (v3.5.3)

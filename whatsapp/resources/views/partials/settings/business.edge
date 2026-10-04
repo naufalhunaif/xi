@@ -1,8 +1,14 @@
-<div class="wa-mcp-add">
-  <input id="mcpName" type="text" maxlength="120" placeholder="Nama" / data-i18n-placeholder="Nama">
-  <input id="mcpUrl" type="url" maxlength="1000" placeholder="URL MCP" />
-  <button id="mcpAddButton" class="button" type="button" data-i18n="Tambah">Tambah</button>
+<div class="wa-section-actions">
+  <button id="mcpAddOpen" class="button primary" type="button" data-i18n="Tambah sumber">Tambah sumber</button>
 </div>
+<dialog id="mcpDialog" class="wa-settings-dialog" aria-labelledby="mcpDialogTitle">
+  <header class="wa-settings-dialog-head"><strong id="mcpDialogTitle" data-i18n="Sumber data (MCP)">Sumber data (MCP)</strong><button type="button" class="shell-icon-button" data-dialog-close aria-label="Tutup" data-i18n-aria-label="Tutup">×</button></header>
+  <div class="wa-mcp-add">
+    <label><span data-i18n="Nama">Nama</span><input id="mcpName" type="text" maxlength="120" placeholder="Nama" data-i18n-placeholder="Nama" /></label>
+    <label><span>URL MCP</span><input id="mcpUrl" type="url" maxlength="1000" placeholder="https://…" /></label>
+    <div class="actions"><button id="mcpAddButton" class="button primary" type="button" data-i18n="Tambah">Tambah</button></div>
+  </div>
+</dialog>
 <div id="mcpConnections" class="wa-mcp-list">
   @each(connection in settings.mcpConnections)
     <div class="wa-mcp-row" data-mcp-row="{{ connection.slug }}">

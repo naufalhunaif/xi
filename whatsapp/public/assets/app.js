@@ -1645,7 +1645,7 @@
     }
   }
   window.addEventListener('hashchange', () => {
-    if (window.location.hash === '#business') void updateMcpOAuth()
+    if (/^#(business|store)$/.test(window.location.hash)) void updateMcpOAuth()
   })
   window.addEventListener('pageshow', () => void updateMcpOAuth())
   window.addEventListener('wa:network-restored', () => {

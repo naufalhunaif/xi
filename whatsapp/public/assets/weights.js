@@ -55,6 +55,8 @@
       status(error.message)
     }
   }
+  // Tersimpan otomatis saat angka diubah.
+  byId('weightFields').addEventListener('change', () => byId('weightSave').click())
   byId('weightSave').addEventListener('click', async () => {
     const weights = {}
     for (const input of panel.querySelectorAll('[data-weight-key]')) weights[input.dataset.weightKey] = Number(input.value)

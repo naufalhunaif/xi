@@ -23,7 +23,7 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 | `public/lang/en.js`, `id.js` | Kamus bahasa antarmuka (kunci = teks Indonesia). |
 | `start/routes.ts` | Rute publik di atas (webhook, `/ig-media`), rute login di dalam grup `accountAuth`. |
 | `docs/` | Catatan desain fitur. Tambahkan dokumen di sini untuk fitur besar baru. `docs/roadmap.md` = PR ke depan (jangan dikerjakan tanpa persetujuan pemilik). |
-| `app/beta3/jev.ts`, `jev_decisions.ts` | Jev (TypeSafe AI): keputusan kecil (layanan ongkir, total toko, janji total, varian, setuju, form, terjawab, maksud, serah CS, komentar IG) + catatan Akurasi. Pengaturan → Jev. |
+| `app/beta3/jev.ts`, `jev_decisions.ts` | Jev (TypeSafe AI): keputusan kecil (layanan ongkir, total toko, janji total, varian, setuju, form, terjawab, maksud, serah CS, komentar IG) + catatan Akurasi. Pengaturan → Koneksi (Jev); Akurasi di Pengaturan → Pemakaian. |
 | `docs/arsip/` | Catatan Beta 1/2 (sudah dihapus sejak v3.5.0). Jangan menghidupkan kembali kodenya. |
 
 ## Konsep penting
@@ -51,7 +51,7 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 - Setiap keputusan Jev punya **cadangan cara lama** (regex/aturan). Jev mati, gagal, lambat (> 800 ms), atau ragu (di bawah ambang `JEV_THRESHOLD`) → cara lama dipakai.
 - Semua panggilan lewat `askJev` (fetch langsung, tanpa SDK); data pelanggan disamarkan `maskPii` dulu. Setiap keputusan dicatat ke `whatsapp_beta3_decisions` (halaman Akurasi).
 - Skor Jev dimulai dari 0 (tiga tingkat = 0 … 2): selalu baca lewat `scoreLevel`, jangan `Math.round` langsung. Tingkat model balasan dipilih di `app/beta3/model_tier.ts`: dasar pola kata (`autoTier`), Jev hanya menaikkan. Topik Jev hanya menambah bagian prompt.
-- Tes memakai `setJevFetcher` (tanpa jaringan) dan mengosongkan config Jev sesudahnya. Kunci API hanya diisi pemilik di Pengaturan → Jev.
+- Tes memakai `setJevFetcher` (tanpa jaringan) dan mengosongkan config Jev sesudahnya. Kunci API hanya diisi pemilik di Pengaturan → Koneksi → Jev. Struktur Pengaturan v3.6: `docs/pengaturan-v36.md` (5 halaman, id elemen tidak diubah, tautan lama dialihkan).
 
 ## Aturan UI
 

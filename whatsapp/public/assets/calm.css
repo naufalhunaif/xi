@@ -95,3 +95,153 @@ html[data-theme='dark'] .workspace-ui {
   background: var(--wa-urgent-bg);
   color: var(--wa-urgent);
 }
+
+/* ───── Pengaturan v3.6: 5 halaman, bagian bertumpuk, "Lanjutan" dilipat ───── */
+.workspace-ui .wa-settings-view {
+  display: grid;
+  gap: 14px;
+}
+.workspace-ui .wa-settings-view-title {
+  margin: 4px 8px 0;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+.workspace-ui .wa-settings-view-desc {
+  margin: -6px 8px 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.workspace-ui .wa-settings-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.workspace-ui .wa-settings-view [data-settings-panel]:last-of-type {
+  border-bottom: 0;
+}
+.workspace-ui details.wa-advanced {
+  margin: 4px 0 0;
+  border-top: 1px dashed var(--line);
+  padding-top: 6px;
+}
+.workspace-ui details.wa-advanced > summary,
+.workspace-ui details.wa-advanced-inline > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  user-select: none;
+}
+.workspace-ui details.wa-advanced > summary::-webkit-details-marker,
+.workspace-ui details.wa-advanced-inline > summary::-webkit-details-marker {
+  display: none;
+}
+.workspace-ui details.wa-advanced > summary::before,
+.workspace-ui details.wa-advanced-inline > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 14px;
+  transition: transform 0.15s ease;
+}
+.workspace-ui details.wa-advanced[open] > summary::before,
+.workspace-ui details.wa-advanced-inline[open] > summary::before {
+  transform: rotate(90deg);
+}
+.workspace-ui details.wa-advanced[open] > summary {
+  color: var(--text);
+}
+.workspace-ui details.wa-advanced-inline {
+  display: grid;
+  gap: 10px;
+}
+.workspace-ui details.wa-advanced-inline > summary {
+  padding: 2px 0;
+}
+.workspace-ui .wa-steps {
+  margin: 4px 0 12px;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+.workspace-ui .wa-danger-title {
+  color: var(--wa-urgent);
+}
+.workspace-ui .wa-settings-menu .wa-settings-block {
+  gap: 2px;
+}
+@media (max-width: 760px) {
+  .workspace-ui .wa-settings-view-title,
+  .workspace-ui .wa-settings-view-desc {
+    margin-left: 2px;
+    margin-right: 2px;
+  }
+}
+/* Koneksi: tiap bagian satu kartu yang sudah berjudul → judul bagian tidak diulang. */
+.workspace-ui .wa-settings-view[data-settings-view='connect'] .wa-settings-section-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.workspace-ui .wa-settings-view[data-settings-view='connect'] [data-settings-panel] {
+  padding-top: 0;
+}
+/* Pembayaran: daftar metode dulu, formulir tambah/ubah di bawahnya. */
+.workspace-ui #settings-payments #paymentEditor {
+  order: 2;
+}
+/* Formulir mengambang (satu tombol per bagian). */
+.workspace-ui .wa-section-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.workspace-ui dialog.wa-settings-dialog {
+  margin: auto;
+  width: min(460px, calc(100vw - 24px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--wa-surface, #fff);
+  color: inherit;
+  box-shadow: 0 16px 50px #162b2429;
+  display: none;
+  gap: 12px;
+}
+.workspace-ui dialog.wa-settings-dialog[open] {
+  display: grid;
+}
+.workspace-ui dialog.wa-settings-dialog::backdrop {
+  background: #14221b40;
+}
+.workspace-ui .wa-settings-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.workspace-ui .wa-settings-dialog-head .shell-icon-button {
+  margin-left: auto;
+  font-size: 20px;
+}
+.workspace-ui dialog.wa-settings-dialog .wa-payment-editor,
+.workspace-ui dialog.wa-settings-dialog .wa-mcp-add {
+  grid-template-columns: minmax(0, 1fr);
+  display: grid;
+  gap: 10px;
+}
+.workspace-ui dialog.wa-settings-dialog label {
+  display: grid;
+  gap: 4px;
+}
+html[data-theme='dark'] .workspace-ui dialog.wa-settings-dialog {
+  background: var(--wa-surface, #1b1b1e);
+}
+.workspace-ui #settings-payments #paymentEditor {
+  order: initial;
+}

@@ -1,38 +1,46 @@
-<div class="wa-card wa-ig-card" id="igCard">
+<div class="wa-card wa-ig-card wa-connect-card" id="igCard">
   <div class="wa-card-head">
     <div class="wa-card-title">
-      <strong data-i18n="Instagram DM & komentar">Instagram DM & komentar</strong>
+      <strong>Instagram</strong>
       <small data-i18n="DM masuk inbox yang sama dan dibalas AI. Komentar yang bertanya dijawab lewat DM.">DM masuk inbox yang sama dan dibalas AI. Komentar yang bertanya dijawab lewat DM.</small>
     </div>
     <div class="actions"><span id="igState" class="wa-pill"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></span></div>
   </div>
   <p id="igNotice" class="wa-alert" role="status" aria-live="polite" hidden></p>
-  <div class="wa-form-grid">
-    <label>
-      <span>Instagram App ID</span>
-      <input id="igAppId" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" data-settings-ignore />
-    </label>
-    <label>
-      <span>Instagram App Secret</span>
-      <input id="igAppSecret" type="password" autocomplete="new-password" spellcheck="false" data-settings-ignore />
-    </label>
+  <div class="actions wa-actions-start">
+    <a id="igConnect" class="button primary" data-i18n="Hubungkan Instagram">Hubungkan Instagram</a>
+    <button id="igDisconnect" type="button" class="button secondary" hidden data-i18n="Putuskan">Putuskan</button>
+    <button id="igSave" type="button" class="button" hidden data-i18n="Simpan">Simpan</button>
+    <small id="igStatus" role="status" aria-live="polite"></small>
   </div>
   <label class="wa-check">
     <input id="igComments" type="checkbox" data-settings-ignore />
     <span data-i18n="Balas komentar yang bertanya lewat DM">Balas komentar yang bertanya lewat DM</span>
   </label>
-  <div class="actions wa-actions-start">
-    <button id="igSave" type="button" class="button" data-i18n="Simpan">Simpan</button>
-    <a id="igConnect" class="button primary" data-i18n="Hubungkan Instagram">Hubungkan Instagram</a>
-    <button id="igDisconnect" type="button" class="button secondary" hidden data-i18n="Putuskan">Putuskan</button>
-    <small id="igStatus" role="status" aria-live="polite"></small>
-  </div>
-  <details class="wa-ig-setup">
-    <summary data-i18n="Isian untuk Meta (sekali saja)">Isian untuk Meta (sekali saja)</summary>
+  <details class="wa-ig-setup" id="igSetup">
+    <summary data-i18n="Aplikasi Meta (sekali saja): 3 langkah">Aplikasi Meta (sekali saja): 3 langkah</summary>
+    <ol class="wa-note wa-steps">
+      <li><span data-i18n="Buka developers.facebook.com → Aplikasi Saya → Buat aplikasi → jenis Bisnis, lalu tambahkan produk Instagram.">Buka developers.facebook.com → Aplikasi Saya → Buat aplikasi → jenis Bisnis, lalu tambahkan produk Instagram.</span></li>
+      <li><span data-i18n="Salin App ID & App Secret dari Pengaturan aplikasi → Dasar ke kolom di bawah (tersimpan otomatis).">Salin App ID & App Secret dari Pengaturan aplikasi → Dasar ke kolom di bawah (tersimpan otomatis).</span></li>
+      <li><span data-i18n="Di produk Instagram, isi Webhook & Redirect URI dari bagian 'Isian untuk Meta', lalu klik Hubungkan Instagram.">Di produk Instagram, isi Webhook & Redirect URI dari bagian 'Isian untuk Meta', lalu klik Hubungkan Instagram.</span></li>
+    </ol>
     <div class="wa-form-grid">
-      <label><span>Webhook callback URL</span><input id="igWebhookUrl" type="text" readonly data-settings-ignore /></label>
-      <label><span>Verify token</span><input id="igVerifyToken" type="text" readonly data-settings-ignore /></label>
-      <label><span>OAuth redirect URI</span><input id="igRedirectUri" type="text" readonly data-settings-ignore /></label>
+      <label>
+        <span>Instagram App ID</span>
+        <input id="igAppId" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" data-settings-ignore />
+      </label>
+      <label>
+        <span>Instagram App Secret</span>
+        <input id="igAppSecret" type="password" autocomplete="new-password" spellcheck="false" data-settings-ignore />
+      </label>
     </div>
+    <details class="wa-ig-meta">
+      <summary data-i18n="Isian untuk Meta">Isian untuk Meta</summary>
+      <div class="wa-form-grid">
+        <label><span>Webhook callback URL</span><input id="igWebhookUrl" type="text" readonly data-settings-ignore /></label>
+        <label><span>Verify token</span><input id="igVerifyToken" type="text" readonly data-settings-ignore /></label>
+        <label><span>OAuth redirect URI</span><input id="igRedirectUri" type="text" readonly data-settings-ignore /></label>
+      </div>
+    </details>
   </details>
 </div>
