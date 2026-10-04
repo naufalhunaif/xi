@@ -1,4 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import { toEnglish } from '#services/english_messages'
 import env from '#start/env'
 import db from '#services/workspace_database'
 import { createHash, randomBytes } from 'node:crypto'
@@ -45,6 +46,7 @@ function authPage(
     email: '',
     name: '',
     ...extra,
+    ...(typeof extra.error === 'string' ? { error: toEnglish(extra.error) } : {}),
   })
 }
 

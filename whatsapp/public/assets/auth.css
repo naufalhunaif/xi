@@ -1,18 +1,125 @@
-/* Halaman login/setup (standalone). Inline style diblokir CSP. */
-:root { color-scheme: light dark; --bg:#f4f5f3; --card:#fff; --text:#16201a; --muted:#5f6b64; --line:#dfe4e0; --accent:#1f8a5b; --accent-text:#fff; --err-bg:#fdecec; --err:#a33; }
-html[data-theme="dark"] { --bg:#000; --card:#171719; --text:#e6ebe7; --muted:#abb8ae; --line:#343438; --accent:#88d9ad; --accent-text:#0b2116; --err-bg:#280e11; --err:#f3aca8; }
-@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) { --bg:#000; --card:#171719; --text:#e6ebe7; --muted:#abb8ae; --line:#343438; --accent:#88d9ad; --accent-text:#0b2116; --err-bg:#280e11; --err:#f3aca8; } }
+/* Halaman login/setup — gaya Wireframe (kartu putih minimal, latar off-white hangat, ikon kawat 3D).
+   Inline style diblokir CSP. Satu-satunya warna: mark kecil di rail. */
+:root {
+  color-scheme: light dark;
+  --bg: #edebe5;
+  --card: #fff;
+  --text: #151515;
+  --muted: #6b6b66;
+  --line: #e2e0d9;
+  --ring: #151515;
+  --err-bg: #fdecec;
+  --err: #a33;
+  --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+html[data-theme="dark"] { --bg: #0f0f0e; --card: #171716; --text: #ecebe6; --muted: #9b9a93; --line: #2a2a28; --ring: #ecebe6; --err-bg: #280e11; --err: #f3aca8; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) { --bg: #0f0f0e; --card: #171716; --text: #ecebe6; --muted: #9b9a93; --line: #2a2a28; --ring: #ecebe6; --err-bg: #280e11; --err: #f3aca8; }
+}
 * { box-sizing: border-box; }
-body { margin:0; min-height:100vh; display:grid; place-items:center; padding:16px; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-.card { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:28px 24px; }
-.brand { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
-.brand svg { width:30px; height:30px; color:var(--text); }
-.brand strong { font-size:17px; }
-h1 { font-size:18px; margin:0 0 4px; }
-p.hint { margin:0 0 18px; color:var(--muted); font-size:13px; }
-label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
-input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; font:inherit; }
-input:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:transparent; }
-button { width:100%; margin-top:18px; padding:11px; border:0; border-radius:8px; background:var(--accent); color:var(--accent-text); font:inherit; font-weight:600; cursor:pointer; }
-.error { background:var(--err-bg); color:var(--err); border-radius:8px; padding:9px 12px; font-size:13px; margin-bottom:6px; }
-footer { margin-top:16px; text-align:center; color:var(--muted); font-size:11px; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--sans);
+}
+.page {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 18px;
+  width: min(560px, 100%);
+  align-items: stretch;
+}
+/* Rail kiri: label vertikal monospace + satu mark berwarna. */
+.rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0 10px;
+}
+.rail h2 {
+  margin: 0;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font: 400 10.5px/1 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rail .mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: conic-gradient(from 20deg, #2f6df6, #ff7a59, #ffd166, #2f6df6);
+}
+.card {
+  position: relative;
+  background: var(--card);
+  border-radius: 8px;
+  padding: 22px 24px 20px;
+  min-height: 420px;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto auto;
+  gap: 8px;
+  outline: 1px solid transparent;
+  transition: outline-color 0.25s;
+  animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.card:focus-within { outline-color: var(--line); }
+.icon {
+  width: clamp(120px, 26vw, 168px);
+  height: auto;
+  margin: -6px 0 0 -10px;
+  color: var(--text);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon path { vector-effect: non-scaling-stroke; }
+.text { align-self: end; }
+.text h1 { margin: 0 0 2px; font: 400 21px/1.2 var(--sans); letter-spacing: -0.01em; }
+.text p { margin: 0; font: 400 11px/1.5 var(--mono); color: var(--muted); }
+form { display: grid; gap: 6px; }
+label { font: 400 10.5px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: 14px/1.4 var(--sans);
+}
+input:focus { outline: 1px solid var(--ring); outline-offset: 0; border-color: var(--ring); }
+button {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--card);
+  font: 500 14px/1 var(--sans);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+button:hover { opacity: 0.88; }
+button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.error { background: var(--err-bg); color: var(--err); border-radius: 6px; padding: 9px 12px; font-size: 13px; }
+footer { font: 400 10.5px/1 var(--mono); color: var(--muted); letter-spacing: 0.06em; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (max-width: 560px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .rail { flex-direction: row; padding: 0 2px; }
+  .rail h2 { writing-mode: horizontal-tb; transform: none; }
+  .card { min-height: 0; padding: 18px 18px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .card { animation: none; } }

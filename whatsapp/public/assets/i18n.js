@@ -4,10 +4,9 @@
   const app = document.querySelector('meta[name="app-url"]')?.content?.replace(/\/$/, '') || ''
   const workspace = document.querySelector('meta[name="whatsapp-workspace-id"]')?.content || '1'
   const key = workspace === '1' ? `${app}:ui-language` : `${app}:${workspace}:ui-language`
+  // v3.6.5: tampilan selalu Inggris (pilihan bahasa dihapus; teks campur EN/ID membingungkan).
   let language = 'en'
-  try {
-    language = localStorage.getItem(key) === 'id' ? 'id' : 'en'
-  } catch {}
+  void key
   const reverse = new Map([...Object.entries(en), ...Object.entries(id)].map(([key, translated]) => [translated, key]))
   const t = (text, ...values) => {
     const source = reverse.get(text) || text

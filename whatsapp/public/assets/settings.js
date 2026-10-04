@@ -10,6 +10,8 @@
   const viewOf = (panel) => panel.closest('[data-settings-view]')?.dataset.settingsView || ''
   const byId = (id) => document.getElementById(id)
   const number = (value) => new Intl.NumberFormat((window.waI18n?.locale || 'id-ID')).format(value)
+  // Label model dari catatan usage: akhiran "(otomatis)" / "· otomatis" → bahasa tampilan.
+  const modelLabel = (model) => String(model).replace(/\s*(?:\(otomatis\)|·\s*otomatis)\s*$/, ` (${t('otomatis')})`)
   const base = document.querySelector('meta[name="app-url"]').content.replace(/\/$/, '')
   let loading = false
   // Usage: rentang/tanggal terpilih & cache kalender (dipakai selectPanel saat halaman dibuka).
@@ -317,7 +319,7 @@
     for (const value of [
       date,
       run.phase || '—',
-      `${({ claude: 'Claude', gemini: 'Gemini', typesafe: 'Jev' })[run.provider] || 'ChatGPT'} / ${String(run.model).replace(' (otomatis)', ` (${t('otomatis')})`)}`,
+      `${({ claude: 'Claude', gemini: 'Gemini', typesafe: 'Jev' })[run.provider] || 'ChatGPT'} / ${modelLabel(run.model)}`,
       run.tokens === null ? '—' : number(run.tokens),
       t("{0} dtk", number(Math.round(run.durationMs / 1000))),
       run.status === 'completed' ? t('Selesai') : t('Gagal'),
@@ -389,7 +391,7 @@
     if (chip) {
       const f = runsState.filter
       chip.hidden = !f
-      chip.textContent = f ? `${f.phase ? t('Fase: {0}', f.phase) : t('Model: {0}', f.model.replace(' (otomatis)', ` (${t('otomatis')})`))} ×` : ''
+      chip.textContent = f ? `${f.phase ? t('Fase: {0}', f.phase) : t('Model: {0}', modelLabel(f.model))} ×` : ''
     }
   }
   function showUsageTab(name) {
@@ -471,7 +473,7 @@
           const name = textElement('td', '')
           const dot = document.createElement('i')
           dot.className = `wa-provider-dot ${row.provider}`
-          name.append(dot, ` ${row.model.replace(' (otomatis)', ` (${t('otomatis')})`)}`)
+          name.append(dot, ` ${modelLabel(row.model)}`)
           line.append(name)
           for (const [value, className] of [
             [number(row.runs), 'wa-usage-number'],

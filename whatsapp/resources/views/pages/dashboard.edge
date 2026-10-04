@@ -242,8 +242,8 @@
                     @if(contact.unanswered_count > 0)
                       <span
                         class="wa-contact-pending"
-                        title="{{ contact.unanswered_count }} pesan belum dibalas"
-                        aria-label="{{ contact.unanswered_count }} pesan belum dibalas"
+                        title="{{ contact.unanswered_count }} unanswered"
+                        aria-label="{{ contact.unanswered_count }} unanswered"
                       >
                         {{ contact.unanswered_count }}
                         ↩
@@ -252,7 +252,7 @@
                     @if(contact.unread_count > 0)
                       <span
                         class="wa-unread-count"
-                        aria-label="{{ contact.unread_count }} pesan belum dibaca"
+                        aria-label="{{ contact.unread_count }} unread"
                       >
                         {{ contact.unread_count }}
                       </span>
@@ -849,7 +849,7 @@
                       <strong data-i18n="Alamat akses & domain">Alamat akses & domain</strong>
                       <p><span data-i18n="Saat ini aplikasi diakses lewat">Saat ini aplikasi diakses lewat</span> <code id="accessUrl">{{ appUrl }}</code></p>
                       <div id="accessDomainForm" class="wa-access-form">
-                        <input id="accessDomain" type="text" placeholder="wa.contoh.com" autocomplete="off" spellcheck="false" data-settings-ignore />
+                        <input id="accessDomain" type="text" placeholder="wa.example.com" autocomplete="off" spellcheck="false" data-settings-ignore />
                         <button type="button" class="button" id="accessDomainSave" data-i18n="Pasang domain">Pasang domain</button>
                         <button type="button" class="button secondary" id="accessDomainUnset" hidden data-i18n="Lepas domain">Lepas domain</button>
                       </div>
@@ -860,13 +860,6 @@
                     </div>
                   @end
                   @include('partials/settings/appearance')
-                  <label>
-                    <span data-i18n="Bahasa tampilan">Bahasa tampilan</span>
-                    <select id="uiLanguage" aria-label="Bahasa tampilan" data-i18n-aria-label="Bahasa tampilan">
-                      <option value="en">English</option>
-                      <option value="id">Bahasa Indonesia</option>
-                    </select>
-                  </label>
                                   </section>
                 <section id="settings-backup" data-settings-panel="backup" aria-labelledby="settings-title-backup">
                   <h3 class="wa-settings-section-title" id="settings-title-backup"><svg class="wa-i" aria-hidden="true"><use href="#i-cloud"/></svg><span>Backup</span></h3>
@@ -886,10 +879,10 @@
                       <details class="wa-span-full">
                         <summary data-i18n="Cara membuat Client ID (sekali saja)">Cara membuat Client ID (sekali saja)</summary>
                         <ol class="wa-note">
-                          <li>console.cloud.google.com → buat project → APIs &amp; Services → Library → aktifkan <b>Google Drive API</b>.</li>
-                          <li>OAuth consent screen → External → isi nama aplikasi &amp; email → tambahkan email Anda sebagai Test user.</li>
-                          <li>Credentials → Create credentials → OAuth client ID → Web application → Authorized redirect URI = Redirect URI di atas.</li>
-                          <li>Salin Client ID &amp; Client Secret ke sini, lalu Hubungkan. Simpan keduanya: dipakai lagi saat pulihkan di VPS baru.</li>
+                          <li>console.cloud.google.com → create a project → APIs &amp; Services → Library → enable <b>Google Drive API</b>.</li>
+                          <li>OAuth consent screen → External → fill in the app name &amp; email → add your email as a Test user.</li>
+                          <li>Credentials → Create credentials → OAuth client ID → Web application → Authorized redirect URI = the Redirect URI above.</li>
+                          <li>Copy the Client ID &amp; Client Secret here, then Connect. Keep both: they are needed again when restoring on a new VPS.</li>
                         </ol>
                       </details>
                     </div>
@@ -907,7 +900,7 @@
                       <div class="actions"><button type="button" class="button primary" id="backupNow"><svg class="wa-i" aria-hidden="true"><use href="#i-upload"/></svg><span data-i18n="Backup sekarang">Backup sekarang</span></button></div>
                     </div>
                     <label class="wa-toggle-row"><span data-i18n="Backup otomatis tiap hari">Backup otomatis tiap hari</span>
-                      <button class="wa-switch" type="button" role="switch" id="backupAuto" aria-checked="true" value="true" aria-label="Backup otomatis"></button></label>
+                      <button class="wa-switch" type="button" role="switch" id="backupAuto" aria-checked="true" value="true" aria-label="Automatic backup"></button></label>
                     <label class="wa-toggle-row"><span><span data-i18n="Sertakan foto &amp; media chat">Sertakan foto &amp; media chat</span></span>
                       <button class="wa-switch" type="button" role="switch" id="backupMedia" aria-checked="true" value="true" aria-label="Sertakan media"></button></label>
                     <label class="wa-toggle-row"><span><span data-i18n="Simpan media jadwal Instagram di Google Drive">Simpan media jadwal Instagram di Google Drive</span></span>

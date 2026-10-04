@@ -862,7 +862,7 @@
         const pending = document.createElement('span')
         pending.className = 'wa-contact-pending'
         pending.textContent = `${contact.unanswered_count} ↩`
-        pending.title = t("{0} pesan belum dibalas", contact.unanswered_count)
+        pending.title = t("{0} unanswered", contact.unanswered_count)
         pending.setAttribute('aria-label', pending.title)
         meta.append(pending)
       }
@@ -871,7 +871,7 @@
         const badge = document.createElement('span')
         badge.className = 'wa-unread-count'
         badge.textContent = String(unread)
-        badge.setAttribute('aria-label', t("{0} pesan belum dibaca", unread))
+        badge.setAttribute('aria-label', t("{0} unread", unread))
         meta.append(badge)
       }
       if (contact.needs_payment) meta.append(coin)
