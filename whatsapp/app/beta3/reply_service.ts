@@ -57,7 +57,7 @@ import { detectAwb } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { tidyLists } from '#beta3/list_tidy'
-import { keepCustomInChat, questionAfterPhotos, stripHelpOffer } from '#beta3/reply_guards'
+import { keepCustomInChat, questionAfterPhotos } from '#beta3/reply_guards'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -940,7 +940,6 @@ export async function createLeanReply(input: {
   decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
   // Deretan pilihan/harga/produk dalam satu kalimat → satu per baris (semua model).
   decision.pesan = decision.pesan.map(tidyLists)
-  decision.pesan = stripHelpOffer(decision.pesan)
   // "Mau custom bisa?" bukan alasan serah CS: jawab bisa + tanya custom apa.
   const custom = keepCustomInChat(decision, input.text)
   if (custom) {

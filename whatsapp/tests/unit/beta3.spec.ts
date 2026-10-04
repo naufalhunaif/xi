@@ -808,16 +808,6 @@ test.group('beta3 · review chat jas hitam (v3.5.1)', () => {
     assert.deepEqual(questionAfterPhotos(['Ini fotonya bos'], 2), ['Ini fotonya bos'])
   })
 
-  test('sapaan tanpa "ada yang bisa kami bantu"; penutup "ada lagi" tetap', async ({ assert }) => {
-    const { stripHelpOffer } = await import('#beta3/reply_guards')
-    assert.deepEqual(stripHelpOffer(['Halo bos, ada yang bisa kami bantu']), ['Halo bos'])
-    assert.deepEqual(stripHelpOffer(['Ada yang bisa di bantu bos?']), ['Iya bos'])
-    assert.deepEqual(stripHelpOffer(['Siap sama sama bos', 'Ada lagi yang bisa di bantu bos?']), [
-      'Siap sama sama bos',
-      'Ada lagi yang bisa di bantu bos?',
-    ])
-  })
-
   test('"mau custom bisa" tidak diserahkan ke CS; custom + warna di luar katalog tetap diserahkan', async ({ assert }) => {
     const { keepCustomInChat, CUSTOM_REPLY } = await import('#beta3/reply_guards')
     const handoff = {

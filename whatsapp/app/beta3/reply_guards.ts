@@ -1,27 +1,5 @@
 // Penjaga kecil sebelum kirim: hal-hal yang skill sudah larang tapi kadang tetap ditulis model.
 
-const HELP_OFFER =
-  /[,.!]?\s*(?:ada\s+)?(?:yang\s+)?(?:bisa|dapat)\s+(?:kami|saya|aku)?\s*(?:di\s*)?bantu(?:\s+(?:bos|kak|gan))?\s*[?.!]*\s*$/i
-
-/**
- * "ada yang bisa kami bantu?" sebagai pembuka dilarang skill (CS langsung menjawab), dibuang.
- * Penutup "Ada lagi yang bisa di bantu bos?" tetap boleh.
- */
-export function stripHelpOffer(pesan: string[]) {
-  let changed = false
-  const out = pesan.map((bubble) => {
-    const lines = bubble.split('\n')
-    const last = lines.length - 1
-    if (/\blagi\s+yang\s+bisa\b/i.test(lines[last]) || !HELP_OFFER.test(lines[last])) return bubble
-    changed = true
-    lines[last] = lines[last].replace(HELP_OFFER, '').trim()
-    return lines.join('\n').trim()
-  })
-  if (!changed) return pesan
-  const kept = out.filter(Boolean)
-  return kept.length ? kept : ['Iya bos']
-}
-
 const OTHER_HANDOFF =
   /bahan|warna|ekspedisi|j&t|lion|sicepat|komplain|rusak|salah kirim|diskon|grosir|seragam|refund|batal|tukar|tanggal|tgl|telepon|telpon|video|nego|alamat|resi/i
 const CUSTOM = /custom|kustom|costum|cust[a-z]?m\b|ukuran sendiri/i

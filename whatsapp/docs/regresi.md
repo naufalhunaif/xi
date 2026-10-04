@@ -41,7 +41,6 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Warna di spesifikasi & balasan = warna KATALOG yang difotokan di chat (foto Choco tidak ditulis "Brown"), kecuali pelanggan menyebut warnanya sendiri; warna di luar katalog (custom, mis. "Broken White") tidak diganti | `beta3_flow.spec` · warna spesifikasi |
 | Daftar model dalam satu kalimat dirapikan tanpa memotong pembuka ("Ini pilihan jas hitamnya bos, masing-masing 485.000:" lalu satu model per baris) | `beta3.spec` · review chat jas hitam |
 | Ada foto: urutan jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah) | `beta3.spec` · review chat jas hitam |
-| Balasan sapaan tanpa "ada yang bisa kami bantu"; penutup "Ada lagi yang bisa di bantu bos?" tetap | `beta3.spec` · review chat jas hitam |
 | "Mau custom bisa?" dijawab sendiri ("Bisa bos, untuk custom nanti di sesuaikan ukuran ya" + tanya custom apa), tidak diserahkan ke CS; custom + warna/bahan/diskon tetap ke CS | `beta3.spec` · review chat jas hitam |
 | Kebijakan tukar size dari Pengaturan masuk prompt dan dikirim apa adanya | `beta3.spec` · pelajaran chat CS |
 | Pertanyaan yang baru ditanyakan tidak diulang | `beta3.spec` · form order |
