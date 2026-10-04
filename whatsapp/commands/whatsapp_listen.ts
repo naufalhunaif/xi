@@ -2093,6 +2093,12 @@ export default class WhatsappListen extends BaseCommand {
       }
       if (decision.catatan) await beta3.writeBeta3ChatNote(jid, decision.catatan)
       const goal = await beta3.finishLeanGoal(run, decision)
+      if (goal?.next_action && goal.next_run_at)
+        trace?.emit({
+          key: 'beta3-nudge-plan',
+          label: `Susulan ${new Date(goal.next_run_at).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' })} bila pelanggan diam · ${goal.next_action}`,
+          status: 'completed',
+        })
       if (decision.serah_cs) {
         await setHandlingMode(jid, 'cs', decision.alasan || 'Diserahkan ke CS oleh AI (beta 3).')
         trace?.emit({

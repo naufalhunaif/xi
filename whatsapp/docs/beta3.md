@@ -68,3 +68,11 @@ keputusan satu per satu.
 
 - **CS membalas sebagian** (mis. menjawab DP & estimasi, tapi form order terlewat): sapuan memeriksa chat yang pesan terakhirnya dari CS/pemilik (≥ 3 menit, `AI_AFTER_HUMAN_MS`). Pesan pelanggan sejak balasan AI terakhir dikirim ke AI dengan catatan "jawab hanya poin yang belum dijawab CS; kosongkan bila semua sudah". Sekali per balasan CS.
 - **Dialihkan AI ke CS tapi CS belum membalas** selama 20 menit (`AI_HANDOFF_GRACE_MS`): pesan baru pelanggan tetap dijawab AI dengan catatan bahwa hal yang diserahkan masih dicek tim. Mode CS yang dipilih manual tidak terpengaruh.
+
+## Susulan menuju pembelian (v3.5.15)
+
+Goal chat = order. Selama belum order/bayar, giliran yang berhenti di pelanggan selalu punya susulan
+(20 menit; form 45 menit; transfer 3 jam; tidak malam). AI menulis `susulan`; kosong → kalimat bawaan
+per tahap di `app/beta3/nudge_plan.ts` (tanpa token, tidak mengulang pertanyaan terakhir). "Oke" yang
+tidak dibalas tetap disusul (`quietAfter`). Tanpa susulan: selesai, tunggu CS, bukti dikirim, tunda/batal
+(Jev), salam/terima kasih. Trace: "Susulan HH:MM bila pelanggan diam · …".

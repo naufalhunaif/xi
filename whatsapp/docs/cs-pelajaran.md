@@ -318,3 +318,19 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 3. Trace balasan menampilkan "Tingkat model: … · alasan" supaya pilihan model bisa dicek.
 4. Jev cukup 6 baris percakapan terakhir; data lain hanya dikirim bila pertanyaannya ditanyakan.
 
+## #13 · Okt 2026 · "oke" sesudah harga setelan tanpa susulan (diterapkan v3.5.15)
+
+**Ringkasan chat (uji pemilik)**
+- "Harga jas berapa" → harga per seri (benar).
+- "Seperti apa" → daftar 5 model berharga, tanpa foto.
+- "Premium seperti apa gan" → "Ini model premiumnya bos, harganya 685.000" + 3 foto + pertanyaan (benar).
+- "Set berapa ya" → "685.000 + 270.000 jadi 955.000" (angka benar, rinciannya tidak perlu).
+- "Oke" → tidak dibalas dan tidak ada susulan; chat berhenti tanpa order.
+
+**Pelajaran**
+1. Goal chat = pembelian. Selama belum order/bayar, setiap giliran yang berhenti di pelanggan punya susulan menuju langkah berikutnya (size → alamat → total → bukti transfer). AI tidak menulis → sistem memakai kalimat bawaan per tahap (`nudge_plan.ts`, tanpa token).
+2. "Oke" tanda terima yang tidak dibalas tetap disusul (dulu susulan dibatalkan karena pesan terakhir milik pelanggan).
+3. Susulan kosong hanya bila pelanggan menunda/membatalkan, pesanan selesai, diserahkan ke CS, atau sekadar salam/terima kasih.
+4. "Seperti apa?" tanpa field foto → sistem mengirim foto produk yang disebut (maks 3), pengantar "Ini fotonya bos, mulai 485.000".
+5. Harga setelan disebut langsung ("Setelan premium 955.000 bos, sudah jas + celana"), tanpa penjumlahan.
+

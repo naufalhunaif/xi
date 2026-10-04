@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import db from '#services/workspace_database'
-import { recoverHandledOrder, missedOrderForm, totalFromStoreMessages } from '#beta3/reply_service'
+import { recoverHandledOrder, missedOrderForm, totalFromStoreMessages, finishLeanGoal, claimLeanNudge } from '#beta3/reply_service'
 import { saveLeanOrder } from '#beta3/order_service'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
 import Beta3Controller from '#controllers/beta3_controller'
@@ -274,3 +274,54 @@ test.group('prioritas chat · kotak masuk (v3.5.11)', () => {
     }
   })
 })
+
+test.group('susulan menuju pembelian (v3.5.15)', () => {
+  test('"oke" tidak dibalas → susulan bawaan dijadwalkan dan tetap terkirim walau pesan terakhir milik pelanggan', async ({ assert }) => {
+    const jid = 'susulan-uji@s.whatsapp.net'
+    const clean = async () => {
+      await db.from('whatsapp_messages').where('jid', jid).delete()
+      await db.from('whatsapp_chat_goals').where('jid', jid).delete()
+    }
+    await clean()
+    try {
+      const now = Date.now()
+      const base = { jid, status: 'received' }
+      await db.table('whatsapp_messages').multiInsert([
+        { ...base, message_id: 'n1', direction: 'in', sender_type: 'customer', body: 'Set berapa ya', created_at: new Date(now - 3 * 60_000) },
+        { ...base, message_id: 'n2', direction: 'out', sender_type: 'ai', status: 'sent', body: 'Setelan premium 955.000 bos, sudah jas + celana', created_at: new Date(now - 2 * 60_000) },
+        { ...base, message_id: 'n3', direction: 'in', sender_type: 'customer', body: 'Oke', created_at: new Date(now - 60_000) },
+      ])
+      const oke = await db.from('whatsapp_messages').where('jid', jid).where('message_id', 'n3').first()
+      await db.table('whatsapp_chat_goals').insert({
+        jid,
+        version: 'uji-susulan',
+        anchor_id: oke.id,
+        status: 'processing',
+        objective: '',
+        waiting_for: '',
+        next_action: '',
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      const goal = await finishLeanGoal(
+        { jid, version: 'uji-susulan', anchor_id: Number(oke.id) },
+        { pesan: [], foto: [], catatan: '', tahap: 'tanya_model', serah_cs: false, alasan: '', susulan: '', spesifikasi: '' }
+      )
+      assert.equal(goal?.status, 'waiting')
+      assert.include(String(goal?.next_action), 'tinggi & berat badannya')
+      await db.from('whatsapp_chat_goals').where('jid', jid).update({ next_run_at: new Date(now - 1000) })
+      const nudge = await claimLeanNudge(jid)
+      assert.include(String(nudge?.text), 'tinggi & berat badannya')
+
+      // Pelanggan menunda (noNudge) → tidak ada susulan bawaan.
+      const later = await finishLeanGoal(
+        { jid, version: 'uji-susulan', anchor_id: Number(oke.id) },
+        { pesan: ['Siap bos'], foto: [], catatan: '', tahap: 'lain', serah_cs: false, alasan: '', susulan: '', spesifikasi: '', noNudge: true }
+      )
+      assert.equal(later?.next_action, '')
+    } finally {
+      await clean()
+    }
+  })
+})
+

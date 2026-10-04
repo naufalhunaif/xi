@@ -2,7 +2,8 @@
 // (reply_polish, quick reply, penjaga custom, tahap & susulan). Setiap ulasan baru → tambah kasus
 // di sini, supaya perbaikan yang saling bersinggungan tidak merusak ulasan sebelumnya.
 import { test } from '@japa/runner'
-import { polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { photosToShow, polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { purchaseNudge } from '#beta3/nudge_plan'
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
 import { keepCustomInChat, CUSTOM_REPLY } from '#beta3/reply_guards'
@@ -22,7 +23,7 @@ const row = (product: string, category: string, price: number, big: number, mate
   price,
   sizesReady: 'S M L XL',
   sizesAll: 'S M L XL XXL 3XL',
-  photoUrl: null,
+  photoUrl: `https://cdn.test/${id}.jpg`,
   materialAvailable: true,
   features: '',
   featuresAi: '',
@@ -163,5 +164,37 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.equal(chooseReplyTier({ csReason: 'komplain', difficulty: 1 }, base).tier, 'heavy')
     assert.isUndefined(chooseReplyTier({ difficulty: 1 }, { ...base, imageCount: 1 }).tier)
     assert.isUndefined(chooseReplyTier({}, base).tier)
+  })
+
+  test('#13 "seperti apa" sesudah tanya harga → foto produk yang disebut, pengantar singkat', ({ assert }) => {
+    const raw = [
+      'Model jas yang tersedia:\n- Basic Suit mulai 485.000\n- Tuxedo mulai 485.000\n- Bescap Cross Placket 485.000\n- Peak Suit 485.000\n- Premium Basic Suit 685.000',
+      'Mau pilih yang mana bos?',
+    ]
+    const shown = photosToShow(raw, 'Seperti apa', catalog)
+    assert.deepEqual(shown, ['Basic Suit - Black 2.0', 'Tuxedo - Black', 'Bescap Cross Placket - Black'])
+    assert.deepEqual(polish(raw, 'Seperti apa', ['Harga jas mulai 485.000 bos'], shown), [
+      'Ini fotonya bos, mulai 485.000',
+      'Mau pilih yang mana bos?',
+    ])
+    // Tanya detail (beda/bahan) atau hanya satu produk disebut → tidak ditambah foto.
+    assert.deepEqual(photosToShow(raw, 'Bedanya apa', catalog), [])
+    assert.deepEqual(photosToShow(['Premium Basic Suit 685.000 bos'], 'Premium seperti apa', catalog), [])
+  })
+
+  test('#13 goal pembelian: "oke" sesudah harga setelan tetap disusul langkah menuju order', ({ assert }) => {
+    const priceReply = 'Setelan premium 955.000 bos, sudah jas + celana'
+    assert.equal(
+      purchaseNudge('tanya_model', priceReply, true),
+      'Kalau sudah ada yang cocok, kirim tinggi & berat badannya ya bos, nanti saya bantu pilihkan size-nya'
+    )
+    // Tahap "lain" disusul hanya bila obrolannya belanja.
+    assert.equal(purchaseNudge('lain', priceReply, true), purchaseNudge('tanya_model', priceReply, true))
+    assert.equal(purchaseNudge('lain', 'Jam buka 09.00 bos', false), '')
+    // Pertanyaan balasan terakhir tidak diulang.
+    assert.notInclude(purchaseNudge('tanya_size', 'Boleh kirim nama & alamat lengkapnya bos?', true), 'alamat lengkapnya ya')
+    assert.include(purchaseNudge('tunggu_bayar', 'Totalnya 1.005.000 bos', true), 'bukti')
+    // Selesai / menunggu CS / bukti dikirim → tanpa susulan.
+    for (const stage of ['selesai', 'tunggu_cs', 'bukti_dikirim']) assert.equal(purchaseNudge(stage, '', true), '')
   })
 })
