@@ -18,12 +18,16 @@
   </div>
   <button id="usageDay" class="wa-usage-day" type="button" hidden></button>
 </div>
-<div id="usageCards" class="wa-usage-stats"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
-<section class="wa-trend" aria-label="Tren token per hari" data-i18n-aria-label="Tren token per hari">
-  <svg id="usageTrend" viewBox="0 0 600 160" preserveAspectRatio="none" role="img"></svg>
-  <div id="usageTrendLegend" class="wa-trend-legend" aria-hidden="true"></div>
-</section>
-<p id="usageProviders" class="wa-usage-caption"></p>
+{{-- Bento: grafik tren besar di kiri (2×2), empat angka ringkas di kanan. Tanpa diagonal, tanpa grain. --}}
+<div class="wa-bento">
+  <section class="wa-trend wa-bento-tile wa-bento-wide" aria-label="Tren token per hari" data-i18n-aria-label="Tren token per hari">
+    <small class="wa-bento-label" data-i18n="Tren token per hari">Tren token per hari</small>
+    <svg id="usageTrend" viewBox="0 0 600 160" preserveAspectRatio="none" role="img"></svg>
+    <div id="usageTrendLegend" class="wa-trend-legend" aria-hidden="true"></div>
+    <p id="usageProviders" class="wa-usage-caption"></p>
+  </section>
+  <div id="usageCards" class="wa-usage-stats"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
+</div>
 <div id="usageTabs" class="wa-segmented wa-usage-tabs" role="group" aria-label="Rincian" data-i18n-aria-label="Rincian">
   <button type="button" data-usage-show="models" aria-pressed="true" data-i18n="Per model">Per model</button>
   <button type="button" data-usage-show="phases" aria-pressed="false" data-i18n="Per fase">Per fase</button>

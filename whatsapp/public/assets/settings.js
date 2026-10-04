@@ -11,7 +11,7 @@
   const byId = (id) => document.getElementById(id)
   const number = (value) => new Intl.NumberFormat((window.waI18n?.locale || 'id-ID')).format(value)
   // Label model dari catatan usage: akhiran "(otomatis)" / "· otomatis" → bahasa tampilan.
-  const modelLabel = (model) => String(model).replace(/\s*(?:\(otomatis\)|·\s*otomatis)\s*$/, ` (${t('otomatis')})`)
+  const modelLabel = (model) => String(model).replace(/\s*(?:\(otomatis\)|Â?·\s*otomatis)\s*$/, ` (${t('otomatis')})`)
   const base = document.querySelector('meta[name="app-url"]').content.replace(/\/$/, '')
   let loading = false
   // Usage: rentang/tanggal terpilih & cache kalender (dipakai selectPanel saat halaman dibuka).
@@ -102,6 +102,7 @@
     if (byId('settings-usage')?.hidden || !lastCalendar.length) return
     calendarKey = ''
     renderCalendar(lastCalendar)
+    renderTrend(lastCalendar)
   })
   // Grafik naik-turun: token per hari per penyedia untuk rentang yang dipilih (SVG sederhana).
   const PROVIDER_LINES = [
@@ -129,9 +130,11 @@
       color,
       values: dates.map((date) => Number(byDate.get(date)?.by?.[key] || 0)),
     })).filter((line) => line.values.some((v) => v > 0))
-    const W = 600
-    const H = 160
-    const pad = { l: 36, r: 8, t: 10, b: 22 }
+    // viewBox mengikuti ukuran nyata supaya teks sumbu tidak melar.
+    const W = Math.max(300, Math.round(svg.clientWidth || 600))
+    const H = Math.max(120, Math.round(svg.clientHeight || 160))
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
+    const pad = { l: 40, r: 10, t: 10, b: 22 }
     const max = Math.max(1, ...series.flatMap((line) => line.values))
     const x = (i) => pad.l + (dates.length === 1 ? 0 : (i / (dates.length - 1)) * (W - pad.l - pad.r))
     const y = (v) => pad.t + (1 - v / max) * (H - pad.t - pad.b)
