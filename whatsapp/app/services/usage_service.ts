@@ -128,7 +128,7 @@ export async function readUsage(options: { days?: number; date?: string } = {}) 
       output: Number(row.output || 0),
       cached: Number(row.cached || 0),
     })),
-    providers: ['chatgpt', 'claude', 'gemini'].map((provider) => {
+    providers: ['chatgpt', 'claude', 'gemini', 'typesafe'].map((provider) => {
       const row = rows.find((item) => item.provider === provider)
       return {
         provider,

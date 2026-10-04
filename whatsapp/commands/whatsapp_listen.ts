@@ -1,3 +1,4 @@
+import { answeredByStore } from '#beta3/jev_decisions'
 import { BaseCommand, flags } from '@adonisjs/core/ace'
 import { startWorkerDiagnostics } from '#services/worker_diagnostics'
 import { workspaceSocket } from '#services/workspace_socket'
@@ -32,7 +33,6 @@ import makeWASocket, {
   fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
   normalizeMessageContent,
-  jidNormalizedUser,
   type WASocket,
   type BaileysEventMap,
   type WAMessage,
@@ -59,18 +59,6 @@ import { databaseAuthState, clearAuthRows } from '#services/baileys_auth_service
 import { currentLine, setCurrentLine, lineColumns, lineOf } from '#services/line_context'
 import { listLines, readLine, removeLineNow, updateLine } from '#services/line_service'
 import { spawn, type ChildProcess } from 'node:child_process'
-import {
-  createReply,
-  repairCatalogNotesWithAi,
-  type AiContextImage,
-  type AiMedia,
-  type AiDecision,
-} from '#services/ai_service'
-import { buildTurnContext, saveChatNote } from '#services/context_service'
-import { createLeanReply, finishLeanGoal, claimLeanNudge } from '#services/lean/lean_reply_service'
-import { syncLeanCatalog } from '#services/lean/lean_mcp'
-import { sendLeanTotal } from '#services/lean/lean_order_service'
-import { describeCatalogPhotos } from '#services/lean/lean_catalog_vision'
 import * as beta3Reply from '#beta3/reply_service'
 import * as beta3Order from '#beta3/order_service'
 import * as beta3Tables from '#beta3/tables'
@@ -90,92 +78,27 @@ const beta3 = {
   ...beta3Examples,
   ...beta3Catalog,
 }
-import { learnFromHumanReply } from '#services/lean/lean_examples_service'
-import {
-  nextLeanGroupOrder,
-  finishLeanGroupOrder,
-  renderGroupOrderMessage,
-} from '#services/lean/lean_order_service'
-import { catalogDigest, findCatalogVariant } from '#services/lean/lean_catalog_service'
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
 import { setHandlingMode } from '#services/message_service'
-import { saveCustomerMemory } from '#services/conversation_memory'
 import { rememberCustomerPhone, phoneFromJid } from '#services/customer_identity_service'
-import { readCart } from '#services/cart_service'
-import {
-  incompleteCartSelection,
-  cartSelectionRecoveryPrompt,
-  conversationOnlyCartRecovery,
-} from '#services/cart_selection_recovery'
-import {
-  CATALOG_NOTES_MISMATCH,
-  catalogNotesRepairInput,
-  applyCatalogNotesRepair,
-} from '#services/catalog_notes_repair'
-import {
-  cacheOrderGroups,
-  orderRouting,
-  recoverOrderGroupQueue,
-} from '#services/order_operations_service'
-import { deliverNextOrderGroup } from '#services/order_group_delivery_service'
-import { processNextShipment, nextShipmentConversation } from '#services/order_shipping_service'
-import { dueShippingNotices, deliverShippingNotice } from '#services/shipping_notice_service'
-import {
-  duePaymentWaitNotices,
-  deliverPaymentWaitNotice,
-} from '#services/payment_wait_notice_service'
-import { dueApprovalWaitNotices, deliverApprovalWaitNotice } from '#services/approval_wait_service'
-import {
-  applyAiCartIntent,
-  CartVerificationError,
-  CartReferenceError,
-  CatalogLookupError,
-  holdCatalogDraft,
-  holdUnverifiedCartReply,
-  resolveCartIssues,
-  holdCheckoutForReview,
-} from '#services/ai_cart_service'
+import { cacheOrderGroups, orderRouting } from '#services/order_operations_service'
 import { isAiWorking } from '#services/ai_work_schedule'
-import { CheckoutConsentError } from '#services/checkout_consent_service'
-import { handleInternalDecision } from '#services/internal_decision_service'
-import { understandHumanAnswer } from '#services/human_answer_service'
 import { readSettings } from '#services/settings_service'
 import env from '#start/env'
 import { startTrace } from '#services/trace_service'
-import { aiFailureDetail, AiProcessFailure } from '#services/ai_failure_service'
-import {
-  recordAnalysisFailure,
-  flushAnalysisFailures,
-  dueAnalysisRetries,
-  recoverInterruptedAnalyses,
-  recoverLegacyPausedAnalyses,
-  recoverCatalogConsentHandoffs,
-  markGoalDelivery,
-} from '#services/analysis_retry_service'
-import { planProviderRun } from '#services/ai_provider_failover'
+import { aiFailureDetail } from '#services/ai_failure_service'
+import { recordAnalysisFailure, markGoalDelivery } from '#services/analysis_retry_service'
 import {
   isTrackedOutgoingMessage,
   trackOutgoingMessage,
   saveSentAiMessage,
 } from '#services/outgoing_delivery_service'
-import { nextEvaluationRoom, evaluateConversation } from '#services/conversation_evaluation_service'
-import { runConversationLearning } from '#services/conversation_learning_service'
 import { saveSyncRetry, dueSyncRetries, finishSyncRetry } from '#services/sync_retry_service'
 import { sendPreparedReply } from '#services/reply_presence_service'
-import { sendAiMessageSequence } from '#services/ai_message_sequence'
-import { recordBalanceRecap, tryConfirmedBalanceCheckout } from '#services/cart_service'
-import { recordCheckoutContinuity } from '#services/checkout_continuity'
-import { prepareOutgoingImages, outgoingMessagePayload } from '#services/outgoing_image_service'
-import {
-  prepareBusinessGuideMedia,
-  selectedBusinessGuides,
-} from '#services/business_guide_media_service'
-import { paymentDataSignature } from '#services/payment_context_service'
 import { resumeAiAfterHumanReply } from '#services/message_service'
 import { csOutgoingPayload, csMediaPath } from '#services/cs_media_service'
 import { markRoomRead } from '#services/contact_inbox_service'
 import { instagramTick, instagramNudge } from '#services/instagram_worker'
-import { isInternalOnlyQuestion } from '#services/customer_scope_service'
 import { readIncomingThrough, flushWorkspaceReads } from '#services/incoming_read_service'
 import {
   requestAiReview,
@@ -193,12 +116,9 @@ import {
   failedGoalMessage,
   invalidateConversationGoal,
   isCurrentGoalRun,
-  saveGoalDecision,
   dueConversationGoals,
-  claimConversationGoal,
   pauseGoalRun,
   type GoalRun,
-  scheduledGoalStillAllowed,
 } from '#services/conversation_goal_service'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -256,13 +176,11 @@ export default class WhatsappListen extends BaseCommand {
   private sweeping = false
   private sweepTimer?: NodeJS.Timeout
   private mediaRetryTimer?: NodeJS.Timeout
-  private leanSyncTimer?: NodeJS.Timeout
+  private catalogSyncTimer?: NodeJS.Timeout
   private recapTimer?: NodeJS.Timeout
   private recapRunning = false
   private goalSweepRunning = false
   private lastGoalSweepAt = 0
-  private evaluationRunning = false
-  private lastEvaluationAt = 0
 
   static commandName = 'whatsapp:listen'
   static description = 'Menjalankan koneksi Baileys dan balasan AI'
@@ -290,11 +208,7 @@ export default class WhatsappListen extends BaseCommand {
   private lastProfileRefreshAt = 0
   private orderGroupRunning = false
   private lastOrderGroupAt = 0
-  private lastPaymentWaitAt = 0
   private lastOrderGroupSyncAt = 0
-  private lastOrderGroupRecoveryAt = 0
-  private shippingRunning = false
-  private lastShippingAt = 0
   private socketOpen = false
   private receivedPending = false
   private syncReadyAt = 0
@@ -302,9 +216,6 @@ export default class WhatsappListen extends BaseCommand {
   private ingestion: Promise<void> = Promise.resolve()
   private reviewing = false
   private retryingSync = false
-  private retryingAnalysis = false
-  private lastAnalysisRetryAt = 0
-  private lastAnalysisRecoveryAt = 0
   private lastSyncRetryAt = 0
   private syncRetryFallback = new Map<string, { message: WAMessage; attempts: number }>()
 
@@ -336,7 +247,7 @@ export default class WhatsappListen extends BaseCommand {
       await stopWorkerHeartbeat(workerId).catch(() => {})
       if (this.sweepTimer) clearInterval(this.sweepTimer)
       if (this.mediaRetryTimer) clearInterval(this.mediaRetryTimer)
-      if (this.leanSyncTimer) clearInterval(this.leanSyncTimer)
+      if (this.catalogSyncTimer) clearInterval(this.catalogSyncTimer)
       if (this.recapTimer) clearInterval(this.recapTimer)
       if (this.igTimer) clearInterval(this.igTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
@@ -420,17 +331,6 @@ export default class WhatsappListen extends BaseCommand {
         const scope = this.sessionScope
         if (scope && (await workspaceState()).active_id === scope.id)
           await inWorkspace(scope, async () => {
-            if (!this.shippingRunning && Date.now() - this.lastShippingAt >= 5000) {
-              this.lastShippingAt = Date.now()
-              this.shippingRunning = true
-              void this.track(() => this.processShippingConversation())
-                .catch(() => {
-                  this.logger.error('Antrean pengiriman akan diperiksa ulang.')
-                })
-                .finally(() => {
-                  this.shippingRunning = false
-                })
-            }
             if (
               this.socketOpen &&
               !this.orderGroupRunning &&
@@ -452,29 +352,15 @@ export default class WhatsappListen extends BaseCommand {
               this.lastSyncRetryAt = Date.now()
               void this.track(() => this.retrySyncMessages())
             }
-            if (!this.evaluationRunning && Date.now() - this.lastEvaluationAt >= 30_000) {
-              this.lastEvaluationAt = Date.now()
-              void this.track(() => this.evaluateNextConversation())
-            }
             if (this.socket && this.readyForAi()) {
               await this.flushOutbox()
               await this.flushReactions()
               await flushWorkspaceReads(this.socket, currentLine()).catch(() => {
                 this.logger.error('Tanda baca WhatsApp akan dicoba kembali.')
               })
-              if (Date.now() - this.lastPaymentWaitAt >= 10_000) {
-                this.lastPaymentWaitAt = Date.now()
-                await this.sendPaymentWaitNotice()
-              }
               void this.track(() => this.consumeAiReviews()).catch((error) =>
                 this.logger.error(String(error))
               )
-              if (!this.retryingAnalysis && Date.now() - this.lastAnalysisRetryAt >= 5000) {
-                this.lastAnalysisRetryAt = Date.now()
-                void this.track(() => this.consumeAnalysisRetries()).catch(() =>
-                  this.logger.error('Antrean pemulihan analisis akan diperiksa kembali.')
-                )
-              }
               if (Date.now() - this.lastGoalSweepAt >= 60_000 && !this.goalSweepRunning) {
                 this.lastGoalSweepAt = Date.now()
                 void this.track(() => this.sweepConversationGoals())
@@ -636,10 +522,6 @@ export default class WhatsappListen extends BaseCommand {
             await this.flushOutbox()
             await this.flushReactions()
             await flushWorkspaceReads(this.socket, line).catch(() => {})
-            if (Date.now() - this.lastPaymentWaitAt >= 10_000) {
-              this.lastPaymentWaitAt = Date.now()
-              await this.sendPaymentWaitNotice()
-            }
             void this.track(() => this.consumeAiReviews()).catch((error) =>
               this.logger.error(String(error))
             )
@@ -654,30 +536,6 @@ export default class WhatsappListen extends BaseCommand {
       await wait(1500)
     }
     process.exit(0)
-  }
-
-  private async processShippingConversation() {
-    if (!this.socket || !this.readyForAi() || this.stopping) return
-    const settings = await readSettings(false)
-    if (!isAiWorking(settings) || !settings.hasSkill) return
-    const candidate = await nextShipmentConversation()
-    if (!candidate || this.chatLocks.has(candidate.jid) || this.pendingTurns.has(candidate.jid))
-      return
-    const jid = String(candidate.jid)
-    const task = (async () => {
-      await this.setActivity(jid, 'thinking')
-      try {
-        await processNextShipment(undefined, undefined, jid)
-      } finally {
-        await this.setActivity(jid, null).catch(() => {})
-      }
-    })()
-    this.chatLocks.set(jid, task)
-    try {
-      await task
-    } finally {
-      if (this.chatLocks.get(jid) === task) this.chatLocks.delete(jid)
-    }
   }
 
   private async processOrderGroups() {
@@ -697,85 +555,9 @@ export default class WhatsappListen extends BaseCommand {
         /* Retry discovery later; do not block existing jobs. */
       }
     }
-    if (Date.now() - this.lastOrderGroupRecoveryAt > 30_000) {
-      this.lastOrderGroupRecoveryAt = Date.now()
-      try {
-        await recoverOrderGroupQueue()
-      } catch {
-        this.logger.error('Antrean order grup yang terlewat akan diperiksa ulang.')
-      }
-    }
-    await this.deliverLeanGroupOrders(socket)
     await this.deliverBeta3GroupOrders(socket)
-    await deliverNextOrderGroup({
-      validateGroup: async (jid) => {
-        if (this.stopping || !this.socketOpen || this.socket !== socket)
-          throw new Error('Disconnected')
-        const metadata = await socket.groupMetadata(jid)
-        const self = [socket.user?.id, socket.user?.lid]
-          .filter(Boolean)
-          .map((id) => jidNormalizedUser(id!))
-        const participant = metadata.participants.find((p) =>
-          [p.id, p.lid, p.phoneNumber].some((id) => id && self.includes(jidNormalizedUser(id)))
-        )
-        if (
-          !participant ||
-          metadata.isCommunity ||
-          (metadata.announce &&
-            !participant.admin &&
-            !participant.isAdmin &&
-            !participant.isSuperAdmin)
-        )
-          throw new Error('Group unavailable')
-      },
-      send: async (jid, payload, messageId) => {
-        if (this.stopping || !this.socketOpen || this.socket !== socket)
-          throw new Error('Disconnected')
-        const sent = await socket.sendMessage(jid, payload, { messageId })
-        return sent?.key.id
-      },
-    })
   }
 
-  /** Beta 2: order lean yang sudah lunas dikirim ke grup produksi default (teks + foto produk). */
-  private async deliverLeanGroupOrders(socket: WASocket) {
-    const order = await nextLeanGroupOrder().catch(() => null)
-    if (!order) return
-    const groupJid = String(order.group_jid)
-    try {
-      if (this.stopping || !this.socketOpen || this.socket !== socket) return
-      const text = renderGroupOrderMessage(order)
-      let image: { bytes: Buffer; caption: string } | null = null
-      try {
-        const digest = await catalogDigest()
-        const firstLine = String(order.spec || order.items || '').split('\n')[0] || ''
-        const variant = findCatalogVariant(
-          digest.rows,
-          firstLine.replace(/^\d+[.)]\s*/, '').split(/[,|]/)[0]
-        )
-        if (variant?.photoUrl) {
-          const bytes = await downloadOutgoingImage(variant.photoUrl)
-          image = { bytes, caption: text }
-        }
-      } catch {
-        image = null
-      }
-      const sent = await socket.sendMessage(
-        groupJid,
-        image ? { image: image.bytes, caption: image.caption, mimetype: 'image/jpeg' } : { text }
-      )
-      if (!sent?.key.id) throw new Error('Pengiriman ke grup belum dikonfirmasi.')
-      await finishLeanGroupOrder(Number(order.id))
-    } catch (error) {
-      await finishLeanGroupOrder(
-        Number(order.id),
-        error instanceof Error ? error.message : String(error)
-      )
-      this.logger.error(
-        `Order lean #${order.id} gagal ke grup: ${error instanceof Error ? error.message : String(error)}`
-      )
-    }
-  }
   /** Beta 3: order beta3 yang sudah lunas dikirim ke grup produksi default (teks + foto produk). */
   private async deliverBeta3GroupOrders(socket: WASocket) {
     const order = await beta3.nextLeanGroupOrder().catch(() => null)
@@ -861,29 +643,8 @@ export default class WhatsappListen extends BaseCommand {
         error instanceof Error ? error.message : String(error)
       )
       this.logger.error(
-        `Order lean #${order.id} gagal ke grup: ${error instanceof Error ? error.message : String(error)}`
+        `Order #${order.id} gagal ke grup: ${error instanceof Error ? error.message : String(error)}`
       )
-    }
-  }
-
-  private async evaluateNextConversation() {
-    if (this.stopping || this.evaluationRunning || this.pendingTurns.size || this.chatLocks.size)
-      return
-    this.evaluationRunning = true
-    try {
-      const settings = await readSettings(true)
-      if (settings.leanMode || settings.beta3Mode) return // Beta 2/3: evaluasi/learning per chat dimatikan; contoh CS yang dipakai.
-      const jid = await nextEvaluationRoom(settings, [
-        ...this.pendingTurns.keys(),
-        ...this.chatLocks.keys(),
-      ])
-      if (jid && !this.stopping) await evaluateConversation(jid, settings)
-      if (!this.stopping && !this.pendingTurns.size && !this.chatLocks.size)
-        await runConversationLearning(settings)
-    } catch {
-      this.logger.error('Evaluasi percakapan belum dapat dijalankan.')
-    } finally {
-      this.evaluationRunning = false
     }
   }
 
@@ -1491,12 +1252,6 @@ export default class WhatsappListen extends BaseCommand {
       )
   }
 
-  private async customerTurnContext(...args: Parameters<typeof buildTurnContext>) {
-    // Retry unresolved old rooms before every AI turn, independently of avatar loading.
-    await this.refreshCustomerPhone(args[0])
-    return buildTurnContext(...args)
-  }
-
   private rememberContact(...args: Parameters<WhatsappListen['rememberContactScoped']>) {
     return this.track(() => this.rememberContactScoped(...args))
   }
@@ -1872,86 +1627,6 @@ export default class WhatsappListen extends BaseCommand {
     )
   }
 
-  private async sendPaymentWaitNotice() {
-    const socket = this.socket
-    if (!socket || !this.readyForAi() || this.stopping) return
-    if (!isAiWorking(await readSettings())) return
-    const notices = [
-      ...(await duePaymentWaitNotices()).map((notice) => ({ ...notice, kind: 'payment' })),
-      ...(await dueApprovalWaitNotices()).map((notice) => ({ ...notice, kind: 'approval' })),
-      ...(await dueShippingNotices()).map((notice) => ({
-        ...notice,
-        id: notice.order_id,
-        due_at: notice.next_attempt_at,
-        kind: 'shipping',
-      })),
-    ].sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime())
-    for (const notice of notices) {
-      if (this.pendingTurns.has(notice.jid) || this.chatLocks.has(notice.jid)) continue
-      if (!(await this.ownsRoom(notice.jid))) continue
-      const deliver =
-        notice.kind === 'shipping'
-          ? deliverShippingNotice
-          : notice.kind === 'approval'
-            ? deliverApprovalWaitNotice
-            : deliverPaymentWaitNotice
-      const task = deliver(
-        notice.id,
-        async (pending, canSend, reserve) =>
-          trackOutgoingMessage(pending.jid, async (outgoingId) => {
-            const anchor = await db
-              .from('whatsapp_messages')
-              .where('id', pending.anchorId)
-              .where('jid', pending.jid)
-              .first()
-            const keys = anchor
-              ? [{ id: anchor.message_id, remoteJid: pending.jid, fromMe: false }]
-              : []
-            const sent = await sendPreparedReply(
-              socket,
-              pending.jid,
-              keys,
-              async () => {
-                if (!(await reserve(outgoingId))) return null
-                return socket.sendMessage(
-                  pending.jid,
-                  { text: pending.text },
-                  { messageId: outgoingId }
-                )
-              },
-              {
-                canSend,
-                read: () =>
-                  readIncomingThrough(socket, pending.jid, Number(pending.anchorId), canSend),
-                onRead: () => markRoomRead(pending.jid, pending.anchorId).then(() => {}),
-                onTyping: () => this.setActivity(pending.jid, 'typing'),
-                onDone: () => this.setActivity(pending.jid, null),
-              }
-            )
-            if (!sent?.key.id) return null
-            await saveSentAiMessage({
-              message_id: sent.key.id,
-              jid: pending.jid,
-              direction: 'out',
-              sender_type: 'ai',
-              body: pending.text,
-              status: 'sent',
-              created_at: new Date(),
-            })
-            return sent.key.id
-          }),
-        () => this.socket === socket && this.readyForAi() && !this.stopping
-      )
-      this.chatLocks.set(notice.jid, task)
-      try {
-        await task
-      } finally {
-        if (this.chatLocks.get(notice.jid) === task) this.chatLocks.delete(notice.jid)
-      }
-      break
-    }
-  }
-
   private async flushOutbox() {
     if (!this.socket) return
     const line = currentLine()
@@ -2020,11 +1695,9 @@ export default class WhatsappListen extends BaseCommand {
       // A mode-update error must not turn an already sent message into a failed send.
       if (message.sender_type === 'cs') {
         await resumeAiAfterHumanReply(message.jid)
-        // Beta 2: jawaban CS menjadi kandidat contoh untuk AI, tanpa mengedit skill.
+        // Jawaban CS menjadi kandidat contoh untuk AI, tanpa mengedit skill.
         try {
-          const latestSettings = await readSettings()
-          if (latestSettings.beta3Mode) await beta3.learnFromHumanReply(message.jid, sentMessageId)
-          else if (latestSettings.leanMode) await learnFromHumanReply(message.jid, sentMessageId)
+          await beta3.learnFromHumanReply(message.jid, sentMessageId)
         } catch {
           /* Contoh opsional; jangan mengganggu pengiriman. */
         }
@@ -2209,7 +1882,6 @@ export default class WhatsappListen extends BaseCommand {
     const items = pending.items
     const last = items[items.length - 1]
     const visualItems = items.filter((item) => item.media?.visual)
-    const primary = visualItems.length ? visualItems[visualItems.length - 1] : undefined
     const notes = items
       .map((item) => item.media?.note)
       .filter((note): note is string => Boolean(note))
@@ -2231,372 +1903,20 @@ export default class WhatsappListen extends BaseCommand {
     const goalRun = await beginGoalTurn(jid, last.id)
     if (!goalRun) return
     const turnSocket = this.socket
-    if (settings.beta3Mode) {
-      const downloadedB3 = new Map<string, string | null>()
-      for (const item of visualItems) downloadedB3.set(item.id, await item.mediaDownload)
-      for (const item of items) if (!visualItems.includes(item)) void item.mediaDownload
-      const imagesB3 = visualItems
-        .map((item) => ({ id: item.id, path: downloadedB3.get(item.id) }))
-        .filter((image): image is { id: string; path: string } => Boolean(image.path))
-        .slice(0, 3)
-      await this.runBeta3Turn(jid, goalRun, turnSocket, settings, {
-        text,
-        messageIds: items.map((item) => item.id),
-        keys: items.map((item) => item.message.key),
-        imagePaths: imagesB3.map((image) => image.path),
-        imageIds: imagesB3.map((image) => image.id),
-      })
-      return
-    }
-    if (settings.leanMode) {
-      const downloadedLean = new Map<string, string | null>()
-      for (const item of visualItems) downloadedLean.set(item.id, await item.mediaDownload)
-      for (const item of items) if (!visualItems.includes(item)) void item.mediaDownload
-      await this.runLeanTurn(jid, goalRun, turnSocket, settings, {
-        text,
-        messageIds: items.map((item) => item.id),
-        keys: items.map((item) => item.message.key),
-        imagePaths: visualItems
-          .map((item) => downloadedLean.get(item.id))
-          .filter((path): path is string => Boolean(path))
-          .slice(0, 3),
-      })
-      return
-    }
-    let trace: Awaited<ReturnType<typeof startTrace>> | undefined
-    try {
-      trace = await startTrace(jid, {
-        text,
-        provider: settings.aiProvider,
-        model: settings.aiProvider === 'claude' ? settings.claudeModel : settings.chatgptModel,
-        skills: settings.skills.map((skill) => skill.name),
-        messages: items.map((item) => ({ id: item.id, mediaType: item.media?.mediaType || null })),
-      }).catch(() => undefined)
-      trace?.emit({ key: 'input', label: 'Menerima pesan dan menyiapkan media', status: 'running' })
-      trace?.emit({
-        key: 'queue-timing',
-        label: 'Waktu tunggu antrean',
-        status: 'completed',
-        detail: {
-          elapsedMs: Math.max(
-            0,
-            Date.now() - Math.min(...items.map((item) => item.queuedAt || Date.now()))
-          ),
-          includesMessageBatching: true,
-        },
-      })
-      await this.setActivity(jid, 'understanding')
-
-      const downloaded = new Map<string, string | null>()
-      for (const item of visualItems) downloaded.set(item.id, await item.mediaDownload)
-      for (const item of items) if (!visualItems.includes(item)) void item.mediaDownload
-
-      const context = await this.customerTurnContext(
-        jid,
-        items.map((item) => item.id),
-        settings.historyLimit
-      )
-      trace?.emit({
-        key: 'input',
-        label: 'Input dan konteks siap',
-        status: 'completed',
-        detail: {
-          context: context.prompt,
-          quotedMessageId: context.quotedMessageId,
-          efficiency: context.efficiency,
-          promptCharacters: context.prompt.length,
-        },
-      })
-
-      // Gambar lain di giliran yang sama (pelanggan sering mengirim beberapa foto
-      // sekaligus) dan gambar yang sedang dikutip pelanggan ikut dilampirkan.
-      const contextImages: AiContextImage[] = []
-      for (const item of [...visualItems].reverse()) {
-        if (item === primary) continue
-        const path = downloaded.get(item.id)
-        if (path && (item.media?.mediaType === 'image' || item.media?.mediaType === 'sticker')) {
-          contextImages.push({
-            path,
-            messageId: item.id,
-            label: 'foto sebelumnya di giliran yang sama; bukan pengganti foto terbaru',
-          })
-        }
-      }
-      if (context.quotedMessageId && context.quotedMessageId !== primary?.id) {
-        const quotedPath = await this.imagePathOfMessage(context.quotedMessageId)
-        if (quotedPath) {
-          contextImages.push({
-            path: quotedPath,
-            messageId: context.quotedMessageId,
-            previouslyAnalyzed: true,
-            label: 'gambar yang dikutip pelanggan; tidak menggantikan lampiran baru',
-          })
-        }
-      }
-
-      const decision = await createReply(
-        { ...settings, conversationAccess: context.access, routingContext: context.routing },
-        text,
-        (activity) => {
-          this.setActivity(jid, activity).catch(() => {})
-          if (activity === 'compacting')
-            trace?.emit({
-              key: `compact-${Date.now()}`,
-              label: 'Provider melaporkan pemadatan konteks',
-              status: 'completed',
-            })
-        },
-        primary?.media?.visual
-          ? {
-              type: primary.media.mediaType as AiMedia['type'],
-              messageId: primary.id,
-              path: downloaded.get(primary.id) || null,
-              thumbnailPath: primary.media.thumbnailPath,
-            }
-          : undefined,
-        context.prompt,
-        contextImages.slice(0, 4),
-        trace?.emit,
-        text,
-        true,
-        context.sections
-      )
-      decision.cartVersion = context.cartVersion
-      await this.deliverAiDecision(
-        goalRun,
-        turnSocket,
-        settings,
-        decision,
-        items.map((item) => item.message.key),
-        false,
-        trace,
-        context.quotedMessageId ? last.message : undefined
-      )
-    } catch (error) {
-      const failure = aiFailureDetail(error, {
-        stage: 'processing',
-        provider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
-      })
-      const retry = await recordAnalysisFailure(goalRun, failure)
-      if (retry)
-        trace?.emit({
-          key: 'analysis-retry',
-          label: retry.nextAttemptAt
-            ? 'Analisis akan dicoba ulang otomatis'
-            : 'Analisis memerlukan pemeriksaan',
-          status: 'completed',
-          detail: retry,
-        })
-      await trace?.finish('failed', {
-        error: failure.message,
-        failure,
-      })
-      this.logger.error(JSON.stringify({ traceId: trace?.id, ...failure }))
-    } finally {
-      await this.setActivity(jid, null).catch(() => {})
-    }
-  }
-
-  /**
-   * Beta 2 — jalur ramping: satu panggilan AI tanpa tool, kirim 1–2 bubble +
-   * foto katalog, simpan catatan chat, tutup goal. Tidak ada cart/evidence/MCP.
-   */
-  private async runLeanTurn(
-    jid: string,
-    run: GoalRun,
-    socket: WASocket,
-    settings: Awaited<ReturnType<typeof readSettings>>,
-    input: { text: string; messageIds: string[]; keys: WAMessageKey[]; imagePaths: string[] }
-  ) {
-    let trace: Awaited<ReturnType<typeof startTrace>> | undefined
-    const canSend = async () =>
-      (await isCurrentGoalRun(run)) &&
-      (await this.waitForDeliverySync(socket)) &&
-      (await this.canSendAiReply(jid, socket)) &&
-      (await isCurrentGoalRun(run))
-    try {
-      trace = await startTrace(jid, {
-        text: input.text,
-        mode: 'lean',
-        provider: settings.aiProvider,
-        model: settings.aiProvider === 'claude' ? settings.claudeModel : settings.chatgptModel,
-        messages: input.messageIds.map((id) => ({ id })),
-      }).catch(() => undefined)
-      await this.setActivity(jid, 'understanding')
-      const reply = await createLeanReply({
-        jid,
-        messageIds: input.messageIds,
-        text: input.text,
-        imagePaths: input.imagePaths,
-        settings: {
-          ...settings,
-          aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
-        },
-        onTrace: trace?.emit,
-      })
-      const { decision } = reply
-      if (!(await canSend())) {
-        await pauseGoalRun(run, 'Konteks, koneksi, atau status AI berubah.')
-        await trace?.finish('cancelled', { reason: 'Konteks berubah; balasan lama dibatalkan.' })
-        return
-      }
-      if (!(await markGoalDelivery(run))) return
-      let firstMessageId: string | undefined
-      const sendBubble = async (body: string, image?: { bytes: Buffer; url: string }) => {
-        return trackOutgoingMessage(jid, async (outgoingId) => {
-          const sent = await sendPreparedReply(
-            socket,
-            jid,
-            firstMessageId ? [] : input.keys,
-            () =>
-              socket.sendMessage(
-                jid,
-                image
-                  ? { image: image.bytes, caption: body, mimetype: 'image/jpeg' as const }
-                  : { text: body },
-                { messageId: outgoingId }
-              ),
-            {
-              canSend,
-              read: () =>
-                firstMessageId
-                  ? Promise.resolve()
-                  : readIncomingThrough(socket, jid, Number(run.anchor_id), canSend),
-              onTyping: async () => {
-                await this.setActivity(jid, 'typing')
-              },
-              onDone: () => this.setActivity(jid, null),
-            }
-          )
-          if (sent === null) return false
-          if (!sent?.key.id) throw new Error('Pengiriman belum dikonfirmasi.')
-          const messageId = sent.key.id
-          await saveSentAiMessage({
-            message_id: messageId,
-            jid,
-            contact_name: null,
-            direction: 'out',
-            sender_type: 'ai',
-            body,
-            media_type: image ? 'image' : null,
-            media_url: image?.url || null,
-            thumbnail_url: image?.url || null,
-            media_mime: image ? 'image/jpeg' : null,
-            media_name: null,
-            media_size: image?.bytes.length || null,
-            media_status: image ? 'ready' : null,
-            reply_to_message_id: null,
-            status: 'sent',
-            created_at: new Date(),
-          })
-          if (!firstMessageId)
-            await markRoomRead(jid, run.anchor_id).catch(() => {
-              this.logger.error('Status baca workspace belum diperbarui.')
-            })
-          firstMessageId ||= messageId
-          return true
-        })
-      }
-      // Urutan seperti CS: jawaban pertama → foto → pertanyaan berikutnya.
-      const bubbles = decision.serah_cs ? [] : decision.pesan
-      let aborted = false
-      const sendPhotos = async () => {
-        for (const photo of reply.photos) {
-          try {
-            const bytes = await downloadOutgoingImage(photo.url)
-            if (!(await sendBubble(photo.caption, { bytes, url: photo.url }))) {
-              aborted = true
-              break
-            }
-            trace?.emit({
-              key: `photo-${photo.caption}`,
-              label: `Foto terkirim · ${photo.caption}`,
-              status: 'completed',
-            })
-          } catch (error) {
-            trace?.emit({
-              key: `photo-${photo.caption}`,
-              label: `Foto tidak terkirim · ${photo.caption}`,
-              status: 'failed',
-              detail: { error: error instanceof Error ? error.message : String(error) },
-            })
-          }
-        }
-      }
-      if (!decision.serah_cs && !bubbles.length) await sendPhotos()
-      for (const [index, body] of bubbles.entries()) {
-        if (aborted || !(await sendBubble(body))) {
-          aborted = true
-          break
-        }
-        trace?.emit({ key: `send-${index + 1}`, label: 'Balasan terkirim', status: 'completed' })
-        if (index === 0) await sendPhotos()
-      }
-      if (!aborted && reply.autoTotal && !decision.serah_cs) {
-        // Total + rekening dikirim sistem (bukan AI) setelah rincian lolos verifikasi katalog.
-        try {
-          const sent = await sendLeanTotal(reply.autoTotal)
-          decision.tahap = 'tunggu_bayar'
-          decision.catatan = `${decision.catatan.replace(/tahap\s*[:=]\s*\w+/i, 'tahap: tunggu_bayar')}\ntotal ${sent.orderNumber}: ${sent.total} dikirim otomatis (${reply.autoTotal.shippingService})`
-          trace?.emit({
-            key: 'lean-total-sent',
-            label: `Total ${sent.total} + rekening dikirim · ${sent.orderNumber}`,
-            status: 'completed',
-            detail: reply.autoTotal,
-          })
-        } catch (error) {
-          trace?.emit({
-            key: 'lean-total-sent',
-            label: 'Total otomatis gagal dikirim; menunggu CS',
-            status: 'failed',
-            detail: { error: error instanceof Error ? error.message : String(error) },
-          })
-        }
-      }
-      if (decision.catatan) await saveChatNote(jid, decision.catatan)
-      const goal = await finishLeanGoal(run, decision)
-      if (decision.serah_cs) {
-        await setHandlingMode(jid, 'cs', decision.alasan || 'Diserahkan ke CS oleh AI (lean).')
-        trace?.emit({
-          key: 'handoff',
-          label: 'Room diserahkan ke CS',
-          status: 'completed',
-          detail: { reason: decision.alasan },
-        })
-      }
-      await trace?.finish(
-        'completed',
-        {
-          decision: decision.serah_cs ? 'handoff' : decision.pesan.length ? 'reply' : 'silent',
-          summary: decision.alasan,
-          tahap: decision.tahap,
-          promptTokens: reply.promptTokens,
-          usage: reply.usage,
-          orderId: reply.orderId,
-          goal,
-        },
-        firstMessageId
-      )
-    } catch (error) {
-      const failure = aiFailureDetail(error, {
-        stage: 'processing',
-        provider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
-      })
-      const retry = await recordAnalysisFailure(run, failure)
-      if (retry)
-        trace?.emit({
-          key: 'analysis-retry',
-          label: retry.nextAttemptAt
-            ? 'Analisis akan dicoba ulang otomatis'
-            : 'Analisis memerlukan pemeriksaan',
-          status: 'completed',
-          detail: retry,
-        })
-      await trace?.finish('failed', { error: failure.message, failure })
-      this.logger.error(JSON.stringify({ traceId: trace?.id, mode: 'lean', ...failure }))
-    } finally {
-      await this.setActivity(jid, null).catch(() => {})
-    }
+    const downloadedB3 = new Map<string, string | null>()
+    for (const item of visualItems) downloadedB3.set(item.id, await item.mediaDownload)
+    for (const item of items) if (!visualItems.includes(item)) void item.mediaDownload
+    const imagesB3 = visualItems
+      .map((item) => ({ id: item.id, path: downloadedB3.get(item.id) }))
+      .filter((image): image is { id: string; path: string } => Boolean(image.path))
+      .slice(0, 3)
+    await this.runBeta3Turn(jid, goalRun, turnSocket, settings, {
+      text,
+      messageIds: items.map((item) => item.id),
+      keys: items.map((item) => item.message.key),
+      imagePaths: imagesB3.map((image) => image.path),
+      imageIds: imagesB3.map((image) => image.id),
+    })
   }
 
   private async runBeta3Turn(
@@ -2828,7 +2148,6 @@ export default class WhatsappListen extends BaseCommand {
     try {
       const settings = await readSettings(true)
       if (!isAiWorking(settings) || !settings.hasSkill || !settings.sweepEnabled) return
-      if (settings.leanMode) return // Beta 2 dihentikan.
       const maxAgeMs = Math.max(1, settings.sweepMaxAgeHours) * 3_600_000
       // Jangan menyerobot giliran yang masih dalam jendela penggabungan.
       const minAgeMs = Math.max(60_000, (settings.turnWindowMs || 6000) * 3)
@@ -2874,19 +2193,17 @@ export default class WhatsappListen extends BaseCommand {
         // Diperiksa ulang: mode bisa berubah antara kueri dan giliran ini.
         const contact = await db.from('whatsapp_contacts').where('jid', candidate.jid).first()
         if (!(await this.aiMayAnswer(candidate.jid, contact)) || contact?.ai_excluded) continue
-        if (settings.beta3Mode) {
-          const task = this.answerBacklogBeta3(candidate.jid, settings)
-          this.chatLocks.set(candidate.jid, task)
-          try {
-            await task
-          } finally {
-            if (this.chatLocks.get(candidate.jid) === task) this.chatLocks.delete(candidate.jid)
-            await this.setActivity(candidate.jid, null).catch(() => {})
-          }
-        } else await this.answerBacklog(candidate.jid, settings)
+        const task = this.answerBacklogBeta3(candidate.jid, settings)
+        this.chatLocks.set(candidate.jid, task)
+        try {
+          await task
+        } finally {
+          if (this.chatLocks.get(candidate.jid) === task) this.chatLocks.delete(candidate.jid)
+          await this.setActivity(candidate.jid, null).catch(() => {})
+        }
         handled += 1
       }
-      if (settings.beta3Mode && handled < batch) await this.sweepAfterHuman(settings, batch - handled, since)
+      if (handled < batch) await this.sweepAfterHuman(settings, batch - handled, since)
     } catch (error) {
       this.logger.error(`Sapuan: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
@@ -2995,6 +2312,22 @@ export default class WhatsappListen extends BaseCommand {
       .orderBy('id', 'asc')
       .limit(15)
     if (!pending.length) return
+    // Jev (bila aktif dan yakin): CS sudah menjawab semua poin → AI tidak perlu menambah apa pun.
+    const storeReplies = await db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'out')
+      .where('created_at', '>', pending[0].created_at)
+      .whereNotIn('status', ['failed', 'queued'])
+      .orderBy('created_at', 'asc')
+      .limit(10)
+      .select('body')
+    const allAnswered = await answeredByStore(
+      jid,
+      pending.map((row) => String(row.body || '').trim()).filter(Boolean),
+      storeReplies.map((row) => String(row.body || '').trim()).filter(Boolean)
+    ).catch(() => undefined)
+    if (allAnswered === true) return
     const goalRun = await beginGoalTurn(jid, String(anchor.message_id))
     if (!goalRun) return
     const text = pending
@@ -3011,168 +2344,6 @@ export default class WhatsappListen extends BaseCommand {
         'Jawab HANYA poin yang belum dijawab CS (mis. form order yang belum ditanggapi, pertanyaan yang terlewat). ' +
         'Jangan mengulang, membantah, atau menyalin jawaban CS. Kalau semuanya sudah dijawab CS, kosongkan pesan.',
     })
-  }
-
-  private async answerBacklog(jid: string, settings: Awaited<ReturnType<typeof readSettings>>) {
-    const contact = await db.from('whatsapp_contacts').where('jid', jid).first()
-    if (contact?.ai_excluded) return
-    const lastOut = await db
-      .from('whatsapp_messages')
-      .where('jid', jid)
-      .where('direction', 'out')
-      .whereNotIn('status', ['failed', 'queued'])
-      .orderBy('created_at', 'desc')
-      .orderBy('id', 'desc')
-      .first()
-    const unanswered = await db
-      .from('whatsapp_messages')
-      .where('jid', jid)
-      .where('direction', 'in')
-      .where((query) => {
-        if (lastOut)
-          query
-            .where('created_at', '>', lastOut.created_at)
-            .orWhere((sameTime) =>
-              sameTime.where('created_at', lastOut.created_at).where('id', '>', lastOut.id)
-            )
-      })
-      .orderBy('created_at', 'asc')
-      .orderBy('id', 'asc')
-    if (!unanswered.length) return
-    // A deliberate non-answer about internals must not be retried every sweep.
-    if (
-      unanswered.every((row) => !row.media_type) &&
-      isInternalOnlyQuestion(unanswered.map((row) => String(row.body || '')).join('\n'))
-    )
-      return
-
-    const previous = this.chatLocks.get(jid) || Promise.resolve()
-    const task = previous
-      .catch(() => {})
-      .then(async () => {
-        if (!this.socket) return
-        const socket = this.socket
-        if (!(await this.canSendAiReply(jid, socket))) return
-        const goalRun = await beginGoalTurn(jid, String(unanswered.at(-1).message_id))
-        if (!goalRun) return
-        let trace: Awaited<ReturnType<typeof startTrace>> | undefined
-        try {
-          const ids = unanswered.map((row) => String(row.message_id))
-          trace = await startTrace(jid, {
-            text: unanswered
-              .map((row) => String(row.body || ''))
-              .filter(Boolean)
-              .join('\n'),
-            provider: settings.aiProvider,
-            model: settings.aiProvider === 'claude' ? settings.claudeModel : settings.chatgptModel,
-            skills: settings.skills.map((skill) => skill.name),
-            trigger: 'backlog',
-            diagnosticsVersion: 2,
-            messages: unanswered.map((row) => ({
-              id: String(row.message_id),
-              mediaType: row.media_type || null,
-            })),
-          }).catch(() => undefined)
-          const context = await this.customerTurnContext(jid, ids, settings.historyLimit)
-          trace?.emit({
-            key: 'input',
-            label: 'Input dan konteks siap',
-            status: 'completed',
-            detail: { efficiency: context.efficiency, promptCharacters: context.prompt.length },
-          })
-          const text = unanswered
-            .map((row) => String(row.body || ''))
-            .filter(Boolean)
-            .join('\n')
-          const images: AiContextImage[] = []
-          for (const row of [...unanswered].reverse()) {
-            const path = await this.imagePathOfMessage(String(row.message_id))
-            if (path)
-              images.push({
-                path,
-                messageId: String(row.message_id),
-                label: images.length
-                  ? 'gambar sebelumnya dari pesan tertunda'
-                  : 'gambar terbaru dari pesan tertunda; referensi utama',
-              })
-            else if (
-              !images.length &&
-              ['image', 'video', 'gif', 'sticker'].includes(row.media_type)
-            )
-              throw new Error(
-                'Gambar terbaru belum tersedia; gambar lama tidak boleh menggantikannya.'
-              )
-            if (images.length === 4) break
-          }
-          if (!text && !images.length) {
-            const failure = aiFailureDetail(new Error('Media belum tersedia.'), {
-              stage: 'processing',
-            })
-            const retry = await recordAnalysisFailure(goalRun, failure)
-            if (retry)
-              trace?.emit({
-                key: 'analysis-retry',
-                label: 'Pemulihan analisis dijadwalkan',
-                status: 'completed',
-                detail: retry,
-              })
-            await trace?.finish('failed', { error: failure.message, failure })
-            return
-          }
-          const decision = await createReply(
-            { ...settings, conversationAccess: context.access, routingContext: context.routing },
-            text || '[Pelanggan mengirim media tanpa teks]',
-            (activity) => {
-              void this.setActivity(jid, activity).catch(() => {})
-            },
-            undefined,
-            context.prompt,
-            images.slice(0, 4),
-            trace?.emit,
-            text || '[Pelanggan mengirim media tanpa teks]',
-            true,
-            context.sections
-          )
-          decision.cartVersion = context.cartVersion
-          await this.deliverAiDecision(
-            goalRun,
-            socket,
-            settings,
-            decision,
-            ids.map((id) => ({ id, remoteJid: jid, fromMe: false })),
-            false,
-            trace
-          )
-          this.logger.info(
-            `Sapuan: pemeriksaan ${ids.length} pesan di ${jid} berakhir (anchor=${goalRun.anchor_id})`
-          )
-        } catch (error) {
-          const failure = aiFailureDetail(error, {
-            stage: 'processing',
-            provider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
-          })
-          const retry = await recordAnalysisFailure(goalRun, failure)
-          if (retry)
-            trace?.emit({
-              key: 'analysis-retry',
-              label: retry.nextAttemptAt
-                ? 'Analisis akan dicoba ulang otomatis'
-                : 'Analisis memerlukan pemeriksaan',
-              status: 'completed',
-              detail: retry,
-            })
-          await trace?.finish('failed', { error: failure.message, failure })
-          this.logger.error(JSON.stringify({ traceId: trace?.id, ...failure }))
-          throw new AiProcessFailure(failure)
-        }
-      })
-    this.chatLocks.set(jid, task)
-    try {
-      await task
-    } finally {
-      if (this.chatLocks.get(jid) === task) this.chatLocks.delete(jid)
-      await this.setActivity(jid, null).catch(() => {})
-    }
   }
 
   /**
@@ -3267,14 +2438,6 @@ export default class WhatsappListen extends BaseCommand {
     this.reviewing = true
     try {
       const settings = await readSettings(true)
-      if (settings.leanMode) {
-        // Beta 2: pemeriksaan ulang ala Beta 1 (analisis penuh + MCP) tidak dipakai.
-        await db
-          .from('whatsapp_ai_reviews')
-          .where('status', 'pending')
-          .update({ status: 'skipped' })
-        return
-      }
       const working = isAiWorking(settings) && settings.hasSkill
       const scope = workspaceScope().prefix
       if (
@@ -3315,9 +2478,7 @@ export default class WhatsappListen extends BaseCommand {
         if (!Number(claimed)) continue
         // Beta 3: pesan yang telat tersinkron / masuk saat offline / di luar jam kerja
         // dijawab lewat jalur Beta 3 (bukan analisis penuh Beta 1).
-        const task = settings.beta3Mode
-          ? this.answerBacklogBeta3(request.jid, settings)
-          : this.reviewChat(request, settings)
+        const task = this.answerBacklogBeta3(request.jid, settings)
         this.chatLocks.set(request.jid, task)
         try {
           await task
@@ -3333,884 +2494,6 @@ export default class WhatsappListen extends BaseCommand {
       }
     } finally {
       this.reviewing = false
-    }
-  }
-
-  private async consumeAnalysisRetries() {
-    if (this.retryingAnalysis || this.stopping || !this.socket || !this.readyForAi()) return
-    this.retryingAnalysis = true
-    try {
-      const settings = await readSettings(true)
-      if (!isAiWorking(settings) || !settings.hasSkill || settings.leanMode || settings.beta3Mode)
-        return
-      await flushAnalysisFailures()
-      if (!this.lastAnalysisRecoveryAt || Date.now() - this.lastAnalysisRecoveryAt >= 60_000) {
-        await recoverInterruptedAnalyses()
-        await recoverLegacyPausedAnalyses()
-        await recoverCatalogConsentHandoffs()
-        this.lastAnalysisRecoveryAt = Date.now()
-      }
-      const rows = await dueAnalysisRetries()
-      for (const row of rows) {
-        if (this.pendingTurns.has(row.jid) || this.chatLocks.has(row.jid)) continue
-        const plan = await planProviderRun(settings)
-        if (!plan.order.length) {
-          const until = Math.min(...plan.limits.map((limit) => limit.until))
-          await db
-            .from('whatsapp_chat_goals')
-            .where({ jid: row.jid, version: row.version, status: 'paused' })
-            .update({
-              next_run_at: new Date(
-                Number.isFinite(until) ? Math.max(Date.now() + 30_000, until) : Date.now() + 60_000
-              ),
-            })
-          continue
-        }
-        const task = this.reviewChat(
-          { jid: row.jid, reason: 'analysis_retry', retryVersion: row.version },
-          settings
-        )
-        this.chatLocks.set(row.jid, task)
-        try {
-          await task
-        } catch (error) {
-          this.logger.error(
-            `Pemulihan analisis: ${error instanceof Error ? error.message : String(error)}`
-          )
-        } finally {
-          if (this.chatLocks.get(row.jid) === task) this.chatLocks.delete(row.jid)
-          await this.setActivity(row.jid, null).catch(() => {})
-        }
-        break
-      }
-    } finally {
-      this.retryingAnalysis = false
-    }
-  }
-
-  private async createReviewDecision(...args: Parameters<typeof createReply>) {
-    return createReply(...args)
-  }
-
-  private async repairCartDesignNotes(...args: Parameters<typeof repairCatalogNotesWithAi>) {
-    return repairCatalogNotesWithAi(...args)
-  }
-
-  private async reviewChat(
-    request: { jid: string; reason: string; retryVersion?: string },
-    settings: Awaited<ReturnType<typeof readSettings>>
-  ) {
-    const socket = this.socket
-    const jid = request.jid
-    if (!socket || !(await this.canSendAiReply(jid, socket))) return
-    const anchor = await db
-      .from('whatsapp_messages')
-      .where('jid', jid)
-      .where((query) => query.where('direction', 'in').orWhereNot('sender_type', 'ai'))
-      .whereNotIn('status', ['failed', 'queued'])
-      .orderBy('created_at', 'desc')
-      .orderBy('id', 'desc')
-      .first()
-    if (!anchor) return
-    const understandingOnly =
-      request.reason !== 'human_decision' &&
-      anchor.direction === 'out' &&
-      ['cs', 'owner'].includes(anchor.sender_type)
-    const run = await beginGoalTurn(jid, anchor.message_id, {
-      humanDecision: request.reason === 'human_decision',
-      retryFailed: request.reason === 'enabled',
-      autoRetryVersion: request.reason === 'analysis_retry' ? request.retryVersion : undefined,
-    })
-    if (!run) return
-    const trigger = `${understandingOnly ? 'MODE MEMAHAMI JAWABAN CS: pahami dan perbarui catatan/cart/goal saja. Jangan mengirim balasan, inisiatif, atau handoff ulang. Pilih silent dan status menunggu yang tepat atau completed.\n' : ''}Pemeriksaan ulang percakapan (${request.reason}). Ini pemicu internal, BUKAN pesan pelanggan baru.
-Baca seluruh konteks termasuk jawaban CS/AI terakhir. Periksa kebutuhan yang belum ditangani dan langkah berikutnya menurut skill.
-Jangan mengulang jawaban yang sudah dikirim atau membalas pesan CS seolah itu pertanyaan pelanggan.
-Jika semua sudah dijawab atau sedang menunggu pelanggan, pilih silent; jangan mempercepat susulan terjadwal.
-Jangan menganggap sedang menunggu data pelanggan bila pertanyaan data itu belum pernah dikirim. Catatan internal "belum menyatakan ingin checkout" bukan alasan diam ketika pilihan sudah disepakati dan pertanyaan tujuan ongkir belum pernah dikirim, kecuali pelanggan menunda/menolak. Meminta data berikutnya tidak mengizinkan checkout atau pembayaran.
-Jika ada kebutuhan yang benar-benar terlewat, atau inisiatif langsung yang sudah memenuhi syarat skill, tangani dengan data bisnis terverifikasi.
-Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
-    let trace: Awaited<ReturnType<typeof startTrace>> | undefined
-    try {
-      trace = await startTrace(jid, {
-        text: trigger,
-        provider: settings.aiProvider,
-        model: settings.aiProvider === 'claude' ? settings.claudeModel : settings.chatgptModel,
-        skills: settings.skills.map((skill) => skill.name),
-      })
-      const context = await this.customerTurnContext(jid, [], settings.historyLimit)
-      const imagePath = await this.imagePathOfMessage(anchor.message_id)
-      const latestMessage = await db
-        .from('whatsapp_messages')
-        .where('jid', jid)
-        .whereNotIn('status', ['queued', 'failed'])
-        .orderBy('created_at', 'desc')
-        .orderBy('id', 'desc')
-        .first()
-      let decision: AiDecision = await this.createReviewDecision(
-        { ...settings, conversationAccess: context.access, routingContext: context.routing },
-        trigger,
-        (activity) => {
-          void this.setActivity(jid, activity).catch(() => {})
-        },
-        undefined,
-        context.prompt,
-        imagePath
-          ? [
-              {
-                path: imagePath,
-                messageId: anchor.message_id,
-                label: 'media dalam konteks percakapan',
-              },
-            ]
-          : [],
-        trace.emit,
-        latestMessage?.direction === 'in' ? String(latestMessage.body || '') : '',
-        true,
-        context.sections
-      )
-      if (understandingOnly) decision = understandHumanAnswer(decision)
-      decision.cartVersion = context.cartVersion
-      await this.deliverAiDecision(
-        run,
-        socket,
-        settings,
-        decision,
-        anchor.direction === 'in' ? [{ id: anchor.message_id, remoteJid: jid, fromMe: false }] : [],
-        false,
-        trace,
-        undefined,
-        understandingOnly
-      )
-    } catch (error) {
-      const failure = aiFailureDetail(error, {
-        stage: 'processing',
-        provider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
-      })
-      const retry = await recordAnalysisFailure(run, failure)
-      if (retry)
-        trace?.emit({
-          key: 'analysis-retry',
-          label: retry.nextAttemptAt
-            ? 'Analisis akan dicoba ulang otomatis'
-            : 'Analisis memerlukan pemeriksaan',
-          status: 'completed',
-          detail: retry,
-        })
-      await trace?.finish('failed', { error: failure.message, failure })
-      this.logger.error(JSON.stringify({ traceId: trace?.id, ...failure }))
-      throw new AiProcessFailure(failure)
-    }
-  }
-
-  private async deliverAiDecision(
-    run: GoalRun,
-    socket: WASocket,
-    settings: Awaited<ReturnType<typeof readSettings>>,
-    decision: AiDecision,
-    keys: WAMessageKey[],
-    scheduled = false,
-    trace?: Awaited<ReturnType<typeof startTrace>>,
-    quoted?: WAMessage,
-    understandingOnly = false
-  ) {
-    const jid = run.jid
-    let guideMediaPrepared = false
-    const canSend = async () => {
-      if (!(await isCurrentGoalRun(run)) || !(await this.waitForDeliverySync(socket))) return false
-      if (!(await this.canSendAiReply(jid, socket)) || !(await isCurrentGoalRun(run))) return false
-      if (decision.cartVersion) {
-        const cart = await readCart(jid)
-        if (cart.version !== decision.cartVersion) return false
-      }
-      const latestSettings = await readSettings()
-      try {
-        if (guideMediaPrepared) selectedBusinessGuides(decision, latestSettings.mcpConnections)
-      } catch {
-        return false // A revoked/changed MCP source cannot send a previously prepared guide.
-      }
-      if (
-        paymentDataSignature(latestSettings.paymentMethods) !==
-        paymentDataSignature(settings.paymentMethods)
-      )
-        return false
-      if (!scheduled) return true
-      const current = await readSettings(true)
-      return current.sweepEnabled && (await scheduledGoalStillAllowed(run, current.skills))
-    }
-    if (!(await canSend())) {
-      await pauseGoalRun(run, 'Konteks, koneksi, atau status AI berubah.')
-      await trace?.finish('cancelled', {
-        reason: 'Konteks atau status berubah; keluaran lama dibatalkan.',
-      })
-      return
-    }
-    if (decision.indexReply) {
-      const { indexReplyEligible } = await import('#services/index_reply')
-      const { levelDigest, levelPolicyHash } = await import('#services/conversation_levels')
-      const fresh = await this.customerTurnContext(
-        jid,
-        keys.map((key) => String(key.id || '')),
-        settings.historyLimit
-      )
-      const currentSettings = await readSettings(true)
-      if (
-        !indexReplyEligible(fresh.routing, fresh.routing.activeState?.currentText || '') ||
-        levelDigest(fresh.routing.activeState) !== decision.indexReply.stateDigest ||
-        levelPolicyHash(currentSettings.skills) !== decision.indexReply.policyHash
-      ) {
-        throw new AiProcessFailure({
-          stage: 'processing',
-          code: 'AI_PROCESS_INTERRUPTED',
-          message: 'State berubah sebelum balasan index dikirim.',
-          action: 'Analisis ulang memakai state terbaru.',
-          retryable: true,
-        })
-      }
-    }
-    if (decision.localResolution === 'closed_ack') {
-      const { localAckGoal, levelPolicyHash } = await import('#services/conversation_levels')
-      const fresh = await this.customerTurnContext(
-        jid,
-        keys.map((key) => String(key.id || '')),
-        settings.historyLimit
-      )
-      const currentSettings = await readSettings(true)
-      if (
-        !localAckGoal(
-          fresh.routing.activeState,
-          fresh.routing.activeState?.currentText || '',
-          levelPolicyHash(currentSettings.skills),
-          false
-        )
-      ) {
-        throw new AiProcessFailure({
-          stage: 'processing',
-          code: 'AI_PROCESS_INTERRUPTED',
-          message: 'State berubah sebelum penyelesaian lokal.',
-          action: 'Analisis ulang memakai state terbaru.',
-          retryable: true,
-        })
-      }
-    }
-    let cartSelectionDeferred = false
-    const missingSelection = incompleteCartSelection(decision.cartIntent)
-    if (missingSelection.length && !scheduled && decision.cartVersion) {
-      cartSelectionDeferred = true
-      trace?.emit({
-        key: 'cart-selection',
-        label: 'Melanjutkan percakapan · pilihan belum lengkap',
-        status: 'running',
-        detail: { missingSelection, cartChanged: false },
-      })
-      if (understandingOnly) {
-        decision = {
-          ...decision,
-          decision: 'silent',
-          message: '',
-          initiative: '',
-          images: [],
-          businessMedia: [],
-          cartIntent: null,
-          checkoutContinuity: null,
-          customSizeQuestion: null,
-          approvalWait: null,
-          handoff_category: 'none',
-        }
-      } else {
-        try {
-          const context = await this.customerTurnContext(
-            jid,
-            keys.map((key) => String(key.id || '')),
-            settings.historyLimit
-          )
-          const repaired = await this.createReviewDecision(
-            { ...settings, conversationAccess: context.access, routingContext: context.routing },
-            cartSelectionRecoveryPrompt(decision.cartIntent!),
-            (activity) => {
-              void this.setActivity(jid, activity).catch(() => {})
-            },
-            undefined,
-            context.prompt,
-            [],
-            trace?.emit,
-            ''
-          )
-          decision = conversationOnlyCartRecovery(decision, repaired)
-        } catch (error) {
-          trace?.emit({
-            key: 'cart-selection',
-            label: 'Kelanjutan percakapan belum valid',
-            status: 'failed',
-            detail: aiFailureDetail(error, { stage: 'processing' }),
-          })
-          throw error
-        }
-      }
-      if (!(await canSend())) {
-        await pauseGoalRun(run, 'Konteks berubah saat melengkapi pilihan.')
-        await trace?.finish('cancelled', { reason: 'Konteks berubah; kelanjutan lama dibatalkan.' })
-        return
-      }
-      trace?.emit({
-        key: 'cart-selection',
-        label: 'Percakapan dilanjutkan · cart tetap',
-        status: 'completed',
-        detail: { missingSelection, cartChanged: false, extraAiCalls: understandingOnly ? 0 : 1 },
-      })
-    }
-    if (!(await markGoalDelivery(run))) return
-    if (decision.localResolution === 'closed_ack') {
-      // This path may only consume the incoming anchor. Never run checkout, cart,
-      // media, memory, handoff or notification effects for a zero-model acknowledgment.
-      const goal = await saveGoalDecision(run, decision, settings.skills, false)
-      await trace?.finish(goal ? 'completed' : 'cancelled', {
-        decision: 'silent',
-        localResolution: 'closed_ack',
-        tokens: 0,
-        goal,
-      })
-      return
-    }
-    let firstMessageId: string | undefined
-    if (!scheduled && decision.customerMemory?.length) {
-      const started = performance.now()
-      try {
-        const saved = await saveCustomerMemory(jid, Number(run.anchor_id), decision.customerMemory)
-        trace?.emit({
-          key: 'customer-memory',
-          label: 'Memori pelanggan diperbarui',
-          status: 'completed',
-          detail: {
-            factsSaved: saved,
-            elapsedMs: Math.round(performance.now() - started),
-            source: 'original_messages',
-            transactionalAuthority: false,
-          },
-        })
-      } catch {
-        trace?.emit({
-          key: 'customer-memory',
-          label: 'Memori pelanggan belum diperbarui',
-          status: 'completed',
-          detail: { fallback: 'original_history', replyBlocked: false },
-        })
-      }
-    }
-    if (decision.checkoutContinuity && decision.cartVersion && !scheduled && !understandingOnly) {
-      const cart = await readCart(jid)
-      if (cart.version === decision.cartVersion) {
-        const reviewed = await recordCheckoutContinuity(cart, decision.checkoutContinuity)
-        trace?.emit({
-          key: 'checkout-context',
-          label: 'Konteks persetujuan diperiksa',
-          status: 'completed',
-          detail: { reviewedMessages: reviewed, grantsNewConsent: false },
-        })
-      }
-    }
-    let settledCart: Awaited<ReturnType<typeof tryConfirmedBalanceCheckout>> = null
-    let cartVerified = !cartSelectionDeferred
-    if (decision.cartIntent) {
-      if (scheduled || !decision.cartVersion)
-        throw new Error('Perubahan cart memerlukan konteks pelanggan terbaru.')
-      trace?.emit({ key: 'cart', label: 'Memperbarui cart', status: 'running' })
-      try {
-        let cart: Awaited<ReturnType<typeof applyAiCartIntent>>
-        try {
-          cart = await applyAiCartIntent(
-            jid,
-            decision.cartVersion,
-            decision.cartIntent,
-            decision.cartEvidence || { products: [], shipping: [] }
-          )
-        } catch (error) {
-          const input = catalogNotesRepairInput(decision.cartIntent)
-          if (
-            !(error instanceof CartVerificationError) ||
-            error.message !== CATALOG_NOTES_MISMATCH ||
-            understandingOnly ||
-            !input.length ||
-            input.length > 20
-          )
-            throw error
-          trace?.emit({
-            key: 'cart-notes-recheck',
-            label: 'Memperbaiki penulisan detail desain',
-            status: 'running',
-          })
-          let repaired: ReturnType<typeof applyCatalogNotesRepair> = null
-          try {
-            repaired = applyCatalogNotesRepair(
-              decision.cartIntent,
-              await this.repairCartDesignNotes(settings, input, trace?.emit)
-            )
-          } catch {
-            /* Failed repair does not authorize an unverified cart. */
-          }
-          if (!(await isCurrentGoalRun(run))) {
-            await trace?.finish('cancelled', {
-              reason: 'Pesan baru mengubah konteks saat pemeriksaan desain.',
-            })
-            return
-          }
-          trace?.emit({
-            key: 'cart-notes-recheck',
-            label: repaired
-              ? 'Penulisan detail diperbaiki · verifikasi ulang'
-              : 'Detail desain masih perlu diperiksa',
-            status: repaired ? 'completed' : 'failed',
-            detail: {
-              attempts: 1,
-              code: repaired ? 'CATALOG_NOTES_REPAIRED' : 'CATALOG_NOTES_REPAIR_UNRESOLVED',
-            },
-          })
-          if (!repaired) throw error
-          cart = await applyAiCartIntent(
-            jid,
-            decision.cartVersion,
-            repaired,
-            decision.cartEvidence || { products: [], shipping: [] }
-          )
-          decision.cartIntent = repaired
-        }
-        // One bounded evidence repair, not recursive retries or a human-approval request.
-        if (
-          cart.catalogIssues?.length &&
-          cart.issues?.length === cart.catalogIssues.length &&
-          !understandingOnly
-        ) {
-          const originalIntent = decision.cartIntent
-          trace?.emit({
-            key: 'catalog-recheck',
-            label: 'Memeriksa ulang data katalog · MCP',
-            status: 'running',
-          })
-          try {
-            const context = await this.customerTurnContext(jid, [], settings.historyLimit)
-            const repair = await this.createReviewDecision(
-              { ...settings, conversationAccess: context.access, routingContext: context.routing },
-              `PEMERIKSAAN KATALOG ULANG (maksimal satu kali pada giliran ini). Pilihan pelanggan sudah disimpan sebagai draft, BUKAN order atau harga terverifikasi.\nMasalah: ${JSON.stringify(cart.catalogIssues)}\nPeriksa ulang tool MCP untuk ukuran, harga dan stok produk yang sama. Jangan mengubah identitas produk/ukuran/jumlah/model agar lolos validasi. Pre-order mengikuti pengaturan lokal, bukan stok ready atau label MCP; jangan menjanjikan ketersediaan atau mengarang harga. Kekurangan bukti MCP bukan alasan meminta persetujuan CS.\nJika bukti tersedia, sync pilihan yang sama dengan data terverifikasi. Jika belum, jangan meminta pembayaran/konfirmasi rekap atau meneruskan ke CS. Lanjutkan satu pertanyaan pilihan yang masih diperlukan sesuai skill dan konteks (contoh pilihan jas saja atau bersama celana, hanya bila belum dijawab). Jangan ulangi konfirmasi size/fit yang sudah disetujui. Tulis pertanyaan saja tanpa klaim harga, stok, estimasi atau kemampuan custom. Jika tidak ada pertanyaan relevan, silent dan jelaskan kebutuhan verifikasi internal di goal.`,
-              (activity) => {
-                void this.setActivity(jid, activity).catch(() => {})
-              },
-              undefined,
-              context.prompt,
-              [],
-              trace?.emit,
-              ''
-            )
-            if (!(await isCurrentGoalRun(run))) {
-              await trace?.finish('cancelled', {
-                reason: 'Pesan baru mengubah konteks saat verifikasi katalog.',
-              })
-              return
-            }
-            const proposed = repair.cartIntent
-            const sameSelection =
-              proposed?.action === 'sync' &&
-              proposed.items.length === originalIntent.items.length &&
-              originalIntent.items.every((item) =>
-                proposed.items.some(
-                  (next) =>
-                    next.productId === item.productId &&
-                    next.name === item.name &&
-                    next.size === item.size &&
-                    next.quantity === item.quantity &&
-                    (next.modelType || 'catalog') === (item.modelType || 'catalog')
-                )
-              )
-            if (sameSelection) {
-              cart = await applyAiCartIntent(
-                jid,
-                cart.version,
-                {
-                  ...originalIntent,
-                  items: originalIntent.items.map((item, index) => ({
-                    ...item,
-                    id: cart.items[index].id,
-                    unitPrice: proposed!.items.find(
-                      (next) => next.productId === item.productId && next.size === item.size
-                    )!.unitPrice,
-                  })),
-                },
-                repair.cartEvidence || { products: [], shipping: [] }
-              )
-            }
-            decision = { ...repair, cartVersion: cart.version, cartIntent: null }
-            trace?.emit({
-              key: 'catalog-recheck',
-              label: cart.catalogIssues?.length
-                ? 'Draft tersimpan · verifikasi katalog tertunda'
-                : 'Data katalog terverifikasi',
-              status: 'completed',
-              detail: {
-                attempts: 1,
-                issues: cart.catalogIssues || [],
-                humanApprovalRequired: false,
-              },
-            })
-          } catch {
-            // Keep the original skill-written safe question if the lookup/provider is unavailable.
-            // The draft remains non-payable; never mask this as a successful verification.
-            trace?.emit({
-              key: 'catalog-recheck',
-              label: 'Pemeriksaan ulang belum tersedia · draft disimpan',
-              status: 'completed',
-              detail: { attempts: 1, issues: cart.catalogIssues, verified: false },
-            })
-          }
-        }
-        decision.cartVersion = cart.version
-        if (cart.settledOrder) settledCart = { ...cart, settledOrder: cart.settledOrder }
-        cartVerified = !cart.issues?.length
-        if (cart.issues?.length) decision = resolveCartIssues(decision, cart, understandingOnly)
-        trace?.emit({
-          key: 'cart',
-          label: cart.settledOrder
-            ? 'Pesanan lunas dari saldo'
-            : cart.catalogIssues?.length
-              ? 'Draft tersimpan · menunggu verifikasi katalog'
-              : cart.items.some((item) => item.unitPrice === null)
-                ? 'Cart tersimpan · menunggu harga'
-                : cart.items.some(
-                      (item) => item.size === 'custom' && !Object.keys(item.measurements).length
-                    )
-                  ? 'Cart tersimpan · menunggu ukuran'
-                  : 'Cart diperbarui',
-          status: 'completed',
-          detail: {
-            itemsSaved: cart.items.length,
-            issues: cart.issues || [],
-            catalogIssues: cart.catalogIssues || [],
-            ...(cart.settledOrder
-              ? {
-                  orderNumber: cart.settledOrder.number,
-                  balanceApplied: cart.settledOrder.balanceApplied,
-                }
-              : {}),
-          },
-        })
-      } catch (error) {
-        if (error instanceof CheckoutConsentError) {
-          decision = holdCheckoutForReview(decision, error)
-          cartVerified = false
-          trace?.emit({
-            key: 'cart',
-            label: 'Checkout menunggu pemeriksaan',
-            status: 'completed',
-            detail: error.detail,
-          })
-        } else {
-          if (!(error instanceof CartVerificationError)) {
-            trace?.emit({
-              key: 'cart',
-              label: 'Cart perlu diperiksa',
-              status: 'failed',
-              detail: { error: (error as Error).message },
-            })
-            throw error
-          }
-          // Continue through current-context checks and the normal goal/handoff path.
-          // Understanding a CS reply must never bounce the room straight back to CS.
-          decision =
-            error instanceof CatalogLookupError
-              ? holdCatalogDraft(decision, [error.issue], understandingOnly)
-              : holdUnverifiedCartReply(decision, error.message, understandingOnly)
-          if (error instanceof CartReferenceError && decision.goal) {
-            decision.goal.waiting_for = 'Pemeriksaan referensi foto model custom oleh CS'
-            decision.goal.next_action =
-              'Cocokkan message_id foto pelanggan di room ini dan pastikan apakah pilihannya model custom atau hanya ukuran custom pada produk katalog. Jangan meminta foto ulang sebelum memeriksa riwayat.'
-          }
-          cartVerified = false
-          trace?.emit({
-            key: 'cart',
-            label: 'Cart menunggu verifikasi',
-            status: 'completed',
-            detail: {
-              reason: error.message,
-              decision: decision.decision,
-              ...(error instanceof CartReferenceError
-                ? { code: error.code, referenceIssue: error.referenceIssue }
-                : {}),
-            },
-          })
-        }
-      }
-    }
-    if (
-      !decision.indexReply &&
-      !settledCart &&
-      cartVerified &&
-      !scheduled &&
-      !understandingOnly &&
-      decision.cartVersion
-    ) {
-      try {
-        settledCart = await tryConfirmedBalanceCheckout(jid, decision.cartVersion)
-      } catch (error) {
-        if (!(error instanceof CheckoutConsentError)) throw error
-        decision = holdCheckoutForReview(decision, error)
-        trace?.emit({
-          key: 'balance-checkout',
-          label: 'Checkout menunggu pemeriksaan',
-          status: 'completed',
-          detail: error.detail,
-        })
-      }
-    }
-    if (settledCart) {
-      const order = settledCart.settledOrder
-      const rupiah = (amount: number) => `Rp${amount.toLocaleString('id-ID')}`
-      // A pre-checkout reply/handoff may now be stale. Only report the committed receipt.
-      decision = {
-        ...decision,
-        decision: 'reply',
-        handoff_category: 'none',
-        approvalWait: null,
-        reason: '',
-        cartIntent: null,
-        images: [],
-        initiative: '',
-        message: `Terima kasih, bos. Pesanannya sudah lunas menggunakan kelebihan pembayaran sebelumnya.\n\nNomor pesanan: ${order.number}\nTotal: ${rupiah(order.total)}\nSisa kelebihan pembayaran: ${rupiah(settledCart.paymentQuote.availableBalance)}`,
-        goal: {
-          objective: `Memproses pesanan ${order.number}`,
-          status: 'waiting',
-          waiting_for: 'Perkembangan pengerjaan atau pengiriman pesanan',
-          next_action:
-            'Pantau status order; jangan meminta pembayaran atau persetujuan yang sudah sah lagi.',
-          follow_up: null,
-        },
-      }
-    }
-    if (settledCart) {
-      decision.cartVersion = settledCart.version
-      trace?.emit({
-        key: 'balance-checkout',
-        label: 'Pesanan lunas dari saldo',
-        status: 'completed',
-        detail: {
-          orderNumber: settledCart.settledOrder.number,
-          balanceApplied: settledCart.settledOrder.balanceApplied,
-        },
-      })
-    }
-    if (decision.decision === 'reply') {
-      let prepared: Awaited<ReturnType<typeof prepareOutgoingImages>>
-      try {
-        const guides = await prepareBusinessGuideMedia(jid, decision, settings.mcpConnections)
-        prepared = await prepareOutgoingImages(
-          jid,
-          guides.decision,
-          settings.mcpConnections,
-          scheduled
-        )
-        prepared.images.push(...guides.media)
-        guideMediaPrepared = true
-        if (prepared.images.length)
-          trace?.emit({
-            key: 'outgoing-media',
-            label: 'Media balasan siap',
-            status: 'completed',
-            detail: { count: prepared.images.length },
-          })
-      } catch (error) {
-        trace?.emit({
-          key: 'outgoing-media',
-          label: 'Menyiapkan media balasan',
-          status: 'failed',
-          detail: {
-            error: error instanceof Error ? error.message : 'Media belum dapat disiapkan.',
-          },
-        })
-        throw error
-      }
-      decision = prepared.decision
-      let imageNumber = 0
-      const complete = await sendAiMessageSequence(
-        decision,
-        scheduled,
-        canSend,
-        async (body, kind, image) => {
-          const traceKey = image
-            ? `send-image-${++imageNumber}`
-            : kind === 'answer'
-              ? 'send'
-              : 'initiative'
-          return trackOutgoingMessage(jid, async (outgoingId) => {
-            const sent = await sendPreparedReply(
-              socket,
-              jid,
-              firstMessageId ? [] : keys,
-              () =>
-                socket.sendMessage(jid, outgoingMessagePayload(body, image), {
-                  messageId: outgoingId,
-                  ...(kind === 'answer' && quoted ? { quoted } : {}),
-                }),
-              {
-                canSend,
-                read: () =>
-                  firstMessageId
-                    ? Promise.resolve()
-                    : readIncomingThrough(socket, jid, Number(run.anchor_id), canSend),
-                onTyping: async () => {
-                  await this.setActivity(jid, 'typing')
-                  trace?.emit({
-                    key: traceKey,
-                    label: image
-                      ? 'Mengirim media · Typing'
-                      : kind === 'answer'
-                        ? 'Menyiapkan balasan · Typing'
-                        : 'Menyiapkan inisiatif · Typing',
-                    status: 'running',
-                  })
-                },
-                onDone: () => this.setActivity(jid, null),
-              }
-            )
-            if (sent === null) return false
-            if (!sent?.key.id) throw new Error('Pengiriman belum dikonfirmasi.')
-            const messageId = sent?.key.id || `ai-${randomUUID()}`
-            await saveSentAiMessage({
-              message_id: messageId,
-              jid,
-              contact_name: quoted?.pushName || null,
-              direction: 'out',
-              sender_type: 'ai',
-              body,
-              media_type: image ? image.mediaType || 'image' : null,
-              media_url: image?.mediaUrl || null,
-              thumbnail_url:
-                image && (!image.mediaType || image.mediaType === 'image') ? image.mediaUrl : null,
-              media_mime: image ? image.mime || 'image/jpeg' : null,
-              media_name: image?.fileName || null,
-              media_size: image?.bytes.length || null,
-              media_status: image ? 'ready' : null,
-              reply_to_message_id: kind === 'answer' ? quoted?.key.id || null : null,
-              status: 'sent',
-              created_at: new Date(),
-            })
-            if (decision.cartVersion && !image)
-              await recordBalanceRecap(jid, decision.cartVersion, messageId, body)
-            if (!firstMessageId) {
-              // A delivered AI answer has handled this snapshot, not messages that arrived
-              // while it was thinking/sending. Never use the new outgoing row as the watermark.
-              await markRoomRead(jid, run.anchor_id).catch(() => {
-                // The reply is already sent: an unread-badge failure must not resend it.
-                this.logger.error('Status baca workspace belum diperbarui.')
-              })
-            }
-            firstMessageId ||= messageId
-            trace?.emit({
-              key: traceKey,
-              label: image
-                ? 'Media terkirim'
-                : kind === 'answer'
-                  ? 'Balasan terkirim'
-                  : 'Inisiatif terkirim terpisah',
-              status: 'completed',
-            })
-            return true
-          })
-        },
-        prepared.images
-      )
-      if (!complete) {
-        await pauseGoalRun(run, 'Pesan berikutnya dibatalkan karena konteks atau status berubah.')
-        await trace?.finish(
-          'cancelled',
-          { reason: 'Pesan berikutnya dibatalkan karena konteks atau status berubah.' },
-          firstMessageId
-        )
-        return
-      }
-    }
-    if (!(await canSend())) {
-      await pauseGoalRun(run, 'Konteks berubah setelah pengiriman; jadwal lama tidak diteruskan.')
-      await trace?.finish(
-        'cancelled',
-        { reason: 'Konteks berubah; jadwal lama dibatalkan.' },
-        firstMessageId
-      )
-      return
-    }
-    const goal = await saveGoalDecision(run, decision, settings.skills, scheduled)
-    if (!goal) {
-      await trace?.finish(
-        'cancelled',
-        { reason: 'Tujuan berubah; keputusan lama tidak diterapkan.' },
-        firstMessageId
-      )
-      return
-    }
-    if (!(await handleInternalDecision(jid, decision)) && decision.note)
-      await saveChatNote(jid, decision.note)
-    trace?.emit({
-      key: 'goal',
-      label: goal?.next_run_at
-        ? 'Tujuan disimpan · susulan dijadwalkan'
-        : 'Tujuan percakapan disimpan',
-      status: 'completed',
-      detail: goal,
-    })
-    await trace?.finish(
-      'completed',
-      {
-        decision: decision.decision,
-        summary: decision.reason,
-        handoffCategory: decision.handoff_category,
-        businessLookupRequired: decision.business_lookup_required,
-        goal,
-      },
-      firstMessageId
-    )
-  }
-
-  /** Beta 2: susulan yang disiapkan AI pada giliran sebelumnya; dikirim tanpa panggilan AI. */
-  private async runLeanNudge(jid: string, socket: WASocket) {
-    const nudge = await claimLeanNudge(jid)
-    if (!nudge) return
-    const canSend = async () =>
-      (await this.waitForDeliverySync(socket)) && (await this.canSendAiReply(jid, socket))
-    try {
-      await trackOutgoingMessage(jid, async (outgoingId) => {
-        const sent = await sendPreparedReply(
-          socket,
-          jid,
-          [],
-          () => socket.sendMessage(jid, { text: nudge.text }, { messageId: outgoingId }),
-          {
-            canSend,
-            onTyping: async () => {
-              await this.setActivity(jid, 'typing')
-            },
-            onDone: () => this.setActivity(jid, null),
-          }
-        )
-        if (!sent?.key.id) return false
-        await saveSentAiMessage({
-          message_id: sent.key.id,
-          jid,
-          contact_name: null,
-          direction: 'out',
-          sender_type: 'ai',
-          body: nudge.text,
-          media_type: null,
-          media_url: null,
-          thumbnail_url: null,
-          media_mime: null,
-          media_name: null,
-          media_size: null,
-          media_status: null,
-          reply_to_message_id: null,
-          status: 'sent',
-          created_at: new Date(),
-        })
-        return true
-      })
-    } catch (error) {
-      this.logger.error(`Susulan lean: ${error instanceof Error ? error.message : String(error)}`)
-    } finally {
-      await this.setActivity(jid, null).catch(() => {})
     }
   }
 
@@ -4303,51 +2586,12 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
     if (!socket || !(await this.canSendAiReply(jid, socket))) return
     const settings = await readSettings(true)
     if (!settings.sweepEnabled) return
-    if (settings.beta3Mode) return this.runBeta3Nudge(jid, socket)
-    if (settings.leanMode) return this.runLeanNudge(jid, socket)
-    const run = await claimConversationGoal(jid, settings.skills)
-    if (!run) return
-    let trace: Awaited<ReturnType<typeof startTrace>> | undefined
-    try {
-      const trigger =
-        'PEMICU SUSULAN TERJADWAL: tidak ada pesan pelanggan baru. Satu percobaan susulan saat ini sudah dicadangkan dalam followup_attempts_reserved. Periksa ulang kelayakan, skill, dan data bisnis; hanya satu pesan jika masih sesuai. Jangan mengulang jawaban sebelumnya. Jika tidak layak, silent tanpa jadwal baru.'
-      trace = await startTrace(jid, {
-        text: trigger,
-        provider: settings.aiProvider,
-        model: settings.aiProvider === 'claude' ? settings.claudeModel : settings.chatgptModel,
-        skills: settings.skills.map((skill) => skill.name),
-        messages: [],
-        trigger: 'scheduled_goal',
-      })
-      const context = await this.customerTurnContext(jid, [], settings.historyLimit)
-      const decision = await createReply(
-        { ...settings, conversationAccess: context.access, routingContext: context.routing },
-        trigger,
-        (activity) => {
-          void this.setActivity(jid, activity).catch(() => {})
-        },
-        undefined,
-        context.prompt,
-        [],
-        trace.emit,
-        ''
-      )
-      decision.cartVersion = context.cartVersion
-      await this.deliverAiDecision(run, socket, settings, decision, [], true, trace)
-    } catch (error) {
-      await pauseGoalRun(run, 'Susulan gagal; tidak diulang otomatis untuk mencegah pesan ganda.')
-      await trace?.finish('failed', {
-        error: 'Susulan gagal; jadwal dihentikan. Periksa log server.',
-      })
-      this.logger.error(`Goal: ${error instanceof Error ? error.message : String(error)}`)
-    } finally {
-      await this.setActivity(jid, null).catch(() => {})
-    }
+    return this.runBeta3Nudge(jid, socket)
   }
 
   /** Nomor utama yang sedang tidak terhubung tetap menjalankan tugas workspace (katalog, rekap). */
   private idleScope?: WorkspaceScope
-  private leanSyncRunning = false
+  private catalogSyncRunning = false
   private lastIdleScopeAt = 0
   private timerScope() {
     return this.sessionScope ?? this.idleScope
@@ -4372,7 +2616,7 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
         void inWorkspace(scope, async () => {
           try {
             const settings = await readSettings(true)
-            if (!settings.beta3Mode || !settings.aiEnabled || !settings.hasSkill) return
+            if (!settings.aiEnabled || !settings.hasSkill) return
             await beta3Recap.runRecapStep()
           } catch (error) {
             this.logger.error(`Rekap order: ${error instanceof Error ? error.message : String(error)}`)
@@ -4382,48 +2626,35 @@ Jangan menyebut pemeriksaan internal ini kepada pelanggan.`
         })
       }, 60_000)
     }
-    if (!this.leanSyncTimer && this.primary) {
-      // Beta 2: katalog/TOKO/bahan ditarik sendiri tiap 30 menit (murah: if_version), lalu ciri foto di latar.
-      const syncLean = () => {
+    if (!this.catalogSyncTimer && this.primary) {
+      // Katalog/TOKO/bahan ditarik sendiri tiap 30 menit (murah: if_version), lalu ciri foto di latar.
+      const syncCatalog = () => {
         const scope = this.timerScope()
-        if (!scope || this.leanSyncRunning) return
-        this.leanSyncRunning = true
+        if (!scope || this.catalogSyncRunning) return
+        this.catalogSyncRunning = true
         // Tanpa soket nomor utama, sinkron berjalan di latar tanpa menahan koneksi baru.
         const run = (task: () => Promise<void>) => (this.socket ? this.track(task) : task())
         void inWorkspace(scope, () =>
           run(async () => {
-            const settings = await readSettings(true)
-            if (!settings.leanMode && !settings.beta3Mode) {
-              this.leanSyncRunning = false
-              return
-            }
             try {
-              const result = settings.beta3Mode
-                ? await beta3.syncLeanCatalog()
-                : await syncLeanCatalog()
+              const result = await beta3.syncLeanCatalog()
               if (result.configured && !result.unchanged)
-                this.logger.info(
-                  `${settings.beta3Mode ? 'Beta 3' : 'Beta 2'}: katalog disinkronkan (${result.count} varian).`
-                )
-              if (result.configured) {
-                if (settings.beta3Mode) await beta3.describeCatalogPhotos()
-                else await describeCatalogPhotos()
-              }
+                this.logger.info(`Katalog disinkronkan (${result.count} varian).`)
+              if (result.configured) await beta3.describeCatalogPhotos()
               // Update ringan: skill terbaru dari rilis online, tanpa `wa update`.
-              if (settings.beta3Mode)
-                await beta3SkillSync.syncRemoteSkills((line) => this.logger.info(line)).catch(() => {})
+              await beta3SkillSync.syncRemoteSkills((line) => this.logger.info(line)).catch(() => {})
             } catch (error) {
               this.logger.warning(
-                `Beta 2: sync katalog gagal: ${error instanceof Error ? error.message : String(error)}`
+                `Sync katalog gagal: ${error instanceof Error ? error.message : String(error)}`
               )
             } finally {
-              this.leanSyncRunning = false
+              this.catalogSyncRunning = false
             }
           })
-        ).catch(() => (this.leanSyncRunning = false))
+        ).catch(() => (this.catalogSyncRunning = false))
       }
-      setTimeout(syncLean, 20_000)
-      this.leanSyncTimer = setInterval(syncLean, LEAN_SYNC_INTERVAL_MS)
+      setTimeout(syncCatalog, 20_000)
+      this.catalogSyncTimer = setInterval(syncCatalog, LEAN_SYNC_INTERVAL_MS)
     }
   }
 

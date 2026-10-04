@@ -1,33 +1,43 @@
-# Beta 3 — salinan Beta 2 yang terisolasi
+# Beta 3 — satu-satunya alur AI CS
 
-Tujuan: mengembangkan jalur ramping tanpa terpengaruh Beta 1/2. Semua yang
-khas Beta 3 hidup di tempatnya sendiri; hanya infrastruktur bersama yang dipakai
-(sesi WhatsApp, penyimpanan pesan/kontak, trace, koneksi MCP di Data bisnis,
-rekening, antrean pesan keluar).
+Sejak v3.5.0 Beta 1/2 dihapus (catatan lama di `docs/arsip/`). Semua logika AI CS ada di
+`app/beta3/*` (alias `#beta3/*`); infrastruktur bersama hanya sesi WhatsApp, penyimpanan
+pesan/kontak, trace, koneksi MCP di Data bisnis, rekening, dan antrean pesan keluar.
 
-| Bagian | Beta 2 | Beta 3 |
-|---|---|---|
-| Kode | `app/services/lean/*` | `app/beta3/*` (alias `#beta3/*`) |
-| Tabel | `whatsapp_lean_*`, `whatsapp_contacts.chat_note` | `whatsapp_beta3_*` termasuk `whatsapp_beta3_chats` (catatan chat sendiri) |
-| Skill | `skills/cs-inti` → `cs-inti` | `skills-beta3/beta3-cs-inti` → `beta3-cs-inti` (terpasang otomatis) |
-| Contoh CS awal | `resources/lean/cs_examples.json` | `resources/beta3/cs_examples.json` |
-| Halaman | `/lean`, Order (mode beta2) | `/beta3`, Order (mode beta3) |
-| API | `/api/lean/*` | `/api/beta3/*` |
-| Perintah | `lean:catalog`, `lean:mcp` | `beta3:catalog`, `beta3:mcp` |
-| Fase usage | `lean-reply`, `lean-ciri` | `beta3-reply`, `beta3-ciri` |
-| Panel keranjang | panel lean | panel beta3 |
+| Bagian | Lokasi |
+|---|---|
+| Kode | `app/beta3/*` |
+| Tabel | `whatsapp_beta3_*` (termasuk `whatsapp_beta3_chats`, `whatsapp_beta3_decisions`) |
+| Skill | `skills-beta3/beta3-cs-inti` (terpasang otomatis) |
+| Contoh CS awal | `resources/beta3/cs_examples.json` |
+| Halaman | `/beta3`, Order, Pengaturan → Jev |
+| API | `/api/beta3/*` |
+| Perintah | `beta3:catalog`, `beta3:mcp` |
+| Fase usage | `beta3-reply`, `beta3-ciri`, `jev-*` |
 
-Mode dipilih di Pengaturan → Perilaku → **Mode AI** (Beta 1 / Beta 2 / Beta 3),
-saling eksklusif; disimpan di `whatsapp_settings.lean_mode` + `beta3_mode`.
 Titik sambung ke worker hanya di `commands/whatsapp_listen.ts`
-(`runBeta3Turn`, `runBeta3Nudge`, sinkron katalog, grup produksi, pembelajaran
-dari jawaban CS) dan pembersihan chat (`deleteBeta3ChatData`).
+(`runBeta3Turn`, `runBeta3Nudge`, sinkron katalog, grup produksi, jawaban setelah CS)
+dan pembersihan chat (`deleteBeta3ChatData`).
 
 Sumber data MCP Beta 3 dipilih sendiri (ikon roda gigi di /beta3) — state-nya
 terpisah, walau daftar koneksinya sama dengan Data bisnis.
 
-Perilaku saat ini identik dengan Beta 2 pada commit pemisahan; perubahan
-berikutnya di Beta 3 tidak menyentuh Beta 2, dan sebaliknya.
+## Jev (v3.5)
+
+Jev (TypeSafe AI, `app/beta3/jev.ts` + `jev_decisions.ts`) menjawab keputusan kecil; model AI tetap menulis balasan.
+
+| Keputusan | Dipakai untuk | Cadangan bila Jev mati/ragu |
+|---|---|---|
+| `maksud`, `form`, `serah_cs`, `setuju`, `layanan` | Satu panggilan sebelum balasan: catatan sistem, tier model ringan untuk sapaan, layanan ongkir pilihan pelanggan | Regex & aturan lama |
+| `total_toko` | Pesan toko sudah berisi total/rekening (form terlewat) | `looksLikeTotalSent` |
+| `janji_total` | Menahan janji total tanpa order | Pola kata `guardTotalPromise` |
+| `varian` | Warna katalog di spesifikasi | `fixCatalogColors` |
+| `terjawab` | Jawaban setelah CS: lewati bila semua sudah dijawab | AI menilai sendiri |
+| `komentar_ig` | Komentar Instagram perlu dijawab | `isQuestionComment` |
+
+Batas waktu 800 ms per panggilan; ambang yakin per keputusan di `JEV_THRESHOLD`. Setiap keputusan
+dicatat; pemilik menandai yang salah di Pengaturan → Jev (Akurasi 30 hari) dan bisa mematikan
+keputusan satu per satu.
 
 ## CS membalas sebagian & chat yang menunggu CS
 

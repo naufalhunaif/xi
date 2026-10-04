@@ -1,0 +1,83 @@
+/*
+ * Beta 3.5 — tampilan tenang (gabungan gaya soft-Swiss + editorial monokrom):
+ * latar off-white hangat, panel/kartu putih bergaris tipis, label kelompok kecil monospace,
+ * radius maksimal 6 px, tanpa bayangan dan tanpa pola latar. Mode gelap memakai token lama.
+ * Dimuat paling akhir; hanya token dan beberapa aturan bentuk, tidak mengubah tata letak.
+ */
+html:not([data-theme='dark']) .workspace-ui {
+  --sidebar: #f4f3ef;
+  --text: #1d1d1b;
+  --muted: #6d6c66;
+  --line: #e6e3dc;
+  --border: #e6e3dc;
+  --wa-page: #f6f5f1;
+  --wa-chat-bg: #f6f5f1;
+  --wa-raised: #f4f3ef;
+  --wa-subtle: #f1f0eb;
+  --wa-form-border: #dcd9d1;
+  background: var(--wa-page);
+}
+html:not([data-theme='dark']) {
+  background: #f6f5f1;
+}
+
+/* Latar chat polos: isi pesan lebih mudah dibaca tanpa pola. */
+.workspace-ui .wa-messages {
+  background-image: none;
+}
+html[data-theme='dark'] .workspace-ui .wa-messages {
+  background-color: #0e0e10;
+}
+
+/* Bentuk: radius ≤ 6 px, tanpa bayangan berat. */
+.workspace-ui :is(.wa-card, .wa-panel, .wa-settings-block, .wa-account-bar, .wa-cart-section, .wa-quality-item, .wa-quality-test) {
+  border-radius: 6px;
+  box-shadow: none;
+}
+.workspace-ui :is(.button, button.button, input, select, textarea) {
+  border-radius: 6px;
+}
+
+/* Panel isi tetap putih di atas latar off-white. */
+html:not([data-theme='dark']) .workspace-ui :is(.wa-card, .wa-panel, .wa-account-bar, .wa-settings-panel) {
+  background: #fff;
+}
+
+/* Menu pengaturan: daftar bersih tanpa kotak abu; label kelompok kecil monospace;
+   item aktif = kartu putih bergaris tipis (bukan blok hijau). */
+@media (min-width: 761px) {
+  .workspace-ui .wa-settings-menu .wa-settings-block {
+    background: transparent;
+    padding: 0;
+  }
+}
+.workspace-ui .wa-settings-menu .wa-settings-group {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.workspace-ui .wa-settings-menu a {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+}
+.workspace-ui .wa-settings-menu a:hover {
+  background: var(--wa-subtle);
+  color: var(--text);
+}
+html:not([data-theme='dark']) .workspace-ui .wa-settings-menu a[aria-current='page'] {
+  background: #fff;
+  border-color: var(--line);
+  color: var(--text);
+}
+
+/* Judul halaman sedikit lebih tegas, judul kartu tetap kecil. */
+.workspace-ui .wa-settings-heading,
+.workspace-ui .wa-page-title {
+  letter-spacing: -0.01em;
+}
+.workspace-ui .wa-card-title small {
+  color: var(--muted);
+}

@@ -1,4 +1,4 @@
-// Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
+// Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
 import db from '#services/workspace_database'
 import { workspaceSql } from '#services/workspace_context'
 import { queueOutgoingMessage } from '#services/message_service'
@@ -1059,7 +1059,9 @@ export function matchAutoTotal(
   /** Teks lain tempat mencari nama layanan bila draft.layanan kosong (catatan, spesifikasi, pesan). */
   hints: string[] = [],
   /** Harga yang sudah disebut pihak toko (CS/AI) di chat, mis. "jas saja 500.000". */
-  statedPrices: number[] = []
+  statedPrices: number[] = [],
+  /** Pilihan layanan dari Jev: alias ("reg"/"yes"), null = belum memilih, undefined = pakai pola kata. */
+  chosenService?: string | null
 ):
   | { ok: true; items: string; subtotal: number; shippingService: string; shippingCost: number }
   | { ok: false; reason: string } {
@@ -1149,10 +1151,15 @@ export function matchAutoTotal(
           row.price > 0
       )
     : null
-  if (chosen && offered.length > 1 && !saidByCustomer(chosen.service)) chosen = null
-  if (!chosen && offered.length > 1) {
-    const picked = offered.filter((row) => saidByCustomer(row.service))
-    if (picked.length === 1) chosen = picked[0]
+  if (offered.length > 1 && chosenService !== undefined) {
+    // Jev yakin: pilihan pelanggan (atau belum memilih) dipakai langsung.
+    chosen = chosenService ? offered.find((row) => alias(row.service.replace(/\d+$/, '')) === alias(chosenService)) || null : null
+  } else {
+    if (chosen && offered.length > 1 && !saidByCustomer(chosen.service)) chosen = null
+    if (!chosen && offered.length > 1) {
+      const picked = offered.filter((row) => saidByCustomer(row.service))
+      if (picked.length === 1) chosen = picked[0]
+    }
   }
   if (!chosen && !draft.layanan && offered.length <= 1) {
     // Nama layanan (tanpa angka) sebagai kata utuh di teks petunjuk; terpanjang menang (CTCYES sebelum CTC).
@@ -1195,14 +1202,15 @@ export async function verifyAutoTotal(
   }>,
   hints: string[] = [],
   statedPrices: number[] = [],
-  spec?: string
+  spec?: string,
+  chosenService?: string | null
 ): Promise<{ ok: true; total: VerifiedAutoTotal } | { ok: false; reason: string }> {
   const order = await readLeanOrder(orderId)
   if (!order || order.status !== 'pending') return { ok: false, reason: 'order bukan pending' }
   const options = order.shipping_options ? JSON.parse(String(order.shipping_options)) : null
   if (!options?.prices?.length) return { ok: false, reason: 'tarif ongkir belum ada di order' }
   if (pantsNumberMissing(String(spec ?? order.spec ?? ''), draft.rincian)) return { ok: false, reason: 'nomor celana belum diketahui' }
-  const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices)
+  const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices, chosenService)
   if (!result.ok) return result
   return {
     ok: true,
@@ -1252,7 +1260,7 @@ export async function sendLeanTotal(
   return { orderNumber: String(order.order_number || `#${order.id}`), total: Number(order.total) }
 }
 
-/** Alasan total belum otomatis, ditampilkan ke CS di Beta 2 / panel pesanan. */
+/** Alasan total belum otomatis, ditampilkan ke CS di panel pesanan. */
 export async function noteAutoTotalReason(orderId: number, reason: string) {
   await ensureLeanTables()
   await db

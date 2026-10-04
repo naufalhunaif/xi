@@ -99,45 +99,6 @@ export type CallbackSession = {
   child?: { killed: boolean; exitCode: number | null }
 }
 
-export function codexPublicCallback(
-  appUrl: string,
-  loginId: string,
-  port: number,
-  webPort: number
-) {
-  const base = new URL(appUrl)
-  if (
-    base.protocol !== 'https:' ||
-    base.username ||
-    base.password ||
-    base.search ||
-    base.hash ||
-    !/^[a-f0-9-]{36}$/.test(loginId) ||
-    !Number.isInteger(port) ||
-    port < 1024 ||
-    port > 65535 ||
-    port === webPort
-  ) {
-    throw new Error('Konfigurasi callback MCP tidak valid.')
-  }
-  return { url: `${base.href.replace(/\/$/, '')}/oauth/mcp/callback/${loginId}`, port }
-}
-
-export function codexPublicCallbackArguments(
-  name: string,
-  callback: { url: string; port: number }
-) {
-  // Override the whole OAuth table so a saved local callback/client ID cannot take precedence.
-  return [
-    '-c',
-    `mcp_oauth_callback_url=${JSON.stringify(callback.url)}`,
-    '-c',
-    `mcp_oauth_callback_port=${callback.port}`,
-    '-c',
-    `mcp_servers.${name}.oauth={callback_url=${JSON.stringify(callback.url)},callback_port=${callback.port}}`,
-  ]
-}
-
 export function isPublicMcpAuthorization(authorizationUrl: string, publicCallbackUrl: string) {
   try {
     const auth = new URL(authorizationUrl)

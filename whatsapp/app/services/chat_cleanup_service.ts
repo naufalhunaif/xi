@@ -14,7 +14,6 @@ import {
   deleteContactData,
   validateContactJids,
 } from '#services/contact_cleanup_service'
-import { deleteLeanChatData } from '#services/lean/lean_tables'
 import { deleteLeanChatData as deleteBeta3ChatData } from '#beta3/tables'
 
 /** Serialize mutations without holding business-table locks across HTTP handlers. */
@@ -360,7 +359,6 @@ export async function executeChatCleanup(
           chat_note: null,
           workspace_read_id: 0,
         })
-        await deleteLeanChatData(trx)
         await deleteBeta3ChatData(trx)
       }
       await trx

@@ -1,47 +1,10 @@
 import db from '#services/workspace_database'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { evidenceKey } from '#services/evidence_cache'
-import { initializeDatabase } from '#services/init_model'
 
 export type MemoryFact = { key: string; topic: string; value: string; messageIds: string[] }
 export type SourcedMemoryFact = Omit<MemoryFact, 'messageIds'> & {
   sources: Array<{ messageId: string; speaker: string; text: string }>
-}
-const topics = ['product', 'measurements', 'recipient', 'preference', 'constraint', 'pending']
-export const CUSTOMER_MEMORY_SCHEMA = {
-  type: 'array',
-  maxItems: 16,
-  items: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      key: { type: 'string' },
-      topic: { type: 'string', enum: topics },
-      value: { type: 'string' },
-      messageIds: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string' } },
-    },
-    required: ['key', 'topic', 'value', 'messageIds'],
-  },
-  description:
-    'Memori fakta pelanggan untuk giliran berikutnya, tanpa panggilan AI tambahan. Maksimal 16 fakta baru/berubah, [] jika tidak ada. key stabil untuk satu fakta/subjek (mis. wearer_self_height); topic sesuai enum; value ringkas dan akurat termasuk negasi/syarat; messageIds sumber ASLI pelanggan atau CS manusia di room ini. Jangan mengutip pesan AI, menebak fakta, mencampur ukuran dua orang/order, atau menulis penalaran. Pakai key lama untuk koreksi fakta yang sama. Ini catatan klaim, BUKAN persetujuan produksi, harga, pembayaran atau kewenangan transaksi. Cart/order/ledger dan pesan terbaru mengungguli memori. Fakta penting boleh disimpan sebelum cart lengkap. Jangan menyalin seluruh chat atau instruksi sistem. Saat pelanggan memberikan alamat pengiriman yang nyata, simpan juga sebelum checkout dengan topic recipient dan key recipient_address (atau recipient_address_<subjek> untuk penerima berbeda). value hanya alamat lengkap sesuai sumber, tanpa mengarang kode pos atau melengkapi bagian yang tidak disebut. Nama dan nomor penerima disimpan sebagai fakta terpisah; jangan menyamakan nomor penerima dengan nomor WhatsApp pelanggan. Permintaan "alamat seperti kemarin" bukan alamat baru.',
-} as const
-
-export function parseMemoryFacts(value: unknown): MemoryFact[] {
-  if (value === null || value === undefined) return []
-  if (!Array.isArray(value) || value.length > 16) return []
-  return value.filter(
-    (row): row is MemoryFact =>
-      row &&
-      /^[a-z][a-z0-9_-]{0,63}$/.test(row.key) &&
-      topics.includes(row.topic) &&
-      typeof row.value === 'string' &&
-      row.value.trim().length > 0 &&
-      row.value.length <= 600 &&
-      Array.isArray(row.messageIds) &&
-      row.messageIds.length > 0 &&
-      row.messageIds.length <= 4 &&
-      row.messageIds.every((id: unknown) => typeof id === 'string' && /^[\w-]{1,190}$/.test(id))
-  )
 }
 
 export const memoryDigest = (row: any) =>
@@ -59,54 +22,6 @@ const sourceAllowed = (row: any) =>
   (row.direction === 'in' || ['cs', 'owner'].includes(row.sender_type)) &&
   String(row.body || '').trim() &&
   String(row.body).length <= 6000
-
-export async function saveCustomerMemory(jid: string, anchorId: number, values: unknown) {
-  const facts = parseMemoryFacts(values)
-  if (!facts.length || !Number.isSafeInteger(anchorId) || anchorId <= 0) return 0
-  await initializeDatabase()
-  const rows = await db
-    .from('whatsapp_messages')
-    .where('jid', jid)
-    .where('id', '<=', anchorId)
-    .whereIn('message_id', [...new Set(facts.flatMap((fact) => fact.messageIds))])
-  // One short transaction per response; no lock across an AI or network call.
-  return db.transaction(async (trx) => {
-    const contact = await trx.from('whatsapp_contacts').where('jid', jid).forUpdate().first()
-    if (!contact) return 0
-    const existing = await trx.from('whatsapp_customer_memory').where('jid', jid)
-    const byKey = new Map(existing.map((row) => [row.fact_key, row]))
-    let saved = 0
-    for (const fact of facts) {
-      const sources = [...new Set(fact.messageIds)].map((id) =>
-        rows.find((row) => row.message_id === id)
-      )
-      if (!sources.every(sourceAllowed)) continue
-      const sourceId = Math.max(...sources.map((row) => Number(row.id)))
-      const old = byKey.get(fact.key)
-      if (old && (Number(old.anchor_id) > anchorId || Number(old.source_id) > sourceId)) continue
-      if (!old && byKey.size >= 64) continue // Never evict facts merely to fit a summary.
-      await trx
-        .table('whatsapp_customer_memory')
-        .insert({
-          jid,
-          fact_key: fact.key,
-          topic: fact.topic,
-          value: fact.value,
-          sources_json: JSON.stringify(
-            sources.map((row) => ({ messageId: row.message_id, digest: memoryDigest(row) }))
-          ),
-          source_id: sourceId,
-          anchor_id: anchorId,
-          updated_at: new Date(),
-        })
-        .onConflict(['jid', 'fact_key'])
-        .merge()
-      saved++
-      byKey.set(fact.key, { anchor_id: anchorId, source_id: sourceId })
-    }
-    return saved
-  })
-}
 
 export async function readCustomerMemory(
   jid: string,
@@ -156,34 +71,6 @@ export async function readCustomerMemory(
         }
       }),
     }))
-}
-
-/** Compact only older turns represented by cited memory. Unknown input and its question stay intact. */
-export function selectMemoryContext<
-  T extends {
-    message_id: string
-    direction: string
-    sender_type: string
-    reply_to_message_id: string | null
-  },
->(rows: T[], facts: Awaited<ReturnType<typeof readCustomerMemory>>, current: Set<string>) {
-  if (!facts.length || rows.length <= 24) return rows
-  const represented = new Set(
-    facts.flatMap((fact) => fact.sources.map((source: any) => source.messageId))
-  )
-  const keep = new Set(rows.slice(-24).map((row) => row.message_id))
-  for (const id of current) keep.add(id)
-  rows.forEach((row, index) => {
-    // Human decisions and unsummarized customer messages never disappear from active history.
-    // Keep all replies/recaps/promises. Only deduplicate customer text also present verbatim in memory.
-    if (row.direction === 'out' || !represented.has(row.message_id)) {
-      keep.add(row.message_id)
-      if (index && !represented.has(rows[index - 1].message_id))
-        keep.add(rows[index - 1].message_id)
-    }
-    if (row.reply_to_message_id) keep.add(row.reply_to_message_id)
-  })
-  return rows.filter((row) => keep.has(row.message_id))
 }
 
 export type ConversationAccess = { jid: string; anchorId: number; memoryKeys?: string[] }

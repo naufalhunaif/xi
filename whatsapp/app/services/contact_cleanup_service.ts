@@ -1,7 +1,6 @@
 import db from '#services/workspace_database'
 import { inWorkspace, workspaceScope } from '#services/workspace_context'
 import { csMediaPath } from '#services/cs_media_service'
-import { deleteLeanChatData } from '#services/lean/lean_tables'
 import { deleteLeanChatData as deleteBeta3ChatData } from '#beta3/tables'
 
 const CUSTOMER_JID = /^\d{5,20}@(s\.whatsapp\.net|lid)$/
@@ -209,7 +208,6 @@ export async function deleteContactData(trx: any, targetJids: unknown, cutoff: D
   for (const table of CONTACT_ORDER_TABLES)
     if (ids.length) await trx.from(table).whereIn('order_id', ids).delete()
   for (const table of CONTACT_DATA_TABLES) await trx.from(table).whereIn('jid', jids).delete()
-  await deleteLeanChatData(trx, jids)
   await deleteBeta3ChatData(trx, jids)
   // Keys are opaque hashes and can contain room-specific observations; invalidate the
   // temporary cache, retaining every other customer's durable facts/orders/messages.

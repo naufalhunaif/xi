@@ -5,11 +5,16 @@
 
 export const controllers = {
   Account: () => import('#controllers/account_controller'),
-  Carts: () => import('#controllers/carts_controller'),
+  AiAccounts: () => import('#controllers/ai_accounts_controller'),
+  Backup: () => import('#controllers/backup_controller'),
+  Beta3: () => import('#controllers/beta3_controller'),
   ContactDirectory: () => import('#controllers/contact_directory_controller'),
   Dashboard: () => import('#controllers/dashboard_controller'),
   Diagnostics: () => import('#controllers/diagnostics_controller'),
-  Learning: () => import('#controllers/learning_controller'),
+  InstagramContent: () => import('#controllers/instagram_content_controller'),
+  Instagram: () => import('#controllers/instagram_controller'),
+  Legal: () => import('#controllers/legal_controller'),
+  Lines: () => import('#controllers/lines_controller'),
   Orders: () => import('#controllers/orders_controller'),
   PaymentMethods: () => import('#controllers/payment_methods_controller'),
   Production: () => import('#controllers/production_controller'),

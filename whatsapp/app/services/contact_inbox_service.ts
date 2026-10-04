@@ -1,4 +1,3 @@
-import { isBeta3Mode } from '#services/settings_service'
 import db from '#services/workspace_database'
 import { initializeDatabase } from '#services/init_model'
 import { ensureLeanTables } from '#beta3/tables'
@@ -42,26 +41,12 @@ export async function markRoomRead(jid: string, throughId: number) {
   )
 }
 
-const PAYMENT_SQL = `COALESCE(cart.payment_status = 'reported', 0) OR EXISTS (
-        SELECT 1 FROM whatsapp_payment_reviews review
-        JOIN whatsapp_orders o ON o.id = review.order_id AND o.jid = m.jid
-        WHERE review.jid = m.jid AND o.status = 'active'
-          AND review.cart_version = cart.version AND review.order_paid = o.paid
-          AND NOT EXISTS (SELECT 1 FROM whatsapp_order_payments p
-            WHERE p.proof_message_id = review.proof_message_id)
-      )`
-const ORDER_SQL = `COALESCE(JSON_LENGTH(CASE WHEN JSON_VALID(cart.items_json) THEN cart.items_json ELSE '[]' END), 0) > 0
-        OR EXISTS (SELECT 1 FROM whatsapp_orders o WHERE o.jid = m.jid AND o.status = 'active')`
-
 export async function latestInboxMessages() {
   await initializeDatabase()
-  // Beta 3: filter Pembayaran/Order memakai order Beta 3 (bukan keranjang Beta 1).
-  const beta3 = await isBeta3Mode().catch(() => false)
-  if (beta3) await ensureLeanTables()
+  await ensureLeanTables()
   // Pembayaran = pelanggan sudah bayar dan menunggu konfirmasi CS: kirim gambar setelah
   // total dikirim, atau AI mencatat tahap bukti_dikirim (belum ada order lunas sesudahnya).
-  const paymentSql = beta3
-    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'awaiting_payment'
+  const paymentSql = `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'awaiting_payment'
           AND EXISTS (SELECT 1 FROM whatsapp_messages p WHERE p.jid = m.jid AND p.direction = 'in'
             AND p.media_type = 'image' AND p.created_at > b.updated_at))
         OR EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'paid'
@@ -76,25 +61,21 @@ export async function latestInboxMessages() {
           AND n.note REGEXP 'tahap[[:space:]]*[:=][[:space:]]*bukti_dikirim'
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
             AND d.status IN ('paid', 'cancelled') AND d.updated_at >= n.updated_at))`
-    : PAYMENT_SQL
   // Resi terkirim = pesan keluar (AI/CS/pemilik) yang memuat nomor resi, kata-katanya
   // bebas (dipindai kode → whatsapp_beta3_shipments). Selesai = chat sudah dikirimi resi dan
   // tidak ada pesanan baru sesudahnya (order dari rekap dibuat belakangan, jadi tidak dihitung
   // "baru"). Order = pesanan berjalan yang belum dikirimi resi. Lunas > 45 hari tanpa resi
   // di chat dianggap selesai.
-  if (beta3) await scanShipments().catch(() => {})
+  await scanShipments().catch(() => {})
   const resiSql = (alias: string, after = '') =>
     `EXISTS (SELECT 1 FROM whatsapp_beta3_shipments ${alias} WHERE ${alias}.jid = m.jid${after})`
   const lastResiSql = `(SELECT MAX(rl.created_at) FROM whatsapp_beta3_shipments rl WHERE rl.jid = m.jid)`
   const shippedSql = `(${resiSql('rs', ' AND rs.created_at >= b.created_at')} OR (b.source = 'rekap' AND ${resiSql('r2')}))`
   // Order = pesanan yang sudah dibayar (DP/lunas) dan belum dikirim. Belum bayar = belum order
   // (masih tanya-tanya / menunggu pembayaran), jadi tidak masuk tab ini.
-  const orderSql = beta3
-    ? `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
+  const orderSql = `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
           AND b.status = 'paid' AND b.updated_at >= NOW() - INTERVAL 45 DAY AND NOT ${shippedSql})`
-    : ORDER_SQL
-  const doneSql = beta3
-    ? `(${resiSql('r5')}
+  const doneSql = `(${resiSql('r5')}
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders n WHERE n.jid = m.jid AND n.source <> 'rekap'
             AND n.status <> 'cancelled' AND n.created_at > ${lastResiSql})
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_specs ns WHERE ns.jid = m.jid AND ns.spec <> ''
@@ -103,7 +84,6 @@ export async function latestInboxMessages() {
           AND b.updated_at < NOW() - INTERVAL 45 DAY
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders n2 WHERE n2.jid = m.jid
             AND n2.status <> 'cancelled' AND n2.created_at > b.updated_at))`
-    : `EXISTS (SELECT 1 FROM whatsapp_orders o WHERE o.jid = m.jid AND o.status = 'completed')`
   // Nama: kontak ini, pasangan LID ↔ nomor HP (dua arah), lalu nama WA terakhir dari
   // pesan masuk (pesan keluar tidak membawa nama pelanggan).
   const result = await db.rawQuery(`WITH successful_replies AS (
@@ -135,7 +115,6 @@ export async function latestInboxMessages() {
     LEFT JOIN whatsapp_contacts c ON c.jid = m.jid
     LEFT JOIN whatsapp_contacts pc ON pc.jid = c.phone_jid AND pc.jid <> m.jid
     LEFT JOIN successful_replies r ON r.jid = m.jid AND r.position = 1
-    LEFT JOIN whatsapp_carts cart ON cart.jid = m.jid
     ORDER BY m.created_at DESC, m.id DESC`)
   return (result[0] as InboxMessage[]).map((message) => ({
     ...message,

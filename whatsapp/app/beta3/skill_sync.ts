@@ -1,4 +1,4 @@
-// Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
+// Beta 3 — sinkron skill bawaan (skills-beta3) ke whatsapp_skills.
 import { createHash } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -8,13 +8,13 @@ import { ensureLeanTables, readLeanState, writeLeanState } from '#beta3/tables'
 import { appVersion } from '#services/app_version'
 
 /**
- * Skill bawaan repo (whatsapp/skills/<nama>/SKILL.md) ikut terpasang otomatis:
+ * Skill bawaan repo (whatsapp/skills-beta3/<nama>/SKILL.md) ikut terpasang otomatis:
  * tiap worker mulai (= tiap deploy), file yang berubah sejak sinkron terakhir
  * di-upsert ke whatsapp_skills. Tidak perlu import manual lagi.
  * Hash per skill disimpan, jadi suntingan lewat UI tidak ditimpa selama filenya
  * tidak berubah.
  */
-/** Hanya skill Beta 2 yang terpasang otomatis; skill Beta 1 tetap ada di repo untuk diimpor manual. */
+/** Skill yang terpasang otomatis. */
 const BUNDLED = ['beta3-cs-inti']
 
 export async function syncBundledSkills(log?: (line: string) => void) {

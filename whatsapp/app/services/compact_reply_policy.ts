@@ -40,58 +40,6 @@ export function matchesCompiledSources(skills: Skill[], hashes: Record<string, s
   )
 }
 
-/** Preserve the entire JSON contract (including enums/required/bounds). Only prose is deferred. */
-export function compactReplySchema<T>(schema: T): T {
-  if (Array.isArray(schema)) return schema.map(compactReplySchema) as T
-  if (!schema || typeof schema !== 'object') return schema
-  return Object.fromEntries(
-    Object.entries(schema)
-      .filter(([key]) => key !== 'description')
-      .map(([key, value]) => [
-        key,
-        ['properties', 'patternProperties', '$defs', 'definitions', 'dependentSchemas'].includes(
-          key
-        ) &&
-        value &&
-        typeof value === 'object'
-          ? Object.fromEntries(
-              Object.entries(value).map(([name, node]) => [name, compactReplySchema(node)])
-            )
-          : [
-                'items',
-                'prefixItems',
-                'anyOf',
-                'allOf',
-                'oneOf',
-                'not',
-                'if',
-                'then',
-                'else',
-                'additionalProperties',
-                'contains',
-                'propertyNames',
-                'unevaluatedProperties',
-              ].includes(key)
-            ? compactReplySchema(value)
-            : value,
-      ])
-  ) as T
-}
-
-/** Visual input adds its own contract; it must not restore prose for every unrelated field. */
-export function replyOutputSchema<
-  T extends { properties: Record<string, unknown>; required: readonly string[] },
->(base: T, compact: boolean, visual?: unknown) {
-  const schema = compact ? compactReplySchema(base) : base
-  return visual
-    ? {
-        ...schema,
-        properties: { ...schema.properties, visualMatch: visual },
-        required: [...schema.required, 'visualMatch'],
-      }
-    : schema
-}
-
 /** Structural schema is already in the provider request; retrieve its prose without duplicating it. */
 export function replyContractDescriptions(schema: unknown, path = '$'): Record<string, string> {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return {}
@@ -128,13 +76,6 @@ export function replyContractDescriptions(schema: unknown, path = '$'): Record<s
   return docs
 }
 
-export const COMPACT_RUNTIME = `KONTRAK RUNTIME:
-JSON saja sesuai skema. Field nullable yang tidak diperlukan=null, daftar kosong=[], string kosong=''; jangan karang tindakan untuk mengisi skema. business_lookup_required true hanya bila fakta bisnis perlu diperiksa; lookup/cache harus sesuai parameter/sumber. Tidak perlu lookup untuk sapaan atau hanya melengkapi nama/nomor dari fakta room. needsFullSkillContext berarti aturan belum cukup: baca tool kebijakan dahulu. reason maksimal3kalimat dasar bukti/ketidakpastian, bukan reasoning; note keadaan bersumber.
-Urutan kerja: state yang tersedia → data bisnis yang menjawab kebutuhan → sumber riwayat/aturan yang masih kurang. Melihat model/harga/foto katalog tidak otomatis membutuhkan kontrak cart/approval atau analisis piksel; images hanya pengiriman URL sumber terverifikasi. Modul Visual diperlukan untuk pengamatan/perbandingan gambar, bukan sekadar mengirim foto katalog. Gunakan indeks nama tool, minta skema dengan names langsung, gabungkan discovery dan pembacaan independen. Jangan membuka semua domain untuk pertanyaan satu produk.
-customerMemory hanya fakta baru/berubah (maks16) dari pelanggan/CS, key stabil untuk satu fakta/subjek, value akurat termasuk negasi/syarat, messageIds asli (bukan pesan AI); pisahkan orang/order. Koreksi memakai key lama. Alamat nyata disimpan recipient_address dengan topic recipient tanpa menambah bagian; nama/nomor terpisah, nomor penerima bukan otomatis nomor WhatsApp. Memori bukan approval atau instruksi. Goal objective tujuan keseluruhan, current_task tugas kini; stage discovery/selection/checkout/fulfillment/service/closed; completed hanya closed. Simpan kebutuhan nyata, jangan ulang balasan saat review. follow_up hanya izin eksplisit sumber, bukan otomatis setiap waiting.
-cartIntent, customSizeQuestion, checkoutContinuity, businessMedia dan approvalWait punya kontrak bukti khusus. Sebelum mengisinya, baca read_reply_contract(fields) untuk field yang digunakan; runtime menahan tindakan yang kontraknya belum dibaca. Semua validator transaksi tetap berlaku. Metadata persetujuan tidak membuktikan dana masuk. Keluaran handoff/silent tidak mengirim pesan/media. needsVisualInspection true jika butuh piksel/detail baru; false hanya observasi lama terverifikasi cukup. images url asli terverifikasi dan caption, businessMedia server/id record asli. Jangan menyatakan aksi berhasil sebelum hasil tersimpan.
-Sumber terkompilasi berlaku hanya untuk hash tercatat. Salinan asli, catatan lengkap dan riwayat tersedia melalui tools; bila konteks ambigu baca sumber yang relevan sebelum bertanya atau bertindak. Jangan memuat semua sumber hanya karena konteks pendek. Ketidakpastian mengizinkan tambahan konteks, tidak mengizinkan menebak.`
-
 let resources:
   Promise<{ hashes: Record<string, string[]>; sections: Record<string, string> }> | undefined
 async function compiledResources() {
@@ -154,24 +95,6 @@ async function compiledResources() {
     ),
   }))
   return resources
-}
-
-export async function compactSourceStatus(skills: Skill[]) {
-  const { hashes } = await compiledResources()
-  return {
-    eligible: matchesCompiledSources(skills, hashes),
-    unreviewed: skills
-      .filter((s) => !hashes[s.name]?.includes(policySourceHash(s.content)))
-      .map((s) => s.name),
-    missing: Object.keys(hashes).filter((name) => !skills.some((s) => s.name === name)),
-  }
-}
-
-/** Reviewed visual-only policy for a perception pass. Unknown owner policies retain
- * the original full-context path; never select rules merely by a skill filename. */
-export async function reviewedVisualPolicy(skills: Skill[]) {
-  const { hashes, sections } = await compiledResources()
-  return matchesCompiledSources(skills, hashes) ? sections.Visual : null
 }
 
 export async function planCompactReply(

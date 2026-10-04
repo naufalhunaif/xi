@@ -1,4 +1,4 @@
-// Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
+// Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
 import { promptBreakdown } from '#services/prompt_size_service'
 import type { LeanExample } from '#beta3/examples_service'
 import { renderExamples } from '#beta3/examples_service'

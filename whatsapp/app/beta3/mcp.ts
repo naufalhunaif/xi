@@ -1,4 +1,4 @@
-// Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
+// Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
 import db from '#services/workspace_database'
 import { readLeanState, writeLeanState } from '#beta3/tables'
 import { sharedMcpToken } from '#services/shared_mcp_oauth_service'
@@ -22,7 +22,7 @@ export type LeanMcpConfig = {
 
 export type LeanMcpSource = { slug: string; name: string; url: string; connected: boolean }
 
-/** Koneksi MCP yang tersedia di Pengaturan → Data bisnis (satu daftar untuk Beta 1 dan Beta 2). */
+/** Koneksi MCP yang tersedia di Pengaturan → Data bisnis (satu daftar). */
 export async function listLeanMcpSources(): Promise<LeanMcpSource[]> {
   const rows = await db
     .from('whatsapp_mcp_connections')
@@ -38,7 +38,7 @@ export async function listLeanMcpSources(): Promise<LeanMcpSource[]> {
 }
 
 /**
- * Beta 2 memakai koneksi yang sama dengan Data bisnis: pilih slug-nya saja.
+ * Beta 3 memakai koneksi yang sama dengan Data bisnis: pilih slug-nya saja.
  * Bila belum dipilih dan hanya ada satu koneksi yang terhubung, itu yang dipakai.
  * URL+token lama (mcp_url/mcp_token) tetap dihormati bila slug kosong.
  */

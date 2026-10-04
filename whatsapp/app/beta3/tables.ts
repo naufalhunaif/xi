@@ -1,4 +1,4 @@
-// Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
+// Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
 import db from '#services/workspace_database'
 import { workspaceScope } from '#services/workspace_context'
 
@@ -169,7 +169,7 @@ export async function ensureLeanTables() {
 }
 
 /**
- * Memori Beta 2 per chat: catatan pelanggan, spesifikasi, order lean, dan state
+ * Memori Beta 3 per chat: catatan pelanggan, spesifikasi, order lean, dan state
  * per jid (ongkir:last, fit:last, fit:<jid>:…). Dipanggil oleh "Hapus chat &
  * media" (semua) dan hapus per kontak (jids) supaya AI mulai dari nol lagi.
  * Katalog, contoh CS, sumber MCP, dan skill tidak disentuh.

@@ -126,17 +126,6 @@ async function oauthRequest(
   })
 }
 
-/** Media uses the same DNS-pinned public-address checks, no redirects or OAuth credentials. */
-export function mcpMediaFetch(configured: string): typeof fetch {
-  return (input) =>
-    oauthRequest(
-      new URL(input instanceof Request ? input.url : String(input)),
-      { method: 'GET', headers: { Accept: 'image/*, video/mp4, application/pdf' } },
-      new URL(configured),
-      16 * 1024 * 1024
-    )
-}
-
 /** Business tool results can exceed OAuth metadata size; keep the same DNS/redirect protections. */
 export function mcpBusinessFetch(server: string): typeof fetch {
   return mcpOAuthFetch(server, (url, init, configured) =>

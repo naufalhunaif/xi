@@ -185,8 +185,6 @@ export async function mediaInfo(token: string, mediaId: string) {
   }
 }
 
-export const mediaCaption = async (token: string, mediaId: string) => (await mediaInfo(token, mediaId)).caption
-
 /** X-Hub-Signature-256 = HMAC-SHA256(Instagram app secret, body mentah). */
 export function validSignature(secret: string, raw: string, header: string) {
   if (!secret || !raw || !/^sha256=[a-f0-9]{64}$/.test(String(header || ''))) return false
@@ -194,7 +192,6 @@ export function validSignature(secret: string, raw: string, header: string) {
   const given = Buffer.from(String(header).slice(7))
   return expected.length === given.length && timingSafeEqual(expected, given)
 }
-
 
 /* ───────────── Posting konten ───────────── */
 
@@ -297,10 +294,6 @@ export async function demographics(token: string, userId: string, breakdown: str
 }
 
 const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count'
-
-export async function recentMedia(token: string, limit = 24) {
-  return (await mediaPage(token, limit)).items
-}
 
 /** Satu halaman postingan profil; `after` = kursor halaman berikutnya ('' bila sudah habis). */
 export async function mediaPage(token: string, limit = 24, after = '') {

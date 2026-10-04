@@ -8,7 +8,7 @@ import { estimateTokens } from '#services/prompt_size_service'
 import { readLeanMcpConfig, syncLeanCatalog } from '#beta3/mcp'
 import { describeCatalogPhotos } from '#beta3/catalog_vision'
 
-/** Beta 2: impor katalog digest dari file JSON (ekspor web/MCP/Excel). */
+/** Beta 3: impor katalog digest dari file JSON (ekspor web/MCP/Excel). */
 export default class Beta3Catalog extends BaseCommand {
   static commandName = 'beta3:catalog'
   static description =
@@ -21,7 +21,7 @@ export default class Beta3Catalog extends BaseCommand {
   @flags.boolean({ description: 'Ganti seluruh katalog, bukan upsert' })
   declare replace: boolean
 
-  @flags.boolean({ description: 'Tarik dari koneksi MCP yang dipilih di Beta 2 / Data bisnis' })
+  @flags.boolean({ description: 'Tarik dari koneksi MCP yang dipilih di Beta 3 / Data bisnis' })
   declare sync: boolean
 
   @flags.boolean({ description: 'Abaikan versi tersimpan; tarik ulang seluruh katalog' })

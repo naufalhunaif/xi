@@ -4,7 +4,7 @@ import type { CommandOptions } from '@adonisjs/core/types/ace'
 import { withActiveWorkspace } from '#services/workspace_service'
 import { callLeanTool, readLeanMcpConfig, writeLeanMcpConfig } from '#beta3/mcp'
 
-/** Beta 2: simpan/uji koneksi MCP satu pintu (katalog, fit advisor, ongkir, resi). */
+/** Beta 3: simpan/uji koneksi MCP satu pintu (katalog, fit advisor, ongkir, resi). */
 export default class Beta3Mcp extends BaseCommand {
   static commandName = 'beta3:mcp'
   static description = 'Pilih koneksi MCP (dari Data bisnis) untuk jalur ramping, lalu uji'

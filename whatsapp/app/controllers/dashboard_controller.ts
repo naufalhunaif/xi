@@ -13,7 +13,6 @@ import { appVersion, appChannel, appVersionLabel } from '#services/app_version'
 import { readAccess, setDomain, unsetDomain } from '#services/access_service'
 import { pendingOrderCount } from '#services/pending_orders'
 import { readRuns, readUsage } from '#services/usage_service'
-import { evaluationOverview } from '#services/conversation_evaluation_service'
 import { readTrace } from '#services/trace_service'
 import {
   createMcpConnection,
@@ -22,8 +21,6 @@ import {
   ensureDefaults,
   readSettings,
   saveSettings,
-  isLeanMode,
-  isBeta3Mode,
 } from '#services/settings_service'
 import {
   codexBinaryStatus,
@@ -63,10 +60,6 @@ function displayPhone(jid: string | null | undefined) {
 }
 
 export default class DashboardController {
-  async evaluations({ response }: HttpContext) {
-    response.header('cache-control', 'no-store')
-    return response.json(await evaluationOverview())
-  }
   private async decorateMessages(messages: Record<string, any>[]) {
     if (!messages.length) return messages
     const messageIds = messages.map((message) => String(message.message_id))
@@ -216,15 +209,8 @@ export default class DashboardController {
       : []
     const messages = await this.decorateMessages(roomMessages.reverse())
     const accountUrl = (env.get('ACCOUNT_URL') || '').replace(/\/$/, '')
-    const leanMode = await isLeanMode().catch((error) => {
-      console.error('leanMode tidak terbaca:', error instanceof Error ? error.message : error)
-      return false
-    })
-    const beta3Mode = await isBeta3Mode().catch(() => false)
     return view.render('pages/dashboard', {
       page: 'chat',
-      leanMode,
-      beta3Mode,
       connection,
       contacts,
       selectedJid,

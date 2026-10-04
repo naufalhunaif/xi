@@ -2,8 +2,6 @@ import db from '#services/workspace_database'
 import { quotaState, storedQuotaWindows, type QuotaProvider } from '#services/ai_quota_store'
 import type { QuotaWindow } from '#services/ai_quota_contract'
 import { AiProcessFailure } from '#services/ai_failure_service'
-
-export const AI_PROVIDERS: QuotaProvider[] = ['chatgpt', 'claude']
 export const otherProvider = (provider: QuotaProvider): QuotaProvider =>
   provider === 'claude' ? 'chatgpt' : 'claude'
 export const aiProviderOf = (value: unknown): QuotaProvider =>

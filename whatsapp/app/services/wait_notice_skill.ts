@@ -103,13 +103,3 @@ export async function ensureWaitNoticeSkill() {
   })
   await upgradeWaitNoticeDelay()
 }
-
-export async function readWaitNoticePolicy() {
-  const skill = await db.from('whatsapp_skills').where('name', WAIT_NOTICE_SKILL).first()
-  if (!skill) return null
-  try {
-    return parseWaitNoticePolicy(String(skill.content))
-  } catch {
-    return null
-  }
-}

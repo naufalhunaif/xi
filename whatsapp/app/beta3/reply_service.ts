@@ -1,4 +1,4 @@
-// Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
+// Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
 import db from '#services/workspace_database'
 import { phoneFromJid } from '#services/customer_identity_service'
 import { estimateTokens } from '#services/prompt_size_service'
@@ -16,6 +16,7 @@ import {
   saveLeanOrder,
   updatePendingOrderSpec,
   latestLeanOrder,
+  readLeanOrder,
   noteAutoTotalReason,
   verifyAutoTotal,
   renderActiveOrder,
@@ -59,6 +60,13 @@ import { tidyLists } from '#beta3/list_tidy'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
+import {
+  chooseVariant,
+  promisesTotal,
+  storeSentTotal,
+  understandTurn,
+  type TurnUnderstanding,
+} from '#beta3/jev_decisions'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 
 /**
@@ -148,13 +156,23 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
  * Tanpa form order, total + rekening tidak pernah dikirim sistem: kalimat "ini totalnya saya
  * kirimkan" dibuang, diganti minta data pengiriman (atau "saya cek dulu" bila alamat sudah ada).
  */
-export function guardTotalPromise(pesan: string[], options: { address: string; hasAddress: boolean }) {
+export function guardTotalPromise(
+  pesan: string[],
+  options: { address: string; hasAddress: boolean; jev?: boolean }
+) {
   const promise = /\b(ini|berikut|saya kirim\w*|kami kirim\w*|menyusul)\b[^.?!\n]*\btotal\w*\b[^.?!\n]*/i
   const promiseAfter = /\btotal\w*\b[^.?!\n]*\b(saya kirim\w*|kami kirim\w*|menyusul|dikirim\w*)\b[^.?!\n]*/i
-  if (!pesan.some((bubble) => promise.test(bubble) || promiseAfter.test(bubble)))
-    return { pesan, changed: false, waitCs: false }
+  const matched = pesan.some((bubble) => promise.test(bubble) || promiseAfter.test(bubble))
+  // Jev yakin (true/false) menang atas pola kata.
+  if (options.jev === false || (options.jev === undefined && !matched)) return { pesan, changed: false, waitCs: false }
   const kept = pesan
-    .map((bubble) => bubble.replace(promise, '').replace(promiseAfter, '').replace(/\s*[.,]\s*$/, '').replace(/\s{2,}/g, ' ').trim())
+    .map((bubble) =>
+      matched
+        ? bubble.replace(promise, '').replace(promiseAfter, '')
+        : // Jev menemukan janji yang tidak tertangkap pola: buang kalimat yang menyebut total/rekening.
+          bubble.replace(/[^.?!\n]*\b(total\w*|rekening)\b[^.?!\n]*[.?!]?/gi, '')
+    )
+    .map((bubble) => bubble.replace(/\s*[.,]\s*$/, '').replace(/\s{2,}/g, ' ').trim())
     .filter(Boolean)
   kept.push(
     options.hasAddress
@@ -162,6 +180,58 @@ export function guardTotalPromise(pesan: string[], options: { address: string; h
       : `Boleh kirim data pengirimannya dulu ${options.address}? (nama, alamat lengkap + kecamatan, kota, no HP) biar totalnya langsung saya kirim`
   )
   return { pesan: kept, changed: true, waitCs: options.hasAddress }
+}
+
+/**
+ * Varian yang dimaksud pelanggan menurut Jev, hanya untuk kasus ragu: warna di spesifikasi adalah
+ * warna katalog yang tidak pernah difotokan, padahal produk itu sudah difotokan di chat.
+ * null = Jev tidak dipakai/ragu → aturan foto terakhir (`fixCatalogColors`).
+ */
+async function jevVariantFix(
+  jid: string,
+  spec: string,
+  catalog: Array<{ product: string; color: string }>,
+  rows: LeanHistoryRow[]
+) {
+  const norm = (value: string) => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim()
+  const chat = rows.map((row) => ({ direction: row.direction, body: row.body, mediaType: row.mediaType }))
+  const lines = String(spec || '').split('\n')
+  const swaps: Array<[string, string]> = []
+  let decided = false
+  for (let index = 0; index < lines.length; index++) {
+    const match = lines[index].match(/^(\s*)(.+?)\s+-\s+(.+?)\s*$/)
+    if (!match) continue
+    const colors = [...new Set(catalog.filter((row) => norm(row.product) === norm(match[2])).map((row) => row.color))]
+    if (colors.length < 2 || !colors.some((color) => norm(color) === norm(match[3]))) continue
+    const shown = chat
+      .filter((row) => row.direction !== 'in' && row.mediaType === 'image')
+      .map((row) => String(row.body || '').trim().match(/^(.+?)\s+-\s+(.+)$/))
+      .filter((found) => found && norm(found[1]) === norm(match[2]))
+      .map((found) => norm(found![2]))
+    if (!shown.length || shown.includes(norm(match[3]))) continue
+    const chosen = await chooseVariant(jid, match[2], colors, chat)
+    if (chosen === undefined) continue
+    decided = true
+    if (chosen && norm(chosen) !== norm(match[3])) {
+      swaps.push([match[3], chosen])
+      lines[index] = `${match[1]}${match[2]} - ${chosen}`
+    }
+  }
+  return decided ? { text: lines.join('\n'), swaps } : null
+}
+
+/** Layanan ongkir yang ditawarkan (alias huruf kecil, tanpa JTR) dari shipping_options order. */
+export function offeredServices(raw: unknown) {
+  let options: any = null
+  try {
+    options = typeof raw === 'string' ? JSON.parse(raw) : raw
+  } catch {
+    options = null
+  }
+  const names = (Array.isArray(options?.prices) ? options.prices : [])
+    .filter((row: any) => Number(row.price) > 0 && !/JTR/i.test(String(row.service)))
+    .map((row: any) => String(row.service).toLowerCase().replace(/[^a-z]/g, '').replace(/^ctc/, '') || 'reg')
+  return [...new Set<string>(names)]
 }
 
 /** Pesan toko yang sudah berisi total/rekening: order itu sudah ditangani (mis. oleh CS). */
@@ -229,7 +299,9 @@ export async function missedOrderForm(
       .filter((later) => later.direction !== 'in')
       .reverse()
     const store = storeRows.map((later) => String(later.body || ''))
-    const handled = store.some((body) => looksLikeTotalSent(body, destinations))
+    // Jev (bila aktif dan yakin) menilai pesan toko; tanpa Jev: pola kata total/rekening.
+    const jevHandled = await storeSentTotal(jid, store).catch(() => undefined)
+    const handled = jevHandled ?? store.some((body) => looksLikeTotalSent(body, destinations))
     // Saat total dikirim toko: bukti transfer setelahnya yang ditampilkan untuk dicek.
     const totalRow = storeRows.find((later) => /\btotal\w*\b[^\n]*\d{1,3}(?:\.\d{3})+/i.test(String(later.body || '')))
     return {
@@ -790,6 +862,22 @@ export async function createLeanReply(input: {
     }
   }
 
+  // Jev (bila aktif): pahami pesan ini — maksud, data pengiriman, perlu CS, setuju, layanan ongkir.
+  const pendingForJev = orderId ? await readLeanOrder(orderId).catch(() => null) : await latestLeanOrder(jid).catch(() => null)
+  const understanding = await understandTurn({
+    jid,
+    text: input.text,
+    history: rows.map((row) => ({ direction: row.direction, body: row.body, mediaType: row.mediaType })),
+    services: offeredServices(pendingForJev?.status === 'pending' ? pendingForJev.shipping_options : null),
+    offerPending: rows.some((row, index) => index >= rows.length - 4 && row.direction === 'out' && /total|\d{1,3}(?:\.\d{3})+/i.test(String(row.body || ''))),
+  }).catch(() => ({}) as TurnUnderstanding)
+  if (understanding.hasShippingData && !form && !loose)
+    systemNote +=
+      '\n\nCATATAN SISTEM: pelanggan sepertinya mengirim data pengiriman, tapi belum lengkap terbaca. Minta bagian yang kurang (nama, alamat lengkap, kecamatan, kota, no HP) dalam satu pesan.'
+  if (understanding.csReason && understanding.csReason !== 'tidak_perlu')
+    systemNote += `\n\nCATATAN SISTEM: pesan ini kemungkinan perlu ditangani manusia (${understanding.csReason.replace(/_/g, ' ')}). Ikuti aturan serah_cs di skill.`
+  if (understanding.agreed && pendingForJev?.status === 'pending')
+    systemNote += '\n\nCATATAN SISTEM: pelanggan sudah menyetujui. Isi field order lengkap supaya total + rekening terkirim otomatis.'
   const store = await readLeanState('store_profile')
   const policy = await readExchangePolicy()
   const activeOrder = await renderActiveOrder(jid).catch(() => '')
@@ -826,10 +914,13 @@ export async function createLeanReply(input: {
   onTrace?.({ key: 'beta3-ai', label: 'Menyusun balasan · tanpa tool', status: 'running' })
   const result = await runLeanProvider(settings, prompt, input.imagePaths || [], undefined, undefined, {
     jid,
+    // Hanya salam/terima kasih (menurut Jev) → model ringan.
+    ...(understanding.intent === 'sapaan' && !input.imagePaths?.length && !systemNote ? { tier: 'light' as const } : {}),
   })
   const decision = parseLeanDecision(result.text)
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
-  const colorFix = fixCatalogColors(decision.spesifikasi, digest.rows, rows)
+  const jevColor = await jevVariantFix(jid, decision.spesifikasi, digest.rows, rows).catch(() => null)
+  const colorFix = jevColor || fixCatalogColors(decision.spesifikasi, digest.rows, rows)
   if (colorFix.swaps.length) {
     decision.spesifikasi = colorFix.text
     decision.pesan = swapColorWords(decision.pesan, colorFix.swaps)
@@ -939,7 +1030,15 @@ export async function createLeanReply(input: {
       ...rows.slice(lastOngkir + 1).filter((row) => row.direction === 'in').map((row) => String(row.body || '')),
       input.text,
     ]
-    const verdict = await verifyAutoTotal(totalOrderId, draft, digest.rows, customerText, statedPrices, String(specNow || ''))
+    const verdict = await verifyAutoTotal(
+      totalOrderId,
+      draft,
+      digest.rows,
+      customerText,
+      statedPrices,
+      String(specNow || ''),
+      understanding.service
+    )
     if (verdict.ok) autoTotal = verdict.total
     await noteAutoTotalReason(totalOrderId, verdict.ok ? '' : verdict.reason)
     // Ongkir lebih dari satu dan pelanggan belum memilih: tanyakan, jangan dipilihkan.
@@ -991,7 +1090,11 @@ export async function createLeanReply(input: {
   } else if (!decision.serah_cs && (await latestLeanOrder(jid))?.status !== 'awaiting_payment') {
     // Belum ada form/order: total + rekening tidak akan terkirim otomatis. Jangan janji
     // "ini totalnya saya kirimkan"; minta data pengiriman, atau tunggu CS bila alamat sudah ada.
+    const jevPromise = /total|rekening/i.test(decision.pesan.join(' '))
+      ? await promisesTotal(jid, decision.pesan).catch(() => undefined)
+      : undefined
     const guarded = guardTotalPromise(decision.pesan, {
+      jev: jevPromise,
       address: style?.address || 'bos',
       hasAddress: rows.some(
         (row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos)\b/i.test(String(row.body || ''))

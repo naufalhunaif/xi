@@ -1,3 +1,4 @@
+import { commentNeedsReply } from '#beta3/jev_decisions'
 import env from '#start/env'
 import db from '#services/workspace_database'
 import { readSettings } from '#services/settings_service'
@@ -136,7 +137,6 @@ async function aiAllowed(jid: string) {
   return {
     settings,
     ok:
-      Boolean(settings.beta3Mode) &&
       isAiWorking(settings) &&
       Boolean(settings.hasSkill) &&
       contact?.handling_mode !== 'cs' &&
@@ -436,7 +436,11 @@ async function runComments(config: IgConfig) {
       await done('skipped')
       continue
     }
-    if (!forced && !isQuestionComment(String(row.body || ''))) {
+    // Jev (bila aktif dan yakin) memilah komentar; tanpa Jev: pola kata pertanyaan.
+    const jevAsk = forced
+      ? true
+      : await commentNeedsReply('', String(row.body || ''), String(row.media_caption || '')).catch(() => undefined)
+    if (!forced && !(jevAsk ?? isQuestionComment(String(row.body || '')))) {
       await done('ignored')
       continue
     }

@@ -366,10 +366,10 @@
                   id="cartOpen"
                   class="wa-icon-button wa-cart-trigger"
                   type="button"
-                  title="{{ (leanMode || beta3Mode) ? 'Pesanan' : 'Cart & Order' }}"
-                  aria-label="{{ (leanMode || beta3Mode) ? 'Pesanan' : 'Cart dan order' }}"
-                  data-i18n-title="{{ (leanMode || beta3Mode) ? 'Pesanan' : 'Cart & Order' }}"
-                  data-i18n-aria-label="{{ (leanMode || beta3Mode) ? 'Pesanan' : 'Cart dan order' }}"
+                  title="Pesanan"
+                  aria-label="Pesanan"
+                  data-i18n-title="Pesanan"
+                  data-i18n-aria-label="Pesanan"
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -614,17 +614,9 @@
         </div>
         @include('partials/process_detail')
       @elseif(page === 'orders')
-        @if(beta3Mode)
-          @include('partials/orders_beta3')
-        @elseif(leanMode)
-          @include('partials/orders_lean')
-        @else
-          @include('partials/orders')
-        @endif
+        @include('partials/orders_beta3')
       @elseif(page === 'instagram')
         @include('partials/instagram')
-      @elseif(page === 'lean')
-        @include('partials/lean')
       @elseif(page === 'beta3')
         @include('partials/beta3')
       @elseif(page === 'directory')
@@ -667,9 +659,9 @@
                 <a href="#skill" data-settings-menu="skill" data-i18n="Skill">Skill</a>
                 @if(bundle)
                 <a href="#skills" data-settings-menu="skills" data-i18n="Editor skill">Editor skill</a>
-                <a href="#evaluation" data-settings-menu="evaluation" data-i18n="Evaluasi">Evaluasi</a>
                 @end
                 <a href="#quality" data-settings-menu="quality" data-i18n="Kualitas">Kualitas</a>
+                <a href="#jev" data-settings-menu="jev">Jev</a>
                 <a href="#usage" data-settings-menu="usage">Usage</a>
               </div>
               <div class="wa-settings-block">
@@ -864,6 +856,49 @@
                     <ul id="testsList" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
                   </div>
                 </section>
+                <section id="settings-jev" data-settings-panel="jev" aria-labelledby="settings-title-jev" hidden>
+                  <h2 id="settings-title-jev">Jev</h2>
+                  <div class="wa-card">
+                    <div class="wa-card-head">
+                      <div class="wa-card-title">
+                        <strong data-i18n="Keputusan kecil oleh Jev">Keputusan kecil oleh Jev</strong>
+                        <small data-i18n="Jev (TypeSafe AI) memutuskan hal kecil, mis. layanan ongkir yang dipilih pelanggan. AI tetap menulis balasan. Jev ragu atau tidak bisa dihubungi = cara lama.">Jev (TypeSafe AI) memutuskan hal kecil, mis. layanan ongkir yang dipilih pelanggan. AI tetap menulis balasan. Jev ragu atau tidak bisa dihubungi = cara lama.</small>
+                      </div>
+                      <div class="actions"><span id="jevState" class="wa-pill"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></span></div>
+                    </div>
+                    <div class="wa-form-grid">
+                      <label class="wa-span-full"><span data-i18n="Kunci API TypeSafe">Kunci API TypeSafe</span><input id="jevKey" type="password" autocomplete="off" data-settings-ignore /></label>
+                    </div>
+                    <div class="wa-toggle-row">
+                      <span data-i18n="Aktifkan Jev">Aktifkan Jev</span>
+                      <button id="jevEnabled" type="button" class="wa-switch" role="switch" aria-checked="false" aria-label="Aktifkan Jev" data-i18n-aria-label="Aktifkan Jev" disabled></button>
+                    </div>
+                    <div class="actions wa-actions-start">
+                      <button id="jevSave" type="button" class="button primary" data-i18n="Simpan">Simpan</button>
+                      <button id="jevTest" type="button" class="button" data-i18n="Uji koneksi">Uji koneksi</button>
+                      <small id="jevStatus" role="status" aria-live="polite"></small>
+                    </div>
+                  </div>
+                  <div class="wa-card">
+                    <div class="wa-card-head">
+                      <div class="wa-card-title">
+                        <strong data-i18n="Keputusan">Keputusan</strong>
+                        <small data-i18n="Matikan keputusan yang sering salah. Persen = benar dalam 30 hari.">Matikan keputusan yang sering salah. Persen = benar dalam 30 hari.</small>
+                      </div>
+                    </div>
+                    <ul id="jevDecisionList" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
+                  </div>
+                  <div class="wa-card">
+                    <div class="wa-card-head">
+                      <div class="wa-card-title">
+                        <strong data-i18n="Akurasi">Akurasi</strong>
+                        <small data-i18n="Keputusan Jev terbaru. Tandai yang salah supaya diperbaiki di rilis berikutnya.">Keputusan Jev terbaru. Tandai yang salah supaya diperbaiki di rilis berikutnya.</small>
+                      </div>
+                      <div class="actions"><select id="jevFilter" data-settings-ignore aria-label="Saring keputusan" data-i18n-aria-label="Saring keputusan"><option value="" data-i18n="Semua keputusan">Semua keputusan</option></select></div>
+                    </div>
+                    <ul id="jevRecent" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
+                  </div>
+                </section>
                 <section id="settings-skill" data-settings-panel="skill" aria-labelledby="settings-title-skill" hidden>
                   <h2 id="settings-title-skill" data-i18n="Skill">Skill</h2>
                   <div class="wa-card" id="skillCard">
@@ -886,15 +921,6 @@
                 >
                   <h2 id="settings-title-skills" data-i18n="Skill">Skill</h2>
                   @include('partials/settings/skills')
-                </section>
-                <section
-                  id="settings-evaluation"
-                  data-settings-panel="evaluation"
-                  aria-labelledby="settings-title-evaluation"
-                  hidden
-                >
-                  <h2 id="settings-title-evaluation" data-i18n="Evaluasi">Evaluasi</h2>
-                  @include('partials/settings/evaluation')
                 </section>
                 <section
                   id="settings-business"

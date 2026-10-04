@@ -32,7 +32,7 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Pesan toko berisi total/rekening dikenali; janji AI ("ini totalnya saya kirimkan") tidak dianggap total | `beta3.spec` · form terlewat |
 | Tanpa form order, AI tidak menjanjikan total; minta data pengiriman / "saya cek dulu" | `beta3.spec` · janji total tanpa order |
 | Pesan grup produksi: tanpa harga, alamat, telepon; ditutup nama + nomor order | `beta3.spec` · pesan grup produksi |
-| Data pesanan (panel, halaman Order, grup): judul "Produk - Warna" + "Jas, Celana", detail diberi "- ", ukuran celana dipisah satu baris kosong dari jas | `beta3.spec` · data pesanan rapi |
+| Data pesanan (panel, halaman Order, grup): judul "Produk - Warna" + "Jas, Celana", detail diberi "- ", ukuran celana dipisah satu baris kosong dari jas; ringkasan satu baris di daftar Order tanpa "- " | `beta3.spec` · data pesanan rapi |
 
 ## Beta 3 — isi balasan
 
@@ -44,6 +44,17 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Prompt lengkap tetap di bawah 10 ribu token | `beta3.spec` · prompt dan keluaran |
 | Model "Otomatis" memilih model per tugas | `beta3.spec` · model otomatis |
 
+## Jev (v3.5)
+
+| Perilaku | Tes |
+|---|---|
+| Jev mati / tanpa kunci / gagal / lewat batas waktu → tidak ada keputusan, cara lama dipakai | `jev.spec` · tanpa kunci / gagal-timeout |
+| Jawaban Jev di bawah ambang yakin tidak dipakai, tetap dicatat (used = 0) | `jev.spec` · pemahaman giliran |
+| Data pelanggan (telepon, rekening, email) disamarkan sebelum dikirim ke Jev | `jev.spec` · disamarkan |
+| Layanan ongkir pilihan Jev dipakai untuk total; "belum memilih" = total ditahan | `jev.spec` · layanan pilihan Jev |
+| Janji total dari Jev ikut menahan janji tanpa order | `jev.spec` · janji total |
+| Akurasi = keputusan dipakai yang tidak ditandai salah, 30 hari terakhir | `jev.spec` · catatan keputusan |
+
 ## Aplikasi umum
 
 | Perilaku | Tes |
@@ -53,6 +64,8 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Pertanyaan internal (backend, model AI, system prompt) tidak memanggil AI/tool | `customer_scope.spec` |
 
 ## Belum ada tes otomatis (cek manual saat menyentuh bagiannya)
+
+- v3.5.0: Beta 1/2, halaman Evaluasi, dan skill klasik dihapus. Pengaturan lama `beta3_mode`/`lean_mode` diabaikan; tidak ada pilihan mode lagi.
 
 - Setelah CS membalas sebagian, AI menjawab poin yang terlewat ±3 menit kemudian; chat yang
   diserahkan ke CS dan tidak dibalas 20 menit dijawab AI lagi (v3.4.177).

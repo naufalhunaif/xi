@@ -109,8 +109,6 @@ export default defineConfig({
   metaFiles: [
     { pattern: 'resources/policies/**', reloadServer: false },
     { pattern: 'resources/skills/**', reloadServer: false },
-    { pattern: 'resources/lean/**', reloadServer: false },
-    { pattern: 'skills/**', reloadServer: false },
     { pattern: 'VERSION', reloadServer: false },
     { pattern: 'CHANNEL', reloadServer: false },
     { pattern: 'skills-beta3/**', reloadServer: false },

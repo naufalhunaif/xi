@@ -11,7 +11,6 @@ import env from '#start/env'
 import { initializeDatabase } from '#services/init_model'
 import { listPaymentMethods } from '#services/payment_method_service'
 import { requestRecentAiReviews } from '#services/ai_review_service'
-import { syncBundledSkills } from '#services/lean/lean_skill_sync'
 import { syncBundledSkills as syncBeta3Skills } from '#beta3/skill_sync'
 import { readProductionPolicy } from '#services/production_service'
 import { isLocalAuth } from '#services/local_auth_service'
@@ -66,20 +65,12 @@ export function ensureDefaults() {
   defaults = (async () => {
     await initializeDatabase()
     const now = new Date()
-    // Beta 1/2 sudah dihentikan: semua pemasangan memakai Beta 3 (pemasangan lama ikut dipindah).
-    const beta3Default = 1
     await db.rawQuery(
       `INSERT IGNORE INTO whatsapp_settings
-       (id, ai_enabled, mcp_seeded, skill_name, skill_content, chatgpt_reasoning, claude_reasoning, chatgpt_speed, claude_speed, lean_mode, beta3_mode, updated_at)
-       VALUES (1, 0, 0, NULL, NULL, 'auto', 'auto', 'standard', 'standard', ?, ?, ?)`,
-      [beta3Default ? 0 : 1, beta3Default, now]
+       (id, ai_enabled, mcp_seeded, skill_name, skill_content, chatgpt_reasoning, claude_reasoning, chatgpt_speed, claude_speed, updated_at)
+       VALUES (1, 0, 0, NULL, NULL, 'auto', 'auto', 'standard', 'standard', ?)`,
+      [now]
     )
-    if (beta3Default)
-      await db
-        .from('whatsapp_settings')
-        .where('id', 1)
-        .where('beta3_mode', 0)
-        .update({ beta3_mode: 1, lean_mode: 0 })
     await db.rawQuery(
       `INSERT IGNORE INTO whatsapp_connection (id, desired_connected, status, phone, qr_data_url, last_error, updated_at)
        VALUES (1, 0, 'disconnected', NULL, NULL, NULL, ?)`,
@@ -88,7 +79,6 @@ export function ensureDefaults() {
     await ensureBusinessSources()
     await ensureWaitNoticeSkill()
     // Skill bawaan repo ikut terpasang setiap deploy; tak perlu import manual.
-    await syncBundledSkills().catch(() => {})
     await syncBeta3Skills().catch(() => {})
   })().catch((error) => {
     workspaceDefaults.delete(key)
@@ -124,10 +114,6 @@ export async function readSettings(includeSkill = false) {
     aiWorkingNow: isAiWorking(row),
     aiProvider: row.ai_provider === 'claude' ? 'claude' : 'chatgpt',
     aiFailover: Boolean(row.ai_failover),
-    // Mode saling eksklusif: beta3 menang atas beta2 (lean).
-    beta3Mode: true,
-    leanMode: false,
-    aiMode: 'beta3' as 'beta1' | 'beta2' | 'beta3',
     chatgptModel: String(row.chatgpt_model || ''),
     chatgptSpeed: runtimeOptions(row, 'chatgpt').speed,
     chatgptReasoning: runtimeOptions(row, 'chatgpt').reasoning,
@@ -248,12 +234,6 @@ export async function saveSettings(input: Record<string, unknown>) {
       throw new Error('Mesin AI tidak valid.')
     values.ai_provider = String(input.aiProvider)
   }
-  if (input.aiMode !== undefined) {
-    // Hanya Beta 3; Beta 1/2 dihentikan.
-    values.lean_mode = 0
-    values.beta3_mode = 1
-  }
-  if (input.leanMode !== undefined) values.lean_mode = 0
   if (input.aiFailover !== undefined) {
     values.ai_failover = input.aiFailover === true || input.aiFailover === 'on'
   }
@@ -417,16 +397,3 @@ export async function deleteSkill(id: number) {
   return readSettings()
 }
 
-/**
- * Nilai sakelar Beta 2 untuk halaman (tanpa ensureDefaults, tanpa menelan error):
- * dibaca langsung dari whatsapp_settings supaya tampilan chat/Order selalu sama
- * dengan yang dipakai worker.
- */
-// Beta 1/2 dihentikan: semua pemasangan Beta 3, tanpa bergantung isi tabel.
-export async function isLeanMode() {
-  return false
-}
-
-export async function isBeta3Mode() {
-  return true
-}

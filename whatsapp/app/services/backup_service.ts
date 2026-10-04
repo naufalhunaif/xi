@@ -463,9 +463,6 @@ export async function autoBackupTick() {
   const last = state.lastBackup?.at || 0
   if (wibHour >= 3 && Date.now() - last > 20 * 3_600_000) await runBackup('auto').catch(() => {})
 }
-export async function listStorageRoot() {
-  return readdir(app.makePath('storage')).catch(() => [])
-}
 
 /* ---------------- Media bertahap (hanya file baru) ----------------
  * Foto & media chat tidak lagi masuk arsip harian (14 salinan penuh = boros Drive & disk server).

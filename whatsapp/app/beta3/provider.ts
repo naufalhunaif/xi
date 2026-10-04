@@ -1,4 +1,4 @@
-// Beta 3 — salinan terisolasi Beta 2. Tabel whatsapp_beta3_*, state & skill sendiri.
+// Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
 import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -111,7 +111,7 @@ export async function runLeanProvider(
   imagePaths: string[] = [],
   phase = 'beta3-reply',
   schema: Record<string, unknown> = LEAN_OUTPUT_SCHEMA,
-  meta: { jid?: string; providers?: AiProviderName[] } = {}
+  meta: { jid?: string; providers?: AiProviderName[]; tier?: AutoTier } = {}
 ): Promise<LeanProviderResult> {
   const jid = meta.jid || ''
   const all = await usableAiAccounts(Date.now(), phase).catch(() => null)
@@ -144,7 +144,8 @@ export async function runLeanProvider(
         account.model ||
         (account.provider === 'claude' ? settings.claudeModel : account.provider === 'chatgpt' ? settings.chatgptModel : '') ||
         ''
-      const tier = !fixed && account.provider !== 'gemini' ? autoTier(phase, prompt, imagePaths.length) : null
+      // Jev menilai maksud pesan (mis. hanya salam) → tingkat model; tanpa Jev: pola kata.
+      const tier = !fixed && account.provider !== 'gemini' ? meta.tier || autoTier(phase, prompt, imagePaths.length) : null
       const wanted = fixed || (tier ? autoModels(account.provider === 'claude' ? 'claude' : 'chatgpt')[tier] : '')
       // Tugas ringan pada mode otomatis: penalaran rendah (kecuali pemilik mengatur sendiri).
       const tuned =

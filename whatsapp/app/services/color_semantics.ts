@@ -38,13 +38,6 @@ const aliases = COLORS.flatMap(([canonical, names]) =>
 // One pass, longest phrase first: "broken white" must never become "broken putih".
 const matcher = new RegExp(`\\b(?:${aliases.map((entry) => entry.alias).join('|')})\\b`, 'g')
 
-export function normalizeColorLanguage(value: unknown) {
-  return words(value).replace(
-    matcher,
-    (alias) => aliases.find((row) => row.alias === alias)!.canonical
-  )
-}
-
 /** Index terms only. Typo/fuzzy/nearby matches must not approve a design or select a SKU. */
 export function catalogColorSearchHints(names: string[]) {
   const found = new Set<string>()

@@ -1,4 +1,3 @@
-import { legacyMeasurementFingerprint, productionFingerprint } from '#services/order_item_details'
 
 type Row = Record<string, any>
 type ToolCall = { server?: string; tool: string; arguments?: Row; result?: any }
@@ -69,80 +68,4 @@ export type ShippingCartState = {
   items: Row[]
   recipient: { address: string }
   shipping: { service: string; cost: number | null }
-}
-
-/** Keeping a saved quote is not a new quote. Share this rule with cart persistence. */
-export function requiresShippingQuote(next: ShippingCartState, previous?: ShippingCartState) {
-  if (next.shipping.cost === null) return false
-  if (!previous) return true
-  // A malformed model draft cannot claim an unchanged package.
-  if (
-    !Array.isArray(next.items) ||
-    !next.recipient ||
-    typeof next.recipient.address !== 'string' ||
-    !Number.isSafeInteger(next.shipping.cost) ||
-    next.shipping.cost < 0 ||
-    !next.shipping.service
-  )
-    return true
-  try {
-    return (
-      next.shipping.cost !== previous.shipping.cost ||
-      next.shipping.service !== previous.shipping.service ||
-      shippingContentsChanged(previous, next)
-    )
-  } catch {
-    return true
-  }
-}
-
-/** Match only aliases actually provided by the same quote, never guess a service code. */
-export function matchShippingQuote(rows: Row[], service: string, cost: number) {
-  const name = normalized(service)
-  if (!name || !Number.isSafeInteger(cost) || cost < 0) return undefined
-  return rows.findLast((row) => shippingAliases(row).includes(name) && shippingCost(row) === cost)
-}
-
-/** Quantity, product composition and destination changes require a fresh shipping lookup. */
-export function shippingContentsChanged(
-  previous: { items: Row[]; recipient: { address: string } },
-  next: { items: Row[]; recipient: { address: string } }
-) {
-  const signature = (items: Row[], retained: Row[] = []) =>
-    JSON.stringify(
-      items
-        .map((item) => {
-          // Match saveCart's retention rule before comparing a partial AI sync.
-          const old =
-            item.id &&
-            retained.find((row) => row.id === item.id && row.productId === item.productId)
-          const details = productionFingerprint(item.productionDetails ?? old?.productionDetails)
-          if (details) {
-            // Sources/pending are bookkeeping, and a color-only correction does
-            // not change package weight. Physical design/size changes may do so.
-            delete (details as Partial<typeof details>).pending
-            delete (details as Partial<typeof details>).color
-          }
-          const measurements = Array.isArray(item.measurements)
-            ? Object.fromEntries(item.measurements.map((row: Row) => [row.name, row.value]))
-            : item.measurements || {}
-          return [
-            item.productId,
-            item.name,
-            item.modelType || 'catalog',
-            item.referenceMessageId || '',
-            item.size,
-            item.requestedSize || '',
-            item.quantity,
-            item.note || '',
-            legacyMeasurementFingerprint(measurements),
-            details,
-          ]
-        })
-        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
-    )
-  return (
-    normalized(previous.recipient.address) !== normalized(next.recipient.address) ||
-    signature(previous.items) !== signature(next.items, previous.items)
-  )
 }

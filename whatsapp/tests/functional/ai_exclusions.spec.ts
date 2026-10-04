@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import db from '@adonisjs/lucid/services/db'
 import { randomUUID } from 'node:crypto'
-import { ensureDefaults, readSettings } from '#services/settings_service'
+import { ensureDefaults } from '#services/settings_service'
 import { setAiExcluded } from '#services/ai_exclusion_service'
 import {
   queueOutgoingMessage,
@@ -9,8 +9,6 @@ import {
   setHandlingMode,
 } from '#services/message_service'
 import { requestAiReview, requestRecentAiReviews } from '#services/ai_review_service'
-import { beginGoalTurn } from '#services/conversation_goal_service'
-import WhatsappListen from '../../commands/whatsapp_listen.js'
 
 const jid = '10000000339001@lid'
 const session = {
@@ -64,46 +62,6 @@ test.group('Contacts excluded from AI replies', (group) => {
     await setHandlingMode(jid, 'ai')
     assert.isOk(await db.from('whatsapp_ai_reviews').where('jid', jid).first())
   })
-  test('delivery checks exclusion again if it is added while AI is preparing to send', async ({
-    assert,
-  }) => {
-    await db.from('whatsapp_settings').where('id', 1).update({ ai_enabled: true })
-    const message = await db.from('whatsapp_messages').where('jid', jid).firstOrFail()
-    const run = await beginGoalTurn(jid, message.message_id)
-    const worker = Object.create(WhatsappListen.prototype) as any
-    Object.assign(worker, {
-      socketOpen: true,
-      receivedPending: true,
-      syncReadyAt: 0,
-      ingesting: 0,
-      ingestion: Promise.resolve(),
-      stopping: false,
-    })
-    let sends = 0
-    const socket = {
-      readMessages: async () => {},
-      sendPresenceUpdate: async (state: string) => {
-        if (state === 'composing') await setAiExcluded(jid, true)
-      },
-      sendMessage: async () => {
-        sends++
-        return { key: { id: randomUUID() } }
-      },
-    }
-    worker.socket = socket
-    await worker.deliverAiDecision(
-      run,
-      socket,
-      await readSettings(true),
-      { decision: 'reply', message: 'Tidak boleh terkirim', reason: '', note: '' },
-      []
-    )
-    assert.equal(sends, 0)
-    assert.isFalse(await worker.canSendAiReply(jid, socket))
-    // Even inconsistent mode data cannot bypass the durable exclusion flag.
-    await db.from('whatsapp_contacts').where('jid', jid).update({ handling_mode: 'ai' })
-    assert.isFalse(await worker.canSendAiReply(jid, socket))
-  }).timeout(10_000)
   test('endpoint requires login/CSRF and validates known contact and boolean state', async ({
     client,
     assert,

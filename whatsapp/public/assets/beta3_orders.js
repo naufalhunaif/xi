@@ -167,7 +167,7 @@
       // Satu baris ringkas dari teks pesanan: produk · jas/celana · size.
       const summary = String(order.text || order.spec || order.items || '')
         .split('\n')
-        .map((line) => line.trim())
+        .map((line) => line.trim().replace(/^[-•]\s*/, ''))
         .filter(Boolean)
         .slice(0, 3)
         .join(' · ')

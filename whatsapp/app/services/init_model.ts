@@ -1,7 +1,6 @@
 import db from '#services/workspace_database'
 
 import { workspaceScope } from '#services/workspace_context'
-import { LEAN_TABLE_STATEMENTS } from '#services/lean/lean_tables'
 const initializations = new Map<string, Promise<void>>()
 
 async function createTables() {
@@ -518,14 +517,6 @@ async function createTables() {
   ]
 
   for (const statement of statements) await db.rawQuery(statement)
-  for (const statement of LEAN_TABLE_STATEMENTS) await db.rawQuery(statement)
-  // Beta 2: jalur balas ramping aktif secara bawaan; jalur lama tetap ada bila dimatikan.
-  await db.rawQuery(
-    'ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS lean_mode TINYINT(1) NOT NULL DEFAULT 1'
-  )
-  await db.rawQuery(
-    'ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS beta3_mode TINYINT(1) NOT NULL DEFAULT 0'
-  )
   await db.rawQuery(
     'ALTER TABLE whatsapp_chat_cleanup ADD COLUMN IF NOT EXISTS target_jids_json TEXT NULL'
   )

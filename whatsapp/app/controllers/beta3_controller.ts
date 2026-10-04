@@ -40,6 +40,7 @@ import { readLeanState, readBeta3ChatNote } from '#beta3/tables'
 import { recoverHandledOrder } from '#beta3/reply_service'
 import { fixCatalogColors } from '#beta3/color_fix'
 import { readExchangePolicy, saveExchangePolicy } from '#beta3/store_policy'
+import { accuracySummary, askJev, jevStatus, listDecisions, markDecision, saveJevConfig } from '#beta3/jev'
 import {
   customerImagesForOrder,
   listActiveRefs,
@@ -72,7 +73,7 @@ import { attachOrderPhotos } from '#beta3/order_photos'
 import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '#beta3/weights'
 import env from '#start/env'
 
-/** Beta 2: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
+/** Beta 3: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
 /** Bukti transfer yang nominalnya sedang/baru dibaca AI (sekali per 10 menit per order). */
 const proofReads = new Map<string, number>()
 
@@ -601,5 +602,55 @@ export default class Beta3Controller {
   async removeTest({ params, response }: HttpContext) {
     await removeTest(Number(params.id))
     return response.noContent()
+  }
+
+  /** Pengaturan → Jev: status, kunci API (terenkripsi), saklar per keputusan. */
+  async jev({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    return response.json(await jevStatus())
+  }
+
+  async saveJev({ request, response }: HttpContext) {
+    const body = request.body() as Record<string, unknown>
+    try {
+      return response.json(
+        await saveJevConfig({
+          ...(typeof body.apiKey === 'string' && body.apiKey.trim() ? { apiKey: body.apiKey } : {}),
+          ...(body.removeKey === true ? { apiKey: '' } : {}),
+          ...(typeof body.model === 'string' ? { model: body.model } : {}),
+          ...(typeof body.enabled === 'boolean' ? { enabled: body.enabled } : {}),
+          ...(Array.isArray(body.off) ? { off: body.off.map((key) => String(key ?? '')) } : {}),
+        })
+      )
+    } catch (error) {
+      return response.badRequest({ error: error instanceof Error ? error.message : 'Gagal menyimpan.' })
+    }
+  }
+
+  /** Uji kunci dengan satu pertanyaan kecil. */
+  async testJev({ response }: HttpContext) {
+    const started = Date.now()
+    const answers = await askJev(
+      'uji',
+      { pesan: 'Assalamualaikum kak, mau tanya harga jas' },
+      { tanya_harga: { type: 'noul', instructions: 'Apakah pesan ini menanyakan harga?' } },
+      { timeoutMs: 5000 }
+    )
+    const answer = answers?.tanya_harga
+    if (!answer) return response.badRequest({ error: (await jevStatus()).lastError || 'Jev belum bisa dihubungi.' })
+    return response.json({ ok: true, ms: Date.now() - started, answer: answer.type === 'noul' ? answer.noul : null })
+  }
+
+  /** Halaman Akurasi: keputusan Jev terbaru + akurasi 30 hari. */
+  async jevDecisions({ request, response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    const decision = String(request.qs().decision ?? '')
+    const [rows, summary] = await Promise.all([listDecisions(60, decision || undefined), accuracySummary()])
+    return response.json({ decisions: rows, summary })
+  }
+
+  async markJevDecision({ params, request, response }: HttpContext) {
+    await markDecision(Number(params.id), request.input('wrong') === true || request.input('wrong') === 'true')
+    return response.json({ ok: true })
   }
 }

@@ -8,7 +8,6 @@
   const number = (value) => new Intl.NumberFormat((window.waI18n?.locale || 'id-ID')).format(value)
   const base = document.querySelector('meta[name="app-url"]').content.replace(/\/$/, '')
   let loading = false
-  let evaluationLoading = false
   // Usage: rentang/tanggal terpilih & cache kalender (dipakai selectPanel saat halaman dibuka).
   const usageState = { days: 30, date: '' }
   const runsState = { filter: null, next: 0, total: 0, shown: 0, extended: false, busy: false }
@@ -45,7 +44,6 @@
       else link.removeAttribute('aria-current')
     }
     if (selected === 'usage') updateUsage()
-    if (selected === 'evaluation') updateEvaluations()
   }
   window.addEventListener('hashchange', selectPanel)
   document.addEventListener('ui-language:change', selectPanel)
@@ -212,7 +210,7 @@
       if (extra) card.append(textElement('span', extra, 'wa-usage-caption'))
       cards.append(card)
     }
-    const names = { claude: 'Claude', gemini: 'Gemini', chatgpt: 'ChatGPT' }
+    const names = { claude: 'Claude', gemini: 'Gemini', chatgpt: 'ChatGPT', typesafe: 'Jev' }
     const used = data.providers.filter((row) => row.runs)
     byId('usageProviders').textContent = used.length
       ? used.map((row) => `${names[row.provider] || row.provider} ${row.measured ? compact(row.input + row.output) : '—'} (${number(row.runs)} ${t('proses')})`).join(' · ')
@@ -237,7 +235,7 @@
     for (const value of [
       date,
       run.phase || '—',
-      `${({ claude: 'Claude', gemini: 'Gemini' })[run.provider] || 'ChatGPT'} / ${String(run.model).replace(' (otomatis)', ` (${t('otomatis')})`)}`,
+      `${({ claude: 'Claude', gemini: 'Gemini', typesafe: 'Jev' })[run.provider] || 'ChatGPT'} / ${String(run.model).replace(' (otomatis)', ` (${t('otomatis')})`)}`,
       run.tokens === null ? '—' : number(run.tokens),
       t("{0} dtk", number(Math.round(run.durationMs / 1000))),
       run.status === 'completed' ? t('Selesai') : t('Gagal'),
@@ -386,7 +384,7 @@
         for (const row of data.models || []) {
           const line = document.createElement('tr')
           for (const [value, className] of [
-            [`${({ claude: 'Claude', gemini: 'Gemini' })[row.provider] || 'ChatGPT'} / ${row.model.replace(' (otomatis)', ` (${t('otomatis')})`)}`, ''],
+            [`${({ claude: 'Claude', gemini: 'Gemini', typesafe: 'Jev' })[row.provider] || 'ChatGPT'} / ${row.model.replace(' (otomatis)', ` (${t('otomatis')})`)}`, ''],
             [number(row.runs), 'wa-usage-number'],
             [number(row.input), 'wa-usage-number'],
             [number(row.cached), 'wa-usage-number'],
@@ -417,114 +415,7 @@
     }
   }
   byId('usageRefresh').addEventListener('click', updateUsage)
-  async function updateEvaluations() {
-    if (evaluationLoading || document.hidden) return
-    evaluationLoading = true
-    byId('evaluationRefresh').disabled = true
-    try {
-      const response = await fetch(`${base}/api/ai/evaluations`, {
-        headers: { Accept: 'application/json' },
-        cache: 'no-store',
-      })
-      if (!response.ok || response.redirected) throw new Error(t('Evaluasi belum dapat dimuat.'))
-      const data = await response.json()
-      byId('evaluationStatus').textContent = !data.skills.length
-        ? 'Import skill eval/evaluation untuk mulai mengevaluasi.'
-        : !data.enabled
-          ? t('Evaluasi dijeda karena AI nonaktif.')
-          : t("Menggunakan {0} · Otomatis di latar belakang setelah percakapan berubah.", data.skills.join(', '))
-      const metrics = byId('evaluationMetrics')
-      metrics.replaceChildren()
-      for (const [label, value] of [
-        [t('Pelanggan'), number(data.customers)],
-        [t('Dengan order'), number(data.ordered)],
-        [
-          'Order rate',
-          data.orderRate === null ? '—' : `${number(Math.round(data.orderRate * 10) / 10)}%`,
-        ],
-      ]) {
-        const card = textElement('article', '', 'wa-usage-card')
-        card.append(textElement('h3', label), textElement('strong', value, 'wa-usage-total'))
-        metrics.append(card)
-      }
-      const list = byId('evaluationList')
-      const opened = new Set(
-        [...list.querySelectorAll('details[open]')].map((item) => item.dataset.jid)
-      )
-      list.replaceChildren()
-      const states = {
-        pending: t('Menunggu evaluasi terbaru'),
-        running: t('Sedang dievaluasi'),
-        completed: t('Selesai'),
-        failed: t('Belum selesai'),
-      }
-      const stages = {
-        discovery: t('Kebutuhan'),
-        selection: t('Pilihan produk'),
-        checkout: t('Data pesanan'),
-        payment: t('Pembayaran'),
-        ordered: 'Order',
-        support: t('Layanan'),
-        unknown: t('Belum jelas'),
-      }
-      for (const row of data.recent) {
-        const card = textElement('details', '', 'wa-evaluation-card')
-        card.dataset.jid = row.jid
-        card.open = opened.has(row.jid)
-        card.append(textElement('summary', `${row.name} · ${states[row.status] || row.status}`))
-        card.append(
-          textElement(
-            'small',
-            new Intl.DateTimeFormat((window.waI18n?.locale || 'id-ID'), {
-              timeZone: 'Asia/Jakarta',
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            }).format(new Date(row.updatedAt)) + ' WIB',
-            'wa-usage-caption'
-          )
-        )
-        if (row.result) {
-          card.append(textElement('p', row.result.summary))
-          const detail = textElement('dl', '', 'wa-evaluation-details')
-          for (const [label, value] of [
-            [t('Tahap'), stages[row.result.stage] || row.result.stage],
-            [t('Kebutuhan terlewat'), row.result.missedNeeds.join('\n') || t('Tidak teridentifikasi')],
-            [t('Tindak lanjut'), row.result.nextAction],
-            [t('Bukti pesan'), row.result.evidenceMessageIds.join(', ') || t('Belum tersedia')],
-            [
-              t('Batas evaluasi'),
-              row.result.limitations.join('\n') ||
-                t('Observasi satu percakapan; bukan kesimpulan peningkatan konversi.'),
-            ],
-          ]) {
-            detail.append(textElement('dt', label), textElement('dd', value))
-          }
-          card.append(detail)
-        } else if (row.error) card.append(textElement('p', row.error))
-        const versions = textElement('details')
-        versions.append(textElement('summary', t('Skill saat evaluasi')))
-        for (const skill of row.skills)
-          versions.append(
-            textElement(
-              'p',
-              `${skill.name} · ${skill.updatedAt ? new Date(skill.updatedAt).toLocaleString((window.waI18n?.locale || 'id-ID'), { timeZone: 'Asia/Jakarta' }) + ' WIB' : t('Waktu belum tercatat')}`
-            )
-          )
-        card.append(versions)
-        list.append(card)
-      }
-      if (!data.recent.length)
-        list.append(textElement('p', t('Belum ada evaluasi tercatat.'), 'wa-usage-caption'))
-    } catch (error) {
-      byId('evaluationStatus').textContent = error.message
-    } finally {
-      evaluationLoading = false
-      byId('evaluationRefresh').disabled = false
-    }
-  }
-  byId('evaluationRefresh').addEventListener('click', updateEvaluations)
   window.setInterval(() => {
     if (!byId('settings-usage').hidden) updateUsage()
-    if (!byId('settings-evaluation').hidden) updateEvaluations()
   }, 15000)
 })()

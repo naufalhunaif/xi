@@ -11,7 +11,6 @@ import { workspaceScope } from '#services/workspace_context'
  * catatan memakai tabel yang sama dengan WhatsApp.
  */
 export const IG_SUFFIX = '@ig'
-export const isIgJid = (jid: unknown) => String(jid || '').endsWith(IG_SUFFIX)
 export const igJid = (igsid: string) => `${String(igsid).replace(/\D/g, '')}${IG_SUFFIX}`
 export const igsidOf = (jid: string) => String(jid).replace(/@ig$/, '')
 

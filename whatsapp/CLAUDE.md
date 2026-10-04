@@ -23,7 +23,8 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 | `public/lang/en.js`, `id.js` | Kamus bahasa antarmuka (kunci = teks Indonesia). |
 | `start/routes.ts` | Rute publik di atas (webhook, `/ig-media`), rute login di dalam grup `accountAuth`. |
 | `docs/` | Catatan desain fitur. Tambahkan dokumen di sini untuk fitur besar baru. `docs/roadmap.md` = PR ke depan (jangan dikerjakan tanpa persetujuan pemilik). |
-| Beta 1/2 (`lean_*`, `orders_lean`, dll.) | Tidak dikembangkan lagi. Jangan menambah fitur di sana. |
+| `app/beta3/jev.ts`, `jev_decisions.ts` | Jev (TypeSafe AI): keputusan kecil (layanan ongkir, total toko, janji total, varian, setuju, form, terjawab, maksud, serah CS, komentar IG) + catatan Akurasi. Pengaturan → Jev. |
+| `docs/arsip/` | Catatan Beta 1/2 (sudah dihapus sejak v3.5.0). Jangan menghidupkan kembali kodenya. |
 
 ## Konsep penting
 
@@ -44,9 +45,17 @@ Aplikasi CS Chameleon Cloth: kotak masuk WhatsApp + Instagram, AI yang membalas 
 - Perubahan perilaku AI: tunjukkan contoh sebelum/sesudah; kalau pemilik bilang salah, kembalikan seperti semula.
 - Contoh chat CS dari pemilik untuk pembelajaran: **catat dulu** di `docs/cs-pelajaran.md`, jangan langsung ubah skill. Skill diubah sekaligus hanya bila pemilik meminta.
 
+## Aturan Jev (v3.5)
+
+- **Jev memutuskan, kode bertindak.** Jev hanya menjawab pertanyaan pilihan/ya-tidak/skor; teks balasan tetap dari model AI.
+- Setiap keputusan Jev punya **cadangan cara lama** (regex/aturan). Jev mati, gagal, lambat (> 800 ms), atau ragu (di bawah ambang `JEV_THRESHOLD`) → cara lama dipakai.
+- Semua panggilan lewat `askJev` (fetch langsung, tanpa SDK); data pelanggan disamarkan `maskPii` dulu. Setiap keputusan dicatat ke `whatsapp_beta3_decisions` (halaman Akurasi).
+- Tes memakai `setJevFetcher` (tanpa jaringan) dan mengosongkan config Jev sesudahnya. Kunci API hanya diisi pemilik di Pengaturan → Jev.
+
 ## Aturan UI
 
 - Baca `design.md` dan jalankan checklist bagian 2 sebelum commit. Pakai komponen `ui.css`/`theme.css`; tanpa inline style dan warna baru di luar token.
+- Tampilan tenang v3.5 (`calm.css`, dimuat terakhir): latar off-white, panel putih bergaris tipis, radius ≤ 6 px, tanpa bayangan dan pola. Ubah token di sana, jangan menambah warna baru.
 - Semua teks UI lewat `data-i18n` (HTML) atau `t()` (JS), dengan entri di **`en.js` dan `id.js`**.
 - Setiap aset yang diubah: naikkan `?v=` di `resources/views/components/layout.edge` (aset ber-versi di-cache browser 1 tahun).
 - Cek di 1440 px dan 390 px, light & dark. HP: menu di bawah (disembunyikan saat room chat terbuka).
