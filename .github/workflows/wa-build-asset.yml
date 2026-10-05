@@ -1,0 +1,53 @@
+# Paket build untuk `wa update`: dibangun di GitHub Actions saat tag v3.x.y dipush, lalu diunggah
+# sebagai aset rilis `wa-build-v<ver>.tar.gz`. Server (deploy/whatsapp-aapanel.mjs fetchPrebuilt)
+# mengunduhnya sehingga tidak perlu build sendiri (menit → detik).
+name: wa-build-asset
+on:
+  push:
+    tags: ['v3.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag rilis (mis. v3.6.21)'
+        required: true
+permissions:
+  contents: write
+jobs:
+  build:
+    if: github.repository == 'naufalhunaif/xi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: whatsapp/package-lock.json
+      - name: Build
+        working-directory: whatsapp
+        env:
+          NODE_ENV: development
+        run: |
+          npm ci --include=dev --include=optional --no-audit --no-fund
+          npm run build
+          printf '%s\n' "${TAG#v}" > build/VERSION
+          tar --exclude='build/public/media' --exclude='build/storage' --exclude='build/tmp' \
+            --exclude='build/.env' --exclude='build/.env.*' --exclude='build/tests' --exclude='build/node_modules' \
+            -czf "../wa-build-$TAG.tar.gz" build
+          ls -la "../wa-build-$TAG.tar.gz"
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Release dibuat deploy/release.sh lewat API tepat setelah tag dipush; tunggu bila belum ada.
+          for i in $(seq 1 24); do
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then break; fi
+            sleep 5
+          done
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "WhatsApp $TAG" --generate-notes
+          gh release upload "$TAG" "wa-build-$TAG.tar.gz" --repo "$GITHUB_REPOSITORY" --clobber
