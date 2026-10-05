@@ -628,7 +628,12 @@
       const button = document.createElement('button')
       button.type = 'button'
       button.dataset.line = String(line.id)
-      button.textContent = line.label
+      button.title = line.label || ''
+      button.setAttribute('aria-label', `SIM ${line.sim}`)
+      const sim = document.createElement('span')
+      sim.className = 'wa-sim'
+      sim.textContent = String(line.sim)
+      button.append(sim)
       box.append(button)
     }
     applyInboxFilters()
@@ -967,11 +972,12 @@
         ig.textContent = 'IG'
         title.append(ig)
       }
-      if (contact.line_label) {
+      if (contact.line_sim) {
         const chip = document.createElement('span')
-        chip.className = 'wa-line-chip'
-        chip.title = t('Nomor penerima')
-        chip.textContent = contact.line_label
+        chip.className = 'wa-sim'
+        chip.title = contact.line_label || ''
+        chip.setAttribute('aria-label', `SIM ${contact.line_sim}`)
+        chip.textContent = String(contact.line_sim)
         title.append(chip)
       }
       const preview = document.createElement('small')

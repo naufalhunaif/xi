@@ -27,5 +27,23 @@ if git diff --cached --quiet; then echo 'xi sudah sinkron.'; else
   git push -q origin HEAD:main
   echo "xi diperbarui."
 fi
-[[ -n "$v" ]] && bash deploy/release.sh "$v"
+if [[ -n "$v" ]]; then
+  # Build di mesin ini (cepat) → diunggah sebagai aset rilis; server tinggal unduh (lihat whatsapp-aapanel.mjs fetchPrebuilt).
+  asset=""
+  if [[ "${WA_SKIP_BUILD:-}" != 1 ]]; then
+    tmp="$(mktemp -d)"
+    if (cd "$ROOT/whatsapp" && rm -rf build && npm run build >"$tmp/build.log" 2>&1); then
+      printf '%s\n' "$v" > "$ROOT/whatsapp/build/VERSION"
+      tar -C "$ROOT/whatsapp" \
+        --exclude='build/public/media' --exclude='build/storage' --exclude='build/tmp' \
+        --exclude='build/.env' --exclude='build/.env.*' --exclude='build/tests' --exclude='build/node_modules' \
+        -czf "$tmp/wa-build-v$v.tar.gz" build
+      asset="$tmp/wa-build-v$v.tar.gz"
+      echo "Paket build siap ($(du -h "$asset" | cut -f1))."
+    else
+      echo "Build lokal gagal (lihat $tmp/build.log); rilis tanpa paket build, server akan build sendiri." >&2
+    fi
+  fi
+  WA_BUILD_ASSET="$asset" bash deploy/release.sh "$v"
+fi
 exit 0

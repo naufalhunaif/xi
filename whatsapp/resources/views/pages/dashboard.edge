@@ -157,9 +157,9 @@
         <div class="wa-chat-grid">
           <aside class="wa-panel wa-contact-panel">
             <div id="inboxLines" class="wa-inbox-lines" role="group" aria-label="Nomor" data-i18n-aria-label="Nomor" {{ inboxLines && inboxLines.length ? '' : 'hidden' }}>
-              <button type="button" data-line="all" aria-pressed="true" data-i18n="Semua nomor">Semua nomor</button>
+              <button type="button" data-line="all" aria-pressed="true" data-i18n="Semua">Semua</button>
               @each(line in (inboxLines || []))
-                <button type="button" data-line="{{ line.id }}" aria-pressed="false">{{ line.label }}</button>
+                <button type="button" data-line="{{ line.id }}" aria-pressed="false" title="{{ line.label }}" aria-label="SIM {{ line.sim }}"><span class="wa-sim">{{ line.sim }}</span></button>
               @end
             </div>
             <div class="wa-inbox-heading">
@@ -246,8 +246,8 @@
                   <span class="wa-contact-content">
                     <strong>
                       {{ contact.contact_name || (contact.jid.endsWith('@lid') ? 'Tanpa nama' : '+' + contact.jid.split('@')[0]) }}
-                      @if(contact.line_label)
-                        <span class="wa-line-chip" title="Nomor penerima">{{ contact.line_label }}</span>
+                      @if(contact.line_sim)
+                        <span class="wa-sim" title="{{ contact.line_label || '' }}" aria-label="SIM {{ contact.line_sim }}">{{ contact.line_sim }}</span>
                       @end
                     </strong>
                     <small class="{{ contact.activity ? 'active' : '' }}">

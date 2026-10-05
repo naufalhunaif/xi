@@ -119,14 +119,16 @@ export default class DashboardController {
         messages.map((message) => message.jid)
       )
     const goalsByJid = new Map(goals.map((goal) => [goal.jid, goal]))
-    // Multi nomor: label 4 digit terakhir nomor penerima, hanya bila ada nomor tambahan.
-    const lines = await listLines().catch(() => [])
+    // Multi nomor: tanda SIM 1/2/… (urutan: utama, lalu nomor tambahan) hanya bila ada nomor tambahan.
+    const lines = (await listLines().catch(() => [])).filter((line) => line.desired_connected)
     const linePhones = new Map(lines.map((line) => [Number(line.id), String(line.phone || '')]))
+    const lineIndex = new Map(lines.map((line, index) => [Number(line.id), index + 2]))
     const lineLabel = (lineId: unknown) => {
       if (!lines.length) return null
       const phone = Number(lineId) > 1 ? linePhones.get(Number(lineId)) : workspaceScope().phone
-      return phone ? `…${String(phone).slice(-4)}` : null
+      return phone ? `+${phone}` : null
     }
+    const lineSim = (lineId: unknown) => (!lines.length ? 0 : Number(lineId) > 1 ? lineIndex.get(Number(lineId)) || 0 : 1)
     const [recentTraces, connection, settings] = await Promise.all([
       db
         .from('whatsapp_ai_traces')
@@ -166,6 +168,7 @@ export default class DashboardController {
         contact_name: profile?.name || message.contact_name || displayPhone(message.phone_jid),
         // Nomor penerima room: dari kontak (claimRoom), bila kosong dari pesan terakhir.
         line_label: lineLabel(profile?.line_id ?? message.message_line_id),
+        line_sim: String(message.jid).endsWith('@ig') ? 0 : lineSim(profile?.line_id ?? message.message_line_id),
         line_id: Number(profile?.line_id ?? message.message_line_id) > 1 ? Number(profile?.line_id ?? message.message_line_id) : 1,
         profile_picture_url: profile?.profile_picture_url || null,
         activity:
@@ -539,10 +542,10 @@ export default class DashboardController {
   private async inboxLines() {
     const lines = (await listLines().catch(() => [])).filter((line) => line.desired_connected)
     if (!lines.length) return []
-    const last4 = (phone: unknown) => (phone ? `…${String(phone).slice(-4)}` : '')
+    const full = (phone: unknown) => (phone ? `+${phone}` : '')
     return [
-      { id: 1, label: last4(workspaceScope().phone) || 'Main' },
-      ...lines.map((line) => ({ id: line.id, label: last4(line.phone) || `#${line.id}` })),
+      { id: 1, sim: 1, label: full(workspaceScope().phone) || 'Main' },
+      ...lines.map((line, index) => ({ id: line.id, sim: index + 2, label: full(line.phone) || `#${line.id}` })),
     ]
   }
   async contactsList({ response }: HttpContext) {

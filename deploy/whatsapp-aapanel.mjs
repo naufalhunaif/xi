@@ -1,4 +1,7 @@
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import { createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
 import {
   access,
@@ -106,6 +109,61 @@ async function cachedInstall({ kind, dir, lockFile, cacheRoot, install }) {
   }
 }
 
+/**
+ * Paket build siap pakai dari GitHub Release (diunggah `deploy/release.sh` saat rilis).
+ * Dipakai bila ada → server tidak perlu `npm ci --include=dev` + `node ace build` (beberapa menit
+ * di VPS kecil). Mengembalikan null bila tidak ada/gagal → build sendiri seperti biasa.
+ */
+export async function fetchPrebuilt({ root, source, repoDir = repoRoot, env = process.env, log = console.log }) {
+  if (env.WA_PREBUILT === "0") return null;
+  let version = "";
+  try {
+    version = (await readFile(join(root, "VERSION"), "utf8")).trim();
+  } catch {
+    return null;
+  }
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return null;
+  let repo = String(env.WA_REPO || "").trim();
+  if (!repo) {
+    const remote = await new Promise((resolve) =>
+      execFile("git", ["-C", repoDir, "remote", "get-url", "origin"], { timeout: 10_000 }, (error, stdout) =>
+        resolve(error ? "" : String(stdout).trim()),
+      ),
+    );
+    repo = /github\.com[:/]([^/]+\/[^/.\s]+)(?:\.git)?$/.exec(remote)?.[1] || "";
+  }
+  if (!repo) return null;
+  const name = `wa-build-v${version}.tar.gz`;
+  const url = `https://github.com/${repo}/releases/download/v${version}/${name}`;
+  const file = join(dirname(source), name);
+  const started = Date.now();
+  try {
+    const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(120_000) });
+    if (!response.ok || !response.body) {
+      log(`Paket build v${version} tidak tersedia di GitHub Release (${response.status}); membangun sendiri.`);
+      return null;
+    }
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(file, { mode: 0o600 }));
+    await new Promise((resolve, reject) => {
+      const child = spawn("tar", ["-xzf", file, "-C", source], { stdio: "ignore" });
+      child.on("error", reject);
+      child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`tar ${code}`))));
+    });
+    for (const required of ["package.json", "package-lock.json", "bin/server.js", "ace.js"])
+      await access(join(source, "build", required));
+    const built = (await readFile(join(source, "build", "VERSION"), "utf8").catch(() => "")).trim();
+    if (built !== version) throw new Error(`versi paket ${built || "?"} ≠ ${version}`);
+    log(`Paket build v${version} dari GitHub Release dipakai (${Math.round((Date.now() - started) / 1000)} dtk).`);
+    return { version, file };
+  } catch (error) {
+    log(`Paket build v${version} tidak bisa dipakai (${error.message}); membangun sendiri.`);
+    await rm(join(source, "build"), { recursive: true, force: true }).catch(() => {});
+    return null;
+  } finally {
+    await rm(file, { force: true }).catch(() => {});
+  }
+}
+
 async function exists(path) {
   try {
     await lstat(path);
@@ -124,7 +182,10 @@ export async function deploy({
   cleanup = cleanupReleases,
   restart = true,
   prepareRestart = prepareSupervisorRestart,
+  prebuilt = fetchPrebuilt,
 } = {}) {
+  const t0 = Date.now();
+  const elapsed = () => `${Math.round((Date.now() - t0) / 1000)} dtk`;
   if (Number(process.versions.node.split(".")[0]) < 24)
     throw new Error("Gunakan Node.js 24+ dari aaPanel.");
   if (
@@ -204,27 +265,32 @@ export async function deploy({
     // Build dependencies must be installed even if aaPanel exports NODE_ENV=production.
     const buildEnv = { ...process.env, NODE_ENV: "development" };
     const cacheRoot = join(deployRoot, "deps");
-    await cachedInstall({
-      kind: "dev",
-      dir: source,
-      lockFile: join(source, "package-lock.json"),
-      cacheRoot,
-      install: () =>
-        execute(
-          "npm",
-          [
-            "ci",
-            "--include=dev",
-            "--include=optional",
-            "--ignore-scripts=false",
-            "--no-audit",
-            "--no-fund",
-          ],
-          source,
-          buildEnv,
-        ),
-    });
-    await execute("npm", ["run", "build"], source, buildEnv);
+    const ready = prebuilt ? await prebuilt({ root, source }).catch(() => null) : null;
+    if (!ready) {
+      await cachedInstall({
+        kind: "dev",
+        dir: source,
+        lockFile: join(source, "package-lock.json"),
+        cacheRoot,
+        install: () =>
+          execute(
+            "npm",
+            [
+              "ci",
+              "--include=dev",
+              "--include=optional",
+              "--ignore-scripts=false",
+              "--no-audit",
+              "--no-fund",
+            ],
+            source,
+            buildEnv,
+          ),
+      });
+      console.log(`Dependensi build siap (${elapsed()}).`);
+      await execute("npm", ["run", "build"], source, buildEnv);
+      console.log(`Build selesai (${elapsed()}).`);
+    }
     const productionEnv = { ...process.env, NODE_ENV: "production" };
     await cachedInstall({
       kind: "prod",
@@ -246,6 +312,7 @@ export async function deploy({
           productionEnv,
         ),
     });
+    console.log(`Dependensi produksi siap (${elapsed()}).`);
     await execute(
       process.execPath,
       [join(repoRoot, "deploy", "whatsapp-runtime-check.mjs"), output],
@@ -297,6 +364,7 @@ export async function deploy({
         runtime,
         runtimeEnv,
       );
+    console.log(`Model database siap (${elapsed()}).`);
     const previous = await realpath(join(root, "current")).catch(() => null);
     const pending = join(release, "next");
     await symlink(runtime, pending, "dir");
@@ -339,11 +407,11 @@ if (
   const args = process.argv.slice(2);
   if (args.includes("--help")) {
     console.log(
-      "bash deploy/build.sh [--verify-only] [--skip-init] [--no-restart] [--cleanup]\nDefault: periksa Supervisor, install, build, cek runtime, init model, ganti current, restart WEB/WORKER, verifikasi proses, bersihkan release lama.\n--no-restart: build/promosi tanpa mengubah proses.\n--verify-only: uji install/build saja, tanpa database/promosi/restart/pembersihan riwayat.\n--skip-init: tunda init model sampai startup aplikasi.\n--cleanup: hanya bersihkan riwayat, tanpa build/database/restart.",
+      "bash deploy/build.sh [--verify-only] [--skip-init] [--no-restart] [--no-prebuilt] [--cleanup]\n--no-prebuilt: abaikan paket build dari GitHub Release, bangun sendiri.\nDefault: periksa Supervisor, install, build, cek runtime, init model, ganti current, restart WEB/WORKER, verifikasi proses, bersihkan release lama.\n--no-restart: build/promosi tanpa mengubah proses.\n--verify-only: uji install/build saja, tanpa database/promosi/restart/pembersihan riwayat.\n--skip-init: tunda init model sampai startup aplikasi.\n--cleanup: hanya bersihkan riwayat, tanpa build/database/restart.",
     );
   } else if (
     args.some(
-      (arg) => !["--verify-only", "--skip-init", "--cleanup", "--no-restart"].includes(arg),
+      (arg) => !["--verify-only", "--skip-init", "--cleanup", "--no-restart", "--no-prebuilt"].includes(arg),
     ) ||
     (args.includes("--cleanup") && args.length !== 1)
   ) {
@@ -361,6 +429,7 @@ if (
       verifyOnly: args.includes("--verify-only"),
       skipInit: args.includes("--skip-init"),
       restart: !args.includes("--no-restart"),
+      prebuilt: args.includes("--no-prebuilt") ? null : fetchPrebuilt,
     }).catch((error) => {
       console.error(error.message);
       process.exitCode = 1;

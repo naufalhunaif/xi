@@ -27,7 +27,18 @@ print(json.dumps({"tag_name":"v"+v,"name":label,"body":notes,"generate_release_n
   code="$(curl -sS -o /tmp/wa-release.json -w '%{http_code}' -X POST \
     -H "Authorization: Bearer $token" -H 'Accept: application/vnd.github+json' \
     "https://api.github.com/repos/$repo/releases" -d "$body")"
-  if [[ "$code" == 201 ]]; then echo "GitHub Release v$v dibuat."; else echo "Release API gagal ($code): $(head -c 300 /tmp/wa-release.json)" >&2; fi
+  if [[ "$code" == 201 ]]; then
+    echo "GitHub Release v$v dibuat."
+    # Paket build (dibuat publish-xi.sh) diunggah sebagai aset rilis → `wa update` tidak perlu build di server.
+    asset="${WA_BUILD_ASSET:-}"
+    if [[ -n "$asset" && -f "$asset" ]]; then
+      rid="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' /tmp/wa-release.json)"
+      ucode="$(curl -sS -o /tmp/wa-asset.json -w '%{http_code}' -X POST \
+        -H "Authorization: Bearer $token" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/gzip' \
+        --data-binary @"$asset" "https://uploads.github.com/repos/$repo/releases/$rid/assets?name=wa-build-v$v.tar.gz")"
+      if [[ "$ucode" == 201 ]]; then echo "Paket build diunggah ($(du -h "$asset" | cut -f1))."; else echo "Unggah paket build gagal ($ucode); server akan build sendiri." >&2; fi
+    fi
+  else echo "Release API gagal ($code): $(head -c 300 /tmp/wa-release.json)" >&2; fi
 else
   echo 'Tidak ada token GitHub; buat Release manual di GitHub bila perlu.'
 fi

@@ -811,3 +811,40 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
   min-height: 52px;
   padding-top: 6px;
 }
+
+/* Tanda nomor penerima: ikon SIM kecil berisi angka 1/2/… (judul = nomor lengkap). */
+.workspace-ui .wa-sim {
+  display: inline-grid;
+  place-items: center;
+  width: 13px;
+  height: 16px;
+  margin-left: 5px;
+  vertical-align: -2px;
+  border: 1px solid var(--muted);
+  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%);
+  font-family: var(--wa-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--wa-surface, #fff);
+}
+.workspace-ui .wa-inbox-lines button .wa-sim {
+  margin: 0;
+  width: 15px;
+  height: 18px;
+  font-size: 9.5px;
+}
+.workspace-ui .wa-inbox-lines button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 2px 7px;
+}
+.workspace-ui .wa-inbox-lines button[aria-pressed='true'] .wa-sim {
+  border-color: var(--wa-page);
+  color: var(--wa-page);
+  background: transparent;
+}
