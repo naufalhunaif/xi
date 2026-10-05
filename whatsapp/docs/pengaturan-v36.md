@@ -308,3 +308,8 @@ Perubahan v3.6.6:
 - Kasus uji memakai skill yang sama dengan balasan; untuk membandingkan, jalankan kasus uji dengan saklar aktif lalu mati.
 - Jev tidak memakai skill (pertanyaan Jev pendek, ±1.500 token).
 - Bersinggungan: memangkas bagian skill per giliran (trimSkill) tetap berjalan di atas digest karena judul ## sama.
+
+## v3.6.40 — Kasus uji dengan model paling kuat
+
+- Settings → Kualitas → Kasus uji: pilihan model di samping **Jalankan semua**: Model otomatis (seperti balasan), Model paling kuat (Claude Opus / ChatGPT Sol), Paling kuat · Claude, Paling kuat · ChatGPT. Dipakai untuk membandingkan skill ringkas (digest) vs skill asli di model yang sama.
+- API: `POST /api/beta3/tests/run` menerima `tier: "heavy"` dan `provider: "claude" | "chatgpt"`.

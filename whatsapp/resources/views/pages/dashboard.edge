@@ -860,7 +860,7 @@
                         <strong data-i18n="Kasus uji">Kasus uji</strong>
                         <small data-i18n="Dari koreksi CS; jalankan setelah update">Dari koreksi CS; jalankan setelah update</small>
                       </div>
-                      <div class="actions"><button type="button" class="button primary" id="testsRun"><svg class="wa-i" aria-hidden="true"><use href="#i-play"/></svg><span data-i18n="Jalankan semua">Jalankan semua</span></button></div>
+                      <div class="actions"><select id="testsModel" data-settings-ignore aria-label="Model uji" data-i18n-aria-label="Model uji"><option value="" data-i18n="Model otomatis">Model otomatis</option><option value="heavy" data-i18n="Model paling kuat">Model paling kuat</option><option value="heavy:claude" data-i18n="Paling kuat · Claude">Paling kuat · Claude</option><option value="heavy:chatgpt" data-i18n="Paling kuat · ChatGPT">Paling kuat · ChatGPT</option></select><button type="button" class="button primary" id="testsRun"><svg class="wa-i" aria-hidden="true"><use href="#i-play"/></svg><span data-i18n="Jalankan semua">Jalankan semua</span></button></div>
                     </div>
                     <p id="testsSummary" class="wa-note"></p>
                     <ul id="testsList" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>

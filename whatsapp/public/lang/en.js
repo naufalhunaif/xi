@@ -1977,4 +1977,8 @@ window.waLocales.en = {
   "{0} \u2192 {1} token": "{0} \u2192 {1} tokens",
   "{0} bagian memakai teks asli": "{0} sections use the full text",
   "Sedang disiapkan \u2014 skill asli dipakai dulu": "Being prepared \u2014 full skill used for now",
+  "Model uji": "Test model",
+  "Model paling kuat": "Strongest model",
+  "Paling kuat \u00b7 Claude": "Strongest \u00b7 Claude",
+  "Paling kuat \u00b7 ChatGPT": "Strongest \u00b7 ChatGPT",
 }

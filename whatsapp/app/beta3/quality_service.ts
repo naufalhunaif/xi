@@ -142,7 +142,9 @@ export async function removeTest(id: number) {
 const TEST_PROVIDERS = ['claude', 'chatgpt'] as const
 
 let running = false
-export async function runTests(settings: LeanSettings, ids: number[] = []) {
+/** v3.6.40: uji bisa dipaksa ke model paling kuat (heavy) dan/atau satu penyedia, untuk perbandingan. */
+export type TestRunOptions = { tier?: 'heavy'; provider?: 'claude' | 'chatgpt' }
+export async function runTests(settings: LeanSettings, ids: number[] = [], options: TestRunOptions = {}) {
   await ensureLeanTables()
   if (running) return { started: false, reason: 'Uji sedang berjalan.' }
   const query = db.from('whatsapp_beta3_tests').orderBy('id', 'asc')
@@ -158,7 +160,7 @@ export async function runTests(settings: LeanSettings, ids: number[] = []) {
     try {
       for (const test of cases) {
         await db.from('whatsapp_beta3_tests').where('id', test.id).update({ status: 'running' })
-        const result = await runOne(test, settings).catch((error) => ({
+        const result = await runOne(test, settings, options).catch((error) => ({
           answer: '',
           pass: false,
           reason: `Gagal dijalankan: ${error instanceof Error ? error.message : String(error)}`.slice(0, 480),
@@ -180,7 +182,7 @@ export async function runTests(settings: LeanSettings, ids: number[] = []) {
   return { started: true, count: cases.length }
 }
 
-async function runOne(test: Record<string, any>, settings: LeanSettings) {
+async function runOne(test: Record<string, any>, settings: LeanSettings, options: TestRunOptions = {}) {
   const rows: LeanHistoryRow[] = JSON.parse(String(test.history || '[]'))
   // Pesan masuk terakhir (yang dijawab) ditandai sebagai pesan sekarang.
   for (let index = rows.length - 1; index >= 0 && rows[index].direction === 'in'; index--)
@@ -218,7 +220,8 @@ async function runOne(test: Record<string, any>, settings: LeanSettings) {
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
   })
   const reply = await runLeanProvider(settings, prompt, [], 'beta3-test', undefined, {
-    providers: [...TEST_PROVIDERS],
+    providers: options.provider ? [options.provider] : [...TEST_PROVIDERS],
+    ...(options.tier ? { tier: options.tier } : {}),
   })
   const answer = parseLeanDecision(reply.text).pesan.join('\n')
   const judgeSchema = {

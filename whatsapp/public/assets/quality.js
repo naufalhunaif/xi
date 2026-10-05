@@ -153,7 +153,9 @@
   }
   byId('testsRun')?.addEventListener('click', async () => {
     try {
-      const result = await call('/api/beta3/tests/run', 'POST', {})
+      // v3.6.40: uji bisa memakai model paling kuat (semua penyedia, atau Claude/ChatGPT saja).
+      const [tier, provider] = String(byId('testsModel')?.value || '').split(':')
+      const result = await call('/api/beta3/tests/run', 'POST', { ...(tier ? { tier } : {}), ...(provider ? { provider } : {}) })
       if (!result.started && result.reason) byId('testsSummary').textContent = result.reason
     } catch (error) {
       byId('testsSummary').textContent = error.message

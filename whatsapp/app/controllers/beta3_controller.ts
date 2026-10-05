@@ -621,7 +621,13 @@ export default class Beta3Controller {
     return response.json(
       await runTests(
         { ...settings, aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt' } as any,
-        ids
+        ids,
+        {
+          ...(request.input('tier') === 'heavy' ? { tier: 'heavy' as const } : {}),
+          ...(['claude', 'chatgpt'].includes(String(request.input('provider')))
+            ? { provider: String(request.input('provider')) as 'claude' | 'chatgpt' }
+            : {}),
+        }
       )
     )
   }
