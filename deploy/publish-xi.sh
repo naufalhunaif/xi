@@ -29,8 +29,10 @@ if git diff --cached --quiet; then echo 'xi sudah sinkron.'; else
 fi
 if [[ -n "$v" ]]; then
   # Build di mesin ini (cepat) → diunggah sebagai aset rilis; server tinggal unduh (lihat whatsapp-aapanel.mjs fetchPrebuilt).
-  asset=""
-  if [[ "${WA_SKIP_BUILD:-}" != 1 ]]; then
+  # Paket bisa juga disiapkan di luar (WA_BUILD_ASSET=/path/wa-build-v<ver>.tar.gz), mis. dibangun di mesin lain
+  # bila node_modules di sini bukan untuk platform ini.
+  asset="${WA_BUILD_ASSET:-}"
+  if [[ -z "$asset" && "${WA_SKIP_BUILD:-}" != 1 ]]; then
     tmp="$(mktemp -d)"
     if (cd "$ROOT/whatsapp" && rm -rf build && npm run build >"$tmp/build.log" 2>&1); then
       printf '%s\n' "$v" > "$ROOT/whatsapp/build/VERSION"
