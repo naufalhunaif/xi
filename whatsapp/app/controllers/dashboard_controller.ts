@@ -43,7 +43,7 @@ import {
 import { createHash } from 'node:crypto'
 import { queueOutgoingMessage, setHandlingMode } from '#services/message_service'
 import { presentedAnalysisStatus } from '#services/analysis_retry_service'
-import { latestInboxMessages, markRoomRead } from '#services/contact_inbox_service'
+import { latestInboxMessages, markRoomRead, setRoomsReadState } from '#services/contact_inbox_service'
 import { readConnectionStatus } from '#services/connection_status_service'
 import { setAiExcluded } from '#services/ai_exclusion_service'
 import { readFile, stat } from 'node:fs/promises'
@@ -544,6 +544,17 @@ export default class DashboardController {
       return response.unprocessableEntity({
         error: error instanceof Error ? error.message : 'Room tidak valid.',
       })
+    }
+  }
+  /** Pilihan di kotak masuk: tandai dibaca / belum dibaca. */
+  async contactsReadState({ request, response }: HttpContext) {
+    const jids = Array.isArray(request.input('jids')) ? request.input('jids').map(String) : []
+    const state = request.input('state') === 'unread' ? 'unread' : 'read'
+    try {
+      const changed = await setRoomsReadState(jids, state)
+      return response.json({ ok: true, changed })
+    } catch (error) {
+      return response.unprocessableEntity({ error: error instanceof Error ? error.message : 'Room tidak valid.' })
     }
   }
   async contactMode({ request, response }: HttpContext) {

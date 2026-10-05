@@ -43,6 +43,36 @@ export async function markRoomRead(jid: string, throughId: number) {
   )
 }
 
+/**
+ * Tandai beberapa room dibaca / belum dibaca (pilihan di kotak masuk).
+ * Dibaca = penanda ke pesan terakhir. Belum dibaca = penanda ke sebelum pesan masuk terakhir,
+ * sehingga satu pesan terhitung belum dibaca (seperti "Tandai belum dibaca" di WhatsApp).
+ */
+export async function setRoomsReadState(jids: string[], state: 'read' | 'unread') {
+  await initializeDatabase()
+  const valid = [...new Set(jids.map(String))].filter((jid) => /^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid)).slice(0, 200)
+  if (!valid.length) throw new Error('Room tidak valid.')
+  const result = await db.rawQuery(
+    `SELECT jid, MAX(id) AS last_id, MAX(CASE WHEN direction = 'in' THEN id ELSE 0 END) AS last_in_id
+     FROM whatsapp_messages WHERE jid IN (${valid.map(() => '?').join(',')}) GROUP BY jid`,
+    valid
+  )
+  let changed = 0
+  for (const row of result[0] as any[]) {
+    const lastId = Number(row.last_id) || 0
+    const lastIn = Number(row.last_in_id) || 0
+    if (state === 'unread' && !lastIn) continue
+    const readId = state === 'read' ? lastId : Math.max(0, lastIn - 1)
+    await db.rawQuery(
+      `INSERT INTO whatsapp_contacts (jid, workspace_read_id, updated_at)
+       VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE workspace_read_id = VALUES(workspace_read_id), updated_at = VALUES(updated_at)`,
+      [String(row.jid), readId, new Date()]
+    )
+    changed++
+  }
+  return changed
+}
+
 export async function latestInboxMessages() {
   await initializeDatabase()
   await ensureLeanTables()

@@ -92,6 +92,7 @@ export type ScannedRoutes = {
     'dashboard.contacts_list': { paramsTuple?: []; params?: {} }
     'dashboard.search_messages': { paramsTuple?: []; params?: {} }
     'dashboard.contact_read': { paramsTuple?: []; params?: {} }
+    'dashboard.contacts_read_state': { paramsTuple?: []; params?: {} }
     'dashboard.contact_mode': { paramsTuple?: []; params?: {} }
     'dashboard.ai_exclusions': { paramsTuple?: []; params?: {} }
     'dashboard.contact_exclusion': { paramsTuple?: []; params?: {} }
@@ -355,6 +356,7 @@ export type ScannedRoutes = {
     'dashboard.unset_access_domain': { paramsTuple?: []; params?: {} }
     'dashboard.chat_cleanup': { paramsTuple?: []; params?: {} }
     'dashboard.contact_read': { paramsTuple?: []; params?: {} }
+    'dashboard.contacts_read_state': { paramsTuple?: []; params?: {} }
     'dashboard.contact_mode': { paramsTuple?: []; params?: {} }
     'dashboard.contact_exclusion': { paramsTuple?: []; params?: {} }
     'dashboard.send_message': { paramsTuple?: []; params?: {} }

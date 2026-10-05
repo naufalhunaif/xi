@@ -122,6 +122,9 @@ html:not([data-theme='dark']) .workspace-ui .wa-inbox-filters button[aria-presse
   text-transform: uppercase;
   white-space: nowrap;
   padding: 2px 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Daftar kontak: baris bergaris tipis, avatar monokrom, baris aktif = garis kiri tipis gelap. */
@@ -714,4 +717,62 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
     width: 10px;
     height: 10px;
   }
+}
+
+/* ---------- Kotak masuk: pilih chat → tandai dibaca / belum dibaca ---------- */
+.workspace-ui .wa-inbox-select {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--muted);
+  border-radius: 6px;
+}
+.workspace-ui .wa-inbox-select[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--wa-page);
+}
+.workspace-ui .wa-inbox-bulk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px 8px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--wa-subtle);
+}
+.workspace-ui .wa-inbox-bulk[hidden] {
+  display: none;
+}
+.workspace-ui .wa-inbox-bulk-count {
+  flex: 1;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.workspace-ui .wa-inbox-bulk .button.small {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.workspace-ui .wa-inbox-bulk .wa-icon-button {
+  width: 26px;
+  height: 26px;
+  font-size: 16px;
+}
+.workspace-ui .wa-contacts[data-selecting='true'] .wa-contact::before {
+  content: '';
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  background: var(--wa-surface, #fff);
+}
+.workspace-ui .wa-contacts[data-selecting='true'] .wa-contact.selected::before {
+  background: var(--text);
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 3px var(--wa-surface, #fff);
 }

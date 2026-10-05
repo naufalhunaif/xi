@@ -1917,5 +1917,11 @@ window.waLocales.id = {
   "Tampilan": "Tampilan",
   "Suka, komentar, dan tayangan sudah termasuk hasil iklan (boost).": "Suka, komentar, dan tayangan sudah termasuk hasil iklan (boost).",
   "Angka dari Instagram API hanya organik; hasil iklan (boost) tidak termasuk, jadi bisa lebih kecil dari aplikasi Instagram.": "Angka dari Instagram API hanya organik; hasil iklan (boost) tidak termasuk, jadi bisa lebih kecil dari aplikasi Instagram.",
+  "Pilih chat": "Pilih chat",
+  "Chat terpilih": "Chat terpilih",
+  "{0} dipilih": "{0} dipilih",
+  "Tandai dibaca": "Tandai dibaca",
+  "Tandai belum dibaca": "Tandai belum dibaca",
+  "Gagal menyimpan.": "Gagal menyimpan.",
   "jid wajib.": "jid wajib.",
 }

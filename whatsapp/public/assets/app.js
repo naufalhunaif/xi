@@ -714,6 +714,49 @@
   window.addEventListener('resize', syncInboxMore)
   setTimeout(syncInboxMore, 0)
   setTimeout(syncInboxMore, 1500)
+  /* ───── Pilih chat → tandai dibaca / belum dibaca (v3.6.16) ───── */
+  const selecting = () => contacts?.dataset.selecting === 'true'
+  const selectedJids = () => [...(contacts?.querySelectorAll('.wa-contact.selected') || [])].map((row) => row.dataset.jid)
+  function setSelecting(on) {
+    if (!contacts) return
+    contacts.dataset.selecting = String(on)
+    byId('inboxSelect')?.setAttribute('aria-pressed', String(on))
+    if (!on) contacts.querySelectorAll('.wa-contact.selected').forEach((row) => row.classList.remove('selected'))
+    updateBulkBar()
+  }
+  function updateBulkBar() {
+    const bar = byId('inboxBulk')
+    if (!bar) return
+    const count = selectedJids().length
+    bar.hidden = !selecting()
+    byId('inboxBulkCount').textContent = t('{0} dipilih', count)
+    byId('inboxBulkRead').disabled = !count
+    byId('inboxBulkUnread').disabled = !count
+  }
+  byId('inboxSelect')?.addEventListener('click', () => setSelecting(!selecting()))
+  byId('inboxBulkCancel')?.addEventListener('click', () => setSelecting(false))
+  contacts?.addEventListener('click', (event) => {
+    if (!selecting()) return
+    const row = event.target.closest('.wa-contact')
+    if (!row) return
+    event.preventDefault()
+    row.classList.toggle('selected')
+    updateBulkBar()
+  })
+  async function bulkReadState(state) {
+    const jids = selectedJids()
+    if (!jids.length) return
+    try {
+      await api('/api/contacts/read-state', { method: 'POST', body: JSON.stringify({ jids, state }) })
+      setSelecting(false)
+      await updateContacts()
+    } catch (error) {
+      showNotice(error.message || t('Gagal menyimpan.'), true)
+    }
+  }
+  byId('inboxBulkRead')?.addEventListener('click', () => bulkReadState('read'))
+  byId('inboxBulkUnread')?.addEventListener('click', () => bulkReadState('unread'))
+
   byId('inboxFilters')?.addEventListener('click', (event) => {
     const button = event.target.closest('button')
     if (!button || button.id === 'inboxFiltersMore') return
@@ -788,6 +831,7 @@
   function renderContacts(items) {
     if (!contacts) return
     const selectedJid = contacts.dataset.selectedJid || ''
+    const picked = new Set(selectedJids())
     contacts.replaceChildren()
     if (!items.length) {
       const empty = document.createElement('div')
@@ -800,7 +844,7 @@
     for (const contact of items) {
       const name = contact.contact_name || fallbackName(contact.jid)
       const link = document.createElement('a')
-      link.className = `wa-contact ${contact.jid === selectedJid ? 'active' : ''}`
+      link.className = `wa-contact ${contact.jid === selectedJid ? 'active' : ''}${picked.has(contact.jid) ? ' selected' : ''}`
       link.classList.toggle('ai-running', contact.ai_running === true)
       link.href = `${appUrl}/?jid=${encodeURIComponent(contact.jid)}`
       link.dataset.jid = contact.jid
@@ -896,6 +940,7 @@
       contacts.append(link)
     }
     applyInboxFilters()
+    updateBulkBar()
   }
   async function updateContacts() {
     if (!contacts) return

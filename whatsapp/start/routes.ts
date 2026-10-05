@@ -124,6 +124,7 @@ router
     router.get('/api/contacts', [DashboardController, 'contactsList'])
     router.get('/api/search', [DashboardController, 'searchMessages'])
     router.post('/api/contacts/read', [DashboardController, 'contactRead'])
+    router.post('/api/contacts/read-state', [DashboardController, 'contactsReadState'])
     router.post('/api/contacts/mode', [DashboardController, 'contactMode'])
     router.get('/api/ai/exclusions', [DashboardController, 'aiExclusions'])
     router.post('/api/contacts/exclusion', [DashboardController, 'contactExclusion'])

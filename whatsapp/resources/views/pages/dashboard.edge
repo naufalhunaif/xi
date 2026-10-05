@@ -164,6 +164,15 @@
                 <button type="button" data-channel="ig" aria-pressed="false">Instagram</button>
               </div>
               <a id="connectHint" class="wa-connect-hint" href="{{ appUrl }}/settings#numbers" hidden data-i18n="Hubungkan nomor">Hubungkan nomor</a>
+              <button id="inboxSelect" type="button" class="wa-icon-button wa-inbox-select" aria-pressed="false" aria-label="Pilih chat" title="Pilih chat" data-i18n-aria-label="Pilih chat" data-i18n-title="Pilih chat">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7l2 2 4-4M4 17l2 2 4-4M13 7h7M13 17h7"/></svg>
+              </button>
+            </div>
+            <div id="inboxBulk" class="wa-inbox-bulk" role="toolbar" aria-label="Chat terpilih" data-i18n-aria-label="Chat terpilih" hidden>
+              <span id="inboxBulkCount" class="wa-inbox-bulk-count"></span>
+              <button id="inboxBulkRead" type="button" class="button small" data-i18n="Tandai dibaca">Tandai dibaca</button>
+              <button id="inboxBulkUnread" type="button" class="button small" data-i18n="Tandai belum dibaca">Tandai belum dibaca</button>
+              <button id="inboxBulkCancel" type="button" class="wa-icon-button" aria-label="Batal" title="Batal" data-i18n-aria-label="Batal" data-i18n-title="Batal">×</button>
             </div>
 
             <div class="wa-inbox-search">
