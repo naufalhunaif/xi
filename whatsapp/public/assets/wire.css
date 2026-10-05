@@ -2,7 +2,7 @@
  * v3.6.7 — lapisan gaya Wireframe (dimuat paling akhir, setelah calm.css).
  * Dasar untuk semua halaman: latar off-white, panel/kartu putih radius 8 tanpa bayangan,
  * garis tipis, label kecil monospace huruf besar, satu warna aksen hanya untuk tanda penting.
- * Halaman per halaman: beranda chat (v3.6.7). Mode gelap memakai token lama, hanya bentuk yang ikut.
+ * Halaman per halaman: beranda chat (v3.6.7). Mode gelap (v3.6.27): bentuk sama, token grafit.
  */
 .workspace-ui {
   --wa-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
@@ -22,6 +22,30 @@ html:not([data-theme='dark']) .workspace-ui {
 }
 html:not([data-theme='dark']) {
   background: #edebe5;
+}
+/* v3.6.27: mode gelap memakai bentuk Wireframe yang sama — grafit netral, kartu sedikit lebih terang, garis tipis. */
+html[data-theme='dark'] .workspace-ui {
+  --sidebar: #121211;
+  --text: #ecebe6;
+  --muted: #9c9b94;
+  --line: #2e2e2b;
+  --border: #2e2e2b;
+  --accent: #ecebe6;
+  --wa-page: #1a1a18;
+  --wa-chat-bg: #1a1a18;
+  --wa-surface: #242422;
+  --wa-raised: #282826;
+  --wa-subtle: #212120;
+  --wa-form-border: #3b3b38;
+  --wa-form-focus: #ecebe6;
+}
+html[data-theme='dark'] {
+  background: #1a1a18;
+  --wa-page: #1a1a18;
+  --wa-surface: #242422;
+  --wa-raised: #282826;
+  --wa-hover: #2c2c2a;
+  --wa-chat-bg: #1a1a18;
 }
 
 /* Bentuk: radius 8 untuk kartu/panel, 6 untuk kontrol. */
@@ -50,8 +74,8 @@ html:not([data-theme='dark']) {
 }
 
 /* Sidebar: item aktif = kartu putih bergaris tipis, ikon tetap warna aksen. */
-html:not([data-theme='dark']) .workspace-ui .nav-item.active {
-  background: #fff;
+html[data-theme] .workspace-ui .nav-item.active {
+  background: var(--wa-surface, #fff);
   box-shadow: inset 0 0 0 1px var(--line);
   font-weight: 500;
 }
@@ -93,7 +117,7 @@ html:not([data-theme='dark']) .workspace-ui .nav-item.active {
   color: var(--text);
   font-weight: 500;
 }
-html:not([data-theme='dark']) .workspace-ui .wa-inbox-filters button[aria-pressed='true'] {
+html[data-theme] .workspace-ui .wa-inbox-filters button[aria-pressed='true'] {
   background: var(--wa-page);
 }
 .workspace-ui .wa-inbox-filters button:focus-visible,
@@ -132,8 +156,8 @@ html:not([data-theme='dark']) .workspace-ui .wa-inbox-filters button[aria-presse
   border-bottom-color: var(--line);
   color: var(--text);
 }
-html:not([data-theme='dark']) .workspace-ui .wa-contact:hover,
-html:not([data-theme='dark']) .workspace-ui .wa-contact.active {
+html[data-theme] .workspace-ui .wa-contact:hover,
+html[data-theme] .workspace-ui .wa-contact.active {
   background: var(--wa-subtle);
 }
 .workspace-ui .wa-contact.active {
@@ -142,8 +166,8 @@ html:not([data-theme='dark']) .workspace-ui .wa-contact.active {
 .workspace-ui .wa-contact.ai-running {
   box-shadow: inset 2px 0 var(--wa-ok, #18865b);
 }
-html:not([data-theme='dark']) .workspace-ui .wa-contact-avatar,
-html:not([data-theme='dark']) .workspace-ui .wa-room-avatar {
+html[data-theme] .workspace-ui .wa-contact-avatar,
+html[data-theme] .workspace-ui .wa-room-avatar {
   background: var(--wa-page);
   color: var(--text);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -181,17 +205,17 @@ html:not([data-theme='dark']) .workspace-ui .wa-room-avatar {
   text-transform: uppercase;
   border-radius: 4px;
 }
-html:not([data-theme='dark']) .workspace-ui :is(.wa-contact-mode, .wa-room-mode, .message-source-badge) {
+html[data-theme] .workspace-ui :is(.wa-contact-mode, .wa-room-mode, .message-source-badge) {
   background: var(--wa-page);
   color: var(--text);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-html:not([data-theme='dark']) .workspace-ui :is(.wa-contact-mode.cs, .wa-room-mode.cs, .source-cs .message-source-badge) {
+html[data-theme] .workspace-ui :is(.wa-contact-mode.cs, .wa-room-mode.cs, .source-cs .message-source-badge) {
   background: var(--text);
   color: var(--wa-page);
   box-shadow: none;
 }
-html:not([data-theme='dark']) .workspace-ui .wa-contact-mode.urgent {
+html[data-theme] .workspace-ui .wa-contact-mode.urgent {
   background: var(--wa-err-bg, #fdecec);
   color: var(--wa-err, #a33);
   box-shadow: none;
@@ -232,19 +256,19 @@ html:not([data-theme='dark']) .workspace-ui .wa-contact-mode.urgent {
 }
 
 /* Pesan: masuk = kartu putih; keluar (AI) = off-white; keluar (CS) = garis gelap. Meta monospace. */
-html:not([data-theme='dark']) .workspace-ui .wa-messages {
+html[data-theme] .workspace-ui .wa-messages {
   background: var(--wa-page);
 }
 .workspace-ui .wa-messages .message {
   border-radius: 8px;
   border-color: var(--line);
 }
-html:not([data-theme='dark']) .workspace-ui .wa-messages .message.out {
+html[data-theme] .workspace-ui .wa-messages .message.out {
   background: var(--wa-subtle);
   border-color: var(--line);
 }
-html:not([data-theme='dark']) .workspace-ui .wa-messages .message.out.source-cs {
-  background: #fff;
+html[data-theme] .workspace-ui .wa-messages .message.out.source-cs {
+  background: var(--wa-surface, #fff);
   border-color: var(--text);
 }
 .workspace-ui .message.has-media .message-media {
@@ -340,7 +364,7 @@ html:not([data-theme='dark']) .workspace-ui .wa-messages .message.out.source-cs 
   border-radius: 0;
   padding: 0;
 }
-html:not([data-theme='dark']) .workspace-ui .wa-panel.wa-settings-panel {
+html[data-theme] .workspace-ui .wa-panel.wa-settings-panel {
   background: transparent;
 }
 .workspace-ui .wa-settings-panel form {
@@ -390,7 +414,7 @@ html:not([data-theme='dark']) .workspace-ui .wa-panel.wa-settings-panel {
   padding: 0;
   margin: 0;
 }
-html:not([data-theme='dark']) .workspace-ui .wa-settings-view [data-settings-panel] > .wa-card {
+html[data-theme] .workspace-ui .wa-settings-view [data-settings-panel] > .wa-card {
   background: transparent;
 }
 .workspace-ui .wa-settings-view [data-settings-panel] > .wa-card + .wa-card,
@@ -492,8 +516,8 @@ html:not([data-theme='dark']) .workspace-ui .wa-settings-view [data-settings-pan
 .workspace-ui .wa-switch[aria-checked='true'] {
   background: var(--text);
 }
-html:not([data-theme='dark']) .workspace-ui .wa-account-bar {
-  background: #fff;
+html[data-theme] .workspace-ui .wa-account-bar {
+  background: var(--wa-surface, #fff);
   border: 1px solid var(--line);
 }
 .workspace-ui .wa-account-info small,
@@ -501,13 +525,13 @@ html:not([data-theme='dark']) .workspace-ui .wa-account-bar {
   font-family: var(--wa-mono);
   font-size: 10.5px;
 }
-html:not([data-theme='dark']) .workspace-ui .wa-orchestra {
+html[data-theme] .workspace-ui .wa-orchestra {
   border-radius: 8px;
 }
 
 /* Produksi: aturan = blok bergaris tipis tanpa warna latar; pre-order aktif ditandai garis kiri. */
-html:not([data-theme='dark']) .workspace-ui .wa-production-rule,
-html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
+html[data-theme] .workspace-ui .wa-production-rule,
+html[data-theme] .workspace-ui .wa-production-rule:last-child {
   background: transparent;
   border-radius: 8px;
   border-color: var(--line);
@@ -891,7 +915,7 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
   border: 0;
   border-left: 2px solid var(--text);
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(128, 128, 128, 0.14);
   color: inherit;
   font: inherit;
   font-size: 11px;
@@ -906,7 +930,7 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.workspace-ui .message-reply-preview:hover { background: rgba(0, 0, 0, 0.09); }
+.workspace-ui .message-reply-preview:hover { background: rgba(128, 128, 128, 0.24); }
 .workspace-ui .message-reply-thumb {
   flex: 0 0 auto;
   width: 38px;
@@ -922,4 +946,32 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
 @keyframes wa-jump {
   0%, 45% { box-shadow: 0 0 0 3px var(--text); }
   100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* v3.6.27 mode gelap: kontrol utama memakai warna teks (bukan hijau), seperti mode terang. */
+html[data-theme='dark'] .workspace-ui :is(.button.primary, .btn.primary, button.button.primary) {
+  background-color: var(--text);
+  color: var(--wa-page);
+  border-color: var(--text);
+}
+html[data-theme='dark'] .workspace-ui :is(.button.primary, .btn.primary):hover {
+  background-color: var(--text);
+  opacity: 0.88;
+}
+html[data-theme='dark'] .workspace-ui .wa-contact.active,
+html[data-theme='dark'] .workspace-ui .wa-contact.active strong,
+html[data-theme='dark'] .workspace-ui .wa-inbox-filters button[aria-pressed='true'],
+html[data-theme='dark'] .workspace-ui .wa-settings-menu a[aria-current='page'] {
+  color: var(--text);
+}
+html[data-theme='dark'] .workspace-ui :focus-visible {
+  outline-color: var(--text);
+}
+html[data-theme='dark'] .workspace-ui .message-reply-preview {
+  background: rgba(128, 128, 128, 0.14);
+  border-left-color: var(--text);
+}
+html[data-theme='dark'] .workspace-ui .wa-settings-menu a[aria-current='page'] {
+  background: var(--wa-surface);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
