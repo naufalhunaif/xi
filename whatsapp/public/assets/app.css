@@ -1939,3 +1939,7 @@ html[data-theme='dark'] .workspace-ui .wa-trace-branch-content > details { color
 .workspace-ui .wa-contact-delete-body .danger:disabled { opacity: .45; }
 html[data-theme='dark'] .workspace-ui .wa-contact-delete-trigger { color: #f3aca8; }
 
+.workspace-ui .wa-icon-role::before {
+  mask-image: url('./icons/vendor.svg');
+  -webkit-mask-image: url('./icons/vendor.svg');
+}

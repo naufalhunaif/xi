@@ -178,7 +178,7 @@
       const badge = el('span', order.shipped ? t('Selesai') : dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, 'wa-order-badge')
       badge.dataset.tone = order.shipped ? 'success' : statusTone[order.status] || ''
       state.append(badge)
-      if (order.shipped_awb) state.append(el('br'), el('small', `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
+      if (order.shipped_awb) state.append(el('br'), el('small', order.shipped_awb === 'ANTAR' ? t('Diantar tim') : `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
       if (order.status === 'pending' && order.auto_total_reason) state.append(el('br'), el('small', order.auto_total_reason, 'wa-muted'))
       if (groupLabel[order.group_status])
         state.append(
@@ -293,7 +293,7 @@
       el('span', order.shipped ? t('Selesai') : dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, `wa-pill ${order.shipped ? 'ok' : dp ? 'warn' : statusPillTone[order.status] || ''}`),
       el('small', when(order.created_at), 'wa-muted')
     )
-    if (order.shipped_awb) head.append(el('small', `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
+    if (order.shipped_awb) head.append(el('small', order.shipped_awb === 'ANTAR' ? t('Diantar tim') : `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
     if (order.source === 'rekap') head.append(el('small', t('Rekap dari chat'), 'wa-muted'))
     box.append(head)
 
@@ -436,6 +436,8 @@
         act(order.group_status === 'sent' ? t('Kirim ulang ke grup') : t('Kirim ke grup'), `/api/beta3/orders/${order.id}/resend-group`, t('Diantrekan ke grup produksi.'), order.group_status !== 'sent')
       )
       if (order.group_error) (picker?.wrap || box).append(el('p', `${t('Grup gagal')}: ${order.group_error}`, 'wa-alert'))
+      // Diantar tim sendiri / diambil pelanggan: selesai tanpa resi (v3.6.31).
+      if (!order.shipped) actions.append(act(t('Diantar tim (tanpa resi)'), `/api/beta3/orders/${order.id}/delivered`, t('Ditandai diantar tim sendiri.'), false))
     }
     // Tombol grup berada di bagian Grup produksi; tindakan lain di bawah.
     if (actions.childElementCount) (order.status === 'paid' && picker ? picker.wrap : box).append(actions)

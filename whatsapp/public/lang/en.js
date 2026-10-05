@@ -1934,4 +1934,12 @@ window.waLocales.en = {
   "Video": "Video",
   "GIF": "GIF",
   "Gagal terkirim": "Failed to send",
+  "Vendor": "Vendor",
+  "Vendor / supplier bahan \u2014 bukan pelanggan": "Vendor / material supplier \u2014 not a customer",
+  "Bukan pelanggan": "Not a customer",
+  "Tandai sebagai vendor": "Mark as vendor",
+  "Tandai kembali sebagai pelanggan": "Mark as customer again",
+  "Diantar tim": "Delivered by team",
+  "Diantar tim (tanpa resi)": "Delivered by team (no tracking number)",
+  "Ditandai diantar tim sendiri.": "Marked as delivered by the team.",
 }

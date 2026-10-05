@@ -1057,7 +1057,14 @@
         urgent.title = t('Prioritas chat di kotak masuk')
         meta.append(urgent)
       }
-      if (contact.handling_mode === 'cs') meta.append(mode)
+      if (contact.role === 'vendor' || contact.role === 'lainnya') {
+        // Vendor/supplier bahan atau bukan pelanggan (dinilai Jev / diatur CS): bukan chat jual jas.
+        const role = document.createElement('span')
+        role.className = 'wa-contact-mode role'
+        role.textContent = contact.role === 'vendor' ? t('Vendor') : t('Lainnya')
+        role.title = contact.role === 'vendor' ? t('Vendor / supplier bahan — bukan pelanggan') : t('Bukan pelanggan')
+        meta.append(role)
+      } else if (contact.handling_mode === 'cs') meta.append(mode)
       link.append(avatar, content, meta)
       contacts.append(link)
     }
@@ -1077,6 +1084,7 @@
           contact.jid === contacts.dataset.selectedJid && roomLine(contact.line_id) === roomLine(contacts.dataset.selectedLine)
       )
       updateRoomMode(selected?.handling_mode || 'ai', Boolean(selected), Boolean(selected?.ai_excluded), Boolean(selected?.schedule_paused))
+      updateRoomRole(selected?.role || '')
       updateRoomDetails(selected)
       const goalStatus = byId('roomGoalStatus')
       if (goalStatus) {
@@ -1140,6 +1148,32 @@
       exclusion.setAttribute('aria-label', exclusion.title)
     }
   }
+  // Peran kontak (v3.6.31): tombol "Vendor" di header room — tekan untuk menandai vendor, tekan lagi untuk kembali pelanggan.
+  function updateRoomRole(role) {
+    const button = byId('roomRoleButton')
+    if (!button) return
+    button.dataset.role = role || ''
+    const vendor = role === 'vendor' || role === 'lainnya'
+    button.setAttribute('aria-pressed', String(vendor))
+    button.title = vendor ? t('Tandai kembali sebagai pelanggan') : t('Tandai sebagai vendor')
+    button.setAttribute('aria-label', button.title)
+  }
+  byId('roomRoleButton')?.addEventListener('click', async () => {
+    const button = byId('roomRoleButton')
+    const jid = messages?.dataset.jid || ''
+    if (!button || !jid) return
+    const vendor = button.dataset.role === 'vendor' || button.dataset.role === 'lainnya'
+    button.disabled = true
+    try {
+      await api('/api/contacts/role', { method: 'POST', body: JSON.stringify({ jid, role: vendor ? 'pelanggan' : 'vendor' }) })
+      updateRoomRole(vendor ? 'pelanggan' : 'vendor')
+      await updateContacts()
+    } catch (error) {
+      showNotice(error.message || t('Gagal menyimpan.'), true)
+    } finally {
+      button.disabled = false
+    }
+  })
   let roomDetailsContact = null
   function closeRoomDetails(restoreFocus = false) {
     const panel = byId('roomHandlingDetails')

@@ -104,6 +104,8 @@ export const LEAN_TABLE_STATEMENTS = [
     created_at DATETIME NOT NULL,
     KEY whatsapp_beta3_shipments_jid (jid, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // v3.6.31: pesanan yang diantar tim sendiri / diambil pelanggan — tanpa resi (awb 'ANTAR', method 'antar').
+  `ALTER TABLE whatsapp_beta3_shipments ADD COLUMN IF NOT EXISTS method VARCHAR(20) NOT NULL DEFAULT 'kurir' AFTER awb`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_proofs (
     message_id VARCHAR(190) NOT NULL PRIMARY KEY,
     jid VARCHAR(190) NOT NULL,

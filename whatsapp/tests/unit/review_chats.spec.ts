@@ -7,6 +7,7 @@ import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pat
 import { quickReply } from '#beta3/token_saver'
 import { keepCustomInChat, CUSTOM_REPLY, dropRepeatedWait } from '#beta3/reply_guards'
 import { partsMissingFromItems, orderPartsOf, parseCsTotalMessage } from '#beta3/order_service'
+import { looksSelfDelivery, detectAwb } from '#beta3/shipments'
 import { normalizeStage, type LeanDecision } from '#beta3/prompt'
 import { goalStatus } from '#beta3/reply_service'
 import { extractShippingQuery, etdText } from '#beta3/mcp'
@@ -243,5 +244,18 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.equal(parseCsTotalMessage('Basic Suit - Cream size L 485.000\nOngkir REG 18.000\n\nTotal 485.000 + 18.000 = 503.000 bos')?.items, 'Basic Suit - Cream size L 485.000')
     assert.isNull(parseCsTotalMessage('Untuk pembayaran tf ke rek BRI 1112223334445 An Toko agar pesanan langsung kami proses'))
     assert.isNull(parseCsTotalMessage('siap bos, totalnya saya hitung dulu ya'))
+  })
+
+  // v3.6.31: pesanan diantar tim sendiri / diambil → terkirim tanpa resi.
+  test('pesan toko "diantar sendiri / diambil" dikenali sebagai pengiriman tanpa resi', ({ assert }) => {
+    assert.isTrue(looksSelfDelivery('Pesanan sudah kami antar langsung ke alamat ya bos'))
+    assert.isTrue(looksSelfDelivery('siang ini diantar tim kami bos'))
+    assert.isTrue(looksSelfDelivery('Jasnya sudah diambil ya bos, terimakasih'))
+    assert.isTrue(looksSelfDelivery('otw kurir toko bos, ditunggu ya'))
+    // Ada ekspedisi/resi → bukan antar sendiri; janji/perkiraan jadi → bukan.
+    assert.isFalse(looksSelfDelivery('Pesanan sudah di kirim bos dengan No. Resi 1234567890123 (JNE)'))
+    assert.isFalse(looksSelfDelivery('nanti kalau sudah jadi kami antar ya bos'.replace('sudah', '')))
+    assert.isFalse(looksSelfDelivery('mau diantar atau diambil bos?'))
+    assert.equal(detectAwb('Pesanan sudah kami antar langsung ke alamat ya bos'), '')
   })
 })

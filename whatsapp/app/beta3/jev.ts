@@ -38,6 +38,8 @@ export const JEV_DECISIONS = {
   urgensi: 'Prioritas chat di kotak masuk',
   harga_konteks: 'Seri & barang yang ditanya harganya',
   bukti_transfer: 'Gambar pelanggan = bukti pembayaran',
+  kirim_sendiri: 'Pesanan diantar tim sendiri / diambil (tanpa resi)',
+  peran_kontak: 'Peran kontak (pelanggan / vendor)',
 } as const
 export type JevDecision = keyof typeof JEV_DECISIONS
 
@@ -64,6 +66,8 @@ export const JEV_THRESHOLD: Record<JevDecision, number> = {
   urgensi: 0.7,
   harga_konteks: 0.8,
   bukti_transfer: 0.9,
+  kirim_sendiri: 0.85,
+  peran_kontak: 0.85,
 }
 
 export type JevNoul = {

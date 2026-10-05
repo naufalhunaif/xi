@@ -57,7 +57,7 @@ import {
   renderAwbTracking,
 } from '#beta3/mcp'
 import { DEFAULT_ITEM_GRAMS, orderWeightGrams } from '#beta3/weights'
-import { detectAwb } from '#beta3/shipments'
+import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
@@ -815,12 +815,22 @@ export async function createLeanReply(input: {
     if (tracked || !mcp.url) return
     tracked = true
     let awb = extractAwb(input.text)
+    let selfDelivery = false
     if (!awb)
       for (const row of [...rows].reverse()) {
         if (row.direction !== 'out') continue
         awb = detectAwb(String(row.body || ''))
         if (awb) break
+        // v3.6.31: toko sudah bilang diantar sendiri/diambil → tidak ada resi untuk dilacak.
+        if (looksSelfDelivery(String(row.body || ''))) {
+          selfDelivery = true
+          break
+        }
       }
+    if (selfDelivery) {
+      toolNotes.push('PENGIRIMAN: pesanan diantar langsung oleh tim toko / diambil pelanggan — tidak ada resi. Jangan menjanjikan atau menanyakan nomor resi; jawab dari status pengantarannya.')
+      onTrace?.({ key: 'beta3-awb', label: 'Diantar tim sendiri · tanpa resi', status: 'completed', detail: {} })
+    }
     if (awb) {
       try {
         const cacheKey = `awb:${awb}`

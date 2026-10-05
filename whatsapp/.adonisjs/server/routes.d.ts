@@ -28,6 +28,7 @@ export type ScannedRoutes = {
     'beta_3.settle_order': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.paid_amount': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.ready_order': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'beta_3.delivered_order': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.cancel_order': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.resend_group': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.mcp': { paramsTuple?: []; params?: {} }
@@ -96,6 +97,7 @@ export type ScannedRoutes = {
     'dashboard.contact_mode': { paramsTuple?: []; params?: {} }
     'dashboard.ai_exclusions': { paramsTuple?: []; params?: {} }
     'dashboard.contact_exclusion': { paramsTuple?: []; params?: {} }
+    'dashboard.contact_role': { paramsTuple?: []; params?: {} }
     'dashboard.messages': { paramsTuple?: []; params?: {} }
     'dashboard.send_message': { paramsTuple?: []; params?: {} }
     'dashboard.media_retry': { paramsTuple?: []; params?: {} }
@@ -326,6 +328,7 @@ export type ScannedRoutes = {
     'beta_3.settle_order': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.paid_amount': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.ready_order': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'beta_3.delivered_order': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.cancel_order': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.resend_group': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.save_mcp': { paramsTuple?: []; params?: {} }
@@ -359,6 +362,7 @@ export type ScannedRoutes = {
     'dashboard.contacts_read_state': { paramsTuple?: []; params?: {} }
     'dashboard.contact_mode': { paramsTuple?: []; params?: {} }
     'dashboard.contact_exclusion': { paramsTuple?: []; params?: {} }
+    'dashboard.contact_role': { paramsTuple?: []; params?: {} }
     'dashboard.send_message': { paramsTuple?: []; params?: {} }
     'dashboard.media_retry': { paramsTuple?: []; params?: {} }
     'dashboard.react_message': { paramsTuple?: []; params?: {} }

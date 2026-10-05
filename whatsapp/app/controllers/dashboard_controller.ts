@@ -229,6 +229,7 @@ export default class DashboardController {
           profile?.handling_mode === 'cs' || profile?.ai_excluded || schedulePaused ? 'cs' : 'ai',
         schedule_paused: schedulePaused,
         ai_excluded: Boolean(profile?.ai_excluded),
+        role: String(profile?.role || ''),
         handoff_reason:
           schedulePaused && profile?.handling_mode !== 'cs' && !profile?.ai_excluded
             ? 'Di luar jam kerja AI. Chat ditangani manusia sampai jadwal AI dimulai.'
@@ -652,6 +653,17 @@ export default class DashboardController {
         excluded: contact.ai_excluded,
       })),
     })
+  }
+  /** Peran kontak diatur CS: pelanggan / vendor / lainnya (v3.6.31). */
+  async contactRole({ request, response }: HttpContext) {
+    try {
+      const { setContactRole } = await import('#beta3/contact_role')
+      const role = String(request.input('role', '') ?? '').trim()
+      await setContactRole(String(request.input('jid', '') ?? '').trim(), role as any, true)
+      return response.json({ ok: true })
+    } catch (error) {
+      return response.unprocessableEntity({ error: error instanceof Error ? error.message : 'Kontak tidak valid.' })
+    }
   }
   async contactExclusion({ request, response }: HttpContext) {
     try {

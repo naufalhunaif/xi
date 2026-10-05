@@ -616,6 +616,9 @@ async function createTables() {
   await db.rawQuery(`ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS line_id INT UNSIGNED NULL`)
   await db.rawQuery(`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS line_id INT UNSIGNED NULL`)
   // v3.6.29: pengiriman gagal dicoba ulang (3x) dan alasannya tersimpan, bukan langsung "!".
+  // v3.6.31: peran kontak (pelanggan / vendor / lainnya) dinilai Jev; role_manual = diatur CS.
+  await db.rawQuery(`ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS role VARCHAR(20) NULL`)
+  await db.rawQuery(`ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS role_manual TINYINT(1) NOT NULL DEFAULT 0`)
   await db.rawQuery(`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS send_attempts TINYINT UNSIGNED NOT NULL DEFAULT 0`)
   await db.rawQuery(`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS send_error VARCHAR(300) NULL`)
   await db.rawQuery(`ALTER TABLE whatsapp_carts

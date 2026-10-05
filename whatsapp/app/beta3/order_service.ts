@@ -422,7 +422,9 @@ export async function renderActiveOrder(jid: string) {
   const parts = [
     `ORDER BERJALAN ${order.order_number ? `#${order.order_number}` : `#${order.id}`}${items ? ` (${items})` : ''}: ${total && paid < total ? `DP, sisa ${rupiah(total - paid)}` : 'lunas'}`,
     shipment
-      ? `sudah dikirim, resi ${shipment.awb} (JNE)`
+      ? shipment.method === 'antar' || shipment.awb === 'ANTAR'
+        ? 'sudah diantar langsung oleh tim kami (tanpa resi)'
+        : `sudah dikirim, resi ${shipment.awb} (JNE)`
       : order.ready_at
         ? 'produksi selesai, siap dikirim'
         : `sedang diproses${order.ship_by ? `, target siap kirim ${shipByText(order.ship_by)}` : ''}`,
@@ -430,7 +432,7 @@ export async function renderActiveOrder(jid: string) {
   return (
     `${parts.join('; ')}.\n` +
     'Ditanya "sudah jadi?/sampai mana?" → jawab dari status ini: "iya sedang proses bos, insyaallah …" (target siap kirim bila ada; jangan mengarang tahap). ' +
-    'Ditanya "sudah dikirim?" → ada resi: "Pesanan sudah di kirim bos dengan No. Resi {resi} (JNE)"; belum: status + perkiraan siap kirim.'
+    'Ditanya "sudah dikirim?" → ada resi: "Pesanan sudah di kirim bos dengan No. Resi {resi} (JNE)"; diantar tim: "sudah diantar langsung tim kami bos" (jangan menyebut/menjanjikan resi); belum: status + perkiraan siap kirim.'
   )
 }
 
@@ -885,6 +887,19 @@ export async function recheckPaidOrders(limit = 3) {
 }
 
 /** Pesanan selesai diproduksi: catat waktu, kembalikan sisa bayar untuk pesan ke pelanggan. */
+/** v3.6.31: pesanan diantar tim sendiri / diambil pelanggan → tercatat terkirim tanpa resi (tab Selesai). */
+export async function markLeanOrderDelivered(id: number) {
+  await ensureLeanTables()
+  const order = await readLeanOrder(id)
+  if (!order || order.status !== 'paid') throw new Error('Order belum dibayar.')
+  await db.rawQuery(
+    'INSERT IGNORE INTO whatsapp_beta3_shipments (message_id, jid, awb, method, created_at) VALUES (?, ?, ?, ?, ?)',
+    [`antar-${id}`, String(order.jid), 'ANTAR', 'antar', new Date()]
+  )
+  await db.from('whatsapp_beta3_orders').where('id', id).update({ updated_at: new Date() })
+  return order
+}
+
 export async function markLeanOrderReady(id: number) {
   await ensureLeanTables()
   const order = await readLeanOrder(id)

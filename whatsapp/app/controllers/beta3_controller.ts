@@ -17,6 +17,7 @@ import {
   latestLeanOrder,
   markLeanOrderPaid,
   markLeanOrderReady,
+  markLeanOrderDelivered,
   settleLeanOrder,
   recheckPaidOrders,
   setLeanPaidAmount,
@@ -315,6 +316,16 @@ export default class Beta3Controller {
   }
 
   /** Pesanan selesai diproduksi: kabari pelanggan (minta pelunasan bila masih DP). */
+  /** Diantar tim sendiri / diambil pelanggan: tandai terkirim tanpa resi. */
+  async deliveredOrder({ params, response }: HttpContext) {
+    try {
+      await markLeanOrderDelivered(Number(params.id))
+      return response.json({ ok: true })
+    } catch (error) {
+      return response.unprocessableEntity({ error: error instanceof Error ? error.message : 'Order tidak valid.' })
+    }
+  }
+
   async readyOrder({ params, response }: HttpContext) {
     try {
       const order = await markLeanOrderReady(Number(params.id))

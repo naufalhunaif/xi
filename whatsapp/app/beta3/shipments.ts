@@ -2,6 +2,10 @@
 // kata-katanya bebas. Dicatat per pesan supaya tab Selesai dan lacak resi memakainya.
 import db from '#services/workspace_database'
 import { ensureLeanTables, readLeanState, writeLeanState } from '#beta3/tables'
+import { storeDeliversItself } from '#beta3/jev_decisions'
+
+/** Penanda pengiriman tanpa resi (diantar tim / diambil) di kolom awb. */
+export const SELF_DELIVERY_AWB = 'ANTAR'
 
 const SHIP_WORDS =
   /\b(resi|awb|no\.?\s*kiriman|kiriman|dikirim|terkirim|kirim|pengiriman|ekspedisi|kurir|jne|j&t|jnt|sicepat|anteraja|tiki|ninja|lion|paket|otw|tracking|lacak)\b/i
@@ -21,6 +25,25 @@ export function detectAwb(text: string, accounts: Set<string> = new Set()) {
     return token
   }
   return ''
+}
+
+/**
+ * v3.6.31 — pesan toko "pesanan diantar tim sendiri / diambil pelanggan" (tanpa resi): pola kata
+ * sebagai saringan awal, Jev (`kirim_sendiri`) yang memutuskan bila aktif.
+ */
+const SELF_WORDS =
+  /\b(diantar|di antar|dianter|di anter|antar sendiri|antar langsung|kami antar|kami anter|tim kami|kurir toko|kurir kami|ambil sendiri|diambil|ambil di toko|cod|ketemuan|kami bawa|dibawa langsung)\b/i
+const SELF_SENT = /\b(sudah|sdh|udah|sedang|lagi|otw|hari ini|besok|siang|sore|malam|pagi|dalam perjalanan|siap|meluncur|berangkat)\b/i
+
+export function looksSelfDelivery(text: string) {
+  const body = String(text || '')
+  return SELF_WORDS.test(body) && SELF_SENT.test(body) && !/\b(resi|awb|jne|j&t|jnt|sicepat|tiki|anteraja|ninja|lion|pos)\b/i.test(body)
+}
+
+export async function detectSelfDelivery(jid: string, text: string) {
+  if (!looksSelfDelivery(text)) return false
+  const verdict = await storeDeliversItself(jid, text).catch(() => undefined)
+  return verdict !== false
 }
 
 async function accountNumbers() {
@@ -52,11 +75,18 @@ export async function scanShipments(batch = 3000) {
     if (!rows.length) return
     const accounts = await accountNumbers()
     for (const row of rows as any[]) {
-      const awb = detectAwb(String(row.body || ''), accounts)
-      if (!awb || !row.message_id) continue
+      if (!row.message_id) continue
+      const body = String(row.body || '')
+      let awb = detectAwb(body, accounts)
+      let method = 'kurir'
+      if (!awb && (await detectSelfDelivery(String(row.jid), body))) {
+        awb = SELF_DELIVERY_AWB
+        method = 'antar'
+      }
+      if (!awb) continue
       await db.rawQuery(
-        'INSERT IGNORE INTO whatsapp_beta3_shipments (message_id, jid, awb, created_at) VALUES (?, ?, ?, ?)',
-        [String(row.message_id), String(row.jid), awb, row.created_at]
+        'INSERT IGNORE INTO whatsapp_beta3_shipments (message_id, jid, awb, method, created_at) VALUES (?, ?, ?, ?, ?)',
+        [String(row.message_id), String(row.jid), awb, method, row.created_at]
       )
     }
     await writeLeanState('shipment_scan_id', String(rows[rows.length - 1].id))

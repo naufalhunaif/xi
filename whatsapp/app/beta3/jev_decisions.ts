@@ -582,3 +582,62 @@ export async function imageIsPaymentProof(input: { jid: string; kind: string; no
   await logDecision({ jid: input.jid, decision: 'bukti_transfer', answer, used: sure, detail: `${input.kind}: ${input.note}`.slice(0, 300) })
   return sure ? yes(answer) : undefined
 }
+
+/**
+ * v3.6.31 — pesan toko menyatakan pesanan DIANTAR SENDIRI oleh tim / diambil pelanggan (tanpa
+ * ekspedisi & resi)? Dipakai pemindai pengiriman setelah pola kata cocok; true/false bila yakin.
+ */
+export async function storeDeliversItself(jid: string, storeMessage: string) {
+  if (!(await jevOn('kirim_sendiri'))) return undefined
+  const answers = await askJev(
+    'kirim-sendiri',
+    { pesan_toko: maskPii(storeMessage).slice(0, 400) },
+    {
+      kirim_sendiri: {
+        type: 'noul',
+        instructions:
+          'Apakah pesan_toko menyatakan pesanan SUDAH/SEDANG dikirim atau diantar langsung oleh tim toko sendiri (kurir toko, COD, diantar ke alamat), atau diambil pelanggan di toko — tanpa ekspedisi dan tanpa nomor resi? Pesan yang menyebut resi/ekspedisi, atau hanya janji/perkiraan jadi, BUKAN.',
+      },
+    },
+    { jid }
+  )
+  const answer = answers?.kirim_sendiri
+  if (!answer) return undefined
+  const sure = confident('kirim_sendiri', answer)
+  await logDecision({ jid, decision: 'kirim_sendiri', answer, used: sure, detail: storeMessage.slice(0, 300) })
+  return sure ? yes(answer) : undefined
+}
+
+/**
+ * v3.6.31 — peran lawan chat: pelanggan toko, atau VENDOR/supplier tempat toko membeli bahan
+ * (kain, kancing, benang, jasa bordir, ekspedisi, dsb.), atau lainnya (internal/tim/pribadi).
+ * Dari ISI percakapan dua arah — toko yang bertanya harga/stok/pesan bahan = vendor.
+ */
+export async function contactRole(jid: string, chat: Line[]) {
+  if (!(await jevOn('peran_kontak'))) return undefined
+  const lines = conversationLines(chat, 12, 600)
+  if (!lines.length) return undefined
+  const answers = await askJev(
+    'peran-kontak',
+    { percakapan: lines },
+    {
+      peran_kontak: {
+        type: 'choice',
+        instructions:
+          'Siapa lawan chat ini bagi toko jas? pelanggan = orang yang bertanya/memesan/membayar jas ke toko. vendor = pihak yang MENJUAL ke toko atau menyediakan jasa (kain, bahan, kancing, benang, bordir, konveksi, ekspedisi, iklan) — toko yang bertanya harga/stok/memesan/membayar ke mereka. lainnya = tim internal, keluarga, pribadi, grup, spam.',
+        criteria: {
+          pelanggan: 'Lawan chat membeli/bertanya produk toko',
+          vendor: 'Toko membeli bahan/jasa dari lawan chat',
+          lainnya: 'Bukan jual beli dengan toko (internal, pribadi, spam)',
+        },
+      },
+    },
+    { jid }
+  )
+  const answer = answers?.peran_kontak
+  if (!answer) return undefined
+  const sure = confident('peran_kontak', answer)
+  await logDecision({ jid, decision: 'peran_kontak', answer, used: sure, detail: lines.slice(-4).join(' | ').slice(0, 300) })
+  const choice = answer.type === 'choice' ? String(answer.choice || '') : ''
+  return sure && ['pelanggan', 'vendor', 'lainnya'].includes(choice) ? (choice as 'pelanggan' | 'vendor' | 'lainnya') : undefined
+}

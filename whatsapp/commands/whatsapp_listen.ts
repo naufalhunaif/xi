@@ -24,6 +24,7 @@ import type { CommandOptions } from '@adonisjs/core/types/ace'
 import db from '#services/workspace_database'
 import { attachOrderPhotos } from '#beta3/order_photos'
 import { screenIncomingImage } from '#beta3/refs_service'
+import { detectContactRole } from '#beta3/contact_role'
 import { autoBackupTick, restartRequestedSince } from '#services/backup_service'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
@@ -1244,6 +1245,12 @@ export default class WhatsappListen extends BaseCommand {
     if (message.key.fromMe) await resumeAiAfterHumanReply(jid)
     else {
       await invalidateConversationGoal(jid)
+      // v3.6.31: peran kontak (pelanggan / vendor bahan / lainnya) dinilai Jev di latar.
+      void detectContactRole(jid)
+        .then((role) => {
+          if (role) this.logger.info(`Peran kontak ${jid}: ${role}`)
+        })
+        .catch(() => {})
       if (mediaDownload) {
         void mediaDownload
           .then(async () => {

@@ -281,7 +281,9 @@
                     @if(Number(contact.priority) >= 4 && (contact.unanswered_count > 0 || contact.handling_mode === 'cs'))
                       <span class="wa-contact-mode urgent" title="Prioritas chat di kotak masuk" data-i18n="Penting" data-i18n-title="Prioritas chat di kotak masuk">Penting</span>
                     @end
-                    @if(contact.handling_mode === 'cs')
+                    @if(contact.role === 'vendor' || contact.role === 'lainnya')
+                      <span class="wa-contact-mode role" title="{{ contact.role === 'vendor' ? 'Vendor / supplier bahan — bukan pelanggan' : 'Bukan pelanggan' }}">{{ contact.role === 'vendor' ? 'Vendor' : 'Lainnya' }}</span>
+                    @elseif(contact.handling_mode === 'cs')
                       <span class="wa-contact-mode cs">CS</span>
                     @end
                   </span>
@@ -367,6 +369,17 @@
                   aria-pressed="{{ selectedContact?.ai_excluded ? 'true' : 'false' }}"
                  data-i18n="Jangan dibalas AI" data-i18n-aria-label="Jangan dibalas AI" data-i18n-title="Jangan dibalas AI">
                   Jangan dibalas AI
+                </button>
+                <button
+                  id="roomRoleButton"
+                  class="wa-setting-icon wa-icon-role"
+                  type="button"
+                  data-role="{{ selectedContact?.role || '' }}"
+                  aria-pressed="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'true' : 'false' }}"
+                  aria-label="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}"
+                  title="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}"
+                  data-i18n="Vendor" data-i18n-aria-label="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}" data-i18n-title="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}">
+                  Vendor
                 </button>
                 <button id="contactDeleteButton" class="wa-icon-button wa-contact-delete-trigger" type="button"
                   aria-label="Hapus data pelanggan" title="Hapus data pelanggan"
