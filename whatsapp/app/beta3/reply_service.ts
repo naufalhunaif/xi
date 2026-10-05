@@ -58,6 +58,7 @@ import { DEFAULT_ITEM_GRAMS, orderWeightGrams } from '#beta3/weights'
 import { detectAwb } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
+import { describeStatus, statusPostsByIds } from '#services/status_posts'
 import { keepCustomInChat } from '#beta3/reply_guards'
 import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
@@ -145,6 +146,12 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
     for (const item of found) {
       const text = String(item.body || '').trim().replace(/\s+/g, ' ').slice(0, 160)
       quoted.set(String(item.message_id), text || (item.media_type ? `[${item.media_type}]` : ''))
+    }
+    // Kutipan ke status WhatsApp toko (diunggah dari HP): bukan pesan chat, disimpan terpisah.
+    const missing = (quotedIds as string[]).filter((id) => !quoted.has(String(id)))
+    if (missing.length) {
+      const statuses = await statusPostsByIds(missing).catch(() => new Map())
+      for (const [id, post] of statuses) quoted.set(id, describeStatus(post))
     }
   }
   // Gambar lama yang tidak dilihat AI (mis. dikirim saat CS membalas) diberi keterangan

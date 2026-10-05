@@ -1,4 +1,5 @@
 import { contactCleanupPreview } from '#services/contact_cleanup_service'
+import { statusPostsByIds } from '#services/status_posts'
 import type { HttpContext } from '@adonisjs/core/http'
 import { listLines } from '#services/line_service'
 import { workspaceScope } from '#services/workspace_context'
@@ -82,6 +83,13 @@ export default class DashboardController {
       reactionsByMessage.set(reaction.target_message_id, current)
     }
     const repliesById = new Map(replies.map((reply) => [reply.message_id, reply]))
+    // Balasan ke status WhatsApp toko: tampilkan caption statusnya sebagai kutipan.
+    const missingReplies = replyIds.filter((id) => !repliesById.has(id))
+    if (missingReplies.length) {
+      const statuses = await statusPostsByIds(missingReplies).catch(() => new Map())
+      for (const [id, post] of statuses)
+        repliesById.set(id, { message_id: id, body: `Status · ${post.caption || (post.media_type === 'video' ? 'video' : 'foto')}`, media_type: post.media_type })
+    }
     const traces = await db
       .from('whatsapp_ai_traces')
       .select('id', 'message_id')

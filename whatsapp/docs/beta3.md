@@ -75,3 +75,13 @@ Goal chat = order. Selama belum order/bayar, AI menulis `susulan` yang nyambung 
 barusan dibahas (20 menit; form 45 menit; transfer 3 jam; tidak malam). Tidak ada kalimat bawaan dari sistem:
 susulan tanpa konteks terasa tidak nyambung. "Oke" yang tidak dibalas tetap mengirim susulan AI yang sudah
 direncanakan (`quietAfter`). Trace: "Susulan HH:MM bila pelanggan diam · …".
+
+## Balasan ke status WhatsApp toko (v3.6.15)
+
+Status diunggah dari HP seperti biasa; aplikasi hanya perlu memahaminya saat pelanggan membalas.
+
+- **Status toko disimpan**: setiap status milik nomor toko yang lewat di soket (`status@broadcast`, `fromMe`) dicatat di `whatsapp_status_posts` (caption, jenis media, thumbnail) dan fotonya diunduh ke `public/media/status-<id>` bila umurnya < 1 hari (`recordOwnStatus`). Dari riwayat sinkron hanya status ≤ 2 hari. Tabel terpisah dari `whatsapp_messages` supaya tidak muncul sebagai room.
+- **Pelanggan membalas status**: `contextInfo.remoteJid === 'status@broadcast'`; `stanzaId` tersimpan sebagai `reply_to_message_id`. Bila statusnya belum tersimpan (diunggah sebelum aplikasi terhubung), caption + thumbnail kecil dari kutipan dipakai (`rememberQuotedStatus`).
+- **AI**: riwayat menampilkan `(membalas "status WhatsApp toko (foto): "…"")` (`reply_service history` → `describeStatus`), pencocokan katalog dari kutipan tetap berjalan (`context_service`). Pada giliran itu foto statusnya dilampirkan sebagai gambar tambahan dengan catatan "foto dari TOKO, bukan kiriman pelanggan" (`runTurn` → `statusContextOf`), jadi "yang ini berapa?" dijawab dari produk di foto/caption.
+- **Room web**: kutipan di gelembung pesan menampilkan "Status · <caption>".
+- Tidak dilakukan: membuat/mengirim status dari aplikasi, membaca status orang lain.

@@ -85,6 +85,7 @@ import { rememberCustomerPhone, phoneFromJid } from '#services/customer_identity
 import { cacheOrderGroups, orderRouting } from '#services/order_operations_service'
 import { isAiWorking } from '#services/ai_work_schedule'
 import { readSettings } from '#services/settings_service'
+import { describeStatus, saveStatusPost, statusImageFile, statusPost, updateStatusMedia } from '#services/status_posts'
 import env from '#start/env'
 import { startTrace } from '#services/trace_service'
 import { aiFailureDetail } from '#services/ai_failure_service'
@@ -1077,6 +1078,10 @@ export default class WhatsappListen extends BaseCommand {
   private async storeSyncedMessage(message: WAMessage) {
     const id = message.key.id
     const jid = message.key.remoteJid
+    if (id && jid === 'status@broadcast' && message.key.fromMe) {
+      await this.recordOwnStatus(message, id, true).catch(() => null)
+      return
+    }
     if (!id || !jid || !/@(?:s\.whatsapp\.net|lid)$/.test(jid)) return
     await this.refreshCustomerPhone(jid, message.key.remoteJidAlt)
     if (message.key.fromMe && isTrackedOutgoingMessage(jid, id)) return
@@ -1542,12 +1547,13 @@ export default class WhatsappListen extends BaseCommand {
     }
   }
 
-  private downloadMedia(message: WAMessage, media: IncomingMedia) {
-    return this.track(() => this.downloadMediaScoped(message, media))
+  private downloadMedia(message: WAMessage, media: IncomingMedia, target: 'message' | 'status' = 'message') {
+    return this.track(() => this.downloadMediaScoped(message, media, target))
   }
-  private async downloadMediaScoped(message: WAMessage, media: IncomingMedia) {
+  private async downloadMediaScoped(message: WAMessage, media: IncomingMedia, target: 'message' | 'status' = 'message') {
     const messageId = message.key.id
     if (!this.socket || !messageId) return null
+    if (target === 'status') return this.downloadStatusMedia(message, media, messageId)
     try {
       const data = await downloadMediaMessage(
         message,
@@ -1586,6 +1592,119 @@ export default class WhatsappListen extends BaseCommand {
       )
       return null
     }
+  }
+
+  /** Media status WhatsApp toko → public/media, dicatat di whatsapp_status_posts (bukan whatsapp_messages). */
+  private async downloadStatusMedia(message: WAMessage, media: IncomingMedia, messageId: string) {
+    try {
+      const data = await downloadMediaMessage(message, 'buffer', {}, {
+        logger: pino({ level: 'silent' }),
+        reuploadRequest: this.socket!.updateMediaMessage,
+      })
+      if (data.byteLength > 50 * 1024 * 1024) throw new Error('Media melebihi batas 50 MB')
+      const directory = this.app.makePath('public', 'media')
+      await mkdir(directory, { recursive: true })
+      const filename = workspaceFileName(`status-${messageId.replace(/[^a-z0-9_-]/gi, '')}.${media.extension}`)
+      const mediaPath = this.app.makePath('public', 'media', filename)
+      await writeFile(mediaPath, data, { mode: 0o644 })
+      await updateStatusMedia(messageId, { media_url: `${env.get('APP_BASE_PATH') || ''}/media/${filename}`, media_status: 'ready' })
+      return mediaPath
+    } catch (error) {
+      await updateStatusMedia(messageId, { media_status: 'failed' }).catch(() => {})
+      this.logger.error(`Media status ${messageId}: ${error instanceof Error ? error.message : String(error)}`)
+      return null
+    }
+  }
+
+  private contextInfoOf(message: WAMessage) {
+    const content = normalizeMessageContent(message.message)
+    return (
+      content?.extendedTextMessage?.contextInfo ||
+      content?.imageMessage?.contextInfo ||
+      content?.videoMessage?.contextInfo ||
+      content?.stickerMessage?.contextInfo ||
+      content?.documentMessage?.contextInfo ||
+      content?.audioMessage?.contextInfo ||
+      content?.documentWithCaptionMessage?.message?.documentMessage?.contextInfo ||
+      null
+    )
+  }
+
+  /**
+   * Status WhatsApp toko yang diunggah dari HP: simpan caption + fotonya supaya balasan pelanggan
+   * ke status itu ("yang ini berapa?") bisa dipahami AI. Status hidup 24 jam; media diunduh bila masih baru.
+   */
+  private async recordOwnStatus(message: WAMessage, id: string, synced = false) {
+    const createdAt = this.messageDate(message)
+    if (synced && Date.now() - createdAt.getTime() > 2 * 86_400_000) return
+    if (await statusPost(id)) return
+    const text = this.textOf(message)
+    const media = await this.prepareMedia(message)
+    if (!text && !media) return
+    const fresh = Boolean(media?.visual) && Date.now() - createdAt.getTime() < 86_400_000
+    await saveStatusPost({
+      messageId: id,
+      caption: text,
+      mediaType: media?.mediaType || null,
+      thumbnailUrl: media?.thumbnailUrl || null,
+      mediaStatus: media?.visual ? (fresh ? 'downloading' : 'expired') : null,
+      createdAt,
+    })
+    if (media && fresh) void this.downloadMedia(message, media, 'status')
+  }
+
+  /**
+   * Pesan pelanggan yang membalas status toko. Bila statusnya belum tersimpan (diunggah sebelum
+   * aplikasi terhubung), caption + thumbnail kecil dari kutipan dipakai sebagai gantinya.
+   */
+  private async rememberQuotedStatus(message: WAMessage) {
+    const info = this.contextInfoOf(message)
+    const stanzaId = String(info?.stanzaId || '')
+    if (!stanzaId || info?.remoteJid !== 'status@broadcast') return null
+    const known = await statusPost(stanzaId)
+    if (known) return known
+    const quoted = normalizeMessageContent(info?.quotedMessage || undefined)
+    const caption = String(
+      quoted?.imageMessage?.caption || quoted?.videoMessage?.caption || quoted?.extendedTextMessage?.text || quoted?.conversation || ''
+    ).trim()
+    const thumbnail = quoted?.imageMessage?.jpegThumbnail || quoted?.videoMessage?.jpegThumbnail
+    const mediaType = quoted?.imageMessage ? 'image' : quoted?.videoMessage ? 'video' : null
+    let thumbnailUrl: string | null = null
+    if (thumbnail?.byteLength) {
+      const directory = this.app.makePath('public', 'media')
+      await mkdir(directory, { recursive: true })
+      const filename = workspaceFileName(`thumb-status-${stanzaId.replace(/[^a-z0-9_-]/gi, '')}.jpg`)
+      await writeFile(this.app.makePath('public', 'media', filename), thumbnail, { mode: 0o644 })
+      thumbnailUrl = `${env.get('APP_BASE_PATH') || ''}/media/${filename}`
+    }
+    if (!caption && !mediaType) return null
+    await saveStatusPost({
+      messageId: stanzaId,
+      caption,
+      mediaType,
+      thumbnailUrl,
+      mediaStatus: mediaType ? 'thumbnail' : null,
+      createdAt: this.messageDate(message),
+    })
+    return statusPost(stanzaId)
+  }
+
+  /** Foto status yang dibalas pelanggan (untuk dilampirkan ke AI) + catatan agar tidak dikira kiriman pelanggan. */
+  private async statusContextOf(message: WAMessage) {
+    const info = this.contextInfoOf(message)
+    if (info?.remoteJid !== 'status@broadcast' || !info?.stanzaId) return null
+    const post = await statusPost(String(info.stanzaId))
+    if (!post) return null
+    const file = statusImageFile(post)
+    let path: string | null = null
+    if (file) {
+      const candidate = this.app.makePath('public', 'media', file)
+      try {
+        await access(candidate)
+        path = candidate
+      } catch {}
+    }
+    return { id: String(post.message_id), path, description: describeStatus(post) }
   }
 
   private replyIdOf(message: WAMessage) {
@@ -1742,7 +1861,11 @@ export default class WhatsappListen extends BaseCommand {
   private async onMessage(message: WAMessage) {
     const id = message.key.id
     const jid = message.key.remoteJid
-    if (!id || !jid || jid.endsWith('@g.us') || jid === 'status@broadcast') return
+    if (!id || !jid || jid.endsWith('@g.us')) return
+    if (jid === 'status@broadcast') {
+      if (message.key.fromMe) await this.recordOwnStatus(message, id)
+      return
+    }
     await this.refreshCustomerPhone(jid, message.key.remoteJidAlt)
     if (message.key.fromMe && isTrackedOutgoingMessage(jid, id)) return
     const exists = await db.from('whatsapp_messages').where('message_id', id).first()
@@ -1753,6 +1876,7 @@ export default class WhatsappListen extends BaseCommand {
     const text = this.textOf(message)
     const media = await this.prepareMedia(message)
     if (!text && !media) return
+    await this.rememberQuotedStatus(message).catch(() => null)
     this.rememberContact(jid, message.pushName || '').catch(() => {})
     await this.claimRoom(jid)
     await db.table('whatsapp_messages').insert({
@@ -1911,8 +2035,22 @@ export default class WhatsappListen extends BaseCommand {
       .map((item) => ({ id: item.id, path: downloadedB3.get(item.id) }))
       .filter((image): image is { id: string; path: string } => Boolean(image.path))
       .slice(0, 3)
+    // Balasan ke status WhatsApp toko: foto statusnya ikut dilampirkan (sekali per status) + catatan.
+    const statusNotes: string[] = []
+    const seenStatus = new Set<string>()
+    for (const item of items) {
+      const status = await this.statusContextOf(item.message).catch(() => null)
+      if (!status || seenStatus.has(status.id)) continue
+      seenStatus.add(status.id)
+      if (status.path) {
+        imagesB3.push({ id: status.id, path: status.path })
+        statusNotes.push(
+          `[Pelanggan membalas ${status.description}. Foto status itu dilampirkan sebagai gambar nomor ${imagesB3.length} — foto dari TOKO, bukan kiriman pelanggan; jawab berdasarkan produk di foto/caption itu.]`
+        )
+      } else statusNotes.push(`[Pelanggan membalas ${status.description}; jawab berdasarkan isi status itu.]`)
+    }
     await this.runBeta3Turn(jid, goalRun, turnSocket, settings, {
-      text,
+      text: [text, ...statusNotes].filter(Boolean).join('\n'),
       messageIds: items.map((item) => item.id),
       keys: items.map((item) => item.message.key),
       imagePaths: imagesB3.map((image) => image.path),
