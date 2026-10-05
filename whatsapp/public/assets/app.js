@@ -540,6 +540,11 @@
       if (catchUp) window.setTimeout(() => void updateMessages(), 150)
     }
   }
+  // v3.6.26: riwayat lama dimuat saat digulir ke atas, daftar belum bisa digulir, atau sedang
+  // mencari di room — bukan seluruh riwayat sekaligus (room besar membuat halaman macet).
+  const wantsMoreHistory = () =>
+    Boolean(roomQuery) ||
+    (messages ? messages.scrollTop < 300 || messages.scrollHeight <= messages.clientHeight + 40 : false)
   async function loadOlderMessages() {
     if (!messages || loadingOlderMessages || !hasOlderMessages) return
     const jid = messages.dataset.jid || ''
@@ -559,7 +564,7 @@
     } catch {
     } finally {
       loadingOlderMessages = false
-      if (hasOlderMessages) window.setTimeout(() => void loadOlderMessages(), 150)
+      if (hasOlderMessages && wantsMoreHistory()) window.setTimeout(() => void loadOlderMessages(), 150)
     }
   }
   if (messages) {
@@ -568,6 +573,7 @@
     messages.addEventListener('scroll', () => {
       if (!adjustingMessageScroll)
         stickToLatest = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 80
+      if (messages.scrollTop < 300) void loadOlderMessages()
       if (!stickToLatest) return
       unreadBoundaryId = null
       messages.querySelector('.new-message-divider')?.remove()
@@ -2280,6 +2286,7 @@
     roomHitId = null
     roomSearchInput.focus()
     applyRoomSearch(true)
+    if (roomQuery) void loadOlderMessages()
   }
   function closeRoomSearch() {
     if (!roomSearchBar) return
@@ -2301,6 +2308,7 @@
     roomQuery = normalizeSearch(roomSearchInput.value)
     roomHitId = null
     applyRoomSearch(true)
+    if (roomQuery) void loadOlderMessages()
   })
   roomSearchInput?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {

@@ -4,7 +4,7 @@ import { activeWorkspace, workspaceState } from '#services/workspace_service'
 import { withChatMutationLock } from '#services/chat_cleanup_service'
 import { inWorkspace } from '#services/workspace_context'
 import { ensureDefaults } from '#services/settings_service'
-import { appVersionLabel } from '#services/app_version'
+import { appVersion, appVersionLabel } from '#services/app_version'
 import { publicAppUrl } from '#services/public_url'
 import { pendingOrderCount } from '#services/pending_orders'
 import { igConnectedQuick } from '#services/instagram_store'
@@ -18,6 +18,8 @@ export default class WorkspaceMiddleware {
       workspaceVersion: scope.version,
       workspaceId: scope.id,
       appVersion: appVersionLabel(),
+      // Cache-buster aset: ikut versi rilis, jadi JS/CSS lama tidak tertinggal di browser setelah update.
+      assetVersion: appVersion(),
       appUrl: publicAppUrl(ctx.request),
       pendingOrders: 0,
     })

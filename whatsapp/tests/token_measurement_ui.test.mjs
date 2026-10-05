@@ -236,7 +236,7 @@ for (const [name, engine] of engines) {
           contentType: 'text/html; charset=utf-8',
           body: `<!doctype html><html><head><meta charset="utf-8"><meta name="app-url" content="https://tokens.test">
             <meta name="csrf-token" content="fixture"><link rel="stylesheet" href="/assets/app.css">
-            <script src="/lang/en.js"></script><script src="/lang/id.js"></script><script src="/assets/i18n.js"></script></head>
+            <script src="/lang/en.js"></script><script src="/assets/i18n.js"></script></head>
             <body class="workspace-ui"><main><form id="settingsForm"><section id="settings-usage" data-settings-panel="usage">${content}</section><button id="evaluationRefresh" hidden></button></form></main>
             <script src="/assets/settings.js"></script></body></html>`,
         })

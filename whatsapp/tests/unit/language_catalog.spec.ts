@@ -2,24 +2,22 @@ import { test } from '@japa/runner'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 
-test('shared English and Indonesian catalogs have matching keys and placeholders', async ({
-  assert,
-}) => {
+// v3.6.26: katalog Indonesia dihapus; tampilan hanya Inggris (kunci = teks sumber Indonesia di kode).
+test('English catalog is well-formed and placeholders survive translation', async ({ assert }) => {
   const sandbox = { window: {} as { waLocales?: Record<string, Record<string, string>> } }
-  for (const language of ['en', 'id'])
-    vm.runInNewContext(await readFile(`public/lang/${language}.js`, 'utf8'), sandbox)
-  const { en, id } = sandbox.window.waLocales!
-  assert.deepEqual(Object.keys(en).sort(), Object.keys(id).sort())
+  vm.runInNewContext(await readFile('public/lang/en.js', 'utf8'), sandbox)
+  const { en } = sandbox.window.waLocales!
   assert.isAbove(Object.keys(en).length, 400)
   for (const key of Object.keys(en)) {
     assert.isString(en[key])
-    assert.isString(id[key])
     const placeholders = (value: string) => [...new Set(value.match(/\{\d+\}/g) || [])].sort()
-    assert.deepEqual(placeholders(en[key]), placeholders(id[key]), key)
+    assert.deepEqual(placeholders(en[key]), placeholders(key), key)
   }
   const runtime = await readFile('public/assets/i18n.js', 'utf8')
   assert.include(runtime, 'window.waLocales?.en')
   assert.notInclude(runtime, "'Salin nomor':")
+  const layout = await readFile('resources/views/components/layout.edge', 'utf8')
+  assert.notInclude(layout, 'lang/id.js')
 })
 
 test('every UI text used in views and scripts has an English translation', async ({ assert }) => {

@@ -20,6 +20,9 @@ function load() {
   return catalog
 }
 
+/** Katalog Indonesia → Inggris (public/lang/en.js), dibaca sekali. */
+export const englishCatalog = () => load()
+
 /** Teks Indonesia → Inggris bila ada di katalog; selain itu apa adanya. Akhiran titik dihormati. */
 export function toEnglish(text: string): string {
   if (!text) return text

@@ -74,7 +74,7 @@ test('one-click production stays compact in both languages and viewport sizes', 
         if (url.pathname === '/')
           return route.fulfill({
             contentType: 'text/html; charset=utf-8',
-            body: `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="app-url" content="https://orders.test"><meta name="csrf-token" content="fixture"><link rel="stylesheet" href="/store.css"><link rel="stylesheet" href="/assets/orders.css"><link rel="stylesheet" href="/assets/forms.css"><style>body{margin:0;padding:12px;font-family:Arial}</style></head><body>${view}<script src="/lang/en.js"></script><script src="/lang/id.js"></script><script src="/assets/i18n.js"></script><script src="/assets/orders.js"></script></body></html>`,
+            body: `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="app-url" content="https://orders.test"><meta name="csrf-token" content="fixture"><link rel="stylesheet" href="/store.css"><link rel="stylesheet" href="/assets/orders.css"><link rel="stylesheet" href="/assets/forms.css"><style>body{margin:0;padding:12px;font-family:Arial}</style></head><body>${view}<script src="/lang/en.js"></script><script src="/assets/i18n.js"></script><script src="/assets/orders.js"></script></body></html>`,
           })
         if (url.pathname === '/store.css')
           return route.fulfill({

@@ -1,6 +1,7 @@
 ;(() => {
   const en = window.waLocales?.en || {}
-  const id = window.waLocales?.id || {}
+  // v3.6.26: katalog Indonesia dihapus — hanya Inggris.
+  const id = {}
   const app = document.querySelector('meta[name="app-url"]')?.content?.replace(/\/$/, '') || ''
   const workspace = document.querySelector('meta[name="whatsapp-workspace-id"]')?.content || '1'
   const key = workspace === '1' ? `${app}:ui-language` : `${app}:${workspace}:ui-language`

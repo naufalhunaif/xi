@@ -6,8 +6,8 @@
     <meta name="csrf-token" content="{{ csrfToken }}" />
     <title>{{ mode === 'setup' ? 'Create owner account' : 'Sign in' }} · Chat</title>
     <link rel="icon" href="{{ appUrl }}/assets/brand.svg" type="image/svg+xml" />
-    <script src="{{ appUrl }}/assets/theme.js?v=1"></script>
-    <link rel="stylesheet" href="{{ appUrl }}/assets/auth.css?v=3" />
+    <script src="{{ appUrl }}/assets/theme.js?v={{ assetVersion }}"></script>
+    <link rel="stylesheet" href="{{ appUrl }}/assets/auth.css?v={{ assetVersion }}" />
   </head>
   <body>
     {{-- Gaya Wireframe (keluarga wireframe-services-grid): kartu putih minimal, ikon gelombang 3D kawat berputar. --}}
@@ -46,6 +46,6 @@
         <footer>v{{ appVersion }}</footer>
       </section>
     </main>
-    <script src="{{ appUrl }}/assets/wire_icon.js?v=1" defer></script>
+    <script src="{{ appUrl }}/assets/wire_icon.js?v={{ assetVersion }}" defer></script>
   </body>
 </html>

@@ -11,7 +11,7 @@ import {
   localSession,
   verifyUser,
 } from '#services/local_auth_service'
-import { appVersionLabel } from '#services/app_version'
+import { appVersion, appVersionLabel } from '#services/app_version'
 import { publicAppUrl } from '#services/public_url'
 
 const clientId = 'whatsapp'
@@ -42,6 +42,7 @@ function authPage(
     mode,
     appUrl: appUrl(request),
     appVersion: appVersionLabel(),
+    assetVersion: appVersion(),
     error: '',
     email: '',
     name: '',
