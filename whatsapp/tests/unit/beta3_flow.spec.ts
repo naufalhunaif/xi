@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import db from '#services/workspace_database'
 import { recoverHandledOrder, missedOrderForm, totalFromStoreMessages, finishLeanGoal, claimLeanNudge } from '#beta3/reply_service'
-import { saveLeanOrder, applyCsTotalMessage, approveLeanOrder, reopenLeanOrderForChange, readLeanOrder } from '#beta3/order_service'
+import { saveLeanOrder, applyCsTotalMessage, approveLeanOrder, reopenLeanOrderForChange, readLeanOrder, reconcileCsTotals, applyCsPaymentConfirm } from '#beta3/order_service'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
 import Beta3Controller from '#controllers/beta3_controller'
 import { writeOrderSpec } from '#beta3/customer_service'
@@ -115,6 +115,65 @@ test.group('beta3 · alur order (database)', () => {
     await db.from('whatsapp_beta3_orders').where('id', id).update({ status: 'awaiting_payment', paid_amount: 916000 })
     assert.isFalse(await reopenLeanOrderForChange(id))
     assert.isNull(await applyCsTotalMessage(jid, 'total 900.000 + 36.000 = 936.000 bos'))
+    await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
+  })
+
+  // v3.6.32 (Retno): total CS dikirim sebelum v3.6.30, dana 916.000 dikonfirmasi, order tetap 503.000.
+  test('order lunas yang totalnya tertinggal disamakan dengan total CS yang nominalnya = dana masuk', async ({ assert }) => {
+    const jid = 'tmpreconcile@s.whatsapp.net'
+    await latestLeanOrder(jid)
+    await db.from('whatsapp_messages').where('jid', jid).delete()
+    await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
+    const id = await saveLeanOrder({
+      jid,
+      form: { customerName: 'Retno', address: 'Sidomoro', district: 'Buluspesantren', regency: 'Kebumen', postalCode: '54391', phone: '0812', note: '' } as any,
+      items: 'Basic Suit - Cream\nJas, Celana, Rompi',
+      spec: 'Basic Suit - Cream\nJas, Celana, Rompi',
+    })
+    await db.from('whatsapp_beta3_orders').where('id', id).update({
+      status: 'paid', subtotal: 485000, shipping_cost: 18000, total: 503000, paid_amount: 916000, created_at: new Date(Date.now() - 3600_000),
+    })
+    const at = (min: number) => new Date(Date.now() - min * 60_000)
+    await db.table('whatsapp_messages').multiInsert([
+      { jid, message_id: 'rc1', direction: 'out', sender_type: 'ai', status: 'sent', body: 'Basic Suit - Cream size L 485.000\nOngkir REG 18.000\n\nTotal 485.000 + 18.000 = 503.000 bos', created_at: at(40) },
+      { jid, message_id: 'rc2', direction: 'out', sender_type: 'cs', status: 'sent', body: 'Jas, Celana, Rompi 880.000\nongkir 2kg, 2 x 18.000 =36.000 \n\ntotal 880.000 + 36.000 =916.000 bos', created_at: at(20) },
+    ])
+    assert.isAtLeast(await reconcileCsTotals(), 1)
+    const order = await readLeanOrder(id)
+    assert.equal(Number(order.total), 916000)
+    assert.equal(Number(order.shipping_cost), 36000)
+    assert.equal(Number(order.subtotal), 880000)
+    assert.equal(Number(order.paid_amount), 916000)
+    assert.equal(String(order.items), 'Jas, Celana, Rompi 880.000')
+    // Sudah sama → tidak diubah lagi.
+    assert.equal(await reconcileCsTotals(), 0)
+    await db.from('whatsapp_messages').where('jid', jid).delete()
+    await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
+  })
+
+  test('konfirmasi dana dari CS di chat → lunas saat itu juga, hanya bila Jev yakin', async ({ assert }) => {
+    const jid = 'tmppayconfirm@s.whatsapp.net'
+    await latestLeanOrder(jid)
+    await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
+    const id = await saveLeanOrder({
+      jid,
+      form: { customerName: 'Budi', address: 'Jl 1', district: 'Wara', regency: 'Palopo', postalCode: '91922', phone: '0812', note: '' } as any,
+      items: 'Setelan Basic Suit - Black 705.000',
+    })
+    await approveLeanOrder({ id, shippingService: 'REG', shippingCost: 20000, subtotal: 705000 })
+    // Bukan konfirmasi dana → tidak bertanya Jev.
+    let asked = 0
+    const yes = async () => { asked++; return true as boolean | undefined }
+    assert.isNull(await applyCsPaymentConfirm(jid, 'siap bos, ditunggu ya', yes))
+    assert.equal(asked, 0)
+    // Jev ragu → tidak dicatat.
+    assert.isNull(await applyCsPaymentConfirm(jid, 'sudah masuk ya bos, terimakasih proses ya', async () => undefined))
+    assert.equal((await readLeanOrder(id))?.status, 'awaiting_payment')
+    const paid = await applyCsPaymentConfirm(jid, 'sudah masuk ya bos, terimakasih proses ya', yes)
+    assert.equal(paid?.amount, 725000)
+    const order = await readLeanOrder(id)
+    assert.equal(order.status, 'paid')
+    assert.equal(Number(order.paid_amount), 725000)
     await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
   })
 

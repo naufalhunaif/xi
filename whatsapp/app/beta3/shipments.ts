@@ -32,7 +32,7 @@ export function detectAwb(text: string, accounts: Set<string> = new Set()) {
  * sebagai saringan awal, Jev (`kirim_sendiri`) yang memutuskan bila aktif.
  */
 const SELF_WORDS =
-  /\b(diantar|di antar|dianter|di anter|antar sendiri|antar langsung|kami antar|kami anter|tim kami|kurir toko|kurir kami|ambil sendiri|diambil|ambil di toko|cod|ketemuan|kami bawa|dibawa langsung)\b/i
+  /\b(diantar|di antar|dianter|di anter|antar sendiri|antar langsung|kami antar|kami anter|tim kami|kurir toko|kurir kami|ambil sendiri|diambil|ambil di toko|ambil di store|diambil di store|datang ke toko|datang ke store|sudah diterima|cod|ketemuan|kami bawa|dibawa langsung)\b/i
 const SELF_SENT = /\b(sudah|sdh|udah|sedang|lagi|otw|hari ini|besok|siang|sore|malam|pagi|dalam perjalanan|siap|meluncur|berangkat)\b/i
 
 export function looksSelfDelivery(text: string) {

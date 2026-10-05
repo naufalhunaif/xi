@@ -1,4 +1,4 @@
-import { answeredByStore } from '#beta3/jev_decisions'
+import { answeredByStore, storeConfirmedPayment } from '#beta3/jev_decisions'
 import { BaseCommand, flags } from '@adonisjs/core/ace'
 import { startWorkerDiagnostics } from '#services/worker_diagnostics'
 import { workspaceSocket } from '#services/workspace_socket'
@@ -1961,6 +1961,11 @@ export default class WhatsappListen extends BaseCommand {
         try {
           const applied = await beta3.applyCsTotalMessage(message.jid, String(message.body || ''))
           if (applied) this.logger.info(`Order ${applied.orderId} diperbarui dari total CS: ${applied.total}`)
+          // Konfirmasi dana dari CS di chat (Jev yakin) → lunas saat itu juga (v3.6.32).
+          else {
+            const paid = await beta3.applyCsPaymentConfirm(message.jid, String(message.body || ''), storeConfirmedPayment)
+            if (paid) this.logger.info(`Order ${paid.orderId} lunas dari konfirmasi CS: ${paid.amount}`)
+          }
         } catch {
           /* Pencatatan opsional; jangan mengganggu pengiriman. */
         }

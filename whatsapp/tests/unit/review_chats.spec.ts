@@ -257,5 +257,8 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.isFalse(looksSelfDelivery('nanti kalau sudah jadi kami antar ya bos'.replace('sudah', '')))
     assert.isFalse(looksSelfDelivery('mau diantar atau diambil bos?'))
     assert.equal(detectAwb('Pesanan sudah kami antar langsung ke alamat ya bos'), '')
+    // v3.6.32: diambil di store / sudah diterima.
+    assert.isTrue(looksSelfDelivery('Pesanan sudah diambil di store ya bos, terimakasih'))
+    assert.isTrue(looksSelfDelivery('pesanan sudah di antar ya bos'))
   })
 })

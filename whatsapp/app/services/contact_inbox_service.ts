@@ -2,6 +2,9 @@ import db from '#services/workspace_database'
 import { initializeDatabase } from '#services/init_model'
 import { ensureLeanTables } from '#beta3/tables'
 import { scanShipments } from '#beta3/shipments'
+import { reconcileCsTotals } from '#beta3/order_service'
+
+let reconciled = false
 
 type InboxMessage = {
   id: number
@@ -156,6 +159,11 @@ export async function latestInboxMessages() {
   // "baru"). Order = pesanan berjalan yang belum dikirimi resi. Lunas > 45 hari tanpa resi
   // di chat dianggap selesai.
   await scanShipments().catch(() => {})
+  // v3.6.32: sekali per proses — order lama yang totalnya tertinggal dari total CS di chat disamakan.
+  if (!reconciled) {
+    reconciled = true
+    void reconcileCsTotals().catch(() => 0)
+  }
   const resiSql = (alias: string, after = '') =>
     `EXISTS (SELECT 1 FROM whatsapp_beta3_shipments ${alias} WHERE ${alias}.jid = m.jid${after})`
   const lastResiSql = `(SELECT MAX(rl.created_at) FROM whatsapp_beta3_shipments rl WHERE rl.jid = m.jid)`

@@ -427,3 +427,20 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 
 **Pelajaran**
 - Keputusan "ini bukti bayar?" harus dari isi gambar + konteks, bukan dari urutan pesan. Vision memberi keterangan, Jev memutuskan — pola yang sama bisa dipakai untuk keputusan dinamis lain.
+
+## #19 · Okt 2026 · order Retno: total 503.000 padahal dana 916.000; ambil/antar dikonfirmasi CS di chat (diterapkan v3.6.32)
+
+**Laporan pemilik**
+- Order #PO-20261005-018: item sudah benar (jas+celana+rompi), tapi total tersimpan 485.000 + 18.000 = 503.000 (total otomatis jas saja), ongkir tarif 1 kg; dana 916.000 dikonfirmasi CS → status lunas dengan angka yang tidak cocok.
+- Pesanan yang diambil/diantar dan dibayar di toko tetap ada di chat, tapi biasanya hanya berupa konfirmasi singkat dari CS ("pesanan sudah di antar ya", "sudah masuk, proses ya") — pelanggan sering tidak membalas lagi.
+
+**Penyebab**
+1. Total CS dikirim sebelum v3.6.30 (tidak berlaku surut); konfirmasi dana tidak mencocokkan nominal dengan total.
+2. Konfirmasi dana dari CS hanya dibaca pada giliran AI (menunggu pesan pelanggan berikutnya).
+3. Tarif lama menyimpan berat sebagai `weight_grams`, pengecekan berat v3.6.29 membaca `grams`.
+
+**Perubahan**
+1. `adoptCsTotal`: saat dana dikonfirmasi (tombol, nominal manual, atau chat) dan nominalnya ≠ total tersimpan, pesan total CS sesudah order dibuat yang nominalnya sama diadopsi (item, subtotal, ongkir, total). `reconcileCsTotals` menjalankan ini sekali per proses untuk order 90 hari terakhir (perbaikan data lama, termasuk Retno → 880.000 + 36.000 = 916.000).
+2. `applyCsPaymentConfirm` (listener, saat pesan CS terkirim): kalimat konfirmasi dana + Jev `dana_masuk` yakin → order menunggu pembayaran dicatat lunas saat itu juga. Tanpa Jev tidak otomatis (keputusan uang).
+3. Antar/ambil: kata "diambil di store", "datang ke toko/store", "sudah diterima" ikut dikenali (v3.6.31 sudah: diantar, diambil, kurir toko).
+4. Berat tarif dibaca dari `grams` atau `weight_grams`.

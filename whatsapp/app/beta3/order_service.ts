@@ -721,6 +721,9 @@ export async function markLeanOrderPaid(
     })
   await writeOrderSpec(String(order.jid), '')
   await attachRefsToOrder(String(order.jid), id)
+  // Dana yang masuk ≠ total tersimpan → total CS di chat yang nominalnya sama diadopsi (v3.6.32).
+  if (paidAmount && paidAmount > 0 && Math.round(paidAmount) !== Number(order.total || 0))
+    await adoptCsTotal(id, paidAmount).catch(() => null)
   return { ...order, group_jid: groupJid }
 }
 
@@ -817,8 +820,10 @@ const proofAmountOf = (note: string) => {
 /** Koreksi nominal dibayar (mis. tercatat lunas padahal DP). Tidak mengirim pesan. */
 export async function setLeanPaidAmount(id: number, amount: number) {
   await ensureLeanTables()
-  const order = await readLeanOrder(id)
+  let order = await readLeanOrder(id)
   if (!order || order.status !== 'paid') throw new Error('Order belum dibayar.')
+  // Nominal lebih besar dari total tersimpan: mungkin total CS di chat yang benar (v3.6.32).
+  if (amount > Number(order.total || 0) && (await adoptCsTotal(id, amount).catch(() => null))) order = await readLeanOrder(id)
   const total = Number(order.total || 0)
   const paid = Math.max(0, Math.round(total ? Math.min(amount, total) : amount))
   await db
@@ -1416,6 +1421,100 @@ export async function applyCsTotalMessage(jid: string, body: string) {
       updated_at: new Date(),
     })
   return { orderId: Number(order.id), items: parsed.items, subtotal, shippingCost, total: parsed.total }
+}
+
+/**
+ * v3.6.32 — total CS yang terlewat (dikirim sebelum v3.6.30, atau nominal dana ≠ total tersimpan):
+ * cari pesan CS/pemilik berformat total sesudah order dibuat yang nominalnya = dana masuk (atau,
+ * untuk order menunggu pembayaran, total CS terakhir yang berbeda) → order disamakan.
+ */
+export async function adoptCsTotal(orderId: number, amount?: number) {
+  await ensureLeanTables()
+  const order = await readLeanOrder(orderId)
+  if (!order || !['paid', 'awaiting_payment'].includes(String(order.status))) return null
+  const rows = await db
+    .from('whatsapp_messages')
+    .where('jid', String(order.jid))
+    .where('direction', 'out')
+    .whereIn('sender_type', ['cs', 'owner'])
+    .where('created_at', '>=', order.created_at)
+    .whereNotIn('status', ['failed', 'queued'])
+    .orderBy('id', 'desc')
+    .limit(60)
+    .select('body')
+  const wanted = amount && amount > 0 ? Math.round(amount) : 0
+  let parsed: ReturnType<typeof parseCsTotalMessage> = null
+  for (const row of rows as any[]) {
+    const candidate = parseCsTotalMessage(String(row.body || ''))
+    if (!candidate) continue
+    if (wanted ? candidate.total === wanted : true) {
+      parsed = candidate
+      break
+    }
+  }
+  if (!parsed) return null
+  const shippingCost = parsed.shippingCost ?? Number(order.shipping_cost || 0)
+  const subtotal = parsed.total - shippingCost
+  if (subtotal <= 0 || Number(order.total || 0) === parsed.total) return null
+  await db
+    .from('whatsapp_beta3_orders')
+    .where('id', orderId)
+    .update({
+      items: parsed.items ? parsed.items.slice(0, 4000) : order.items,
+      subtotal,
+      shipping_cost: shippingCost || null,
+      total: parsed.total,
+      cs_note: order.status === 'paid' ? (Number(order.paid_amount || 0) >= parsed.total ? 'Lunas' : order.cs_note) : 'total dikirim CS di chat',
+      updated_at: new Date(),
+    })
+  return { orderId, total: parsed.total, shippingCost, subtotal }
+}
+
+/** Sekali jalan saat worker mulai: order lunas/menunggu bayar yang nominal dananya ≠ total disamakan dengan total CS di chat. */
+export async function reconcileCsTotals() {
+  await ensureLeanTables()
+  const orders = await db
+    .from('whatsapp_beta3_orders')
+    .whereIn('status', ['paid', 'awaiting_payment'])
+    .where('created_at', '>=', new Date(Date.now() - 90 * 86_400_000))
+    .select('id', 'status', 'total', 'paid_amount')
+  let fixed = 0
+  for (const order of orders as any[]) {
+    const paid = Number(order.paid_amount || 0)
+    if (order.status === 'paid' && (!paid || paid === Number(order.total || 0))) continue
+    const result = await adoptCsTotal(Number(order.id), order.status === 'paid' ? paid : undefined).catch(() => null)
+    if (result) fixed++
+  }
+  return fixed
+}
+
+/**
+ * v3.6.32 — CS mengonfirmasi dana di chat ("sudah masuk ya bos, proses ya", "lunas di toko") saat
+ * order menunggu pembayaran: dicatat lunas saat pesan CS terkirim, tanpa menunggu pelanggan
+ * membalas (pelanggan yang bayar/ambil di toko sering tidak chat lagi). Keputusan uang → wajib
+ * Jev `dana_masuk` yakin; tanpa Jev tidak dicatat otomatis.
+ */
+const PAY_CONFIRM = /\b(sudah|sdh|udah|dana|pembayaran|transfer\w*|tf)\b[^.\n]{0,40}\b(masuk|diterima|terima|lunas|kami terima)\b|\blunas\b|\bterima ?kasih\b[^.\n]{0,30}\bproses\b/i
+
+export async function applyCsPaymentConfirm(
+  jid: string,
+  body: string,
+  confirm: (jid: string, messages: string[]) => Promise<boolean | undefined>
+) {
+  if (!PAY_CONFIRM.test(String(body || ''))) return null
+  await ensureLeanTables()
+  const order = await db
+    .from('whatsapp_beta3_orders')
+    .where('jid', jid)
+    .where('status', 'awaiting_payment')
+    .orderBy('id', 'desc')
+    .first()
+  if (!order || !Number(order.total || 0)) return null
+  const sure = await confirm(jid, [String(body)]).catch(() => undefined)
+  if (sure !== true) return null
+  const amount = Number(order.reported_amount || 0) > 0 ? Number(order.reported_amount) : Number(order.total)
+  await markLeanOrderPaid(Number(order.id), amount < Number(order.total) ? undefined : 'Lunas', amount)
+  return { orderId: Number(order.id), amount }
 }
 
 /** Alasan total belum otomatis, ditampilkan ke CS di panel pesanan. */

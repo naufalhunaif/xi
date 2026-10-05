@@ -933,7 +933,8 @@ export async function createLeanReply(input: {
         ? (parseJson<ShippingRates>(String(pending.shipping_options)) as ShippingRates | null)
         : null
       // Berat berubah (item bertambah/berkurang) → tarif lama tidak dipakai, dihitung ulang.
-      if (!rates?.prices?.length || (rates.grams && rates.grams !== orderGrams)) {
+      const ratesGrams = Number(rates?.grams ?? (rates as any)?.weight_grams ?? 0)
+      if (!rates?.prices?.length || (ratesGrams && ratesGrams !== orderGrams)) {
         try {
           const lastResolved = parseJson<LastShipping>(await readLeanState(lastKey))?.resolved
           rates = await ratesForAddress(
@@ -1306,7 +1307,9 @@ export async function createLeanReply(input: {
     const storedRates = current?.shipping_options
       ? (parseJson<ShippingRates & { grams?: number }>(String(current.shipping_options)) as (ShippingRates & { grams?: number }) | null)
       : null
-    if (current && mcp.url && storedRates?.prices?.length && storedRates.grams !== gramsNow) {
+    // Tarif lama menyimpan berat sebagai weight_grams (dari MCP); yang baru juga grams.
+    const storedGrams = Number(storedRates?.grams ?? (storedRates as any)?.weight_grams ?? 0)
+    if (current && mcp.url && storedRates?.prices?.length && storedGrams !== gramsNow) {
       try {
         const lastResolved = parseJson<LastShipping>(await readLeanState(lastKey))?.resolved
         const fresh = await ratesForAddress(
