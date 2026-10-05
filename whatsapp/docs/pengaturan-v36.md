@@ -267,3 +267,8 @@ Perubahan v3.6.6:
 
 - Lihat `docs/cs-pelajaran.md` #21. Kode: `VENDOR_SQL` di `listLeanOrders`/`countLeanOrders` (status `vendor`), `nextLeanGroupOrder` melewati vendor, `saveRecap`/`recapCandidates` melewati vendor, `orderSql` kotak masuk, `rescanSelfDeliveries` (`shipments.ts`, state `self-delivery-rescan-v1`), `oneTimeMaintenance` (`contact_inbox_service.ts`, juga dipanggil dari endpoint daftar Order), tab Vendor di `orders_beta3.edge`.
 - Bersinggungan: menandai/membatalkan vendor di room langsung memindahkan order kontak itu antara tab Vendor dan tab pelanggan (tanpa mengubah data order).
+
+## v3.6.35 — `wa update` tidak lagi tertahan "Build lain masih berjalan"
+
+- Bila update sebelumnya terputus, folder lock `whatsapp/.deploy/lock` tertinggal. `clear_stale_lock` (`deploy/wa.sh`) seharusnya menghapusnya bila tidak ada build, tapi pengecekannya juga menghitung proses yang berjalan dari folder `.deploy/release-…` — termasuk WEB/WORKER/nomor tambahan yang selalu berjalan — sehingga lock tidak pernah terhapus dan setiap `wa update` gagal. Kini hanya proses build (`whatsapp-aapanel.mjs`, `deploy/build.sh`) yang dihitung.
+- Bersinggungan: `wa update` dari versi yang tertahan langsung mengambil v3.6.35 lalu memakai `wa.sh` baru untuk build, jadi tidak perlu menghapus lock manual.

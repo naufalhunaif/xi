@@ -171,7 +171,9 @@ clear_stale_lock() {
   # Lock tertinggal bila build sebelumnya terputus (mis. SSH putus). Hapus hanya jika tidak ada build yang berjalan.
   local lock="$APP/whatsapp/.deploy/lock"
   [[ -d "$lock" ]] || return 0
-  if pgrep -f "deploy/whatsapp-aapanel.mjs" >/dev/null 2>&1 || pgrep -f "$APP/whatsapp/.deploy/release-" >/dev/null 2>&1; then
+  # Hanya proses build yang dihitung. Proses WEB/WORKER yang sedang berjalan juga memakai folder
+  # .deploy/release-…, jadi folder itu bukan tanda build berjalan (v3.6.35: dulu lock tidak pernah terhapus).
+  if pgrep -f "deploy/whatsapp-aapanel.mjs" >/dev/null 2>&1 || pgrep -f "deploy/build.sh" >/dev/null 2>&1; then
     die 'Build lain masih berjalan. Tunggu sampai selesai, lalu ulangi.'
   fi
   rm -rf "$lock"
