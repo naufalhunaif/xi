@@ -746,6 +746,9 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
 }
 .workspace-ui .wa-inbox-bulk-count {
   flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--wa-mono);
   font-size: 10.5px;
   letter-spacing: 0.08em;
@@ -847,4 +850,33 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
   border-color: var(--wa-page);
   color: var(--wa-page);
   background: transparent;
+}
+.workspace-ui .wa-inbox-bulk-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  white-space: nowrap;
+  padding: 2px 6px 2px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--wa-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.workspace-ui .wa-inbox-bulk-all::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--muted);
+  border-radius: 3px;
+  background: var(--wa-surface, #fff);
+}
+.workspace-ui .wa-inbox-bulk-all[aria-pressed='true']::before {
+  background: var(--text);
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 3px var(--wa-surface, #fff);
 }

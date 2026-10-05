@@ -11,7 +11,10 @@ v="${1:-}"
 command -v rsync >/dev/null || { echo 'rsync diperlukan.' >&2; exit 1; }
 if [[ ! -d "$XI_DIR/.git" ]]; then git clone -q "$XI_URL" "$XI_DIR"; fi
 git -C "$XI_DIR" pull -q --ff-only origin main 2>/dev/null || true
-for d in whatsapp deploy; do
+# .github (workflow build aset) hanya ikut bila token punya scope `workflow` (WA_SYNC_GITHUB=1);
+# tanpa scope itu GitHub menolak push berkas workflow.
+dirs=(whatsapp deploy); [[ "${WA_SYNC_GITHUB:-}" == 1 ]] && dirs+=(.github)
+for d in "${dirs[@]}"; do
   rsync -a --delete --include '.env.example' \
     --exclude node_modules --exclude build --exclude current --exclude .deploy --exclude storage \
     --exclude 'tmp/*' --exclude logs --exclude 'public/media' --exclude '.env' --exclude '.env.*' \
@@ -20,7 +23,7 @@ for d in whatsapp deploy; do
 done
 cp -f "$ROOT/whatsapp/.env.example" "$XI_DIR/whatsapp/.env.example"
 cd "$XI_DIR"
-git add -A whatsapp deploy
+git add -A "${dirs[@]}"
 if git diff --cached --quiet; then echo 'xi sudah sinkron.'; else
   git -c user.name="$(git -C "$ROOT" log -1 --format=%an)" -c user.email="$(git -C "$ROOT" log -1 --format=%ae)" \
     commit -q -m "Sinkron dari alogaritm--app $(git -C "$ROOT" rev-parse --short HEAD)"
@@ -31,8 +34,10 @@ if [[ -n "$v" ]]; then
   # Build di mesin ini (cepat) → diunggah sebagai aset rilis; server tinggal unduh (lihat whatsapp-aapanel.mjs fetchPrebuilt).
   # Paket bisa juga disiapkan di luar (WA_BUILD_ASSET=/path/wa-build-v<ver>.tar.gz), mis. dibangun di mesin lain
   # bila node_modules di sini bukan untuk platform ini.
+  # Bawaan: paket dibangun GitHub Actions (.github/workflows/wa-build-asset.yml) saat tag dipush.
+  # Build lokal hanya bila WA_LOCAL_BUILD=1 (node_modules harus untuk platform ini & jaringan boleh ke uploads.github.com).
   asset="${WA_BUILD_ASSET:-}"
-  if [[ -z "$asset" && "${WA_SKIP_BUILD:-}" != 1 ]]; then
+  if [[ -z "$asset" && "${WA_LOCAL_BUILD:-}" == 1 ]]; then
     tmp="$(mktemp -d)"
     if (cd "$ROOT/whatsapp" && rm -rf build && npm run build >"$tmp/build.log" 2>&1); then
       printf '%s\n' "$v" > "$ROOT/whatsapp/build/VERSION"

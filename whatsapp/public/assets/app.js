@@ -762,11 +762,15 @@
     if (!on) contacts.querySelectorAll('.wa-contact.selected').forEach((row) => row.classList.remove('selected'))
     updateBulkBar()
   }
+  const visibleRows = () => [...(contacts?.querySelectorAll('.wa-contact') || [])].filter((row) => !row.hidden)
   function updateBulkBar() {
     const bar = byId('inboxBulk')
     if (!bar) return
     const count = selectedJids().length
     bar.hidden = !selecting()
+    const visible = visibleRows()
+    const allPicked = visible.length > 0 && visible.every((row) => row.classList.contains('selected'))
+    byId('inboxBulkAll')?.setAttribute('aria-pressed', String(allPicked))
     byId('inboxBulkCount').textContent = t('{0} dipilih', count)
     byId('inboxBulkRead').disabled = !count
     byId('inboxBulkUnread').disabled = !count
@@ -805,6 +809,13 @@
   byId('roomBack')?.addEventListener('click', saveInboxScroll)
   byId('inboxSelect')?.addEventListener('click', () => setSelecting(!selecting()))
   byId('inboxBulkCancel')?.addEventListener('click', () => setSelecting(false))
+  // Pilih semua = semua baris yang sedang terlihat (sesuai filter/pencarian); tekan lagi untuk melepas.
+  byId('inboxBulkAll')?.addEventListener('click', () => {
+    const visible = visibleRows()
+    const allPicked = visible.length > 0 && visible.every((row) => row.classList.contains('selected'))
+    for (const row of visible) row.classList.toggle('selected', !allPicked)
+    updateBulkBar()
+  })
   contacts?.addEventListener('click', (event) => {
     if (!selecting()) return
     const row = event.target.closest('.wa-contact')

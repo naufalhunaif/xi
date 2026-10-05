@@ -1924,5 +1924,6 @@ window.waLocales.en = {
   "Tandai belum dibaca": "Mark as unread",
   "Gagal menyimpan.": "Failed to save.",
   "Semua nomor": "All numbers",
+  "Pilih semua": "Select all",
   "jid wajib.": "jid is required.",
 }

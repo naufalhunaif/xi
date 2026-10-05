@@ -198,3 +198,5 @@ Perubahan v3.6.6:
 - Catatan: aset berlaku mulai rilis ini; update KE v3.6.20 sendiri masih build di server (skrip baru baru aktif setelahnya).
 - **Tanda nomor**: chip "…1234" diganti ikon SIM kecil berisi angka (1 = nomor utama, 2… = nomor tambahan urut), judul = nomor lengkap; baris filter nomor: "Semua · SIM 1 · SIM 2". Room Instagram tidak diberi tanda.
 - v3.6.21: `deploy/upload-build.sh <ver> <tar>` mengunggah/mengganti aset build pada rilis yang sudah ada; `publish-xi.sh` menerima `WA_BUILD_ASSET` (paket dibangun di mesin lain bila `node_modules` lokal bukan untuk platform skrip). Paket harus berisi `build/VERSION` = versi rilis.
+- v3.6.22: paket build dibangun **GitHub Actions** (`.github/workflows/wa-build-asset.yml`, dipicu tag `v3.*` atau manual lewat `workflow_dispatch`) karena mesin pengembang tidak bisa mengunggah ke `uploads.github.com`; `publish-xi.sh` ikut menyinkronkan `.github/`. Aset muncul ±1–2 menit setelah rilis; `wa update` sebelum itu akan build sendiri.
+- v3.6.22: tombol **Pilih semua** di bilah pilihan: memilih semua chat yang sedang terlihat (mengikuti filter/pencarian); tekan lagi untuk melepas.
