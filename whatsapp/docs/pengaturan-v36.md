@@ -185,3 +185,9 @@ Perubahan v3.6.6:
   - Proses nomor memantau worker utama (`WA_PARENT_WORKER_ID` vs `whatsapp_connection.worker_id`): bila worker utama berganti → berhenti rapi agar worker baru menyalakan proses segar (kode terbaru).
   - Worker utama saat berhenti menunggu proses anak keluar (maks 4 detik) sebelum keluar; `deploy/run.sh worker` mematikan proses `--line=` tertinggal di bawah folder aplikasi sebelum worker mulai.
 - Diagnosis bila masih terjadi: `/var/log/wa/worker.err.log` baris "Koneksi #N tertutup (kode …)": 440 = sesi ganda, 408 = timeout jaringan, 515 = WhatsApp minta mulai ulang (normal sesekali), 401/403 = sesi dilepas dari HP.
+
+## v3.6.19 — satu pelanggan satu room; filter nomor/Instagram lebih tegas
+
+- **Dua room untuk orang yang sama** = room `…@lid` (ID internal WhatsApp) dan room `…@s.whatsapp.net` (nomor). Room kanonik kini nomor HP: saat pesan masuk dari LID yang pasangannya diketahui (`whatsapp_contacts.phone_jid`), pesan disimpan ke room nomor (`roomOf` di listener; akhiran perangkat `:n` juga dibuang), dan data room LID lama dipindah sekali (`mergeLidRoom`: pesan, order, bukti, referensi, resi, trace, dll.; tabel berkunci jid — goal, keranjang, catatan pelanggan — room nomor menang, baris LID dibuang; nama/foto/penanda baca disalin). Sapu data lama tiap jam (`mergeKnownLidRooms`, 200 room/putaran, worker utama).
+- **Filter**: memilih satu nomor hanya menampilkan room WhatsApp nomor itu (room Instagram tidak ikut); saluran Instagram menyembunyikan baris nomor. Nomor room diambil dari kontak, bila kosong dari pesan terakhir (`message_line_id`).
+- Bersinggungan: tautan lama `/?jid=<lid>` tidak lagi punya pesan (room kosong) setelah digabung. Tes: `tests/unit/lid_room_merge.spec.ts`.

@@ -614,13 +614,12 @@
       line: /^\d+$/.test(line || '') ? line : 'all',
     }
   }
-  // Nomor (bila lebih dari satu): room WhatsApp milik nomor itu; room Instagram ikut semua nomor.
-  const inLine = (row, line) => line === 'all' || isIgRow(row) || String(row.dataset.line || '1') === line
+  // Nomor (bila lebih dari satu): hanya room WhatsApp milik nomor itu (room Instagram tidak ikut).
+  const inLine = (row, line) => line === 'all' || (!isIgRow(row) && String(row.dataset.line || '1') === line)
   function renderInboxLines(lines) {
     const box = byId('inboxLines')
     if (!box || !Array.isArray(lines)) return
     const key = JSON.stringify(lines)
-    box.hidden = !lines.length
     if (box.dataset.key === key) return
     box.dataset.key = key
     const all = box.querySelector('[data-line="all"]')
@@ -649,11 +648,17 @@
         button.setAttribute('aria-pressed', String(button.dataset.channel === state.channel))
       )
     }
-    byId('inboxLines')?.querySelectorAll('[data-line]').forEach((button) =>
-      button.setAttribute('aria-pressed', String(button.dataset.line === state.line))
-    )
-    for (const row of allRows) if (!inChannel(row, state.channel) || !inLine(row, state.line)) row.hidden = true
-    const rows = allRows.filter((row) => inChannel(row, state.channel) && inLine(row, state.line))
+    // Saluran Instagram tidak punya nomor: baris nomor disembunyikan dan filternya diabaikan.
+    const lineFilter = state.channel === 'ig' ? 'all' : state.line
+    const linesBar = byId('inboxLines')
+    if (linesBar) {
+      linesBar.hidden = state.channel === 'ig' || !linesBar.querySelector('[data-line]:not([data-line="all"])')
+      linesBar.querySelectorAll('[data-line]').forEach((button) =>
+        button.setAttribute('aria-pressed', String(button.dataset.line === lineFilter))
+      )
+    }
+    for (const row of allRows) if (!inChannel(row, state.channel) || !inLine(row, lineFilter)) row.hidden = true
+    const rows = allRows.filter((row) => inChannel(row, state.channel) && inLine(row, lineFilter))
     const matches = (row, key) =>
       key === 'all' ||
       (key === 'unanswered' && Number(row.dataset.unanswered) > 0) ||

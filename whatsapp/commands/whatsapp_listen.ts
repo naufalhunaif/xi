@@ -81,7 +81,7 @@ const beta3 = {
 }
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
 import { setHandlingMode } from '#services/message_service'
-import { rememberCustomerPhone, phoneFromJid } from '#services/customer_identity_service'
+import { canonicalRoomJid, mergeKnownLidRooms, mergeLidRoom, rememberCustomerPhone, phoneFromJid } from '#services/customer_identity_service'
 import { cacheOrderGroups, orderRouting } from '#services/order_operations_service'
 import { isAiWorking } from '#services/ai_work_schedule'
 import { readSettings } from '#services/settings_service'
@@ -918,6 +918,8 @@ export default class WhatsappListen extends BaseCommand {
         this.sweepTimer = setInterval(() => {
           if (this.sessionScope && this.socketOpen)
             void inWorkspace(this.sessionScope, () => this.track(() => this.sweepUnanswered()))
+          if (this.sessionScope && this.socketOpen && this.primary)
+            void inWorkspace(this.sessionScope, () => this.sweepLidRooms()).catch(() => {})
         }, SWEEP_INTERVAL_MS)
       }
       if (!this.mediaRetryTimer) {
@@ -1150,7 +1152,7 @@ export default class WhatsappListen extends BaseCommand {
   /** History/offline events are persisted first, never answered one-by-one. */
   private async storeSyncedMessage(message: WAMessage) {
     const id = message.key.id
-    const jid = message.key.remoteJid
+    let jid = message.key.remoteJid
     if (id && jid === 'status@broadcast' && message.key.fromMe) {
       await this.recordOwnStatus(message, id, true).catch(() => null)
       return
@@ -1158,6 +1160,7 @@ export default class WhatsappListen extends BaseCommand {
     if (!id || !jid || !/@(?:s\.whatsapp\.net|lid)$/.test(jid)) return
     await this.refreshCustomerPhone(jid, message.key.remoteJidAlt)
     if (message.key.fromMe && isTrackedOutgoingMessage(jid, id)) return
+    jid = await this.roomOf(jid)
     const known = await db.from('whatsapp_messages').where('message_id', id).first()
     if (known) {
       // Riwayat yang datang lagi: lengkapi foto yang dulu belum sempat terunduh.
@@ -1294,6 +1297,27 @@ export default class WhatsappListen extends BaseCommand {
     } catch {
       return remoteUrl
     }
+  }
+
+  /** LID yang sudah dipetakan ke nomor → room nomor; data room LID lama dipindah sekali. */
+  private mergedLids = new Set<string>()
+  private async roomOf(jid: string) {
+    const room = await canonicalRoomJid(jid).catch(() => jid)
+    if (room !== jid && !this.mergedLids.has(jid)) {
+      this.mergedLids.add(jid)
+      const moved = await mergeLidRoom(jid, room).catch(() => 0)
+      if (moved) this.logger.info(`Room ${jid} digabung ke ${room} (${moved} pesan).`)
+    }
+    return room
+  }
+
+  private lastLidSweepAt = 0
+  /** Data lama: room LID yang pasangannya sudah diketahui digabung ke room nomor (tiap jam, 200 room/putaran). */
+  private async sweepLidRooms() {
+    if (Date.now() - this.lastLidSweepAt < 60 * 60_000) return
+    this.lastLidSweepAt = Date.now()
+    const moved = await mergeKnownLidRooms().catch(() => 0)
+    if (moved) this.logger.info(`Room LID digabung ke room nomor: ${moved} pesan dipindah.`)
   }
 
   private async refreshCustomerPhone(jid: string, alternate?: string | null) {
@@ -1933,13 +1957,16 @@ export default class WhatsappListen extends BaseCommand {
 
   private async onMessage(message: WAMessage) {
     const id = message.key.id
-    const jid = message.key.remoteJid
+    let jid = message.key.remoteJid
     if (!id || !jid || jid.endsWith('@g.us')) return
     if (jid === 'status@broadcast') {
       if (message.key.fromMe) await this.recordOwnStatus(message, id)
       return
     }
     await this.refreshCustomerPhone(jid, message.key.remoteJidAlt)
+    if (message.key.fromMe && isTrackedOutgoingMessage(jid, id)) return
+    // Room kanonik: LID yang sudah diketahui nomornya masuk ke room nomor (satu pelanggan = satu room).
+    jid = await this.roomOf(jid)
     if (message.key.fromMe && isTrackedOutgoingMessage(jid, id)) return
     const exists = await db.from('whatsapp_messages').where('message_id', id).first()
     if (exists) return

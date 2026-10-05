@@ -6,6 +6,7 @@ import { scanShipments } from '#beta3/shipments'
 type InboxMessage = {
   id: number
   jid: string
+  message_line_id: number | null
   contact_name: string | null
   phone_jid: string | null
   body: string
@@ -123,7 +124,7 @@ export async function latestInboxMessages() {
         ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages WHERE direction = 'out' AND status IN ('sent', 'delivered', 'read')
     )
-    SELECT m.id, m.jid,
+    SELECT m.id, m.jid, m.line_id AS message_line_id,
       COALESCE(NULLIF(c.name, ''), NULLIF(pc.name, ''),
         (SELECT NULLIF(x.name, '') FROM whatsapp_contacts x WHERE x.phone_jid = m.jid
           AND x.jid <> m.jid AND x.name IS NOT NULL AND x.name <> '' LIMIT 1),

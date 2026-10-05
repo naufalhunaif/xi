@@ -164,8 +164,9 @@ export default class DashboardController {
         ...message,
         // Tanpa nama: tampilkan nomor HP (bila sudah terpetakan), bukan ID internal.
         contact_name: profile?.name || message.contact_name || displayPhone(message.phone_jid),
-        line_label: lineLabel(profile?.line_id),
-        line_id: Number(profile?.line_id) > 1 ? Number(profile.line_id) : 1,
+        // Nomor penerima room: dari kontak (claimRoom), bila kosong dari pesan terakhir.
+        line_label: lineLabel(profile?.line_id ?? message.message_line_id),
+        line_id: Number(profile?.line_id ?? message.message_line_id) > 1 ? Number(profile?.line_id ?? message.message_line_id) : 1,
         profile_picture_url: profile?.profile_picture_url || null,
         activity:
           activityIsFresh && !schedulePaused
