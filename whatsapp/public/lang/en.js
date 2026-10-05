@@ -1915,5 +1915,7 @@ window.waLocales.en = {
   "Tampilan daftar": "List view",
   "Tampilan grid": "Grid view",
   "Tampilan": "View",
+  "Suka, komentar, dan tayangan sudah termasuk hasil iklan (boost).": "Likes, comments, and views include results from ads (boost).",
+  "Angka dari Instagram API hanya organik; hasil iklan (boost) tidak termasuk, jadi bisa lebih kecil dari aplikasi Instagram.": "Numbers from the Instagram API are organic only; results from ads (boost) are not included, so they can be lower than in the Instagram app.",
   "jid wajib.": "jid is required.",
 }

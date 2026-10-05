@@ -1915,5 +1915,7 @@ window.waLocales.id = {
   "Tampilan daftar": "Tampilan daftar",
   "Tampilan grid": "Tampilan grid",
   "Tampilan": "Tampilan",
+  "Suka, komentar, dan tayangan sudah termasuk hasil iklan (boost).": "Suka, komentar, dan tayangan sudah termasuk hasil iklan (boost).",
+  "Angka dari Instagram API hanya organik; hasil iklan (boost) tidak termasuk, jadi bisa lebih kecil dari aplikasi Instagram.": "Angka dari Instagram API hanya organik; hasil iklan (boost) tidak termasuk, jadi bisa lebih kecil dari aplikasi Instagram.",
   "jid wajib.": "jid wajib.",
 }

@@ -158,3 +158,9 @@ Perubahan v3.6.6:
 ## v3.6.13 — suka/komentar tidak lagi tertimpa angka insight lama
 
 - `buildRows` (instagram_content.js) dan `recentPosts` (instagram_ai.ts): `like_count`/`comments_count` dari daftar media (selalu segar) sekarang menimpa `likes`/`comments` dari insight tersimpan — sebelumnya terbalik, sehingga suka di app tertinggal (mis. 11 padahal di Instagram 27) sampai jeda insight lewat.
+
+## v3.6.14 — angka postingan yang di-boost (iklan)
+
+- Instagram API memberi angka **organik saja**; suka/komentar/tayangan/kunjungan profil dari iklan (boost) tidak ikut, sehingga bisa lebih kecil dari aplikasi Instagram. Metrik `total_likes`/`total_comments`/`total_views` (termasuk iklan) kini ikut diminta; Instagram hanya memberinya pada login lewat Facebook — bila ditolak dilewati otomatis (mekanisme `unsupported`), bila ada dipakai saat lebih besar.
+- Detail postingan menampilkan catatan apakah angkanya sudah termasuk hasil iklan atau belum.
+- Kunjungan profil dari iklan tidak tersedia lewat API postingan mana pun (hanya lewat laporan iklan).

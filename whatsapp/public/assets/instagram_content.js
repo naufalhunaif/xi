@@ -135,10 +135,12 @@
         time: item.timestamp || post?.publishedAt,
         status: 'published',
         // Suka & komentar dari daftar media selalu segar; angka insight tersimpan hanya pelengkap (jangan menimpa).
+        // total_* (bila ada) sudah termasuk hasil iklan/boost → dipakai bila lebih besar.
         stats: {
           ...(item.stats || {}),
-          likes: item.like_count ?? item.stats?.likes,
-          comments: item.comments_count ?? item.stats?.comments,
+          likes: Math.max(item.like_count ?? item.stats?.likes ?? 0, item.stats?.total_likes ?? 0) || (item.like_count ?? item.stats?.likes),
+          comments: Math.max(item.comments_count ?? item.stats?.comments ?? 0, item.stats?.total_comments ?? 0) || (item.comments_count ?? item.stats?.comments),
+          views: Math.max(item.stats?.views ?? 0, item.stats?.total_views ?? 0) || item.stats?.views,
         },
         signals: item.signals || null,
         permalink: item.permalink || post?.permalink || '',
@@ -632,6 +634,13 @@
     if (tiles.childElementCount) {
       const perf = section(t('Performa'))
       perf.append(tiles)
+      perf.append(
+        el(
+          'small',
+          has('total_likes') ? t('Suka, komentar, dan tayangan sudah termasuk hasil iklan (boost).') : t('Angka dari Instagram API hanya organik; hasil iklan (boost) tidak termasuk, jadi bisa lebih kecil dari aplikasi Instagram.'),
+          'wa-muted'
+        )
+      )
       blocks.push(perf)
     }
     // Rincian interaksi: batang sebanding supaya langsung terlihat mana yang paling banyak.

@@ -320,7 +320,9 @@ export async function activeStories(token: string) {
 }
 
 const MEDIA_METRICS: Record<string, string[]> = {
-  FEED: ['reach', 'views', 'likes', 'comments', 'shares', 'saved', 'total_interactions', 'profile_visits', 'follows'],
+  // total_likes/total_comments/total_views = termasuk hasil iklan (boost); Instagram hanya memberinya pada
+  // login lewat Facebook — bila ditolak, otomatis dilewati (lihat `unsupported`).
+  FEED: ['reach', 'views', 'likes', 'comments', 'shares', 'saved', 'total_interactions', 'profile_visits', 'follows', 'total_likes', 'total_comments', 'total_views'],
   REELS: [
     'reach',
     'views',
@@ -328,6 +330,9 @@ const MEDIA_METRICS: Record<string, string[]> = {
     'comments',
     'shares',
     'saved',
+    'total_likes',
+    'total_comments',
+    'total_views',
     'total_interactions',
     'ig_reels_avg_watch_time',
     'ig_reels_video_view_total_time',
