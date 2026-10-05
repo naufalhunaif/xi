@@ -547,12 +547,21 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-jev-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .workspace-ui .wa-jev-kind { font-size: 11px; font-weight: 600; }
 .workspace-ui .wa-jev-open { margin-left: auto; font-size: 11px; }
-.workspace-ui .wa-jev-bubble { justify-self: start; max-width: min(100%, 560px); padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px 10px 10px 2px; background: var(--wa-subtle, transparent); }
-.workspace-ui .wa-jev-bubble.jev { justify-self: end; border-radius: 10px 10px 2px 10px; border-color: color-mix(in srgb, #7c6cf0 45%, var(--line)); background: color-mix(in srgb, #7c6cf0 10%, var(--wa-surface, transparent)); }
-.workspace-ui .wa-jev-bubble.unsure { opacity: .75; border-style: dashed; }
+.workspace-ui .wa-jev-thread { display: grid; gap: 4px; padding: 8px; border-radius: 8px; background: var(--wa-chat-bg, transparent); max-height: 22em; overflow: auto; }
+.workspace-ui .wa-jev-bubble { justify-self: start; max-width: min(85%, 520px); padding: 5px 9px; border: 1px solid var(--line); border-radius: 10px 10px 10px 2px; background: var(--wa-surface, transparent); }
+.workspace-ui .wa-jev-bubble.store { justify-self: end; border-radius: 10px 10px 2px 10px; background: var(--wa-subtle, transparent); }
+.workspace-ui .wa-jev-bubble.judged { border: 2px solid #7c6cf0; }
 .workspace-ui .wa-jev-bubble > small { display: block; font-size: 10px; color: var(--muted); }
-.workspace-ui .wa-jev-bubble > p { margin: 2px 0 0; font-size: 13px; white-space: pre-wrap; max-height: 9em; overflow: auto; }
-.workspace-ui .wa-jev-bubble > .wa-jev-effect { margin-top: 4px; font-size: 11px; }
+.workspace-ui .wa-jev-bubble.judged > small { color: #7c6cf0; font-weight: 600; }
+.workspace-ui .wa-jev-bubble > p { margin: 1px 0 0; font-size: 12.5px; white-space: pre-wrap; max-height: 8em; overflow: auto; }
+.workspace-ui .wa-jev-seen { font-size: 11px; }
+.workspace-ui .wa-jev-answer { padding: 6px 10px; border-left: 3px solid #7c6cf0; border-radius: 4px; background: color-mix(in srgb, #7c6cf0 10%, transparent); }
+.workspace-ui .wa-jev-answer.unsure { border-left-style: dashed; opacity: .8; }
+.workspace-ui .wa-jev-answer > small { display: block; font-size: 10px; color: var(--muted); }
+.workspace-ui .wa-jev-answer > p { margin: 2px 0 0; font-size: 13px; font-weight: 500; }
+.workspace-ui .wa-jev-answer > .wa-jev-effect { margin-top: 3px; font-weight: 400; font-size: 11px; }
+.workspace-ui .wa-jev-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; list-style: none; }
+.workspace-ui .wa-jev-nav strong { font-size: 13px; font-variant-numeric: tabular-nums; }
 .workspace-ui .wa-jev-more { font-size: 11px; color: var(--muted); }
 .workspace-ui .wa-jev-more summary { cursor: pointer; width: max-content; }
 .workspace-ui .wa-jev-more p { margin: 3px 0 0; }

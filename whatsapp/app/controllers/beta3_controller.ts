@@ -662,7 +662,7 @@ export default class Beta3Controller {
   async jevDecisions({ request, response }: HttpContext) {
     response.header('cache-control', 'no-store')
     const decision = String(request.qs().decision ?? '')
-    const [rows, summary] = await Promise.all([listDecisions(80, decision || undefined), accuracySummary()])
+    const [rows, summary] = await Promise.all([listDecisions(100, decision || undefined), accuracySummary()])
     return response.json({ decisions: rows, summary })
   }
 

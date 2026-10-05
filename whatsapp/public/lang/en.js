@@ -1964,4 +1964,11 @@ window.waLocales.en = {
   "Pesanan diantar tim sendiri / diambil (tanpa resi)": "Order delivered by the team / picked up (no tracking number)",
   "Peran kontak (pelanggan / vendor)": "Contact role (customer / vendor)",
   "Detail": "Details",
+  "dinilai Jev": "judged by Jev",
+  "Isi gambar menurut AI": "What the AI saw in the image",
+  "Belum dinilai": "Not rated yet",
+  "Kembali": "Back",
+  "Lewati": "Skip",
+  "Selesai \u2014 {0} keputusan sudah dilihat.": "Done \u2014 {0} decisions checked.",
+  "Muat lagi": "Load again",
 }

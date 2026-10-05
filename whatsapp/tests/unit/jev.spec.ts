@@ -292,6 +292,8 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
     // v3.6.37: jawaban Jev sebagai kalimat yang dibaca di bawah pesan.
     assert.equal(total?.says, 'The store sent the total to pay / bank account here.')
     assert.isNotEmpty(String(total?.input_text || ''))
+    // v3.6.38: potongan chat sebelumnya ikut dikirim (array, boleh kosong bila belum ada pesan).
+    assert.isArray(total?.context)
     await markDecision(Number(ours[0].id), 'salah', 'tidak')
     if (ours[1]) await markDecision(Number(ours[1].id), 'benar')
     const summary = await accuracySummary()

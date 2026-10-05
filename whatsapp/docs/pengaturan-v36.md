@@ -290,3 +290,11 @@ Perubahan v3.6.6:
 - Jawaban yang tidak dipakai karena Jev ragu ditampilkan bergaris putus-putus: "Jev was unsure, so this answer was not used."
 - Keputusan lama yang belum menyimpan pesan kini memakai pesan terakhir di chat itu sebelum keputusan dibuat (pesan toko untuk keputusan atas pesan toko), jadi kartu lama juga ada isinya.
 - Tanpa token tambahan (kalimat dari daftar tetap `app/beta3/jev_explain.ts` → `SAY`).
+
+## v3.6.38 — Jev accuracy pindah ke halaman Jev, satu per satu dengan konteks chat
+
+- Kartu **Jev accuracy** dipindah dari Usage ke halaman **Jev** (di bawah daftar Keputusan).
+- Dinilai **satu per satu**: "1 / 100" dengan tombol **Back** dan **Skip**; setelah Correct/Wrong langsung lanjut ke berikutnya. Di akhir: "Done — N decisions checked" + **Load again**.
+- Saringan bawaan **Not rated yet** (belum dinilai); pilihan lain: Needs checking, Already rated, All decisions, per jenis keputusan. Maksimal 100 keputusan per muat.
+- Masukan CS: pesan tanpa konteks membingungkan. Kini tiap kartu menampilkan **potongan chat sebelumnya** (maks. 6 pesan pelanggan & toko), pesan yang dinilai Jev diberi bingkai "judged by Jev", lalu jawaban Jev di bawahnya. Untuk gambar, isi gambar menurut AI ditampilkan.
+- Tanpa token tambahan (konteks dibaca dari tabel pesan).

@@ -388,7 +388,7 @@ function alternativesOf(answer: JevAnswer) {
 
 /**
  * Log keputusan untuk dinilai CS. filter: '' semua · 'cek' perlu dicek (ragu, soal uang, peran kontak,
- * belum dinilai) · 'dinilai' sudah dinilai · kunci keputusan.
+ * belum dinilai) · 'belum' belum dinilai · 'dinilai' sudah dinilai · kunci keputusan.
  */
 export async function listDecisions(limit = 50, decision?: string) {
   await ensureDecisionTable()
@@ -405,27 +405,52 @@ export async function listDecisions(limit = 50, decision?: string) {
         .orWhereIn('d.decision', ['dana_masuk', 'bukti_transfer', 'total_toko', 'layanan', 'peran_kontak', 'kirim_sendiri'])
     )
   else if (decision === 'dinilai') query.whereNotNull('d.verdict')
+  else if (decision === 'belum') query.whereNull('d.verdict').where('d.wrong', 0)
   else if (decision && decision in JEV_DECISIONS) query.where('d.decision', decision)
   const rows = (await query) as Array<Record<string, any>>
   const { explainDecision, answerLabel, decisionSource } = await import('#beta3/jev_explain')
-  // Log lama (sebelum v3.6.36) belum menyimpan pesan yang dibaca Jev: diambil pesan terakhir
-  // dari chat itu sebelum keputusan dibuat (pesan toko untuk keputusan atas pesan toko).
+  // v3.6.38: tiap keputusan membawa potongan chat sebelumnya (maks. 6 pesan) supaya CS paham
+  // konteksnya; pesan yang dinilai Jev ditandai. Log lama tanpa input_text memakai pesan itu.
   await Promise.all(
     rows
-      .filter((row) => !row.input_text && row.jid)
+      .filter((row) => row.jid)
       .map(async (row) => {
-        const fromStore = decisionSource(String(row.decision)) === 'toko'
-        const message = await db
+        const source = decisionSource(String(row.decision))
+        const fromStore = source === 'toko'
+        const at = new Date(row.created_at)
+        // Keputusan atas pesan toko bisa dicatat sebelum pesan itu tersimpan (mis. janji total).
+        const until = new Date(at.getTime() + (fromStore ? 120_000 : 5_000))
+        const messages = (await db
           .from('whatsapp_messages')
           .where('jid', row.jid)
-          .where('direction', fromStore ? 'out' : 'in')
-          .where('created_at', '<=', row.created_at)
+          .whereNotIn('status', ['failed'])
+          .where('created_at', '<=', until)
           .orderBy('id', 'desc')
-          .select('body', 'media_type')
-          .first()
-          .catch(() => null)
-        const text = String(message?.body || '').trim() || (message?.media_type ? `(${message.media_type})` : '')
-        if (text) row.input_text = maskPii(text).slice(0, 2000)
+          .limit(6)
+          .select('direction', 'body', 'media_type', 'created_at')
+          .catch(() => [])) as Array<Record<string, any>>
+        messages.reverse()
+        const want = fromStore ? 'out' : 'in'
+        let judged = -1
+        if (source !== 'percakapan')
+          for (let index = messages.length - 1; index >= 0; index--)
+            if (messages[index].direction === want && (source !== 'gambar' || messages[index].media_type)) {
+              judged = index
+              break
+            }
+        if (judged < 0 && source !== 'percakapan')
+          judged = messages.map((item) => item.direction).lastIndexOf(want)
+        row.context = messages.map((item, index) => {
+          const body = String(item.body || '').trim()
+          const media = item.media_type ? `[${String(item.media_type)}]` : ''
+          return {
+            from: item.direction === 'out' ? 'store' : 'customer',
+            text: maskPii([media, body].filter(Boolean).join(' ') || '—').slice(0, 400),
+            judged: index === judged,
+            at: item.created_at,
+          }
+        })
+        if (!row.input_text && judged >= 0) row.input_text = row.context[judged].text
       })
   )
   return rows.map((row): Record<string, any> => {

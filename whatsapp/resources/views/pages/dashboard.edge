@@ -753,6 +753,16 @@
                     <summary data-i18n="Keputusan">Keputusan</summary>
                                         <ul id="jevDecisionList" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
                   </details>
+                  <div class="wa-card">
+                    <div class="wa-card-head">
+                      <div class="wa-card-title">
+                        <strong data-i18n="Akurasi Jev">Akurasi Jev</strong>
+                        <small data-i18n="Nilai tiap keputusan: Benar atau Salah">Nilai tiap keputusan: Benar atau Salah</small>
+                      </div>
+                      <div class="actions"><select id="jevFilter" data-settings-ignore aria-label="Saring keputusan" data-i18n-aria-label="Saring keputusan"><option value="" data-i18n="Semua keputusan">Semua keputusan</option></select></div>
+                    </div>
+                    <ul id="jevRecent" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
+                  </div>
                 </section>
                 </div>
                 <div class="wa-settings-view" data-settings-view="store" hidden>
@@ -868,16 +878,6 @@
                   aria-labelledby="settings-title-usage">
                   <h3 class="wa-settings-section-title" id="settings-title-usage"><svg class="wa-i" aria-hidden="true"><use href="#i-chart"/></svg><span data-i18n="Pemakaian token">Pemakaian token</span></h3>
                   @include('partials/settings/usage')
-                  <div class="wa-card">
-                    <div class="wa-card-head">
-                      <div class="wa-card-title">
-                        <strong data-i18n="Akurasi Jev">Akurasi Jev</strong>
-                        <small data-i18n="Nilai tiap keputusan: Benar atau Salah">Nilai tiap keputusan: Benar atau Salah</small>
-                      </div>
-                      <div class="actions"><select id="jevFilter" data-settings-ignore aria-label="Saring keputusan" data-i18n-aria-label="Saring keputusan"><option value="" data-i18n="Semua keputusan">Semua keputusan</option></select></div>
-                    </div>
-                    <ul id="jevRecent" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
-                  </div>
                 </section>
                 </div>
                 <div class="wa-settings-view" data-settings-view="app" hidden>
