@@ -407,7 +407,27 @@ export async function listDecisions(limit = 50, decision?: string) {
   else if (decision === 'dinilai') query.whereNotNull('d.verdict')
   else if (decision && decision in JEV_DECISIONS) query.where('d.decision', decision)
   const rows = (await query) as Array<Record<string, any>>
-  const { explainDecision, answerLabel } = await import('#beta3/jev_explain')
+  const { explainDecision, answerLabel, decisionSource } = await import('#beta3/jev_explain')
+  // Log lama (sebelum v3.6.36) belum menyimpan pesan yang dibaca Jev: diambil pesan terakhir
+  // dari chat itu sebelum keputusan dibuat (pesan toko untuk keputusan atas pesan toko).
+  await Promise.all(
+    rows
+      .filter((row) => !row.input_text && row.jid)
+      .map(async (row) => {
+        const fromStore = decisionSource(String(row.decision)) === 'toko'
+        const message = await db
+          .from('whatsapp_messages')
+          .where('jid', row.jid)
+          .where('direction', fromStore ? 'out' : 'in')
+          .where('created_at', '<=', row.created_at)
+          .orderBy('id', 'desc')
+          .select('body', 'media_type')
+          .first()
+          .catch(() => null)
+        const text = String(message?.body || '').trim() || (message?.media_type ? `(${message.media_type})` : '')
+        if (text) row.input_text = maskPii(text).slice(0, 2000)
+      })
+  )
   return rows.map((row): Record<string, any> => {
     let pairs: Array<[string, number]> = []
     try {

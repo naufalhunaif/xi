@@ -282,3 +282,11 @@ Perubahan v3.6.6:
 - Tabel `whatsapp_beta3_decisions` ditambah kolom `input_text`, `alternatives`, `verdict`, `correct_answer` (otomatis saat dipakai). Keputusan lama tidak punya teks input/pilihan lain — hanya pertanyaan, jawaban, dan akibatnya.
 - Tidak menambah pemakaian token: penjelasan dibuat dari daftar tetap di server (`app/beta3/jev_explain.ts`), bukan AI.
 - Bersinggungan: bila kartu kosong/error, cek `GET /api/beta3/jev/decisions?decision=cek` dan bahwa ALTER kolom baru berhasil (lihat log "Jev").
+
+## v3.6.37 — Kartu Jev accuracy dibaca seperti chat
+
+- Masukan CS: kartu v3.6.36 (Customer message / Question to Jev / Jev's answer / What it changed) sulit dipahami. Kini tiap kartu tampil seperti percakapan: **gelembung pesan** (Customer / Store / Customer (image)) lalu **gelembung balasan Jev** berupa kalimat biasa, mis. "The customer asks about price / discount / total." atau "This image is not a payment proof.", dengan tingkat yakin dan akibatnya satu baris kecil (→ …).
+- Pertanyaan teknis ke Jev dan pilihan lain dipindah ke **Details** (tertutup).
+- Jawaban yang tidak dipakai karena Jev ragu ditampilkan bergaris putus-putus: "Jev was unsure, so this answer was not used."
+- Keputusan lama yang belum menyimpan pesan kini memakai pesan terakhir di chat itu sebelum keputusan dibuat (pesan toko untuk keputusan atas pesan toko), jadi kartu lama juga ada isinya.
+- Tanpa token tambahan (kalimat dari daftar tetap `app/beta3/jev_explain.ts` → `SAY`).

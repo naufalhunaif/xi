@@ -1963,4 +1963,5 @@ window.waLocales.en = {
   "Gambar pelanggan = bukti pembayaran": "Customer image = payment proof",
   "Pesanan diantar tim sendiri / diambil (tanpa resi)": "Order delivered by the team / picked up (no tracking number)",
   "Peran kontak (pelanggan / vendor)": "Contact role (customer / vendor)",
+  "Detail": "Details",
 }

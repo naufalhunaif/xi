@@ -183,12 +183,61 @@ const INFO: Record<string, Info> = {
   },
 }
 
+/**
+ * Jawaban Jev sebagai satu kalimat biasa (v3.6.37) — dibaca seperti balasan atas pesan di atasnya,
+ * tanpa perlu membaca pertanyaan teknisnya dulu.
+ */
+const yn = (yes: string, no: string) => (answer: string) => (answer === 'ya' ? yes : no)
+const SAY: Record<string, (answer: string, label: string, sub: string) => string> = {
+  maksud: (answer, label) =>
+    ({
+      sapaan: "It's a greeting / thanks / ok.",
+      produk: 'The customer asks about a product (model, color, stock, photo, fabric).',
+      harga: 'The customer asks about price / discount / total.',
+      ukuran: 'The customer asks about size.',
+      ongkir: 'The customer asks about shipping.',
+      data_pengiriman: 'The customer sends shipping details.',
+      bayar: 'This is about payment.',
+      status_pesanan: 'The customer asks about order progress / tracking.',
+      komplain: 'The customer is complaining.',
+      lain: 'Something else (no specific topic).',
+    })[answer] || label,
+  form: yn('These are shipping details for an order.', 'These are not shipping details.'),
+  serah_cs: (answer, label) => (answer === 'tidak_perlu' ? 'The AI can handle this, no CS needed.' : `A CS person should handle this: ${label.toLowerCase()}.`),
+  setuju: (answer, label) => (answer === 'setuju' ? 'The customer agrees to the total/offer.' : `The customer has not agreed: ${label.toLowerCase()}.`),
+  layanan: (answer) => (answer === 'belum' ? 'The customer has not chosen a shipping service yet.' : `The customer chose ${answer.toUpperCase()} shipping.`),
+  tanggapan: (answer, label) =>
+    ({ terima: "It's just an ok / thanks, nothing to answer.", setuju: 'The customer agrees.', jawab: "The customer answers the store's question.", tanya: 'The customer asks something.', lain: 'Something else.' })[answer] || label,
+  topik: (answer, _label, sub) => (answer === 'ya' ? `This is about ${TOPIC_NAME[sub] || sub}.` : `This is not about ${TOPIC_NAME[sub] || sub}.`),
+  kesulitan: (answer) => `Difficulty to answer: ${answer === '3' ? 'complex' : answer === '1' ? 'simple' : 'normal'}.`,
+  sudah_tf: yn('The customer says they have already paid.', 'The customer has not said they paid.'),
+  lanjut: (answer) => (answer === 'batal' ? 'The customer is cancelling.' : answer === 'tunda' ? 'The customer is postponing.' : 'The customer is still going ahead.'),
+  urgensi: (answer) => `Urgency ${answer} of 5${Number(answer) >= 4 ? ' — needs attention.' : '.'}`,
+  harga_konteks: (_a, label, sub) => (sub === 'seri' ? `The fabric series discussed is ${label}.` : `The price question is about: ${label.toLowerCase()}.`),
+  janji_total: yn('This AI reply promises to send the total/bank account.', 'This AI reply makes no promise about the total.'),
+  total_toko: yn('The store sent the total to pay / bank account here.', 'The store did not send a total here.'),
+  terjawab: (answer) => (answer.endsWith('3') ? "The store answered all the customer's questions." : answer.endsWith('2') ? 'The store answered only part of the questions.' : "The store hasn't answered the questions yet."),
+  varian: (answer, label) => (answer === 'lain' ? 'The color is not in the catalog (custom).' : `The customer ordered color ${label}.`),
+  komentar_ig: (_a, label) => `This comment is: ${label.toLowerCase()}.`,
+  warna_gambar: (answer, label) => (answer === 'lain' ? 'No catalog color matches this image.' : `The clothing in the image is color ${label}.`),
+  tujuan_baru: yn('The customer gave a new shipping destination.', 'Same destination as before.'),
+  dana_masuk: yn("The store confirms the customer's payment has arrived.", 'The store has not confirmed payment.'),
+  bukti_transfer: yn('This image is a payment proof.', 'This image is not a payment proof.'),
+  kirim_sendiri: yn('The order is delivered by the team / picked up (no tracking number).', 'Not a team delivery.'),
+  peran_kontak: (answer) => (answer === 'vendor' ? 'This contact is a vendor / supplier.' : answer === 'lainnya' ? 'This contact is not a customer (team, personal, spam).' : 'This contact is a customer.'),
+}
+
 const SOURCE_LABEL: Record<string, string> = {
-  pelanggan: 'Customer message',
-  toko: 'Store message',
-  gambar: 'Customer image',
-  percakapan: 'Conversation',
+  pelanggan: 'Customer',
+  toko: 'Store',
+  gambar: 'Customer (image)',
+  percakapan: 'Chat',
   komentar: 'Instagram comment',
+}
+
+/** Pesan siapa yang dinilai keputusan ini (untuk mengambil pesan asli pada log lama). */
+export function decisionSource(decision: string) {
+  return INFO[decision]?.source || 'pelanggan'
 }
 
 /** Kunci jawaban sebagai teks biasa ("ya" → "Yes", "status_pesanan" → "Asks about progress…"). */
@@ -207,8 +256,10 @@ export function explainDecision(row: Row) {
   return {
     question: info ? info.question(sub) : row.decision,
     answer_label: answerLabel(row.decision, answer, sub),
+    /** Jawaban Jev sebagai kalimat (dibaca langsung di bawah pesan). */
+    says: SAY[row.decision]?.(answer, answerLabel(row.decision, answer, sub), sub) || answerLabel(row.decision, answer, sub),
     effect: !used
-      ? 'Jev was unsure — the system used the old word rules; this answer was not used.'
+      ? 'Jev was unsure, so this answer was not used.'
       : info
         ? info.effect(answer, sub)
         : '',

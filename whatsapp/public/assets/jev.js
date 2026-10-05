@@ -100,13 +100,6 @@
   // v3.6.36: tiap keputusan dijelaskan — pesan yang dibaca, pertanyaan, jawaban, akibat — lalu dinilai Benar/Salah.
   const appRoot = (document.querySelector('meta[name="app-url"]')?.content || '').replace(/\/$/, '')
   const pct = (value) => `${Math.round(Number(value) * 100)}%`
-  function line(label, value, className = '') {
-    const row = el('div', `wa-jev-line ${className}`.trim())
-    row.append(el('small', 'wa-note', label))
-    if (value instanceof Node) row.append(value)
-    else row.append(el('span', '', value))
-    return row
-  }
   async function judge(row, verdict, correct = '') {
     try {
       await call(`/api/beta3/jev/decisions/${row.id}`, 'POST', { verdict, correct })
@@ -164,9 +157,10 @@
     if (!rows.length) list.append(el('li', 'wa-empty', t('Belum ada keputusan Jev.')))
     const labels = Object.fromEntries(state.decisions.map((item) => [item.key, item.label]))
     for (const row of rows) {
+      // v3.6.37: dibaca seperti chat — pesan di atas, jawaban Jev di bawahnya, lalu Benar/Salah.
       const item = el('li', 'wa-quality-item wa-jev-card')
       const head = el('div', 'wa-jev-head')
-      head.append(el('strong', '', t(labels[row.decision] || row.decision)))
+      head.append(el('span', 'wa-jev-kind', t(labels[row.decision] || row.decision)))
       const who = row.contact_name || String(row.jid || '').split('@')[0] || '—'
       const meta = el('small', 'wa-note', `${who} · ${window.waTime.ago(row.created_at)}`)
       meta.title = window.waTime.full(row.created_at)
@@ -177,24 +171,23 @@
         head.append(open)
       }
       item.append(head)
-      if (row.input_text) {
-        const quote = el('blockquote', 'wa-jev-quote', String(row.input_text))
-        item.append(line(row.source_label || t('Pesan'), quote))
-      }
-      item.append(line(t('Pertanyaan ke Jev'), row.question || row.decision))
-      const answer = el('span')
-      answer.append(el('strong', '', row.answer_label || row.answer))
-      answer.append(el('small', 'wa-note', ` · ${t('yakin')} ${pct(row.confidence)}`))
+      const message = el('div', 'wa-jev-bubble')
+      message.append(el('small', '', row.source_label || t('Pelanggan')))
+      message.append(el('p', '', row.input_text ? String(row.input_text) : '—'))
+      item.append(message)
+      const reply = el('div', `wa-jev-bubble jev${Number(row.used) ? '' : ' unsure'}`)
+      reply.append(el('small', '', `Jev · ${t('yakin')} ${pct(row.confidence)}`))
+      reply.append(el('p', '', row.says || row.answer_label || row.answer))
+      if (row.effect) reply.append(el('small', 'wa-jev-effect', `→ ${row.effect}`))
+      item.append(reply)
+      const more = el('details', 'wa-jev-more')
+      more.append(el('summary', '', t('Detail')))
+      more.append(el('p', '', `${t('Pertanyaan ke Jev')}: ${row.question || row.decision}`))
       if (row.alternatives?.length)
-        answer.append(
-          el(
-            'small',
-            'wa-note wa-jev-alt',
-            `${t('Pilihan lain')}: ${row.alternatives.slice(0, 3).map((alt) => `${alt.label} ${alt.pct}%`).join(' · ')}`
-          )
+        more.append(
+          el('p', '', `${t('Pilihan lain')}: ${row.alternatives.slice(0, 3).map((alt) => `${alt.label} ${alt.pct}%`).join(' · ')}`)
         )
-      item.append(line(t('Jawaban Jev'), answer))
-      if (row.effect) item.append(line(t('Akibatnya'), row.effect, Number(row.used) ? '' : 'muted'))
+      item.append(more)
       item.append(verdictControls(row))
       list.append(item)
     }

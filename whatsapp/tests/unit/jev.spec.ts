@@ -289,6 +289,9 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
     assert.equal(total?.answer_label, 'Yes')
     assert.include(String(total?.effect), 'awaiting payment')
     assert.isAbove(total?.alternatives.length, 0)
+    // v3.6.37: jawaban Jev sebagai kalimat yang dibaca di bawah pesan.
+    assert.equal(total?.says, 'The store sent the total to pay / bank account here.')
+    assert.isNotEmpty(String(total?.input_text || ''))
     await markDecision(Number(ours[0].id), 'salah', 'tidak')
     if (ours[1]) await markDecision(Number(ours[1].id), 'benar')
     const summary = await accuracySummary()
