@@ -134,7 +134,12 @@
         caption: item.caption || post?.caption || '',
         time: item.timestamp || post?.publishedAt,
         status: 'published',
-        stats: { likes: item.like_count, comments: item.comments_count, ...(item.stats || {}) },
+        // Suka & komentar dari daftar media selalu segar; angka insight tersimpan hanya pelengkap (jangan menimpa).
+        stats: {
+          ...(item.stats || {}),
+          likes: item.like_count ?? item.stats?.likes,
+          comments: item.comments_count ?? item.stats?.comments,
+        },
         signals: item.signals || null,
         permalink: item.permalink || post?.permalink || '',
         post,

@@ -154,3 +154,7 @@ Perubahan v3.6.6:
 ## v3.6.12 — perbaikan grid Instagram
 
 - Grid kosong bila ada reels/carousel: ikon jenis (SVG) diberi `className` lewat `Object.assign` → `className` SVG hanya-baca → galat menghentikan render. Kini `setAttribute('class', …)`. Pelajaran: untuk elemen SVG selalu pakai `setAttribute('class')`/`classList`.
+
+## v3.6.13 — suka/komentar tidak lagi tertimpa angka insight lama
+
+- `buildRows` (instagram_content.js) dan `recentPosts` (instagram_ai.ts): `like_count`/`comments_count` dari daftar media (selalu segar) sekarang menimpa `likes`/`comments` dari insight tersimpan — sebelumnya terbalik, sehingga suka di app tertinggal (mis. 11 padahal di Instagram 27) sampai jeda insight lewat.

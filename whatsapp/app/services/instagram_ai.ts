@@ -105,7 +105,10 @@ async function storedMedia(limit: number): Promise<StoredMedia[]> {
       type: meta.media_type === 'CAROUSEL_ALBUM' ? 'carousel' : row.product === 'REELS' ? 'reels' : 'feed',
       caption: String(meta.caption || ''),
       postedAt: meta.timestamp || row.posted_at,
-      stats: { likes: meta.like_count, comments: meta.comments_count, ...JSON.parse(row.stats || '{}') },
+      stats: (() => {
+        const stats = JSON.parse(row.stats || '{}')
+        return { ...stats, likes: meta.like_count ?? stats.likes, comments: meta.comments_count ?? stats.comments }
+      })(),
     }
   })
 }
