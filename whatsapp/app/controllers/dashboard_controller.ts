@@ -59,6 +59,35 @@ function whereLine<T extends { where: any; whereNull: any }>(query: T, line: num
   return query
 }
 
+/** Kutipan balasan: teks + gambar kecil pesan yang dibalas, dan id untuk melompat ke pesannya (v3.6.25). */
+function replyPreview(reply: Record<string, any> | undefined) {
+  if (!reply) return null
+  const type = String(reply.media_type || '')
+  const thumb =
+    ['image', 'sticker'].includes(type)
+      ? reply.media_url || reply.thumbnail_url || null
+      : ['video', 'gif'].includes(type)
+        ? reply.thumbnail_url || null
+        : null
+  const labels: Record<string, string> = {
+    image: 'Foto',
+    sticker: 'Stiker',
+    video: 'Video',
+    gif: 'GIF',
+    audio: 'Pesan suara',
+    document: reply.media_name || 'Dokumen',
+    location: 'Lokasi',
+    contact: 'Kontak',
+  }
+  return {
+    message_id: String(reply.message_id),
+    body: String(reply.body || ''),
+    media_type: type || null,
+    thumb,
+    label: labels[type] || (type ? 'Media' : ''),
+  }
+}
+
 function displayPhone(jid: string | null | undefined) {
   const digits = /^(\d{6,15})(?::\d+)?@s\.whatsapp\.net$/.exec(String(jid || ''))?.[1]
   if (!digits) return null
@@ -79,7 +108,7 @@ export default class DashboardController {
       replyIds.length
         ? db
             .from('whatsapp_messages')
-            .select('message_id', 'body', 'media_type')
+            .select('message_id', 'body', 'media_type', 'media_url', 'thumbnail_url', 'media_name')
             .whereIn('message_id', replyIds)
         : [],
     ])
@@ -95,7 +124,13 @@ export default class DashboardController {
     if (missingReplies.length) {
       const statuses = await statusPostsByIds(missingReplies).catch(() => new Map())
       for (const [id, post] of statuses)
-        repliesById.set(id, { message_id: id, body: `Status · ${post.caption || (post.media_type === 'video' ? 'video' : 'foto')}`, media_type: post.media_type })
+        repliesById.set(id, {
+          message_id: id,
+          body: `Status · ${post.caption || (post.media_type === 'video' ? 'video' : 'foto')}`,
+          media_type: post.media_type,
+          media_url: post.media_url,
+          thumbnail_url: post.thumbnail_url,
+        })
     }
     const traces = await db
       .from('whatsapp_ai_traces')
@@ -106,7 +141,7 @@ export default class DashboardController {
       ...message,
       trace_id: tracesByMessage.get(message.message_id) || null,
       reactions: reactionsByMessage.get(message.message_id) || [],
-      reply: repliesById.get(message.reply_to_message_id) || null,
+      reply: replyPreview(repliesById.get(message.reply_to_message_id)),
     }))
   }
 

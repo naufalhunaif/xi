@@ -461,9 +461,16 @@
                     </div>
                   </div>
                   @if(message.reply)
-                    <div class="message-reply-preview">
-                      {{ message.reply.body || message.reply.media_type || 'Media' }}
-                    </div>
+                    <button type="button" class="message-reply-preview" data-quote="{{ message.reply.message_id }}" title="Lihat pesan yang dibalas">
+                      @if(message.reply.thumb)
+                        <img class="message-reply-thumb" src="{{ message.reply.thumb }}" alt="" />
+                      @end
+                      @if(message.reply.body)
+                        <span>{{ message.reply.body }}</span>
+                      @else
+                        <span data-i18n="{{ message.reply.label || 'Media' }}">{{ message.reply.label || 'Media' }}</span>
+                      @end
+                    </button>
                   @end
                   @if(message.media_type)
                     <div class="message-media-wrap">
@@ -578,6 +585,7 @@
             </button>
             <form id="messageForm" class="wa-composer" enctype="multipart/form-data">
               <div id="replyComposer" class="wa-reply-composer" hidden>
+                <img id="replyComposerThumb" class="message-reply-thumb" alt="" hidden />
                 <span id="replyComposerText"></span>
                 <button type="button" id="cancelReply" aria-label="Batal reply" data-i18n-aria-label="Batal reply">×</button>
               </div>

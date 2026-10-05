@@ -1926,4 +1926,11 @@ window.waLocales.id = {
   "Semua nomor": "Semua nomor",
   "Pilih semua": "Pilih semua",
   "jid wajib.": "jid wajib.",
+  "Lihat pesan yang dibalas": "Lihat pesan yang dibalas",
+  "Pesan yang dibalas belum termuat.": "Pesan yang dibalas belum termuat.",
+  "Media": "Media",
+  "Foto": "Foto",
+  "Stiker": "Stiker",
+  "Video": "Video",
+  "GIF": "GIF",
 }

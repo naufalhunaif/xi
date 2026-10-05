@@ -880,3 +880,46 @@ html:not([data-theme='dark']) .workspace-ui .wa-production-rule:last-child {
   border-color: var(--text);
   box-shadow: inset 0 0 0 3px var(--wa-surface, #fff);
 }
+
+/* Kutipan balasan (v3.6.25): gambar kecil pesan yang dibalas, bisa diklik untuk melompat ke pesannya. */
+.workspace-ui .message-reply-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  border: 0;
+  border-left: 2px solid var(--text);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  white-space: normal;
+}
+.workspace-ui .message-reply-preview > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-ui .message-reply-preview:hover { background: rgba(0, 0, 0, 0.09); }
+.workspace-ui .message-reply-thumb {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--line);
+}
+.workspace-ui .wa-reply-composer { align-items: center; }
+.workspace-ui .wa-reply-composer .message-reply-thumb { width: 30px; height: 30px; }
+.workspace-ui .wa-reply-composer .message-reply-thumb[hidden] { display: none; }
+.workspace-ui .message.wa-jump { animation: wa-jump 1.5s ease-out; }
+@keyframes wa-jump {
+  0%, 45% { box-shadow: 0 0 0 3px var(--text); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}

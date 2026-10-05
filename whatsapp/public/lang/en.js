@@ -1926,4 +1926,11 @@ window.waLocales.en = {
   "Semua nomor": "All numbers",
   "Pilih semua": "Select all",
   "jid wajib.": "jid is required.",
+  "Lihat pesan yang dibalas": "View the replied message",
+  "Pesan yang dibalas belum termuat.": "The replied message is not loaded yet.",
+  "Media": "Media",
+  "Foto": "Photo",
+  "Stiker": "Sticker",
+  "Video": "Video",
+  "GIF": "GIF",
 }

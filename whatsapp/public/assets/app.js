@@ -242,9 +242,22 @@
     article.append(actions)
 
     if (message.reply) {
-      const reply = document.createElement('div')
+      // Kutipan: gambar kecil + teks pesan yang dibalas; klik → lompat ke pesannya.
+      const reply = document.createElement('button')
+      reply.type = 'button'
       reply.className = 'message-reply-preview'
-      reply.textContent = message.reply.body || message.reply.media_type || 'Media'
+      reply.dataset.quote = message.reply.message_id || ''
+      reply.title = t('Lihat pesan yang dibalas')
+      if (message.reply.thumb) {
+        const thumb = document.createElement('img')
+        thumb.className = 'message-reply-thumb'
+        thumb.src = message.reply.thumb
+        thumb.alt = ''
+        reply.append(thumb)
+      }
+      const text = document.createElement('span')
+      text.textContent = message.reply.body || t(message.reply.label || 'Media')
+      reply.append(text)
       article.append(reply)
     }
     if (hasMedia) {
@@ -1234,11 +1247,38 @@
     form.elements.namedItem('replyToMessageId').value = ''
     byId('replyComposer').hidden = true
     byId('replyComposerText').textContent = ''
+    const thumb = byId('replyComposerThumb')
+    if (thumb) {
+      thumb.hidden = true
+      thumb.removeAttribute('src')
+    }
+  }
+  /** Lompat ke pesan yang dikutip; muat halaman lama dulu bila belum tampil. */
+  async function jumpToMessage(messageId) {
+    const find = () => messageList?.querySelector(`.message[data-message-id="${CSS.escape(messageId)}"]`)
+    let target = find()
+    for (let round = 0; !target && round < 6 && hasOlderMessages; round++) {
+      await loadOlderMessages()
+      target = find()
+    }
+    if (!target) {
+      showNotice(t('Pesan yang dibalas belum termuat.'), true)
+      return
+    }
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    target.classList.remove('wa-jump')
+    void target.offsetWidth
+    target.classList.add('wa-jump')
+    setTimeout(() => target.classList.remove('wa-jump'), 1600)
   }
   messages?.addEventListener('click', async (event) => {
     const button = event.target.closest('button')
     const article = event.target.closest('.message')
     if (!button || !article) return
+    if (button.matches('[data-quote]')) {
+      if (button.dataset.quote) void jumpToMessage(button.dataset.quote)
+      return
+    }
     if (button.matches('[data-reaction-toggle]')) {
       const picker = article.querySelector('.reaction-picker')
       messages.querySelectorAll('.reaction-picker').forEach((item) => {
@@ -1251,7 +1291,13 @@
       const form = byId('messageForm')
       form.elements.namedItem('replyToId').value = article.dataset.id
       form.elements.namedItem('replyToMessageId').value = article.dataset.messageId
-      byId('replyComposerText').textContent = article.dataset.body || 'Media'
+      byId('replyComposerText').textContent = article.dataset.body || t('Media')
+      const thumb = byId('replyComposerThumb')
+      const picture = article.querySelector('img.message-media')?.src || article.querySelector('video.message-media')?.poster || ''
+      if (thumb) {
+        thumb.src = picture
+        thumb.hidden = !picture
+      }
       byId('replyComposer').hidden = false
       form.elements.namedItem('body').focus()
       return
