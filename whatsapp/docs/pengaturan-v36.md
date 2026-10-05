@@ -272,3 +272,13 @@ Perubahan v3.6.6:
 
 - Bila update sebelumnya terputus, folder lock `whatsapp/.deploy/lock` tertinggal. `clear_stale_lock` (`deploy/wa.sh`) seharusnya menghapusnya bila tidak ada build, tapi pengecekannya juga menghitung proses yang berjalan dari folder `.deploy/release-…` — termasuk WEB/WORKER/nomor tambahan yang selalu berjalan — sehingga lock tidak pernah terhapus dan setiap `wa update` gagal. Kini hanya proses build (`whatsapp-aapanel.mjs`, `deploy/build.sh`) yang dihitung.
 - Bersinggungan: `wa update` dari versi yang tertahan langsung mengambil v3.6.35 lalu memakai `wa.sh` baru untuk build, jadi tidak perlu menghapus lock manual.
+
+## v3.6.36 — Log keputusan Jev bisa dipahami & dinilai Benar/Salah
+
+- Settings → Usage → kartu **Jev accuracy**: tiap keputusan kini ditampilkan sebagai kartu berisi pesan yang dibaca Jev (teks pelanggan/toko/isi gambar, nomor & data pribadi disamarkan), **pertanyaan** yang diajukan dalam bahasa biasa, **jawaban** Jev + tingkat yakin + pilihan lain yang hampir dipilih, dan **akibatnya** (mis. "order set to awaiting payment", atau "Jev was unsure — the old word rules were used"). Ada tautan **Open chat**.
+- Tombol **Correct / Wrong** menggantikan "Wrong?". Saat Wrong, CS bisa memilih jawaban yang seharusnya (disimpan untuk memperbaiki Jev). Penilaian bisa dibatalkan.
+- Saring: **Needs checking** (belum dinilai dan Jev ragu <90%, atau keputusan soal uang/peran kontak/antar sendiri) dan **Already rated**, selain per jenis keputusan.
+- Akurasi per keputusan kini dihitung hanya dari yang sudah dinilai ("X% correct of N rated · M not rated"); sebelumnya semua keputusan yang tidak ditandai salah dianggap benar.
+- Tabel `whatsapp_beta3_decisions` ditambah kolom `input_text`, `alternatives`, `verdict`, `correct_answer` (otomatis saat dipakai). Keputusan lama tidak punya teks input/pilihan lain — hanya pertanyaan, jawaban, dan akibatnya.
+- Tidak menambah pemakaian token: penjelasan dibuat dari daftar tetap di server (`app/beta3/jev_explain.ts`), bukan AI.
+- Bersinggungan: bila kartu kosong/error, cek `GET /api/beta3/jev/decisions?decision=cek` dan bahwa ALTER kolom baru berhasil (lihat log "Jev").

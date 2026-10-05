@@ -540,3 +540,18 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-b3-dp-row .wa-pill:empty { display: none; }
 .workspace-ui .wa-cart-summary input.wa-b3-dp { width: 110px !important; min-height: 0 !important; height: 26px !important; padding: 0 6px !important; font-size: inherit !important; }
 .workspace-ui .wa-cart-summary input.wa-b3-dp[readonly] { border-color: transparent !important; background: transparent !important; box-shadow: none !important; }
+
+/* v3.6.36 — kartu keputusan Jev (Usage → Jev accuracy). */
+.workspace-ui .wa-quality-item.wa-jev-card { display: grid; gap: 6px; align-items: stretch; }
+.workspace-ui .wa-jev-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.workspace-ui .wa-jev-head strong { font-size: 12px; }
+.workspace-ui .wa-jev-open { margin-left: auto; font-size: 11px; }
+.workspace-ui .wa-jev-line { display: grid; gap: 2px; font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.workspace-ui .wa-jev-line > small { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; }
+.workspace-ui .wa-jev-line.muted > span { color: var(--muted); }
+.workspace-ui .wa-jev-quote { margin: 0; padding: 4px 8px; border-left: 2px solid var(--line); white-space: pre-wrap; max-height: 7.5em; overflow: auto; font-size: 12px; }
+.workspace-ui .wa-jev-alt { display: block; }
+.workspace-ui .wa-jev-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.workspace-ui .wa-jev-actions select { min-width: 0; max-width: 100%; flex: 1 1 160px; }
+.workspace-ui .wa-jev-card > *, .workspace-ui .wa-jev-line > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.workspace-ui .wa-jev-actions .wa-pill { white-space: normal; height: auto; line-height: 1.4; padding-block: 3px; }

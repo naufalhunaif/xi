@@ -264,7 +264,7 @@ export async function understandTurn(input: {
     if (!answer) return
     const sure = confident(key, answer)
     if (sure) apply()
-    await logDecision({ jid: input.jid, decision: key, answer, used: sure })
+    await logDecision({ jid: input.jid, decision: key, answer, used: sure, input: input.text })
   }
   await take('maksud', () => (result.intent = choiceOf(answers.maksud)))
   await take('form', () => (result.hasShippingData = yes(answers.form)))
@@ -277,7 +277,7 @@ export async function understandTurn(input: {
   if (answers.tanggapan) {
     const sure = confident('tanggapan', answers.tanggapan)
     if (sure) result.reaction = choiceOf(answers.tanggapan) as TurnUnderstanding['reaction']
-    await logDecision({ jid: input.jid, decision: 'tanggapan', answer: answers.tanggapan, used: sure, detail: input.text })
+    await logDecision({ jid: input.jid, decision: 'tanggapan', answer: answers.tanggapan, used: sure, detail: input.text, input: input.text })
   }
   const topics: Partial<Record<TurnTopic, boolean>> = {}
   for (const key of Object.keys(TOPICS) as TurnTopic[]) {
@@ -285,13 +285,13 @@ export async function understandTurn(input: {
     if (!answer) continue
     const sure = confident('topik', answer)
     if (sure) topics[key] = yes(answer)
-    await logDecision({ jid: input.jid, decision: 'topik', answer, used: sure, detail: key })
+    await logDecision({ jid: input.jid, decision: 'topik', answer, used: sure, detail: key, input: input.text })
   }
   if (Object.keys(topics).length) result.topics = topics
   if (answers.kesulitan && answers.kesulitan.type === 'score') {
     const sure = confident('kesulitan', answers.kesulitan)
     if (sure) result.difficulty = scoreLevel(answers.kesulitan, 3)
-    await logDecision({ jid: input.jid, decision: 'kesulitan', answer: answers.kesulitan, used: sure })
+    await logDecision({ jid: input.jid, decision: 'kesulitan', answer: answers.kesulitan, used: sure, input: input.text })
   }
   await take('sudah_tf', () => (result.paidClaim = yes(answers.sudah_tf)))
   await take('lanjut', () => (result.follow = choiceOf(answers.lanjut) as TurnUnderstanding['follow']))
@@ -304,12 +304,12 @@ export async function understandTurn(input: {
       if (key === 'seri') result.series = choice as TurnUnderstanding['series']
       else result.item = choice as TurnUnderstanding['item']
     }
-    await logDecision({ jid: input.jid, decision: 'harga_konteks', answer, used: sure, detail: key })
+    await logDecision({ jid: input.jid, decision: 'harga_konteks', answer, used: sure, detail: key, input: input.text })
   }
   if (answers.urgensi && answers.urgensi.type === 'score') {
     const sure = confident('urgensi', answers.urgensi)
     if (sure) result.urgency = scoreLevel(answers.urgensi, 5)
-    await logDecision({ jid: input.jid, decision: 'urgensi', answer: answers.urgensi, used: sure })
+    await logDecision({ jid: input.jid, decision: 'urgensi', answer: answers.urgensi, used: sure, input: input.text })
   }
   return result
 }
@@ -337,6 +337,7 @@ export async function promisesTotal(jid: string, bubbles: string[]) {
     answer,
     used: sure,
     detail: bubbles.join(' | '),
+    input: bubbles.join('\n'),
   })
   return sure ? yes(answer) : undefined
 }
@@ -367,6 +368,7 @@ export async function storeSentTotal(jid: string, bodies: string[]) {
     answer: all.find((answer) => yes(answer)) || all[0],
     used: true,
     detail: recent.join(' | '),
+    input: recent.join('\n—\n'),
   })
   return sent
 }
@@ -396,7 +398,7 @@ export async function answeredByStore(jid: string, customer: string[], store: st
   const answer = answers?.terjawab
   if (!answer || answer.type !== 'score') return undefined
   const sure = confident('terjawab', answer)
-  await logDecision({ jid, decision: 'terjawab', answer, used: sure })
+  await logDecision({ jid, decision: 'terjawab', answer, used: sure, input: `Pelanggan: ${customer.join(' / ')}\nToko: ${store.join(' / ')}` })
   return sure ? scoreLevel(answer, 3) === 3 : undefined
 }
 
@@ -425,7 +427,7 @@ export async function chooseVariant(jid: string, product: string, colors: string
   const answer = answers?.varian
   if (!answer || answer.type !== 'choice') return undefined
   const sure = confident('varian', answer)
-  await logDecision({ jid, decision: 'varian', answer, used: sure, detail: product })
+  await logDecision({ jid, decision: 'varian', answer, used: sure, detail: product, input: conversationLines(chat, 4, 200).join('\n') })
   if (!sure) return undefined
   return answer.choice === 'lain' ? null : answer.choice
 }
@@ -461,6 +463,7 @@ export async function commentNeedsReply(jid: string, comment: string, caption: s
     answer,
     used: sure,
     detail: comment.slice(0, 300),
+    input: comment,
   })
   if (!sure) return undefined
   return ['calon_pembeli', 'pertanyaan'].includes(answer.choice)
@@ -504,7 +507,7 @@ export async function chooseImageColor(input: {
   const answer = answers?.warna_gambar
   if (!answer || answer.type !== 'choice') return undefined
   const sure = confident('warna_gambar', answer)
-  await logDecision({ jid: input.jid, decision: 'warna_gambar', answer, used: sure, detail: input.measured })
+  await logDecision({ jid: input.jid, decision: 'warna_gambar', answer, used: sure, detail: input.measured, input: `${input.text ? `Pesan: ${input.text}\n` : ''}Hasil ukur: ${input.measured}` })
   if (!sure) return undefined
   return answer.choice === 'lain' ? null : answer.choice
 }
@@ -526,7 +529,7 @@ export async function isNewDestination(jid: string, text: string, place: string,
   const answer = answers?.tujuan_baru
   if (!answer) return undefined
   const sure = confident('tujuan_baru', answer)
-  await logDecision({ jid, decision: 'tujuan_baru', answer, used: sure, detail: `${text} → ${place}` })
+  await logDecision({ jid, decision: 'tujuan_baru', answer, used: sure, detail: `${text} → ${place}`, input: `${text}\n(dikira tempat: ${place}; tujuan sebelumnya: ${lastPlace})` })
   return sure ? yes(answer) : undefined
 }
 
@@ -548,7 +551,7 @@ export async function storeConfirmedPayment(jid: string, storeMessages: string[]
   const answer = answers?.dana_masuk
   if (!answer) return undefined
   const sure = confident('dana_masuk', answer)
-  await logDecision({ jid, decision: 'dana_masuk', answer, used: sure, detail: recent.join(' | ').slice(0, 300) })
+  await logDecision({ jid, decision: 'dana_masuk', answer, used: sure, detail: recent.join(' | ').slice(0, 300), input: recent.join('\n—\n') })
   return sure ? yes(answer) : undefined
 }
 
@@ -579,7 +582,7 @@ export async function imageIsPaymentProof(input: { jid: string; kind: string; no
   const answer = answers?.bukti_transfer
   if (!answer) return undefined
   const sure = confident('bukti_transfer', answer)
-  await logDecision({ jid: input.jid, decision: 'bukti_transfer', answer, used: sure, detail: `${input.kind}: ${input.note}`.slice(0, 300) })
+  await logDecision({ jid: input.jid, decision: 'bukti_transfer', answer, used: sure, detail: `${input.kind}: ${input.note}`.slice(0, 300), input: `Isi gambar (dilihat AI): ${input.note || '-'}${input.customerText ? `\nTeks pelanggan: ${input.customerText}` : ''}` })
   return sure ? yes(answer) : undefined
 }
 
@@ -604,7 +607,7 @@ export async function storeDeliversItself(jid: string, storeMessage: string) {
   const answer = answers?.kirim_sendiri
   if (!answer) return undefined
   const sure = confident('kirim_sendiri', answer)
-  await logDecision({ jid, decision: 'kirim_sendiri', answer, used: sure, detail: storeMessage.slice(0, 300) })
+  await logDecision({ jid, decision: 'kirim_sendiri', answer, used: sure, detail: storeMessage.slice(0, 300), input: storeMessage })
   return sure ? yes(answer) : undefined
 }
 
@@ -637,7 +640,7 @@ export async function contactRole(jid: string, chat: Line[]) {
   const answer = answers?.peran_kontak
   if (!answer) return undefined
   const sure = confident('peran_kontak', answer)
-  await logDecision({ jid, decision: 'peran_kontak', answer, used: sure, detail: lines.slice(-4).join(' | ').slice(0, 300) })
+  await logDecision({ jid, decision: 'peran_kontak', answer, used: sure, detail: lines.slice(-4).join(' | ').slice(0, 300), input: lines.slice(-8).join('\n') })
   const choice = answer.type === 'choice' ? String(answer.choice || '') : ''
   return sure && ['pelanggan', 'vendor', 'lainnya'].includes(choice) ? (choice as 'pelanggan' | 'vendor' | 'lainnya') : undefined
 }

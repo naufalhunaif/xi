@@ -333,6 +333,12 @@ async function ensureDecisionTable() {
     KEY whatsapp_beta3_decisions_created (created_at),
     KEY whatsapp_beta3_decisions_decision (decision, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  // v3.6.36: teks yang dinilai, peluang tiap jawaban, dan penilaian CS (benar/salah + jawaban yang benar).
+  await db.rawQuery(`ALTER TABLE whatsapp_beta3_decisions
+    ADD COLUMN IF NOT EXISTS input_text TEXT NULL AFTER detail,
+    ADD COLUMN IF NOT EXISTS alternatives VARCHAR(600) NULL AFTER input_text,
+    ADD COLUMN IF NOT EXISTS verdict VARCHAR(10) NULL AFTER wrong,
+    ADD COLUMN IF NOT EXISTS correct_answer VARCHAR(80) NULL AFTER verdict`)
   tableReady = true
 }
 
@@ -344,6 +350,8 @@ export async function logDecision(input: {
   used: boolean
   fallback?: string
   detail?: string
+  /** Teks yang dinilai Jev (pesan pelanggan/toko, keterangan gambar) — ditampilkan ke CS. */
+  input?: string
 }) {
   if (!input.answer) return
   try {
@@ -356,6 +364,8 @@ export async function logDecision(input: {
       used: input.used,
       fallback: String(input.fallback || '').slice(0, 190),
       detail: input.detail ? String(input.detail).slice(0, 2000) : null,
+      input_text: input.input ? maskPii(String(input.input)).slice(0, 2000) : null,
+      alternatives: alternativesOf(input.answer),
       created_at: new Date(),
     })
   } catch {
@@ -363,6 +373,23 @@ export async function logDecision(input: {
   }
 }
 
+/** Peluang tiap jawaban (pilihan ganda: 3 teratas; ya/tidak: peluang "ya"), untuk ditampilkan. */
+function alternativesOf(answer: JevAnswer) {
+  if (answer.type === 'choice')
+    return JSON.stringify(
+      Object.entries(answer.probabilities || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([key, value]) => [key, Math.round(value * 100)])
+    ).slice(0, 600)
+  if (answer.type === 'noul') return JSON.stringify([['ya', Math.round(answer.noul * 100)], ['tidak', Math.round((1 - answer.noul) * 100)]])
+  return null
+}
+
+/**
+ * Log keputusan untuk dinilai CS. filter: '' semua · 'cek' perlu dicek (ragu, soal uang, peran kontak,
+ * belum dinilai) · 'dinilai' sudah dinilai · kunci keputusan.
+ */
 export async function listDecisions(limit = 50, decision?: string) {
   await ensureDecisionTable()
   const query = db
@@ -371,36 +398,67 @@ export async function listDecisions(limit = 50, decision?: string) {
     .select('d.*', 'c.name as contact_name')
     .orderBy('d.id', 'desc')
     .limit(Math.max(1, Math.min(200, limit)))
-  if (decision && decision in JEV_DECISIONS) query.where('d.decision', decision)
-  return query
+  if (decision === 'cek')
+    query.whereNull('d.verdict').where((inner) =>
+      inner
+        .where('d.confidence', '<', 0.9)
+        .orWhereIn('d.decision', ['dana_masuk', 'bukti_transfer', 'total_toko', 'layanan', 'peran_kontak', 'kirim_sendiri'])
+    )
+  else if (decision === 'dinilai') query.whereNotNull('d.verdict')
+  else if (decision && decision in JEV_DECISIONS) query.where('d.decision', decision)
+  const rows = (await query) as Array<Record<string, any>>
+  const { explainDecision, answerLabel } = await import('#beta3/jev_explain')
+  return rows.map((row): Record<string, any> => {
+    let pairs: Array<[string, number]> = []
+    try {
+      pairs = JSON.parse(String(row.alternatives || '[]'))
+    } catch {}
+    const alternatives = (Array.isArray(pairs) ? pairs : [])
+      .filter((pair) => Array.isArray(pair) && String(pair[0]) !== String(row.answer))
+      .map(([key, pct]) => ({ key: String(key), pct: Number(pct) || 0, label: answerLabel(row.decision, String(key)) }))
+    return { ...row, alternatives, ...explainDecision(row as any) }
+  })
 }
 
-export async function markDecision(id: number, wrong: boolean) {
+/** Penilaian CS: benar / salah (+ jawaban yang benar) / kosong = batal menilai. */
+export async function markDecision(id: number, verdict: 'benar' | 'salah' | '' , correct = '') {
   await ensureDecisionTable()
-  await db.from('whatsapp_beta3_decisions').where('id', id).update({ wrong })
+  await db
+    .from('whatsapp_beta3_decisions')
+    .where('id', id)
+    .update({
+      verdict: verdict || null,
+      wrong: verdict === 'salah',
+      correct_answer: verdict === 'salah' && correct ? correct.slice(0, 80) : null,
+    })
 }
 
 /** Akurasi 30 hari per keputusan: jumlah keputusan, ditandai salah, persen benar. */
 export async function accuracySummary() {
   await ensureDecisionTable()
-  const rows = await db
-    .from('whatsapp_beta3_decisions')
-    .where('created_at', '>=', new Date(Date.now() - 30 * 86_400_000))
-    .groupBy('decision')
-    .select('decision')
-    .count('* as total')
-    .sum('wrong as wrong')
-    .sum('used as used')
-  return (rows as any[]).map((row) => {
+  // Akurasi hanya dari keputusan yang sudah dinilai CS (v3.6.36); sisanya "belum dinilai".
+  const [result] = await db.rawQuery(
+    `SELECT decision, COUNT(*) AS total, SUM(used) AS used,
+        SUM(verdict = 'benar') AS benar,
+        SUM(verdict = 'salah' OR (verdict IS NULL AND wrong = 1)) AS salah
+       FROM whatsapp_beta3_decisions WHERE created_at >= ? GROUP BY decision`,
+    [new Date(Date.now() - 30 * 86_400_000)]
+  )
+  return (result as any[]).map((row) => {
     const total = Number(row.total || 0)
-    const wrong = Number(row.wrong || 0)
+    const benar = Number(row.benar || 0)
+    const salah = Number(row.salah || 0)
+    const reviewed = benar + salah
     return {
       decision: String(row.decision),
       label: JEV_DECISIONS[row.decision as JevDecision] || String(row.decision),
       total,
       used: Number(row.used || 0),
-      wrong,
-      accuracy: total ? Math.round(((total - wrong) / total) * 1000) / 10 : null,
+      wrong: salah,
+      benar,
+      reviewed,
+      unreviewed: total - reviewed,
+      accuracy: reviewed ? Math.round((benar / reviewed) * 1000) / 10 : null,
     }
   })
 }

@@ -662,12 +662,20 @@ export default class Beta3Controller {
   async jevDecisions({ request, response }: HttpContext) {
     response.header('cache-control', 'no-store')
     const decision = String(request.qs().decision ?? '')
-    const [rows, summary] = await Promise.all([listDecisions(60, decision || undefined), accuracySummary()])
+    const [rows, summary] = await Promise.all([listDecisions(80, decision || undefined), accuracySummary()])
     return response.json({ decisions: rows, summary })
   }
 
   async markJevDecision({ params, request, response }: HttpContext) {
-    await markDecision(Number(params.id), request.input('wrong') === true || request.input('wrong') === 'true')
+    // v3.6.36: verdict benar/salah (+ jawaban yang benar); `wrong` lama tetap diterima.
+    const verdictInput = request.input('verdict')
+    const verdict =
+      verdictInput === 'benar' || verdictInput === 'salah'
+        ? verdictInput
+        : verdictInput === undefined && (request.input('wrong') === true || request.input('wrong') === 'true')
+          ? 'salah'
+          : ''
+    await markDecision(Number(params.id), verdict as 'benar' | 'salah' | '', String(request.input('correct') ?? ''))
     return response.json({ ok: true })
   }
 }

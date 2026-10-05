@@ -279,16 +279,28 @@ test.group('Jev · kunci, panggilan, cadangan', (group) => {
     )
   })
 
-  test('catatan keputusan: tandai salah → akurasi turun', async ({ assert }) => {
+  test('catatan keputusan: dijelaskan dalam bahasa biasa; benar/salah → akurasi dari yang dinilai saja', async ({ assert }) => {
     const before = await listDecisions(200)
     const ours = before.filter((row: any) => row.jid === 'jevtest@s.whatsapp.net')
     assert.isAbove(ours.length, 0)
-    await markDecision(Number(ours[0].id), true)
+    // v3.6.36: pertanyaan, arti jawaban, dan akibatnya ikut dikirim ke tampilan.
+    const total = ours.find((row: any) => row.decision === 'total_toko')
+    assert.equal(total?.question, 'Does this store message state the amount to pay or the bank account?')
+    assert.equal(total?.answer_label, 'Yes')
+    assert.include(String(total?.effect), 'awaiting payment')
+    assert.isAbove(total?.alternatives.length, 0)
+    await markDecision(Number(ours[0].id), 'salah', 'tidak')
+    if (ours[1]) await markDecision(Number(ours[1].id), 'benar')
     const summary = await accuracySummary()
     assert.isAbove(
       summary.reduce((sum, row) => sum + row.wrong, 0),
       0
     )
+    const reviewed = summary.reduce((sum, row) => sum + row.reviewed, 0)
+    assert.isAtLeast(reviewed, 1)
+    const marked = (await listDecisions(200, 'dinilai')).find((row: any) => Number(row.id) === Number(ours[0].id))
+    assert.equal(marked?.verdict, 'salah')
+    assert.equal(marked?.correct_answer, 'tidak')
     await db.from('whatsapp_beta3_decisions').where('jid', 'jevtest@s.whatsapp.net').delete()
   })
 })

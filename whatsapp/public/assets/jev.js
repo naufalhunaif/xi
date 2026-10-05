@@ -1,4 +1,4 @@
-// Pengaturan → Jev: kunci API, saklar per keputusan, dan Akurasi (tandai keputusan yang salah).
+// Pengaturan → Jev: kunci API, saklar per keputusan, dan Akurasi (nilai Benar/Salah tiap keputusan, v3.6.36).
 ;(() => {
   const panel = document.getElementById('settings-jev')
   if (!panel) return
@@ -55,8 +55,10 @@
     const list = byId('jevDecisionList')
     list.replaceChildren()
     const filter = byId('jevFilter')
-    if (filter.options.length <= 1)
+    if (filter.options.length <= 1) {
+      filter.append(new Option(t('Perlu dicek'), 'cek'), new Option(t('Sudah dinilai'), 'dinilai'))
       for (const item of state.decisions) filter.append(new Option(t(item.label), item.key))
+    }
     for (const item of state.decisions) {
       const row = el('li', 'wa-quality-item')
       const stats = summary.find((entry) => entry.decision === item.key)
@@ -65,9 +67,11 @@
         el(
           'small',
           'wa-note',
-          stats?.total
-            ? `${stats.accuracy}% · ${t('{0} keputusan', stats.total)}`
-            : t('Belum ada data')
+          !stats?.total
+            ? t('Belum ada data')
+            : stats.reviewed
+              ? `${t('{0}% benar dari {1} dinilai', stats.accuracy, stats.reviewed)} · ${t('belum dinilai {0}', stats.unreviewed)}`
+              : `${t('{0} keputusan', stats.total)} · ${t('belum dinilai')}`
         )
       )
       const toggle = el('button', 'wa-switch')
@@ -93,48 +97,112 @@
     }
   }
 
+  // v3.6.36: tiap keputusan dijelaskan — pesan yang dibaca, pertanyaan, jawaban, akibat — lalu dinilai Benar/Salah.
+  const appRoot = (document.querySelector('meta[name="app-url"]')?.content || '').replace(/\/$/, '')
+  const pct = (value) => `${Math.round(Number(value) * 100)}%`
+  function line(label, value, className = '') {
+    const row = el('div', `wa-jev-line ${className}`.trim())
+    row.append(el('small', 'wa-note', label))
+    if (value instanceof Node) row.append(value)
+    else row.append(el('span', '', value))
+    return row
+  }
+  async function judge(row, verdict, correct = '') {
+    try {
+      await call(`/api/beta3/jev/decisions/${row.id}`, 'POST', { verdict, correct })
+      await loadRecent()
+    } catch (error) {
+      status(error.message)
+    }
+  }
+  function verdictControls(row) {
+    const box = el('div', 'wa-jev-actions')
+    const verdict = row.verdict || (Number(row.wrong) ? 'salah' : '')
+    if (verdict) {
+      const label =
+        verdict === 'benar'
+          ? t('Ditandai benar')
+          : row.correct_answer
+            ? `${t('Ditandai salah')} → ${row.options?.[row.correct_answer] || row.correct_answer}`
+            : t('Ditandai salah')
+      box.append(el('span', `wa-pill ${verdict === 'benar' ? 'ok' : 'warn'}`, label))
+      const undo = el('button', 'button small', t('Batalkan'))
+      undo.type = 'button'
+      undo.addEventListener('click', () => void judge(row, ''))
+      box.append(undo)
+      return box
+    }
+    const right = el('button', 'button small', t('Benar'))
+    right.type = 'button'
+    right.addEventListener('click', () => void judge(row, 'benar'))
+    const wrong = el('button', 'button small danger', t('Salah'))
+    wrong.type = 'button'
+    box.append(right, wrong)
+    wrong.addEventListener('click', () => {
+      const choices = Object.entries(row.options || {}).filter(([key]) => key !== row.answer)
+      if (!choices.length) return void judge(row, 'salah')
+      // Pilih jawaban yang seharusnya (membantu memperbaiki Jev nanti).
+      box.replaceChildren()
+      const select = el('select')
+      select.setAttribute('aria-label', t('Jawaban yang benar'))
+      select.append(new Option(t('Jawaban yang benar…'), ''))
+      for (const [key, label] of choices) select.append(new Option(label, key))
+      const save = el('button', 'button small danger', t('Simpan salah'))
+      save.type = 'button'
+      save.addEventListener('click', () => void judge(row, 'salah', select.value))
+      const cancel = el('button', 'button small', t('Batal'))
+      cancel.type = 'button'
+      cancel.addEventListener('click', () => void loadRecent())
+      box.append(select, save, cancel)
+    })
+    return box
+  }
+
   function paintRecent(rows) {
     const list = byId('jevRecent')
     list.replaceChildren()
     if (!rows.length) list.append(el('li', 'wa-empty', t('Belum ada keputusan Jev.')))
     const labels = Object.fromEntries(state.decisions.map((item) => [item.key, item.label]))
     for (const row of rows) {
-      const item = el('li', 'wa-quality-item')
-      const time = window.waTime.ago(row.created_at)
-      item.title = window.waTime.full(row.created_at)
+      const item = el('li', 'wa-quality-item wa-jev-card')
+      const head = el('div', 'wa-jev-head')
+      head.append(el('strong', '', t(labels[row.decision] || row.decision)))
       const who = row.contact_name || String(row.jid || '').split('@')[0] || '—'
-      const text = el('span')
-      text.append(el('strong', '', `${t(labels[row.decision] || row.decision)}: ${row.answer}`))
-      text.append(
-        el(
-          'small',
-          'wa-note',
-          ` · ${Math.round(Number(row.confidence) * 100)}% · ${who} · ${time}${Number(row.used) ? '' : ` · ${t('ragu, cara lama dipakai')}`}`
+      const meta = el('small', 'wa-note', `${who} · ${window.waTime.ago(row.created_at)}`)
+      meta.title = window.waTime.full(row.created_at)
+      head.append(meta)
+      if (row.jid && !String(row.jid).startsWith('ig:')) {
+        const open = el('a', 'wa-jev-open', t('Buka chat'))
+        open.href = `${appRoot}/?jid=${encodeURIComponent(row.jid)}`
+        head.append(open)
+      }
+      item.append(head)
+      if (row.input_text) {
+        const quote = el('blockquote', 'wa-jev-quote', String(row.input_text))
+        item.append(line(row.source_label || t('Pesan'), quote))
+      }
+      item.append(line(t('Pertanyaan ke Jev'), row.question || row.decision))
+      const answer = el('span')
+      answer.append(el('strong', '', row.answer_label || row.answer))
+      answer.append(el('small', 'wa-note', ` · ${t('yakin')} ${pct(row.confidence)}`))
+      if (row.alternatives?.length)
+        answer.append(
+          el(
+            'small',
+            'wa-note wa-jev-alt',
+            `${t('Pilihan lain')}: ${row.alternatives.slice(0, 3).map((alt) => `${alt.label} ${alt.pct}%`).join(' · ')}`
+          )
         )
-      )
-      item.append(text)
-      const wrong = Boolean(Number(row.wrong))
-      const button = el(
-        'button',
-        `button small${wrong ? ' danger' : ''}`,
-        wrong ? t('Ditandai salah') : t('Salah?')
-      )
-      button.type = 'button'
-      button.setAttribute('aria-pressed', String(wrong))
-      button.addEventListener('click', async () => {
-        try {
-          await call(`/api/beta3/jev/decisions/${row.id}`, 'POST', { wrong: !wrong })
-          await loadRecent()
-        } catch (error) {
-          status(error.message)
-        }
-      })
-      item.append(button)
+      item.append(line(t('Jawaban Jev'), answer))
+      if (row.effect) item.append(line(t('Akibatnya'), row.effect, Number(row.used) ? '' : 'muted'))
+      item.append(verdictControls(row))
       list.append(item)
     }
   }
 
   async function loadRecent() {
+    // Kartu Akurasi juga ada di halaman Usage: keadaan Jev dimuat dulu bila belum.
+    if (!state) state = await call('/api/beta3/jev')
     const filter = byId('jevFilter').value
     const result = await call(
       `/api/beta3/jev/decisions${filter ? `?decision=${encodeURIComponent(filter)}` : ''}`
