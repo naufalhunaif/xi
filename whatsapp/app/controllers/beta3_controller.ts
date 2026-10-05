@@ -52,6 +52,7 @@ import {
 } from '#beta3/refs_service'
 import { readRecapProgress, requestRecap } from '#beta3/recap_service'
 import { skillStatus, syncRemoteSkills } from '#beta3/skill_sync'
+import { setSkillDigestOff, skillDigestView } from '#beta3/skill_digest'
 import { ensureDefaults, readSettings } from '#services/settings_service'
 import {
   addRule,
@@ -451,12 +452,21 @@ export default class Beta3Controller {
   /** Pengaturan → Skill: status skill + tombol ambil skill terbaru dari rilis online. */
   async skill({ response }: HttpContext) {
     response.header('cache-control', 'no-store')
-    return response.json(await skillStatus())
+    const status = await skillStatus()
+    return response.json({ ...status, digest: await skillDigestView(status.installed ? status : null) })
+  }
+
+  /** v3.6.39: skill ringkas (digest) aktif/mati; mati = skill asli dikirim ke AI. */
+  async skillDigest({ request, response }: HttpContext) {
+    await setSkillDigestOff(request.input('off') === true || request.input('off') === 'true')
+    const status = await skillStatus()
+    return response.json({ ...status, digest: await skillDigestView(status.installed ? status : null) })
   }
 
   async updateSkill({ response }: HttpContext) {
     const result = await syncRemoteSkills()
-    return response.json({ updated: result.updated, ...(await skillStatus()) })
+    const status = await skillStatus()
+    return response.json({ updated: result.updated, ...status, digest: await skillDigestView(status.installed ? status : null) })
   }
 
   /** Rekap order dari chat lama yang dilayani CS manusia (dikerjakan worker di latar). */

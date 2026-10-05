@@ -80,6 +80,7 @@ import {
   type TurnUnderstanding,
 } from '#beta3/jev_decisions'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
+import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 
 /**
  * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
@@ -499,6 +500,20 @@ export async function createLeanReply(input: {
       status: 'completed',
       detail: { tokens: skillTokens, limit: LEAN_SKILL_TOKEN_LIMIT },
     })
+
+  // v3.6.39: isi skill sama, format ringkas (digest). Skill asli tidak diubah; digest belum ada /
+  // tidak lengkap → skill asli. Skill diubah tanpa DIGEST.md baru → digest dibuat AI sekali di latar.
+  const skillUsed = await skillForPrompt(skill, async (content) => {
+    const made = await runLeanProvider(
+      { ...settings, aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt' },
+      digestPrompt(content),
+      [],
+      'beta3-digest',
+      { type: 'object', additionalProperties: false, properties: { digest: { type: 'string' } }, required: ['digest'] },
+      { tier: 'standard' }
+    )
+    return String(JSON.parse(made.text).digest || '')
+  }).catch(() => ({ content: skill.content, digest: false, fallback: [] as string[] }))
 
   await seedLeanExamples().catch(() => 0)
   const [digest, examples, customerNote, chatNote, rows, spec, rules] = await Promise.all([
@@ -1044,7 +1059,7 @@ export async function createLeanReply(input: {
     hasOrder: Boolean(activeOrder) || Boolean(pendingForJev),
     topics: understanding.topics,
   })
-  const trimmedSkill = trimSkill(skill.content, skillNeed)
+  const trimmedSkill = trimSkill(skillUsed.content, skillNeed)
   const focus = needs.catalog
     ? focusCatalog(digest.rows, {
         text: input.text,
@@ -1105,9 +1120,9 @@ export async function createLeanReply(input: {
   })
   onTrace?.({
     key: 'prompt-size',
-    label: `Ukuran prompt ≈ ${prompt.size.tokens} token (skill ~${skillTokens})`,
+    label: `Ukuran prompt ≈ ${prompt.size.tokens} token (skill ~${skillUsed.digest ? `${estimateTokens(skillUsed.content)} digest, asli ${skillTokens}` : skillTokens})`,
     status: 'completed',
-    detail: { ...prompt.size, skillName: skill.name, catalogRows: digest.rows.length },
+    detail: { ...prompt.size, skillName: skill.name, skillDigest: skillUsed.digest, skillDigestFallback: skillUsed.fallback, catalogRows: digest.rows.length },
   })
 
   // Tingkat model: aturan pola kata (v3.5.7) sebagai dasar; Jev hanya menaikkan. Alasan tampil di trace.

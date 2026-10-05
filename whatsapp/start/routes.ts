@@ -67,6 +67,7 @@ router
     router.post('/api/beta3/room/spec', [Beta3Controller, 'saveSpec'])
     router.get('/api/beta3/skill', [Beta3Controller, 'skill'])
     router.post('/api/beta3/skill/update', [Beta3Controller, 'updateSkill'])
+    router.post('/api/beta3/skill/digest', [Beta3Controller, 'skillDigest'])
     router.get('/api/beta3/recap', [Beta3Controller, 'recapStatus'])
     router.post('/api/beta3/recap', [Beta3Controller, 'startRecap'])
     router.get('/api/beta3/weights', [Beta3Controller, 'weights'])

@@ -1971,4 +1971,10 @@ window.waLocales.en = {
   "Lewati": "Skip",
   "Selesai \u2014 {0} keputusan sudah dilihat.": "Done \u2014 {0} decisions checked.",
   "Muat lagi": "Load again",
+  "Skill ringkas (digest)": "Compact skill (digest)",
+  "Lihat isi digest": "View digest",
+  "Mati \u2014 skill asli dipakai": "Off \u2014 full skill used",
+  "{0} \u2192 {1} token": "{0} \u2192 {1} tokens",
+  "{0} bagian memakai teks asli": "{0} sections use the full text",
+  "Sedang disiapkan \u2014 skill asli dipakai dulu": "Being prepared \u2014 full skill used for now",
 }

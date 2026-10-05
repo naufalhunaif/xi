@@ -298,3 +298,13 @@ Perubahan v3.6.6:
 - Saringan bawaan **Not rated yet** (belum dinilai); pilihan lain: Needs checking, Already rated, All decisions, per jenis keputusan. Maksimal 100 keputusan per muat.
 - Masukan CS: pesan tanpa konteks membingungkan. Kini tiap kartu menampilkan **potongan chat sebelumnya** (maks. 6 pesan pelanggan & toko), pesan yang dinilai Jev diberi bingkai "judged by Jev", lalu jawaban Jev di bawahnya. Untuk gambar, isi gambar menurut AI ditampilkan.
 - Tanpa token tambahan (konteks dibaca dari tabel pesan).
+
+## v3.6.39 — Skill ringkas (digest): isi sama, token lebih sedikit
+
+- Skill asli (`skills-beta3/beta3-cs-inti/SKILL.md`, dan yang tampil di Settings → Skill CS) **tidak diubah**. Yang dikirim ke AI saat membalas kini **digest**: isi aturan sama, ditulis ringkas (`→` jawab, `SC` = serah ke CS, `!` = dilarang). ±7.000 → ±4.800 token (±32% lebih hemat untuk bagian skill; skill = ±54% isi prompt balasan).
+- Digest bawaan: `skills-beta3/beta3-cs-inti/DIGEST.md` (`digest_of` = sha256 SKILL.md). Diperiksa otomatis (juga di tes): setiap kalimat CS "…", angka, nama bagian (KATALOG, ONGKIR, …), field (`spesifikasi`, `susulan`, …) dan judul ## wajib tetap ada; bagian yang tidak lengkap memakai teks asli bagian itu.
+- Skill diubah tanpa DIGEST.md baru → skill asli dipakai dulu, digest dibuat AI sekali di latar (fase `beta3-digest`), diperiksa dengan aturan yang sama, lalu dipakai.
+- Settings → Skill CS: saklar **Compact skill (digest)** (mati = skill asli), ukuran asli → digest, dan **View digest**.
+- Kasus uji memakai skill yang sama dengan balasan; untuk membandingkan, jalankan kasus uji dengan saklar aktif lalu mati.
+- Jev tidak memakai skill (pertanyaan Jev pendek, ±1.500 token).
+- Bersinggungan: memangkas bagian skill per giliran (trimSkill) tetap berjalan di atas digest karena judul ## sama.

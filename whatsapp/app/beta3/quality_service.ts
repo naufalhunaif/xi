@@ -1,6 +1,7 @@
 // Kualitas balasan tanpa lapor manual: Aturan Toko, Koreksi dari room, Kasus uji (manual),
 // dan pemeriksa harga sebelum kirim. Semua berlaku sama untuk model AI mana pun.
 import db from '#services/workspace_database'
+import { skillForPrompt } from '#beta3/skill_digest'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { ensureLeanTables, readLeanState, writeLeanState } from '#beta3/tables'
 import { addLeanExample, listLeanExamples, pickExamples } from '#beta3/examples_service'
@@ -188,8 +189,11 @@ async function runOne(test: Record<string, any>, settings: LeanSettings) {
   const skill = selectLeanSkill(settings.skills)
   const [digest, examples, rules] = await Promise.all([catalogDigest(), listLeanExamples(), listRules()])
   const style = await storeStyle(examples).catch(() => null)
+  // v3.6.39: kasus uji memakai skill yang sama dengan balasan (digest bila aktif) — untuk
+  // membandingkan, jalankan uji dengan Skill ringkas aktif lalu mati.
+  const used = await skillForPrompt(skill).catch(() => ({ content: skill.content }))
   const prompt = buildLeanPrompt({
-    skill: skill.content,
+    skill: used.content,
     store: await readLeanState('store_profile'),
     policy: renderExchangePolicy((await readExchangePolicy()).text),
     fabrics: await readLeanState('fabrics'),

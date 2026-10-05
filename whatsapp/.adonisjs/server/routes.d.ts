@@ -37,6 +37,7 @@ export type ScannedRoutes = {
     'beta_3.save_spec': { paramsTuple?: []; params?: {} }
     'beta_3.skill': { paramsTuple?: []; params?: {} }
     'beta_3.update_skill': { paramsTuple?: []; params?: {} }
+    'beta_3.skill_digest': { paramsTuple?: []; params?: {} }
     'beta_3.recap_status': { paramsTuple?: []; params?: {} }
     'beta_3.start_recap': { paramsTuple?: []; params?: {} }
     'beta_3.weights': { paramsTuple?: []; params?: {} }
@@ -334,6 +335,7 @@ export type ScannedRoutes = {
     'beta_3.save_mcp': { paramsTuple?: []; params?: {} }
     'beta_3.save_spec': { paramsTuple?: []; params?: {} }
     'beta_3.update_skill': { paramsTuple?: []; params?: {} }
+    'beta_3.skill_digest': { paramsTuple?: []; params?: {} }
     'beta_3.start_recap': { paramsTuple?: []; params?: {} }
     'beta_3.save_weights': { paramsTuple?: []; params?: {} }
     'beta_3.save_jev': { paramsTuple?: []; params?: {} }
