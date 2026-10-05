@@ -5,6 +5,7 @@ import app from '@adonisjs/core/services/app'
 import db from '#services/workspace_database'
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
 import { ensureLeanTables } from '#beta3/tables'
+import { imageIsPaymentProof } from '#beta3/jev_decisions'
 
 /** Kotak [x, y, lebar, tinggi] dalam skala 0–1000 terhadap gambar. */
 export type RefBox = [number, number, number, number]
@@ -68,11 +69,53 @@ export async function recordImageKinds(
   if (!imageIds.length) return
   await ensureLeanTables()
   const proofs = new Set(proofIds)
+  // Gambar yang sudah dipilah dari ISINYA (screenIncomingImage, v3.6.30) tidak ditimpa tebakan giliran.
+  const judged = new Set<string>(
+    (
+      await db
+        .from('whatsapp_beta3_proofs')
+        .whereIn('message_id', imageIds.slice(0, 10))
+        .where('note', '<>', '')
+        .where('note', '<>', '?')
+        .select('message_id')
+        .catch(() => [])
+    ).map((row: any) => String(row.message_id))
+  )
   for (const [index, id] of imageIds.slice(0, 10).entries()) {
+    if (judged.has(id)) continue
     const ref = refs.find((item) => item.gambar === index + 1)
     const kind = proofs.has(id) ? 'bukti' : ref ? (SIZE_PART.test(ref.bagian) ? 'ukuran' : 'model') : 'dilihat'
     await saveImageKind(jid, id, kind)
   }
+}
+
+/**
+ * v3.6.30 — setiap gambar masuk dipilah dari ISINYA begitu filenya siap (mode AI maupun CS):
+ * AI melihat gambar (jenis + keterangan), lalu Jev menilai "bukti pembayaran atau bukan" dari
+ * keterangan + teks pelanggan. Bukan dari urutan "setelah rekening pasti bukti". Hasil Jev yang
+ * yakin menang; selain itu jenis dari AI dipakai. Dipanggil listener di latar.
+ */
+export async function screenIncomingImage(jid: string, messageId: string, mediaUrl: string, caption = '') {
+  await ensureLeanTables()
+  const kinds = await classifyImages(jid, [{ message_id: messageId, media_url: mediaUrl }]).catch(() => new Map<string, string>())
+  const kind = kinds.get(messageId)
+  if (!kind) return null
+  const row = await db.from('whatsapp_beta3_proofs').where('message_id', messageId).first().catch(() => null)
+  const note = String(row?.note || '')
+  const order = await db
+    .from('whatsapp_beta3_orders')
+    .where('jid', jid)
+    .whereIn('status', ['awaiting_payment', 'paid'])
+    .orderBy('id', 'desc')
+    .first()
+    .catch(() => null)
+  const awaiting = Boolean(order) && (order.status === 'awaiting_payment' || Number(order.paid_amount || 0) < Number(order.total || 0))
+  const verdict = await imageIsPaymentProof({ jid, kind, note, customerText: caption, awaitingPayment: awaiting }).catch(() => undefined)
+  const final = verdict === true ? 'bukti' : verdict === false && kind === 'bukti' ? 'lain' : kind
+  // Hasil pilah isi (+Jev) menang atas tebakan giliran AI yang mungkin sudah tersimpan ("bukti" lengket).
+  if (String(row?.kind || '') !== final)
+    await db.from('whatsapp_beta3_proofs').where('message_id', messageId).update({ kind: final }).catch(() => {})
+  return { kind: final, note, jev: verdict }
 }
 
 async function saveImageKind(jid: string, id: string, kind: string, note = '') {
@@ -226,15 +269,15 @@ export async function paymentProofIds(jid: string) {
   ])
   const kinds = new Map<string, string>(judged.map((row: any) => [String(row.message_id), String(row.kind)]))
   const ids = new Set<string>([...kinds].filter(([, kind]) => kind === 'bukti').map(([id]) => id))
-  const payTimes = payInfo
-    .filter((row: any) => PAY_INFO.test(String(row.body || '')))
-    .map((row: any) => new Date(row.created_at).getTime())
+  // v3.6.30: gambar yang belum dipilah tidak lagi ditebak dari waktu ("setelah rekening") — hanya
+  // caption pelanggan yang tegas ("ini bukti tf") yang dihitung, sampai pemilahan isi selesai.
+  void payInfo
+  void PAY_INFO
+  void PROOF_WINDOW
   for (const image of images as any[]) {
     const id = String(image.message_id)
     if (kinds.has(id)) continue // sudah dilihat AI (bukan bukti bila tidak ditandai)
-    const at = new Date(image.created_at).getTime()
-    const afterPayInfo = payTimes.some((time) => at >= time && at - time <= PROOF_WINDOW)
-    if (PROOF_CAPTION.test(String(image.body || '')) || afterPayInfo) ids.add(id)
+    if (PROOF_CAPTION.test(String(image.body || ''))) ids.add(id)
   }
   return ids
 }

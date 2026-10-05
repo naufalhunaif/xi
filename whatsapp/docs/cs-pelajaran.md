@@ -409,3 +409,21 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 **Pelajaran**
 - Total resmi harus mencerminkan seluruh yang dibahas, bukan baris terakhir yang diisi AI: sistem mencocokkan bagian (celana/rompi) sebelum mengirim.
 - Janji "saya cek ulang" harus punya mekanisme di sistem; kalau tidak ada, jangan dijanjikan.
+
+## #18 · Okt 2026 · total CS di chat tidak tercatat; foto jas dianggap bukti transfer (diterapkan v3.6.30)
+
+**Laporan pemilik**
+- Setelah sistem terlanjur mengirim total (jas saja), CS mengirim total yang benar (916.000) di chat — order tetap 503.000 dengan item jas saja; saat dana masuk, ditandai lunas dengan angka lama.
+- Pelanggan mengirim **foto jas** sesudah rekening → aplikasi menampilkan "pembayaran masuk/perlu konfirmasi", padahal belum bayar. Pemilik: "bukan berarti gambar setelah rekening pasti bukti transfer — belum tentu; semuanya dinamis, perlu Jev."
+
+**Penyebab**
+1. Total dari pesan CS hanya dibaca AI pada giliran berikutnya, dan hanya diterapkan bila order masih "pending" (belum ada total). Rincian item tidak pernah diambil dari pesan CS.
+2. Penanda "Pembayaran" di kotak masuk untuk order menunggu pembayaran menghitung **setiap gambar** pelanggan sesudah total sebagai bukti — tanpa melihat isinya. Ditambah aturan "tahap bukti_dikirim → semua gambar giliran itu bukti" dan tebakan "gambar ≤48 jam setelah rekening = bukti".
+
+**Perubahan**
+1. `parseCsTotalMessage` + `applyCsTotalMessage` (listener, saat pesan CS terkirim): pesan CS berformat total (item + harga, ongkir, "total … = …", format baris atau satu baris) langsung memperbarui order — rincian item, subtotal, ongkir, total, catatan "total dikirim CS di chat" — untuk order pending maupun menunggu pembayaran yang belum ada dana masuk. Ongkir tidak disebut → ongkir order yang ada dipakai.
+2. Bukti pembayaran dinilai dari **isi gambar**: setiap gambar pelanggan yang filenya siap dipilah AI di latar (`screenIncomingImage`: jenis bukti/model/ukuran/lain + keterangan), lalu Jev (`bukti_transfer`, ambang 0,9) menilai dari keterangan + teks pelanggan + status order. Hasil ini menang atas tebakan giliran AI. Berlaku di mode AI maupun CS.
+3. Penanda "Pembayaran" (kotak masuk, panel room, pelunasan DP) hanya untuk gambar berjenis "bukti" atau yang belum/gagal dipilah; aturan "tahap bukti_dikirim → semua gambar" dan tebakan waktu dihapus. Caption pelanggan yang tegas ("ini bukti tf") tetap dihitung sampai pemilahan selesai.
+
+**Pelajaran**
+- Keputusan "ini bukti bayar?" harus dari isi gambar + konteks, bukan dari urutan pesan. Vision memberi keterangan, Jev memutuskan — pola yang sama bisa dipakai untuk keputusan dinamis lain.

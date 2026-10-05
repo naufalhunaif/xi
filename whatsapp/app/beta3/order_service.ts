@@ -790,7 +790,11 @@ export async function pendingSettlement(order: Record<string, any> | null | unde
         .select('message_id', 'kind', 'note')
     ).map((row: any) => [String(row.message_id), { kind: String(row.kind), note: String(row.note || '') }])
   )
-  const proofs = images.filter((row: any) => !['model', 'ukuran', 'lain'].includes(kinds.get(String(row.message_id))?.kind || ''))
+  // Bukti = hasil pilah isi "bukti", atau belum dipilah / gagal dilihat ('?'); jenis lain bukan bukti (v3.6.30).
+  const proofs = images.filter((row: any) => {
+    const judged = kinds.get(String(row.message_id))
+    return !judged || judged.kind === 'bukti' || judged.note === '?'
+  })
   if (!proofs.length) return null
   const sisa = total - paid
   const fromNote = Math.max(0, ...proofs.map((row: any) => proofAmountOf(kinds.get(String(row.message_id))?.note || '')))
@@ -1329,6 +1333,74 @@ export async function sendLeanTotal(
   )
   if (payment) await queueOutgoingMessage({ jid: String(order.jid), body: payment, sender })
   return { orderNumber: String(order.order_number || `#${order.id}`), total: Number(order.total) }
+}
+
+/**
+ * v3.6.30 — CS mengirim total sendiri di chat, mis.
+ *   "Jas, Celana, Rompi 880.000 / ongkir 2kg, 2 x 18.000 = 36.000 / total 880.000 + 36.000 = 916.000 bos"
+ * Dibaca saat pesan CS terkirim dan order diperbarui saat itu juga (tanpa menunggu giliran AI):
+ * rincian item, subtotal, ongkir, total; berlaku untuk order pending maupun menunggu pembayaran
+ * yang belum ada dana masuk. Nomor order tetap.
+ */
+export function parseCsTotalMessage(body: string) {
+  // Dipotong per baris dan di depan kata "ongkir"/"total", supaya format satu baris
+  // ("Beskap, Celana 705.000, ongkir 95.000, Total 705.000 + 95.000 = 800.000 bos") ikut terbaca.
+  const segments = String(body || '')
+    .split(/\n|(?=\btotal\b)|(?=\bongkir\b)/i)
+    .map((segment) => segment.replace(/^[\s,;/]+|[\s,;/]+$/g, ''))
+    .filter(Boolean)
+  const totalSegments = segments.filter((segment) => /^total\b/i.test(segment))
+  const totalSegment = totalSegments[totalSegments.length - 1]
+  if (!totalSegment) return null
+  const total = parsePrices(totalSegment).pop() || 0
+  const ongkirSegment = segments.find((segment) => /^ongkir\b/i.test(segment))
+  // null = ongkir tidak disebut (dipakai ongkir order yang sudah ada).
+  const shippingCost: number | null = ongkirSegment ? parsePrices(ongkirSegment).pop() || 0 : null
+  const itemLines = segments.filter(
+    (segment) =>
+      !/^(total|ongkir)\b/i.test(segment) &&
+      !/rekening|rek\.|transfer|\ba\.?n\b|atas nama|pembayaran|\bdp\b/i.test(segment) &&
+      parsePrices(segment).length > 0
+  )
+  const subtotal = total - (shippingCost || 0)
+  if (total < 10000 || subtotal <= 0) return null
+  return { items: itemLines.join('\n'), subtotal, shippingCost, total }
+}
+
+export async function applyCsTotalMessage(jid: string, body: string) {
+  const parsed = parseCsTotalMessage(body)
+  if (!parsed) return null
+  await ensureLeanTables()
+  const order = await db
+    .from('whatsapp_beta3_orders')
+    .where('jid', jid)
+    .whereIn('status', ['pending', 'awaiting_payment'])
+    .orderBy('id', 'desc')
+    .first()
+  if (!order || Number(order.paid_amount || 0) > 0) return null
+  const shippingCost = parsed.shippingCost ?? Number(order.shipping_cost || 0)
+  const subtotal = parsed.total - shippingCost
+  if (subtotal <= 0) return null
+  const unchanged =
+    Number(order.total || 0) === parsed.total &&
+    Number(order.shipping_cost || 0) === shippingCost &&
+    (!parsed.items || String(order.items || '').trim() === parsed.items)
+  if (order.status === 'awaiting_payment' && unchanged) return null
+  await db
+    .from('whatsapp_beta3_orders')
+    .where('id', order.id)
+    .update({
+      order_number: order.order_number || (await nextOrderNumber()),
+      items: parsed.items ? parsed.items.slice(0, 4000) : order.items,
+      subtotal,
+      shipping_cost: shippingCost || null,
+      total: parsed.total,
+      cs_note: 'total dikirim CS di chat',
+      auto_total_reason: null,
+      status: 'awaiting_payment',
+      updated_at: new Date(),
+    })
+  return { orderId: Number(order.id), items: parsed.items, subtotal, shippingCost, total: parsed.total }
 }
 
 /** Alasan total belum otomatis, ditampilkan ke CS di panel pesanan. */

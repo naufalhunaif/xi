@@ -23,6 +23,7 @@ import {
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import db from '#services/workspace_database'
 import { attachOrderPhotos } from '#beta3/order_photos'
+import { screenIncomingImage } from '#beta3/refs_service'
 import { autoBackupTick, restartRequestedSince } from '#services/backup_service'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
@@ -1689,14 +1690,24 @@ export default class WhatsappListen extends BaseCommand {
       )
       const mediaPath = this.app.makePath('public', 'media', filename)
       await writeFile(mediaPath, data, { mode: 0o644 })
+      const mediaUrl = `${(env.get('APP_BASE_PATH') || '')}/media/${filename}`
       await db
         .from('whatsapp_messages')
         .where('message_id', messageId)
         .update({
-          media_url: `${(env.get('APP_BASE_PATH') || '')}/media/${filename}`,
+          media_url: mediaUrl,
           media_status: 'ready',
         })
       await db.from('whatsapp_media_protos').where('message_id', messageId).delete().catch(() => {})
+      // v3.6.30: gambar pelanggan dipilah dari isinya di latar (bukti transfer / model / ukuran / lain),
+      // mode AI maupun CS — penanda "Pembayaran" tidak lagi menebak dari urutan pesan.
+      if (target === 'message' && media.mediaType === 'image' && !message.key.fromMe) {
+        const jid = String(message.key.remoteJid || '')
+        const caption = String(message.message?.imageMessage?.caption || '')
+        void screenIncomingImage(jid, messageId, mediaUrl, caption).catch((error) =>
+          this.logger.info(`Pilah gambar ${messageId}: ${error instanceof Error ? error.message : String(error)}`)
+        )
+      }
       return mediaPath
     } catch (error) {
       await db
@@ -1939,6 +1950,13 @@ export default class WhatsappListen extends BaseCommand {
       }
       // A mode-update error must not turn an already sent message into a failed send.
       if (message.sender_type === 'cs') {
+        // Total yang diketik CS di chat langsung memperbarui order (v3.6.30).
+        try {
+          const applied = await beta3.applyCsTotalMessage(message.jid, String(message.body || ''))
+          if (applied) this.logger.info(`Order ${applied.orderId} diperbarui dari total CS: ${applied.total}`)
+        } catch {
+          /* Pencatatan opsional; jangan mengganggu pengiriman. */
+        }
         await resumeAiAfterHumanReply(message.jid)
         // Jawaban CS menjadi kandidat contoh untuk AI, tanpa mengedit skill.
         try {

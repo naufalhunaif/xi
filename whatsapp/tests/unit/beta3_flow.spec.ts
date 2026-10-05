@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import db from '#services/workspace_database'
 import { recoverHandledOrder, missedOrderForm, totalFromStoreMessages, finishLeanGoal, claimLeanNudge } from '#beta3/reply_service'
-import { saveLeanOrder } from '#beta3/order_service'
+import { saveLeanOrder, applyCsTotalMessage, approveLeanOrder, reopenLeanOrderForChange, readLeanOrder } from '#beta3/order_service'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
 import Beta3Controller from '#controllers/beta3_controller'
 import { writeOrderSpec } from '#beta3/customer_service'
@@ -79,6 +79,42 @@ test.group('beta3 · alur order (database)', () => {
     assert.isBelow(new Date(order.updated_at).getTime(), Date.now() - 100 * 60_000)
     assert.isNull(await recoverHandledOrder(jid, ['1112223334445']))
     await db.from('whatsapp_messages').where('jid', jid).delete()
+    await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
+  })
+
+  // v3.6.30 (ulasan #17): total yang diketik CS setelah total sistem terkirim memperbarui order saat itu juga.
+  test('total CS di chat memperbarui order yang sudah menunggu pembayaran (belum dibayar)', async ({ assert }) => {
+    const jid = 'tmpcstotal@s.whatsapp.net'
+    await latestLeanOrder(jid)
+    await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
+    const id = await saveLeanOrder({
+      jid,
+      form: { customerName: 'Retno', address: 'Sidomoro', district: 'Buluspesantren', regency: 'Kebumen', postalCode: '54391', phone: '0812', note: '' } as any,
+      items: 'Basic Suit - Cream size L 485.000',
+      spec: 'Basic Suit - Cream, size L\nJas',
+      shippingOptions: { prices: [{ service: 'CTC', price: 18000 }], grams: 800 },
+    })
+    await approveLeanOrder({ id, shippingService: 'CTC', shippingCost: 18000, subtotal: 485000 })
+    assert.equal((await readLeanOrder(id))?.status, 'awaiting_payment')
+    // Pesan CS biasa tidak mengubah apa pun.
+    assert.isNull(await applyCsTotalMessage(jid, 'Untuk pembayaran tf ke rek BRI 1112223334445 An Toko'))
+    const applied = await applyCsTotalMessage(jid, 'Jas, Celana, Rompi 880.000\nongkir 2kg, 2 x 18.000 =36.000 \n\ntotal 880.000 + 36.000 =916.000 bos')
+    assert.equal(applied?.total, 916000)
+    const order = await readLeanOrder(id)
+    assert.equal(order.status, 'awaiting_payment')
+    assert.equal(Number(order.total), 916000)
+    assert.equal(Number(order.shipping_cost), 36000)
+    assert.equal(Number(order.subtotal), 880000)
+    assert.equal(String(order.items), 'Jas, Celana, Rompi 880.000')
+    assert.equal(String(order.cs_note), 'total dikirim CS di chat')
+    // Total yang sama dikirim lagi → tidak ada perubahan.
+    assert.isNull(await applyCsTotalMessage(jid, 'total 880.000 + 36.000 = 916.000 bos'))
+    // Item berubah sebelum dibayar → order bisa dibuka lagi untuk dihitung sistem; sudah dibayar → tidak.
+    assert.isTrue(await reopenLeanOrderForChange(id))
+    assert.equal((await readLeanOrder(id))?.status, 'pending')
+    await db.from('whatsapp_beta3_orders').where('id', id).update({ status: 'awaiting_payment', paid_amount: 916000 })
+    assert.isFalse(await reopenLeanOrderForChange(id))
+    assert.isNull(await applyCsTotalMessage(jid, 'total 900.000 + 36.000 = 936.000 bos'))
     await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
   })
 

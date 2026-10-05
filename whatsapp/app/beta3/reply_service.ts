@@ -1248,11 +1248,9 @@ export async function createLeanReply(input: {
   // Tahap bukti_dikirim tanpa nomor → semua gambar giliran ini dianggap bukti.
   if (input.imageIds?.length) {
     const ids = input.imageIds
-    const proofNumbers = decision.bukti?.length
-      ? decision.bukti
-      : decision.tahap === 'bukti_dikirim' && !decision.referensi?.length
-        ? ids.map((_, index) => index + 1)
-        : []
+    // v3.6.30: hanya gambar yang AI tandai tegas sebagai bukti; tahap "bukti_dikirim" saja tidak
+    // menjadikan semua gambar bukti (foto jas sesudah rekening pernah dianggap bukti).
+    const proofNumbers = decision.bukti?.length ? decision.bukti : []
     const proofIds = proofNumbers.map((number) => ids[number - 1]).filter(Boolean)
     if (proofNumbers.length)
       decision.referensi = (decision.referensi || []).filter((ref) => !proofNumbers.includes(ref.gambar))

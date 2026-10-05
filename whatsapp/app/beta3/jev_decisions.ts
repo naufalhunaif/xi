@@ -551,3 +551,34 @@ export async function storeConfirmedPayment(jid: string, storeMessages: string[]
   await logDecision({ jid, decision: 'dana_masuk', answer, used: sure, detail: recent.join(' | ').slice(0, 300) })
   return sure ? yes(answer) : undefined
 }
+
+/**
+ * v3.6.30 — gambar pelanggan = bukti pembayaran? Dinilai dari ISI gambar (keterangan hasil AI
+ * melihat gambar) + teks pelanggan, bukan dari urutan "setelah rekening pasti bukti".
+ * true/false bila yakin; undefined bila Jev mati/ragu (pemanggil memakai jenis dari AI).
+ */
+export async function imageIsPaymentProof(input: { jid: string; kind: string; note: string; customerText: string; awaitingPayment: boolean }) {
+  if (!(await jevOn('bukti_transfer'))) return undefined
+  const answers = await askJev(
+    'bukti-transfer',
+    {
+      jenis_menurut_ai: input.kind,
+      keterangan_gambar: maskPii(input.note).slice(0, 300),
+      teks_pelanggan: maskPii(input.customerText).slice(0, 300),
+      toko_menunggu_pembayaran: input.awaitingPayment,
+    },
+    {
+      bukti_transfer: {
+        type: 'noul',
+        instructions:
+          'Apakah gambar ini BUKTI PEMBAYARAN ke toko (struk/screenshot transfer, m-banking, e-wallet, QRIS, nominal & tujuan)? Foto/screenshot jas, celana, model, tabel ukuran, katalog, atau tangkapan layar chat BUKAN bukti pembayaran, walaupun toko sedang menunggu pembayaran.',
+      },
+    },
+    { jid: input.jid }
+  )
+  const answer = answers?.bukti_transfer
+  if (!answer) return undefined
+  const sure = confident('bukti_transfer', answer)
+  await logDecision({ jid: input.jid, decision: 'bukti_transfer', answer, used: sure, detail: `${input.kind}: ${input.note}`.slice(0, 300) })
+  return sure ? yes(answer) : undefined
+}

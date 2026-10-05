@@ -6,7 +6,7 @@ import { completePhotos, polishText, polishWithPhotos } from '#beta3/reply_polis
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
 import { keepCustomInChat, CUSTOM_REPLY, dropRepeatedWait } from '#beta3/reply_guards'
-import { partsMissingFromItems, orderPartsOf } from '#beta3/order_service'
+import { partsMissingFromItems, orderPartsOf, parseCsTotalMessage } from '#beta3/order_service'
 import { normalizeStage, type LeanDecision } from '#beta3/prompt'
 import { goalStatus } from '#beta3/reply_service'
 import { extractShippingQuery, etdText } from '#beta3/mcp'
@@ -225,5 +225,23 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.isFalse(dropRepeatedWait(['siap, totalnya saya hitung dulu ya bos'], last, 'jadi berapa totalnya?').changed)
     // Janji pertama (pesan sebelumnya bukan janji) tetap boleh.
     assert.isFalse(dropRepeatedWait(['totalnya saya hitung dulu ya bos'], 'Siap bos, dicatat pakai size L ya.', 'Oke').changed)
+  })
+
+  test('#17 total yang diketik CS di chat terbaca: item, ongkir, total (format baris & satu baris)', ({ assert }) => {
+    assert.deepEqual(parseCsTotalMessage('Jas, Celana, Rompi 880.000\nongkir 2kg, 2 x 18.000 =36.000 \n\ntotal 880.000 + 36.000 =916.000 bos'), {
+      items: 'Jas, Celana, Rompi 880.000',
+      subtotal: 880000,
+      shippingCost: 36000,
+      total: 916000,
+    })
+    assert.deepEqual(parseCsTotalMessage('Beskap, Celana 705.000, ongkir 95.000, Total 705.000 + 95.000 = 800.000 bos'), {
+      items: 'Beskap, Celana 705.000',
+      subtotal: 705000,
+      shippingCost: 95000,
+      total: 800000,
+    })
+    assert.equal(parseCsTotalMessage('Basic Suit - Cream size L 485.000\nOngkir REG 18.000\n\nTotal 485.000 + 18.000 = 503.000 bos')?.items, 'Basic Suit - Cream size L 485.000')
+    assert.isNull(parseCsTotalMessage('Untuk pembayaran tf ke rek BRI 1112223334445 An Toko agar pesanan langsung kami proses'))
+    assert.isNull(parseCsTotalMessage('siap bos, totalnya saya hitung dulu ya'))
   })
 })

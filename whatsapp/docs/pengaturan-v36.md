@@ -241,3 +241,8 @@ Perubahan v3.6.6:
 
 - Lihat `docs/cs-pelajaran.md` #17. Kode: `partsMissingFromItems`/`orderPartsOf`/`reopenLeanOrderForChange` (`order_service.ts`), `HISTORY_LIMIT_ORDER = 60` dan pengambilan ulang tarif saat `shipping_options.grams` ≠ berat spesifikasi (`reply_service.ts`), `dropRepeatedWait` (`reply_guards.ts`), kolom `whatsapp_messages.send_attempts/send_error` + coba ulang 3× di `flushQueued` (listener), judul tanda "!" di chat menampilkan alasannya.
 - Bersinggungan: order "menunggu pembayaran" bisa kembali "pending" otomatis bila item berubah sebelum dibayar (panel pesanan CS akan menampilkannya lagi dengan catatan "item berubah, total dihitung ulang"). Pesan yang sedang dicoba ulang tetap berstatus antrean (tanpa "!") maksimal ±5 detik.
+
+## v3.6.30 — ulasan #18: total CS langsung tercatat; bukti transfer dinilai dari isi gambar (Jev)
+
+- Lihat `docs/cs-pelajaran.md` #18. Kode: `parseCsTotalMessage`/`applyCsTotalMessage` (`order_service.ts`, dipanggil listener setelah pesan CS terkirim), `screenIncomingImage` (`refs_service.ts`, dipanggil listener saat media gambar masuk siap), keputusan Jev baru `bukti_transfer` (`jev.ts`, `jev_decisions.ts` → tampil di Pengaturan → Jev, bisa dimatikan), SQL penanda pembayaran di `contact_inbox_service.ts` dan `pendingSettlement` (`order_service.ts`), `recordImageKinds` tidak menimpa hasil pilah isi.
+- Bersinggungan: tiap gambar pelanggan kini memicu satu panggilan AI vision di latar (biaya kecil, akurasi penanda pembayaran naik). Gambar yang gagal dilihat ('?') tetap dihitung calon bukti agar tidak ada pembayaran terlewat. Order "menunggu pembayaran" bisa berubah angkanya mengikuti pesan CS — panel pesanan menampilkan catatan "total dikirim CS di chat".

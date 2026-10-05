@@ -130,17 +130,21 @@ export async function latestInboxMessages() {
   await ensureLeanTables()
   // Pembayaran = pelanggan sudah bayar dan menunggu konfirmasi CS: kirim gambar setelah
   // total dikirim, atau AI mencatat tahap bukti_dikirim (belum ada order lunas sesudahnya).
+  // v3.6.30: gambar dihitung bukti hanya bila hasil pilah isinya "bukti" atau belum dipilah (note '?' = gagal dilihat);
+  // foto jas/model/ukuran sesudah rekening bukan pembayaran.
+  const notProofSql = (alias: string) =>
+    `NOT EXISTS (SELECT 1 FROM whatsapp_beta3_proofs k WHERE k.message_id = ${alias}.message_id
+              AND k.kind <> 'bukti' AND k.note <> '?')`
   const paymentSql = `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'awaiting_payment'
           AND EXISTS (SELECT 1 FROM whatsapp_messages p WHERE p.jid = m.jid AND p.direction = 'in'
-            AND p.media_type = 'image' AND p.created_at > b.updated_at))
+            AND p.media_type = 'image' AND p.created_at > b.updated_at AND ${notProofSql('p')}))
         OR EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'paid'
           AND b.paid_amount < b.total
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_shipments sx WHERE sx.jid = m.jid
             AND (sx.created_at >= b.created_at OR b.source = 'rekap'))
           AND EXISTS (SELECT 1 FROM whatsapp_messages p WHERE p.jid = m.jid AND p.direction = 'in'
             AND p.media_type = 'image' AND p.created_at > COALESCE(b.paid_checked_at, b.updated_at)
-            AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_proofs k WHERE k.message_id = p.message_id
-              AND k.kind IN ('model', 'ukuran', 'lain'))))
+            AND ${notProofSql('p')}))
         OR EXISTS (SELECT 1 FROM whatsapp_beta3_chats n WHERE n.jid = m.jid
           AND n.note REGEXP 'tahap[[:space:]]*[:=][[:space:]]*bukti_dikirim'
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders d WHERE d.jid = m.jid
