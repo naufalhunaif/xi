@@ -51,7 +51,7 @@ export async function markRoomRead(jid: string, throughId: number) {
  */
 export async function setRoomsReadState(jids: string[], state: 'read' | 'unread') {
   await initializeDatabase()
-  const valid = [...new Set(jids.map(String))].filter((jid) => /^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid)).slice(0, 200)
+  const valid = [...new Set(jids.map(String))].filter((jid) => /^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid)).slice(0, 2000)
   if (!valid.length) throw new Error('Room tidak valid.')
   const result = await db.rawQuery(
     `SELECT jid, MAX(id) AS last_id, MAX(CASE WHEN direction = 'in' THEN id ELSE 0 END) AS last_in_id

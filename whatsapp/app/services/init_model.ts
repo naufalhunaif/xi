@@ -602,6 +602,7 @@ async function createTables() {
   await db.rawQuery(`ALTER TABLE whatsapp_contacts
     ADD COLUMN IF NOT EXISTS ai_excluded TINYINT(1) NOT NULL DEFAULT 0`)
   await db.rawQuery(`ALTER TABLE whatsapp_contacts
+    ADD COLUMN IF NOT EXISTS name_from_book TINYINT(1) NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS phone_jid VARCHAR(190) NULL,
     ADD COLUMN IF NOT EXISTS phone_resolved_at DATETIME NULL`)
   // Multi nomor: nomor (line) yang menerima/mengirim pesan; NULL = nomor utama.

@@ -199,6 +199,7 @@ export default class WhatsappListen extends BaseCommand {
   private lineWorkerIds = new Map<number, string>()
   private lineHeldLogged = new Set<number>()
   private workerId = ''
+  private contactsResynced = false
   private lastLineSuperviseAt = 0
   private get primary() {
     return currentLine() === 1
@@ -853,6 +854,14 @@ export default class WhatsappListen extends BaseCommand {
               inWorkspace(connectedScope, () =>
                 this.track(() => this.refreshContactProfiles(true))
               ).catch(() => {})
+            // Nama dari buku kontak HP dikirim ulang (app state) sekali per proses, 20 detik setelah terhubung.
+            if (!this.contactsResynced) {
+              this.contactsResynced = true
+              setTimeout(() => {
+                if (this.socket === socket && this.socketOpen)
+                  socket.resyncAppState(['critical_unblock_low'], false).catch(() => {})
+              }, 20_000).unref()
+            }
           }
           if (connection === 'close') {
             resolveScope(null)
@@ -948,7 +957,8 @@ export default class WhatsappListen extends BaseCommand {
               jid,
               contact.name || contact.notify || contact.verifiedName || '',
               false,
-              jid === contact.id ? contact.imgUrl : undefined
+              jid === contact.id ? contact.imgUrl : undefined,
+              Boolean(contact.name)
             ).catch(() => {})
         }
         await ingestion
@@ -985,7 +995,8 @@ export default class WhatsappListen extends BaseCommand {
               jid,
               contact.name || contact.notify || contact.verifiedName || '',
               false,
-              jid === contact.id ? contact.imgUrl : undefined
+              jid === contact.id ? contact.imgUrl : undefined,
+              Boolean(contact.name)
             )
         }
       })
@@ -997,7 +1008,8 @@ export default class WhatsappListen extends BaseCommand {
               jid,
               contact.name || contact.notify || contact.verifiedName || '',
               jid === contact.id,
-              jid === contact.id ? contact.imgUrl : undefined
+              jid === contact.id ? contact.imgUrl : undefined,
+              Boolean(contact.name)
             )
         }
       })
@@ -1358,11 +1370,17 @@ export default class WhatsappListen extends BaseCommand {
   private rememberContact(...args: Parameters<WhatsappListen['rememberContactScoped']>) {
     return this.track(() => this.rememberContactScoped(...args))
   }
+  /**
+   * Nama kontak: nama dari buku kontak HP (`fromBook`, event contacts dengan `name`) selalu menimpa;
+   * nama profil WhatsApp pelanggan (pushName) hanya mengisi bila belum ada nama. Tanpa ini nama
+   * yang tersimpan tetap nama profil pelanggan walau di HP sudah disimpan dengan nama lain.
+   */
   private async rememberContactScoped(
     jid: string,
     name = '',
     refreshPicture = false,
-    suppliedPictureUrl?: string | null
+    suppliedPictureUrl?: string | null,
+    fromBook = false
   ) {
     if (!jid || jid.endsWith('@g.us')) return
     await this.refreshCustomerPhone(jid)
@@ -1377,12 +1395,14 @@ export default class WhatsappListen extends BaseCommand {
       } catch {}
     }
     await db.rawQuery(
-      `INSERT INTO whatsapp_contacts (jid, name, profile_picture_url, activity, activity_updated_at, updated_at)
-       VALUES (?, NULLIF(?, ''), ?, NULL, NULL, ?)
-       ON DUPLICATE KEY UPDATE name = COALESCE(VALUES(name), name),
+      `INSERT INTO whatsapp_contacts (jid, name, profile_picture_url, activity, activity_updated_at, updated_at, name_from_book)
+       VALUES (?, NULLIF(?, ''), ?, NULL, NULL, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         name = ${fromBook ? 'COALESCE(VALUES(name), name)' : 'COALESCE(name, VALUES(name))'},
+         name_from_book = ${fromBook ? '1' : 'name_from_book'},
          profile_picture_url = COALESCE(VALUES(profile_picture_url), profile_picture_url),
          updated_at = VALUES(updated_at)`,
-      [jid, name, picture, new Date()]
+      [jid, name, picture, new Date(), fromBook && name ? 1 : 0]
     )
   }
 

@@ -200,3 +200,10 @@ Perubahan v3.6.6:
 - v3.6.21: `deploy/upload-build.sh <ver> <tar>` mengunggah/mengganti aset build pada rilis yang sudah ada; `publish-xi.sh` menerima `WA_BUILD_ASSET` (paket dibangun di mesin lain bila `node_modules` lokal bukan untuk platform skrip). Paket harus berisi `build/VERSION` = versi rilis.
 - v3.6.22: paket build dibangun **GitHub Actions** (`.github/workflows/wa-build-asset.yml`, dipicu tag `v3.*` atau manual lewat `workflow_dispatch`) karena mesin pengembang tidak bisa mengunggah ke `uploads.github.com`; `publish-xi.sh` ikut menyinkronkan `.github/`. Aset muncul ±1–2 menit setelah rilis; `wa update` sebelum itu akan build sendiri.
 - v3.6.22: tombol **Pilih semua** di bilah pilihan: memilih semua chat yang sedang terlihat (mengikuti filter/pencarian); tekan lagi untuk melepas.
+- Catatan: push berkas workflow butuh PAT ber-scope `workflow`; `publish-xi.sh` menyertakan `.github/` hanya bila `WA_SYNC_GITHUB=1`. Tanpa itu, tambahkan `wa-build-asset.yml` lewat web GitHub sekali.
+
+## v3.6.23 — nama kontak mengikuti buku kontak HP
+
+- Sebelumnya nama yang pertama tersimpan tidak pernah diganti (`COALESCE(VALUES(name), name)`), dan yang sering datang duluan adalah nama profil WhatsApp pelanggan (pushName dari pesan), sehingga nama di app ≠ nama di HP. Kini nama dari buku kontak (event `contacts.*`/riwayat dengan `name`, `fromBook`) selalu menimpa dan ditandai `whatsapp_contacts.name_from_book = 1`; pushName hanya mengisi bila belum ada nama.
+- 20 detik setelah terhubung, proses meminta WhatsApp mengirim ulang buku kontak (`resyncAppState(['critical_unblock_low'])`, sekali per proses) supaya nama lama ikut diperbarui tanpa menunggu kontak berubah.
+- Bersinggungan: nama yang diubah di HP akan menimpa nama di app saat sinkron berikutnya (yang diinginkan). Room Instagram tidak terpengaruh.
