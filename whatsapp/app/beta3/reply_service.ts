@@ -22,6 +22,8 @@ import {
   verifyAutoTotal,
   renderActiveOrder,
   updatePendingOrderRates,
+  orderPartsOf,
+  reopenLeanOrderForChange,
   type VerifiedAutoTotal,
 } from '#beta3/order_service'
 import {
@@ -59,7 +61,7 @@ import { detectAwb } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { keepCustomInChat } from '#beta3/reply_guards'
+import { dropRepeatedWait, keepCustomInChat } from '#beta3/reply_guards'
 import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -87,6 +89,9 @@ export const LEAN_SKILL_NAME = 'beta3-cs-inti'
 export const LEAN_SKILL_TOKEN_LIMIT = 7000
 // Riwayat 20 pesan; keadaan yang lebih lama tersimpan di CATATAN CHAT & spesifikasi.
 const HISTORY_LIMIT = 20
+// v3.6.29: saat order sedang disusun/menunggu total, riwayat diperpanjang supaya pembahasan item
+// sebelumnya (bagian bawah/celana, rompi, referensi dari CS) tidak terpotong — kasus Retno.
+const HISTORY_LIMIT_ORDER = 60
 
 export type LeanSettings = LeanProviderSettings & {
   production?: Parameters<typeof renderProductionEstimate>[0]
@@ -127,6 +132,8 @@ function stageFromNote(note: string) {
 }
 
 async function history(jid: string, currentIds: Set<string>): Promise<LeanHistoryRow[]> {
+  const active = await latestLeanOrder(jid).catch(() => null)
+  const limit = active && ['pending', 'awaiting_payment'].includes(String(active.status)) ? HISTORY_LIMIT_ORDER : HISTORY_LIMIT
   const rows = await db
     .from('whatsapp_messages')
     .select('message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at', 'reply_to_message_id')
@@ -134,7 +141,7 @@ async function history(jid: string, currentIds: Set<string>): Promise<LeanHistor
     .whereNotIn('status', ['failed', 'queued'])
     .orderBy('created_at', 'desc')
     .orderBy('id', 'desc')
-    .limit(HISTORY_LIMIT)
+    .limit(limit)
   // Pesan yang dikutip pelanggan ("yang ini berapa" sambil membalas foto Tuxedo).
   const quotedIds = [...new Set(rows.map((row) => row.reply_to_message_id).filter(Boolean))]
   const quoted = new Map<string, string>()
@@ -912,10 +919,11 @@ export async function createLeanReply(input: {
     const pending = await latestLeanOrder(jid)
     if (pending && pending.status === 'pending' && mcp.url) {
       orderId = Number(pending.id)
-      let rates: ShippingRates | null = pending.shipping_options
+      let rates: (ShippingRates & { grams?: number }) | null = pending.shipping_options
         ? (parseJson<ShippingRates>(String(pending.shipping_options)) as ShippingRates | null)
         : null
-      if (!rates?.prices?.length) {
+      // Berat berubah (item bertambah/berkurang) → tarif lama tidak dipakai, dihitung ulang.
+      if (!rates?.prices?.length || (rates.grams && rates.grams !== orderGrams)) {
         try {
           const lastResolved = parseJson<LastShipping>(await readLeanState(lastKey))?.resolved
           rates = await ratesForAddress(
@@ -929,7 +937,7 @@ export async function createLeanReply(input: {
             orderGrams,
             String(pending.address || '')
           )
-          if (rates?.prices?.length) await updatePendingOrderRates(orderId, rates)
+          if (rates?.prices?.length) await updatePendingOrderRates(orderId, { ...rates, grams: orderGrams })
         } catch (error) {
           onTrace?.({
             key: 'beta3-rates',
@@ -1265,15 +1273,52 @@ export async function createLeanReply(input: {
   // Order pending yang tertinggal (mis. sebelum fitur ini) dicoba lagi saat pelanggan
   // menanyakan totalnya atau memilih layanan.
   let totalOrderId = orderId
+  const specNow = decision.spesifikasi || spec
   if (!totalOrderId) {
     const pending = await latestLeanOrder(jid)
     if (pending && pending.status === 'pending') totalOrderId = Number(pending.id)
+    // Total sudah terkirim, belum dibayar, lalu item berubah (tambah rompi/celana): buka lagi
+    // dan hitung total baru di giliran ini — janji "saya cek ulang" ditepati sistem (v3.6.29).
+    else if (
+      pending &&
+      pending.status === 'awaiting_payment' &&
+      !Number(pending.paid_amount || 0) &&
+      // Bandingkan dengan spesifikasi awal giliran (spec): spesifikasi order sudah ditimpa di atas.
+      orderPartsOf(String(spec || '')).join() !== orderPartsOf(String(specNow || '')).join() &&
+      (await reopenLeanOrderForChange(Number(pending.id)))
+    ) {
+      totalOrderId = Number(pending.id)
+      onTrace?.({ key: 'beta3-total', label: 'Item berubah setelah total · dihitung ulang', status: 'completed', detail: { before: spec, after: specNow } })
+    }
   }
   if (totalOrderId) {
+    // Berat sesuai spesifikasi terbaru (giliran ini): tarif ongkir diambil ulang bila berubah.
+    const gramsNow = await orderWeightGrams(String(specNow || '')).catch(() => orderGrams)
+    const current = await readLeanOrder(totalOrderId)
+    const storedRates = current?.shipping_options
+      ? (parseJson<ShippingRates & { grams?: number }>(String(current.shipping_options)) as (ShippingRates & { grams?: number }) | null)
+      : null
+    if (current && mcp.url && storedRates?.prices?.length && storedRates.grams !== gramsNow) {
+      try {
+        const lastResolved = parseJson<LastShipping>(await readLeanState(lastKey))?.resolved
+        const fresh = await ratesForAddress(
+          { district: String(current.district || ''), regency: String(current.regency || ''), postalCode: String(current.postal_code || '') },
+          lastResolved || null,
+          mcp,
+          gramsNow,
+          String(current.address || '')
+        )
+        if (fresh?.prices?.length) {
+          await updatePendingOrderRates(totalOrderId, { ...fresh, grams: gramsNow })
+          onTrace?.({ key: 'beta3-rates', label: `Ongkir dihitung ulang · ${gramsNow} g`, status: 'completed', detail: fresh })
+        }
+      } catch (error) {
+        onTrace?.({ key: 'beta3-rates', label: 'Ongkir ulang gagal', status: 'completed', detail: { error: error instanceof Error ? error.message : String(error) } })
+      }
+    }
     // Cadangan bila AI tidak mengisi field order: rincian dari lembar spesifikasi,
     // subtotal dihitung kode dari katalog (0 = jangan bandingkan), layanan dicari
     // di catatan/spesifikasi/pesan ("ongkir: CTCYES", "pakai YES").
-    const specNow = decision.spesifikasi || spec
     const draft =
       decision.order && decision.order.rincian
         ? decision.order
@@ -1319,6 +1364,19 @@ export async function createLeanReply(input: {
         decision.pesan.push(block ? `${block}\n\nMau pakai yang mana ${address}?` : `Pengirimannya mau pakai yang mana ${address}?`)
       }
       if (!decision.pesan.length) decision.pesan.push(`Siap ${style?.address || 'bos'}, datanya sudah masuk ya`)
+    }
+    // Bagian yang disebut (celana/rompi) belum ada di rincian: jangan kirim total jas saja —
+    // konfirmasi dulu, total menyusul setelah jelas (v3.6.29).
+    if (!verdict.ok && verdict.reason.startsWith('item belum lengkap') && !decision.serah_cs) {
+      const parts = verdict.reason.replace('item belum lengkap: ', '').split(', ')
+      decision.pesan = decision.pesan
+        .map((bubble) => bubble.replace(/,?\s*(ini|berikut)\s+totalnya.*$/i, '').trim())
+        .filter((bubble) => bubble && !/\b(ini|berikut)\b[^.?!]*\btotal/i.test(bubble))
+      const asked = decision.pesan.some((bubble) => /\?/.test(bubble) && parts.some((part) => new RegExp(part, 'i').test(bubble)))
+      if (!asked)
+        decision.pesan.push(
+          `mau jas saja atau sekalian ${parts.length > 1 ? 'celana dan rompinya' : `${parts[0]}nya`} ${style?.address || 'bos'}? biar totalnya pas`
+        )
     }
     // Setelan tanpa nomor celana: tanya dulu (kalimat CS), total menyusul setelah dijawab.
     if (!verdict.ok && verdict.reason === 'nomor celana belum diketahui' && !decision.serah_cs) {
@@ -1367,6 +1425,15 @@ export async function createLeanReply(input: {
         status: 'completed',
         detail: {},
       })
+    }
+  }
+  // Janji "saya hitung/cek dulu" tidak diulang saat pelanggan cuma mengiyakan (v3.6.29).
+  if (!decision.serah_cs && !autoTotal) {
+    const lastOutgoing = [...rows].reverse().find((row) => row.direction === 'out' && !row.current)
+    const repeated = dropRepeatedWait(decision.pesan, String(lastOutgoing?.body || ''), input.text)
+    if (repeated.changed) {
+      decision.pesan = repeated.pesan
+      onTrace?.({ key: 'beta3-total', label: repeated.pesan.length ? 'Janji tunggu tidak diulang' : 'Diam · janji tunggu sudah dikirim', status: 'completed', detail: {} })
     }
   }
   // Total/pembayaran yang dikerjakan CS langsung di chat ikut tercatat di order.

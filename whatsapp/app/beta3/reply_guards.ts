@@ -42,3 +42,19 @@ export function questionAfterPhotos(pesan: string[], photoCount: number) {
   if (!head.trim() || question.length > 120) return pesan
   return [head.trim(), question.trim()]
 }
+
+/**
+ * v3.6.29 — janji tunggu ("totalnya saya hitung dulu ya") sudah dikirim, pelanggan hanya mengiyakan
+ * ("iyaa mas", "oke"): jangan mengulang janji yang sama. Bubble janji dibuang; bila tidak ada yang
+ * tersisa, AI diam sampai totalnya siap (kasus Retno: janji dikirim dua kali).
+ */
+export const WAIT_PROMISE =
+  /\b(saya|kami)\s+(cek|hitung|kabari|konfirmasi|tanyakan|tanya|pastikan)\w*\s+(dulu|ulang)\b|\btotal\w*\s+(saya|kami)\s+(cek|hitung)\w*\s+dulu/i
+const BARE_ACK =
+  /^\s*(iya+|iy+a+|ya+|yaa+|oke+|ok+|okay|okey|siap+|sip+|baik|yoi|boleh|oke siap|iya oke|ok siap|iya ok)\b[\s!.,]*(mas|bos|bosku|kak|bang|pak|bu|min|gan)?[\s!.🙏👍]*$/i
+
+export function dropRepeatedWait(pesan: string[], lastOutgoing: string, customerText: string) {
+  if (!BARE_ACK.test(customerText || '') || !WAIT_PROMISE.test(lastOutgoing || '')) return { pesan, changed: false }
+  const kept = pesan.filter((bubble) => !WAIT_PROMISE.test(bubble))
+  return { pesan: kept, changed: kept.length !== pesan.length }
+}

@@ -5,7 +5,8 @@ import { test } from '@japa/runner'
 import { completePhotos, polishText, polishWithPhotos } from '#beta3/reply_polish'
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
-import { keepCustomInChat, CUSTOM_REPLY } from '#beta3/reply_guards'
+import { keepCustomInChat, CUSTOM_REPLY, dropRepeatedWait } from '#beta3/reply_guards'
+import { partsMissingFromItems, orderPartsOf } from '#beta3/order_service'
 import { normalizeStage, type LeanDecision } from '#beta3/prompt'
 import { goalStatus } from '#beta3/reply_service'
 import { extractShippingQuery, etdText } from '#beta3/mcp'
@@ -194,5 +195,35 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.deepEqual(completePhotos(['Basic Suit 485.000, Tuxedo 485.000 bos'], [], 'Harga berapa', catalog), [])
     // Warna yang disebut di balasan dipilih.
     assert.deepEqual(completePhotos(['Ini fotonya Pants Premium warna Gray bos'], [], 'liat celananya', catalog), ['Pants Premium - Gray'])
+  })
+
+  // #17 Retno (Okt 2026): pesan jas+celana+rompi, total hanya jas; ongkir tidak dihitung ulang;
+  // janji "saya hitung dulu" diulang.
+  test('#17 spesifikasi/chat menyebut celana & rompi, rincian hanya jas → total ditahan sampai dikonfirmasi', ({ assert }) => {
+    const spec = 'Basic Suit - Cream, size L\nCelana: menyesuaikan, karet kanan kiri\nDetail custom seperti referensi'
+    assert.deepEqual(partsMissingFromItems(spec, 'Basic Suit - Cream size L 485.000', ['Sama ini ada rompinya ga sii']), ['celana', 'rompi'])
+    // Celana ada di rincian, rompi ditanyakan pelanggan → tinggal rompi.
+    assert.deepEqual(partsMissingFromItems(spec, 'Basic Suit - Cream size L 485.000\nCelana - Cream 220.000', ['Sama ini ada rompinya ga sii']), ['rompi'])
+    // Produk "Setelan …" sudah mencakup celana.
+    assert.deepEqual(partsMissingFromItems(spec, 'Setelan Basic Suit - Cream size L 705.000', []), [])
+    // Pelanggan menolak rompi → tidak dihitung kurang.
+    assert.deepEqual(partsMissingFromItems(spec, 'Setelan Basic Suit - Cream size L 705.000', ['rompinya gak usah mas']), [])
+    assert.deepEqual(partsMissingFromItems(spec, 'Setelan Basic Suit - Cream size L 705.000', ['gak usah pakai rompi']), [])
+    // Jas saja memang jas saja.
+    assert.deepEqual(partsMissingFromItems('Basic Suit - Cream, size L\nJas saja', 'Basic Suit - Cream size L 485.000', []), [])
+    // Perubahan item setelah total terkirim terdeteksi dari bagian pesanan.
+    assert.notEqual(orderPartsOf('Basic Suit - Cream\nJas, Celana').join(), orderPartsOf('Basic Suit - Cream\nJas, Celana, Rompi').join())
+    assert.equal(orderPartsOf('Basic Suit - Cream\nJas, Celana').join(), orderPartsOf('Basic Suit - Cream size L\nJas, Celana\nkaret kanan kiri').join())
+  })
+
+  test('#17 janji "totalnya saya hitung dulu" tidak diulang saat pelanggan hanya mengiyakan', ({ assert }) => {
+    const last = 'Siap bos, celananya menyesuaikan dan dikasih karet kanan kiri ya., totalnya saya hitung dulu ya bos'
+    const again = dropRepeatedWait(['siap, totalnya saya hitung dulu ya bos'], last, 'Iyaa mas')
+    assert.deepEqual(again.pesan, [])
+    assert.isTrue(again.changed)
+    // Pesan baru yang bukan sekadar mengiyakan tetap dibalas.
+    assert.isFalse(dropRepeatedWait(['siap, totalnya saya hitung dulu ya bos'], last, 'jadi berapa totalnya?').changed)
+    // Janji pertama (pesan sebelumnya bukan janji) tetap boleh.
+    assert.isFalse(dropRepeatedWait(['totalnya saya hitung dulu ya bos'], 'Siap bos, dicatat pakai size L ya.', 'Oke').changed)
   })
 })

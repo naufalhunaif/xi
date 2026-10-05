@@ -1925,8 +1925,16 @@ export default class WhatsappListen extends BaseCommand {
           .from('whatsapp_messages')
           .where('id', message.id)
           .update({ status: 'sent', message_id: sentId })
-      } catch {
-        await db.from('whatsapp_messages').where('id', message.id).update({ status: 'failed' })
+      } catch (error) {
+        // Gagal kirim (koneksi putus sesaat, dua pesan beruntun): coba lagi sampai 3x di putaran
+        // berikutnya; alasannya disimpan supaya tampak di chat (v3.6.29).
+        const attempts = Number(message.send_attempts || 0) + 1
+        const reason = (error instanceof Error ? error.message : String(error)).slice(0, 300)
+        await db
+          .from('whatsapp_messages')
+          .where('id', message.id)
+          .update({ status: attempts >= 3 ? 'failed' : 'queued', send_attempts: attempts, send_error: reason })
+        if (attempts < 3) this.logger.info(`Kirim ulang (${attempts}/3) ${message.jid}: ${reason}`)
         continue
       }
       // A mode-update error must not turn an already sent message into a failed send.

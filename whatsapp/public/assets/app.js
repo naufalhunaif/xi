@@ -400,7 +400,7 @@
     if (message.direction === 'out') {
       const status = document.createElement('span')
       status.className = `message-status ${message.status}`
-      status.title = message.status
+      status.title = message.status === 'failed' && message.send_error ? `${t('Gagal terkirim')}: ${message.send_error}` : message.status
       status.textContent = ['read', 'delivered'].includes(message.status)
         ? '✓✓'
         : message.status === 'failed'

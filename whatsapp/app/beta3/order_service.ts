@@ -463,6 +463,75 @@ export function pantsNumberMissing(spec: string, rincian: string) {
     .some((line) => /celana|\bno\.?\b|nomor|\bsize\b/i.test(line) && /\b(2[5-9]|3\d|4\d|5[0-2])\b/.test(line))
 }
 
+/**
+ * v3.6.29 — bagian yang disebut (celana/rompi) tapi tidak ada di rincian order.
+ * Kasus Retno: spesifikasi memuat "celana menyesuaikan + karet" dan pelanggan menanyakan rompi,
+ * rincian AI hanya "Basic Suit - Cream" → total jas saja terkirim. Sumber: lembar spesifikasi
+ * (tulisan AI) dan pesan pelanggan sesudah total/ongkir terakhir; "gak usah rompi" = tidak dihitung.
+ */
+const ORDER_PARTS = [
+  { name: 'celana', pattern: /\b(celana|pants|trousers?)/i, covered: /\b(celana|pants|trousers?|setelan|set\b)/i },
+  { name: 'rompi', pattern: /\b(rompi|vest|waistcoat)/i, covered: /\b(rompi|vest|waistcoat)/i },
+] as const
+
+function partDeclined(text: string, part: string) {
+  const no = '(?:gak|ga|nggak|ngga|engga|enggak|tidak|tdk|no)'
+  const t = String(text || '').replace(/[?!.,]+/g, ' ')
+  return (
+    // "gak usah rompi", "tanpa rompi", "tidak jadi pakai rompinya"
+    new RegExp(`(?:tanpa|${no}\\s+(?:usah|perlu|pakai|pake|jadi|sama|ambil|mau|minat))\\s+(?:\\w+\\s+){0,2}${part}`, 'i').test(t) ||
+    // "rompinya gak usah", "rompi gak jadi", "rompi nggak" (di akhir) — bukan "ada rompinya ga?" (pertanyaan)
+    new RegExp(`${part}\\w*\\s+(?:nya\\s+)?${no}(?:\\s+(?:usah|perlu|jadi|dulu|aja|deh)\\b|\\s*$)`, 'i').test(t)
+  )
+}
+
+export function partsMissingFromItems(spec: string, rincian: string, customerTexts: string[] = []) {
+  const sheet = String(spec || '')
+  const lines = String(rincian || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const jasOnly = /\bjas\s+(saja|aja)\b|hanya\s+jas/i.test(sheet)
+  const missing: string[] = []
+  for (const part of ORDER_PARTS) {
+    const inSheet = part.pattern.test(sheet) && !partDeclined(sheet, part.name)
+    const askedByCustomer = customerTexts.some((text) => part.pattern.test(text) && !partDeclined(text, part.name))
+    const declinedByCustomer = customerTexts.some((text) => partDeclined(text, part.name))
+    if (declinedByCustomer || (!inSheet && !askedByCustomer)) continue
+    if (jasOnly && !askedByCustomer) continue
+    if (lines.some((line) => part.covered.test(line))) continue
+    missing.push(part.name)
+  }
+  return missing
+}
+
+/** Jenis bagian yang ada di teks spesifikasi (jas/celana/rompi/kemeja/beskap) — untuk mendeteksi perubahan item. */
+export function orderPartsOf(spec: string) {
+  const text = String(spec || '').toLowerCase()
+  const parts: string[] = []
+  if (/\b(jas|tuxedo|blazer|suit|coat|setelan)\b/.test(text)) parts.push('jas')
+  for (const part of ORDER_PARTS) if (part.pattern.test(text) && !partDeclined(text, part.name)) parts.push(part.name)
+  if (/\b(kemeja|shirt)\b/.test(text)) parts.push('kemeja')
+  if (/\bbeskap\b/.test(text)) parts.push('beskap')
+  return parts.sort()
+}
+
+/**
+ * Total sudah terkirim tapi belum dibayar, lalu item berubah (tambah rompi/celana): order dibuka
+ * lagi (pending) supaya sistem menghitung & mengirim total baru — bukan janji "saya cek ulang"
+ * yang tidak ditepati. Nomor order tetap.
+ */
+export async function reopenLeanOrderForChange(id: number) {
+  await ensureLeanTables()
+  const order = await readLeanOrder(id)
+  if (!order || order.status !== 'awaiting_payment' || Number(order.paid_amount || 0) > 0) return false
+  await db
+    .from('whatsapp_beta3_orders')
+    .where('id', id)
+    .update({ status: 'pending', auto_total_reason: 'item berubah, total dihitung ulang', updated_at: new Date() })
+  return true
+}
+
 /** Pesan total yang dikirim kode setelah CS mengisi ongkir. Formatnya meniru CS. */
 /** Patokan DP pre-order (persen dari total); tidak harus pas. */
 export const PREORDER_DP_PERCENT = 50
@@ -1210,6 +1279,8 @@ export async function verifyAutoTotal(
   const options = order.shipping_options ? JSON.parse(String(order.shipping_options)) : null
   if (!options?.prices?.length) return { ok: false, reason: 'tarif ongkir belum ada di order' }
   if (pantsNumberMissing(String(spec ?? order.spec ?? ''), draft.rincian)) return { ok: false, reason: 'nomor celana belum diketahui' }
+  const missing = partsMissingFromItems(String(spec ?? order.spec ?? ''), draft.rincian, hints)
+  if (missing.length) return { ok: false, reason: `item belum lengkap: ${missing.join(', ')}` }
   const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices, chosenService)
   if (!result.ok) return result
   return {

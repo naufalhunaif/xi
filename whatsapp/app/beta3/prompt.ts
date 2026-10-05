@@ -43,7 +43,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     catatan: {
       type: 'string',
       description:
-        'Catatan chat untuk giliran berikutnya, maksimal 6 baris: produk, size (TB/BB), jas saja/setelan, alamat, tahap, menunggu apa.',
+        'Catatan chat untuk giliran berikutnya, maksimal 6 baris: produk, size (TB/BB), bagian yang dipesan WAJIB ditulis (jas saja / jas+celana / jas+celana+rompi — termasuk yang dibahas CS atau terlihat di foto referensi), alamat, tahap, menunggu apa.',
     },
     tahap: { type: 'string', enum: [...LEAN_STAGES] },
     serah_cs: {
@@ -134,7 +134,7 @@ export const LEAN_OUTPUT_SCHEMA = {
             rincian: {
               type: 'string',
               description:
-                'Satu baris per item, nama persis dari KATALOG + harga, mis. "Setelan Peak Suit - Black size S, celana no 30 705.000". Setelan memakai produk "Setelan …" dari KATALOG, bukan jas + celana dijumlah sendiri.',
+                'Satu baris per item, nama persis dari KATALOG + harga, mis. "Setelan Peak Suit - Black size S, celana no 30 705.000". Setelan memakai produk "Setelan …" dari KATALOG, bukan jas + celana dijumlah sendiri. Semua bagian yang dipesan harus ada barisnya (celana, rompi) — cek seluruh riwayat & spesifikasi, bukan hanya pesan terakhir; jas saja hanya bila pelanggan memang hanya pesan jas.',
             },
             subtotal: { type: 'integer', description: 'Jumlah harga semua item dalam rupiah.' },
             layanan: {

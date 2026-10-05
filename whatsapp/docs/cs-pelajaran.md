@@ -383,3 +383,29 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 **Pelajaran**
 - Janji di teks ("ini fotonya") harus ditepati sistem: yang disebut, itu yang dikirim.
 
+
+## #17 · Okt 2026 · pesan jas+celana+rompi, total hanya jas; ongkir tidak dihitung ulang (diterapkan v3.6.29)
+
+**Laporan pemilik (chat Retno)**
+- Pelanggan lama kirim referensi full look; CS sebelumnya sudah membahas "bagian bawah". AI menanyakan celana ("menyesuaikan, karet"), lalu mengirim total **jas saja** 485.000 + ongkir 18.000.
+- Pelanggan: "Lah ini jasnya tok? Celananya? Sama ini ada rompinya ga sii" → AI menyebut harga jas+celana 705.000 / +rompi 880.000, janji "ongkir saya cek ulang dulu" — tidak pernah ditepati; CS yang menghitung 2 kg = 2 × 18.000 → 916.000.
+- "Totalnya saya hitung dulu ya bos" dikirim dua kali karena pelanggan menjawab "Iyaa mas"/"Oke".
+- Pesan rekening pertama gagal terkirim (!), CS kirim ulang manual.
+
+**Penyebab**
+1. Total otomatis dihitung persis dari rincian AI; tidak ada pengecekan bahwa spesifikasi/chat menyebut celana & rompi yang tidak ada di rincian.
+2. AI hanya membaca 20 pesan terakhir; pembahasan item oleh CS sudah di luar jendela, catatan chat tidak mencatat "jas+celana".
+3. Tarif ongkir disimpan di order saat berat 1 kg; setelah item bertambah (berat 2 kg) tarif lama tetap dipakai dan tidak pernah diambil ulang. Order yang sudah terkirim totalnya (menunggu pembayaran) tidak bisa dihitung ulang sistem.
+4. Janji tunggu tidak dicek terhadap pesan sebelumnya.
+5. Pengiriman gagal langsung ditandai "!" tanpa coba ulang dan tanpa alasan.
+
+**Perubahan**
+1. `partsMissingFromItems`: bagian yang disebut di spesifikasi atau pesan pelanggan (celana, rompi — "gak usah rompi" dikecualikan) tapi tidak ada di rincian → total ditahan, AI bertanya "mau jas saja atau sekalian celana dan rompinya bos? biar totalnya pas". Produk "Setelan …" dihitung sudah memuat celana.
+2. Saat ada order pending/menunggu pembayaran, riwayat yang dibaca AI 60 pesan (bukan 20); catatan chat wajib menulis bagian yang dipesan; rincian order wajib memuat semua bagian.
+3. Berat pesanan dari spesifikasi terbaru dibandingkan dengan tarif tersimpan (`shipping_options.grams`); beda → tarif diambil ulang sebelum total dihitung. Order menunggu pembayaran yang belum dibayar dan itemnya berubah (bagian bertambah/berkurang) dibuka lagi (`reopenLeanOrderForChange`) dan total baru dikirim otomatis — nomor order tetap.
+4. `dropRepeatedWait`: pesan sebelumnya sudah berjanji "saya hitung/cek dulu" dan pelanggan hanya mengiyakan → janji tidak diulang; bila tidak ada kalimat lain, AI diam.
+5. Pengiriman gagal dicoba ulang sampai 3× (`send_attempts`), alasannya disimpan (`send_error`) dan tampil saat kursor di tanda "!".
+
+**Pelajaran**
+- Total resmi harus mencerminkan seluruh yang dibahas, bukan baris terakhir yang diisi AI: sistem mencocokkan bagian (celana/rompi) sebelum mengirim.
+- Janji "saya cek ulang" harus punya mekanisme di sistem; kalau tidak ada, jangan dijanjikan.

@@ -1933,4 +1933,5 @@ window.waLocales.en = {
   "Stiker": "Sticker",
   "Video": "Video",
   "GIF": "GIF",
+  "Gagal terkirim": "Failed to send",
 }

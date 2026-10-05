@@ -236,3 +236,8 @@ Perubahan v3.6.6:
 
 - Halaman `/` saat belum login bukan halaman login, melainkan beranda publik dari `legal_controller.ts` (`landingPage`, dipakai `account_auth_middleware`), beserta `/privacy` dan `/terms` — ini yang masih memakai gaya lama (hijau, Indonesia). Kini `public.css` memakai token Wireframe yang sama dengan login (off-white/grafit, kartu radius 8, label monospace, tombol warna teks), teks Inggris (Sign in, Home/Privacy/Terms, Privacy Policy, Terms of Service), `lang="en"`, dan `public.css?v=<versi>`.
 - Bersinggungan: isi kebijakan privasi/syarat (dipakai untuk Google OAuth & Meta) diterjemahkan apa adanya; tautan `#hapus-data` tetap.
+
+## v3.6.29 — ulasan chat #17: total harus lengkap, ongkir dihitung ulang, janji tunggu tidak diulang, kirim ulang bila gagal
+
+- Lihat `docs/cs-pelajaran.md` #17. Kode: `partsMissingFromItems`/`orderPartsOf`/`reopenLeanOrderForChange` (`order_service.ts`), `HISTORY_LIMIT_ORDER = 60` dan pengambilan ulang tarif saat `shipping_options.grams` ≠ berat spesifikasi (`reply_service.ts`), `dropRepeatedWait` (`reply_guards.ts`), kolom `whatsapp_messages.send_attempts/send_error` + coba ulang 3× di `flushQueued` (listener), judul tanda "!" di chat menampilkan alasannya.
+- Bersinggungan: order "menunggu pembayaran" bisa kembali "pending" otomatis bila item berubah sebelum dibayar (panel pesanan CS akan menampilkannya lagi dengan catatan "item berubah, total dihitung ulang"). Pesan yang sedang dicoba ulang tetap berstatus antrean (tanpa "!") maksimal ±5 detik.
