@@ -262,3 +262,8 @@ Perubahan v3.6.6:
 
 - Lihat `docs/cs-pelajaran.md` #20. Kode: `hasCustomerHistory`, `repairAutoRoles` (`contact_role.ts`, dijalankan sekali per proses dari `contact_inbox_service`), penanda `role-excluded:<jid>` (pengecualian AI karena peran otomatis), ambang `peran_kontak` 0,95, `scanShipments` melewati vendor/lainnya.
 - Bersinggungan: kontak yang dikembalikan ke pelanggan berada di mode CS (AI tidak langsung membalas sampai diaktifkan/ada balasan CS), sama seperti setelah mencabut "Jangan dibalas AI".
+
+## v3.6.34 — halaman Order: antar tim lama tercatat Selesai; tab Vendor untuk pembelian bahan
+
+- Lihat `docs/cs-pelajaran.md` #21. Kode: `VENDOR_SQL` di `listLeanOrders`/`countLeanOrders` (status `vendor`), `nextLeanGroupOrder` melewati vendor, `saveRecap`/`recapCandidates` melewati vendor, `orderSql` kotak masuk, `rescanSelfDeliveries` (`shipments.ts`, state `self-delivery-rescan-v1`), `oneTimeMaintenance` (`contact_inbox_service.ts`, juga dipanggil dari endpoint daftar Order), tab Vendor di `orders_beta3.edge`.
+- Bersinggungan: menandai/membatalkan vendor di room langsung memindahkan order kontak itu antara tab Vendor dan tab pelanggan (tanpa mengubah data order).

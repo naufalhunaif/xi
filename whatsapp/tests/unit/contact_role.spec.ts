@@ -3,6 +3,7 @@ import db from '#services/workspace_database'
 import { initializeDatabase } from '#services/init_model'
 import { ensureLeanTables, writeLeanState } from '#beta3/tables'
 import { repairAutoRoles, setContactRole, detectContactRole } from '#beta3/contact_role'
+import { listLeanOrders, countLeanOrders } from '#beta3/order_service'
 
 // v3.6.33 (kasus Mauldy): pelanggan yang pesanannya diantar tim ditandai vendor otomatis.
 test.group('peran kontak · pelanggan tidak boleh tertandai vendor (database)', () => {
@@ -45,6 +46,29 @@ test.group('peran kontak · pelanggan tidak boleh tertandai vendor (database)', 
     // Deteksi berikutnya: kontak dengan riwayat pelanggan tidak ditanyakan lagi dan tetap pelanggan.
     await db.from('whatsapp_contacts').where('jid', jids[0]).update({ role: 'lainnya' })
     assert.equal(await detectContactRole(jids[0]), 'pelanggan')
+    await clean()
+  })
+
+  // v3.6.34 (Rozikin): "Pesen bahan Scuro 509 2pcs" dari chat vendor tercatat sebagai order lunas.
+  test('order dari chat vendor hanya muncul di tab Vendor, tidak di tab order pelanggan', async ({ assert }) => {
+    await initializeDatabase()
+    await ensureLeanTables()
+    await clean()
+    const at = new Date()
+    await db.table('whatsapp_messages').insert({ jid: jids[0], message_id: 'v-1', direction: 'in', sender_type: 'customer', body: 'oke pak', status: 'received', created_at: at })
+    await setContactRole(jids[0], 'vendor', true)
+    const [id] = await db.table('whatsapp_beta3_orders').insert({
+      jid: jids[0], customer_name: 'Vendor kain', address: '', district: '', regency: '', postal_code: '', phone: '',
+      items: '- Scuro 509 2pcs\n- Scuro 522 2pcs', status: 'paid', source: 'rekap', group_status: 'none', created_at: at, updated_at: at,
+    })
+    const all = await listLeanOrders('all')
+    assert.isFalse(all.some((order: any) => Number(order.id) === Number(id)))
+    const vendor = await listLeanOrders('vendor')
+    const row = vendor.find((order: any) => Number(order.id) === Number(id))
+    assert.isTrue(Boolean(row?.vendor))
+    const counts = await countLeanOrders()
+    assert.isAtLeast(counts.vendor, 1)
+    await db.from('whatsapp_beta3_orders').where('id', id).delete()
     await clean()
   })
 })

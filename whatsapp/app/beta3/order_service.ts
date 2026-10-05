@@ -332,6 +332,8 @@ export async function nextOrderNumber() {
 const SHIPPED_SQL = `(o.status <> 'cancelled' AND (EXISTS (SELECT 1 FROM whatsapp_beta3_shipments s2 WHERE s2.jid = o.jid
     AND (s2.created_at >= o.created_at OR o.source = 'rekap'))
     OR (o.status = 'paid' AND o.updated_at < NOW() - INTERVAL 45 DAY)))`
+/** v3.6.34: order dari chat vendor/lainnya = pembelian bahan oleh toko, bukan order pelanggan. */
+const VENDOR_SQL = `EXISTS (SELECT 1 FROM whatsapp_contacts vc WHERE vc.jid = o.jid AND vc.role IN ('vendor', 'lainnya'))`
 const SHIPPED_AWB_SQL = `(SELECT s.awb FROM whatsapp_beta3_shipments s WHERE s.jid = o.jid
     AND (s.created_at >= o.created_at OR o.source = 'rekap')
     ORDER BY CASE WHEN o.source = 'rekap' THEN -UNIX_TIMESTAMP(s.created_at) ELSE UNIX_TIMESTAMP(s.created_at) END LIMIT 1)`
@@ -340,10 +342,13 @@ export async function listLeanOrders(status?: string, q?: string) {
   await ensureLeanTables()
   const query = db
     .from('whatsapp_beta3_orders as o')
-    .select('o.*', db.raw(`${SHIPPED_SQL} AS shipped`), db.raw(`${SHIPPED_AWB_SQL} AS shipped_awb`))
+    .select('o.*', db.raw(`${SHIPPED_SQL} AS shipped`), db.raw(`${SHIPPED_AWB_SQL} AS shipped_awb`), db.raw(`${VENDOR_SQL} AS vendor`))
     .orderBy('o.id', 'desc')
     .limit(300)
-  if (status && status !== 'all') {
+  // Tab Vendor: pembelian bahan; tab lain hanya order pelanggan.
+  if (status === 'vendor') query.whereRaw(workspaceSql(VENDOR_SQL))
+  else query.whereRaw(workspaceSql(`NOT ${VENDOR_SQL}`))
+  if (status && status !== 'all' && status !== 'vendor') {
     // whereRaw tidak ikut prefix workspace otomatis (db.raw/rawQuery ikut): nama tabel di-scope manual.
     if (status === 'done') query.whereRaw(workspaceSql(SHIPPED_SQL))
     else if (status === 'cancelled') query.where('o.status', 'cancelled')
@@ -370,22 +375,24 @@ export async function listLeanOrders(status?: string, q?: string) {
     )
   }
   const rows = await query
-  return rows.map((row: Record<string, any>) => ({ ...row, shipped: Boolean(Number(row.shipped)) }))
+  return rows.map((row: Record<string, any>) => ({ ...row, shipped: Boolean(Number(row.shipped)), vendor: Boolean(Number(row.vendor)) }))
 }
 
 /** Jumlah order per tab halaman Order (tahap = belum dikirim; Selesai = sudah ada resi). */
 export async function countLeanOrders() {
   await ensureLeanTables()
-  const [rows] = await db.rawQuery(`SELECT COUNT(*) AS \`all\`,
-      SUM(o.status = 'pending' AND NOT ${SHIPPED_SQL}) AS pending,
-      SUM(o.status = 'awaiting_payment' AND NOT ${SHIPPED_SQL}) AS awaiting_payment,
-      SUM(o.status = 'paid' AND NOT ${SHIPPED_SQL}) AS process,
-      SUM(${SHIPPED_SQL}) AS done,
-      SUM(o.status = 'cancelled') AS cancelled
+  const customer = `NOT ${VENDOR_SQL}`
+  const [rows] = await db.rawQuery(`SELECT SUM(${customer}) AS \`all\`,
+      SUM(${customer} AND o.status = 'pending' AND NOT ${SHIPPED_SQL}) AS pending,
+      SUM(${customer} AND o.status = 'awaiting_payment' AND NOT ${SHIPPED_SQL}) AS awaiting_payment,
+      SUM(${customer} AND o.status = 'paid' AND NOT ${SHIPPED_SQL}) AS process,
+      SUM(${customer} AND ${SHIPPED_SQL}) AS done,
+      SUM(${customer} AND o.status = 'cancelled') AS cancelled,
+      SUM(${VENDOR_SQL}) AS vendor
     FROM whatsapp_beta3_orders o`)
   const row = (rows?.[0] || {}) as Record<string, unknown>
   const counts: Record<string, number> = {}
-  for (const key of ['all', 'pending', 'awaiting_payment', 'process', 'done', 'cancelled'])
+  for (const key of ['all', 'pending', 'awaiting_payment', 'process', 'done', 'cancelled', 'vendor'])
     counts[key] = Number(row[key] || 0)
   return counts
 }
@@ -1088,6 +1095,12 @@ export async function nextLeanGroupOrder() {
     .from('whatsapp_beta3_orders')
     .where('group_status', 'pending')
     .whereNotNull('group_jid')
+    // Pembelian bahan ke vendor tidak dikirim ke grup produksi (v3.6.34).
+    .whereRaw(
+      workspaceSql(
+        `NOT EXISTS (SELECT 1 FROM whatsapp_contacts vc WHERE vc.jid = whatsapp_beta3_orders.jid AND vc.role IN ('vendor', 'lainnya'))`
+      )
+    )
     .orderBy('id', 'asc')
     .first()
 }

@@ -1942,4 +1942,7 @@ window.waLocales.en = {
   "Diantar tim": "Delivered by team",
   "Diantar tim (tanpa resi)": "Delivered by team (no tracking number)",
   "Ditandai diantar tim sendiri.": "Marked as delivered by the team.",
+  "Pembelian bahan": "Material purchase",
+  "Pembelian bahan ke vendor \u2014 bukan order pelanggan": "Material purchase from a vendor \u2014 not a customer order",
+  "Chat ini ditandai vendor: pesanan di sini adalah pembelian bahan oleh toko, bukan order pelanggan. Tidak dikirim ke grup produksi.": "This chat is marked as a vendor: orders here are the store's material purchases, not customer orders. Not sent to the production group.",
 }

@@ -1,11 +1,24 @@
 import db from '#services/workspace_database'
 import { initializeDatabase } from '#services/init_model'
 import { ensureLeanTables } from '#beta3/tables'
-import { scanShipments } from '#beta3/shipments'
+import { rescanSelfDeliveries, scanShipments } from '#beta3/shipments'
 import { reconcileCsTotals } from '#beta3/order_service'
 import { repairAutoRoles } from '#beta3/contact_role'
 
 let reconciled = false
+/**
+ * Perbaikan data sekali per proses (kotak masuk atau halaman Order, mana yang dibuka dulu):
+ * total CS tertinggal (v3.6.32) → peran vendor keliru (v3.6.33) → antar-sendiri lama (v3.6.34).
+ */
+export function oneTimeMaintenance() {
+  if (reconciled) return
+  reconciled = true
+  void (async () => {
+    await reconcileCsTotals().catch(() => 0)
+    await repairAutoRoles().catch(() => 0)
+    await rescanSelfDeliveries().catch(() => 0)
+  })()
+}
 
 type InboxMessage = {
   id: number
@@ -160,20 +173,15 @@ export async function latestInboxMessages() {
   // "baru"). Order = pesanan berjalan yang belum dikirimi resi. Lunas > 45 hari tanpa resi
   // di chat dianggap selesai.
   await scanShipments().catch(() => {})
-  // v3.6.32: sekali per proses — order lama yang totalnya tertinggal dari total CS di chat disamakan.
-  if (!reconciled) {
-    reconciled = true
-    void reconcileCsTotals().catch(() => 0)
-    // v3.6.33: pelanggan yang keliru ditandai vendor/lainnya otomatis dikembalikan.
-    void repairAutoRoles().catch(() => 0)
-  }
+  oneTimeMaintenance()
   const resiSql = (alias: string, after = '') =>
     `EXISTS (SELECT 1 FROM whatsapp_beta3_shipments ${alias} WHERE ${alias}.jid = m.jid${after})`
   const lastResiSql = `(SELECT MAX(rl.created_at) FROM whatsapp_beta3_shipments rl WHERE rl.jid = m.jid)`
   const shippedSql = `(${resiSql('rs', ' AND rs.created_at >= b.created_at')} OR (b.source = 'rekap' AND ${resiSql('r2')}))`
   // Order = pesanan yang sudah dibayar (DP/lunas) dan belum dikirim. Belum bayar = belum order
   // (masih tanya-tanya / menunggu pembayaran), jadi tidak masuk tab ini.
-  const orderSql = `EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
+  const orderSql = `NOT EXISTS (SELECT 1 FROM whatsapp_contacts cvo WHERE cvo.jid = m.jid AND cvo.role IN ('vendor', 'lainnya'))
+        AND EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
           AND b.status = 'paid' AND b.updated_at >= NOW() - INTERVAL 45 DAY AND NOT ${shippedSql})`
   const doneSql = `(${resiSql('r5')}
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders n WHERE n.jid = m.jid AND n.source <> 'rekap'

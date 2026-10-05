@@ -188,6 +188,8 @@ export default class Beta3Controller {
     response.header('cache-control', 'no-store')
     // Resi terbaru dari chat supaya tab Selesai ikut terbarui walau kotak masuk belum dibuka.
     await scanShipments().catch(() => {})
+    const { oneTimeMaintenance } = await import('#services/contact_inbox_service')
+    oneTimeMaintenance()
     const [orders, counts] = await Promise.all([
       listLeanOrders(status || undefined, q || undefined),
       countLeanOrders(),

@@ -260,5 +260,8 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     // v3.6.32: diambil di store / sudah diterima.
     assert.isTrue(looksSelfDelivery('Pesanan sudah diambil di store ya bos, terimakasih'))
     assert.isTrue(looksSelfDelivery('pesanan sudah di antar ya bos'))
+    // v3.6.34 (Mauldi): bahasa Jawa "ta antar" = kami antar.
+    assert.isTrue(looksSelfDelivery('Terimakasih mas, pesanan sudah ta antar ya'))
+    assert.isFalse(looksSelfDelivery('Assalamualaikum mas, ini untuk pesanannya mau di antar jam berapa ya?'))
   })
 })

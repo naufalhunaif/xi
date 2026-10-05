@@ -175,7 +175,7 @@
       const total = el('td', order.total ? money(order.total) : '—', 'wa-order-amount')
       const state = el('td')
       const dp = order.status === 'paid' && order.paid_amount && order.total && Number(order.paid_amount) < Number(order.total)
-      const badge = el('span', order.shipped ? t('Selesai') : dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, 'wa-order-badge')
+      const badge = el('span', order.vendor ? t('Pembelian bahan') : order.shipped ? t('Selesai') : dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, 'wa-order-badge')
       badge.dataset.tone = order.shipped ? 'success' : statusTone[order.status] || ''
       state.append(badge)
       if (order.shipped_awb) state.append(el('br'), el('small', order.shipped_awb === 'ANTAR' ? t('Diantar tim') : `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
@@ -296,6 +296,11 @@
     if (order.shipped_awb) head.append(el('small', order.shipped_awb === 'ANTAR' ? t('Diantar tim') : `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
     if (order.source === 'rekap') head.append(el('small', t('Rekap dari chat'), 'wa-muted'))
     box.append(head)
+    // Chat vendor: pembelian bahan oleh toko — tanpa tombol order pelanggan (v3.6.34).
+    if (order.vendor) {
+      box.append(el('p', t('Chat ini ditandai vendor: pesanan di sini adalah pembelian bahan oleh toko, bukan order pelanggan. Tidak dikirim ke grup produksi.'), 'wa-alert'))
+      return
+    }
 
     // Foto katalog + gambar dari pelanggan (referensi model/bagian), sama seperti yang dikirim ke grup.
     const pictures = [

@@ -456,3 +456,16 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. Jev: ambang 0,95; instruksi menyebut pesanan diantar/diambil/alamat/"sudah diterima" = pelanggan, ragu = pelanggan.
 3. Perbaikan sekali jalan (`repairAutoRoles`, saat kotak masuk dibuka): peran otomatis vendor/lainnya yang punya riwayat pelanggan → pelanggan; yang tanpa riwayat ditanyakan ulang ke Jev dengan instruksi baru, tetap vendor hanya bila Jev yakin. Pengecualian AI yang dibuat oleh penandaan otomatis ikut dicabut (mode CS, AI bisa diaktifkan lagi). Peran yang diatur manual CS tidak disentuh.
 4. Pemindai pengiriman melewati chat vendor/lainnya ("kain sudah diterima" bukan pengiriman pesanan).
+
+## #21 · Okt 2026 · halaman Order: Mauldi diantar tim belum Selesai; pembelian bahan ke vendor tampil sebagai order (diterapkan v3.6.34)
+
+**Laporan pemilik:** di halaman Order, order Mauldi (diantar tim) belum masuk Selesai, dan "Pesen bahan Scuro 509 2pcs / Scuro 522 2pcs" (CS memesan bahan ke vendor Rozikin) tampil sebagai order lunas.
+
+**Penyebab**
+1. Mauldi: pesan CS "pesanan sudah **ta** antar ya" (bahasa Jawa) tidak cocok pola; lagi pula pesan itu (25 Sep) sudah dilewati pemindai sebelum pengenalan antar-sendiri ada (v3.6.31).
+2. Rozikin: "Rekap dari chat" membuat order dari chat vendor; halaman Order tidak membedakan peran kontak.
+
+**Perubahan**
+1. Pola antar-sendiri + "ta/tak antar/anter", "sudah antar"; pindai ulang sekali (`rescanSelfDeliveries`, 120 hari, hanya chat yang punya order dan bukan vendor).
+2. Order dari chat vendor/lainnya hanya tampil di tab baru **Vendor** (badge "Pembelian bahan", tanpa tombol order pelanggan), tidak dihitung di tab lain, tidak dikirim ke grup produksi, tidak dibuat oleh Rekap dari chat, dan chat vendor tidak bertanda order di kotak masuk.
+3. Perbaikan data sekali per proses berjalan berurutan (total CS → peran vendor keliru → antar-sendiri lama) saat kotak masuk atau halaman Order dibuka pertama kali.

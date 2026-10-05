@@ -32,7 +32,7 @@ export function detectAwb(text: string, accounts: Set<string> = new Set()) {
  * sebagai saringan awal, Jev (`kirim_sendiri`) yang memutuskan bila aktif.
  */
 const SELF_WORDS =
-  /\b(diantar|di antar|dianter|di anter|antar sendiri|antar langsung|kami antar|kami anter|tim kami|kurir toko|kurir kami|ambil sendiri|diambil|ambil di toko|ambil di store|diambil di store|datang ke toko|datang ke store|sudah diterima|cod|ketemuan|kami bawa|dibawa langsung)\b/i
+  /\b(diantar|di antar|dianter|di anter|ta antar|tak antar|ta anter|tak anter|sudah antar|udah antar|sdh antar|antar sendiri|antar langsung|kami antar|kami anter|tim kami|kurir toko|kurir kami|ambil sendiri|diambil|ambil di toko|ambil di store|diambil di store|datang ke toko|datang ke store|sudah diterima|cod|ketemuan|kami bawa|dibawa langsung)\b/i
 const SELF_SENT = /\b(sudah|sdh|udah|sedang|lagi|otw|hari ini|besok|siang|sore|malam|pagi|dalam perjalanan|siap|meluncur|berangkat)\b/i
 
 export function looksSelfDelivery(text: string) {
@@ -105,4 +105,40 @@ export async function scanShipments(batch = 3000) {
   } finally {
     scanning = false
   }
+}
+
+/**
+ * v3.6.34 — sekali jalan: pesan toko lama (120 hari) "pesanan sudah ta antar ya" yang sudah dilewati
+ * pemindai sebelum pengenalan antar-sendiri ada (v3.6.31) ikut dicatat terkirim tanpa resi.
+ * Hanya chat yang punya order (tidak batal) dan bukan vendor/lainnya.
+ */
+export async function rescanSelfDeliveries() {
+  await ensureLeanTables()
+  if (await readLeanState('self-delivery-rescan-v1')) return 0
+  await writeLeanState('self-delivery-rescan-v1', String(Date.now()))
+  const rows = await db
+    .from('whatsapp_messages as m')
+    .join('whatsapp_beta3_orders as o', 'o.jid', 'm.jid')
+    .leftJoin('whatsapp_contacts as c', 'c.jid', 'm.jid')
+    .where('m.direction', 'out')
+    .whereNotNull('m.body')
+    .where('m.created_at', '>=', new Date(Date.now() - 120 * 86_400_000))
+    .whereNot('o.status', 'cancelled')
+    .whereRaw('m.created_at >= o.created_at')
+    .where((query) => query.whereNull('c.role').orWhereNotIn('c.role', ['vendor', 'lainnya']))
+    .select('m.message_id', 'm.jid', 'm.body', 'm.created_at')
+    .groupBy('m.message_id', 'm.jid', 'm.body', 'm.created_at')
+    .orderBy('m.created_at', 'asc')
+    .limit(3000)
+  let found = 0
+  for (const row of rows as any[]) {
+    if (!row.message_id || !looksSelfDelivery(String(row.body || ''))) continue
+    if (!(await detectSelfDelivery(String(row.jid), String(row.body || '')))) continue
+    await db.rawQuery(
+      'INSERT IGNORE INTO whatsapp_beta3_shipments (message_id, jid, awb, method, created_at) VALUES (?, ?, ?, ?, ?)',
+      [String(row.message_id), String(row.jid), SELF_DELIVERY_AWB, 'antar', row.created_at]
+    )
+    found++
+  }
+  return found
 }

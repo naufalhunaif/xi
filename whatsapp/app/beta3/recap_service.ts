@@ -139,6 +139,9 @@ export async function summarizeChat(jid: string, since: Date): Promise<ChatRecap
  */
 export async function saveRecap(jid: string, recap: ChatRecap) {
   await ensureLeanTables()
+  // Chat vendor/lainnya: pesanan di sana adalah pembelian bahan oleh toko, bukan order pelanggan (v3.6.34).
+  const contact = await db.from('whatsapp_contacts').where('jid', jid).select('role').first().catch(() => null)
+  if (['vendor', 'lainnya'].includes(String(contact?.role || ''))) return null
   if (recap.catatan) await writeBeta3ChatNote(jid, recap.catatan)
   if (recap.status === 'belum_order' || !recap.rincian) return null
   const tidy = recap.alamat ? tidyLooseAddress(`${recap.nama}\n${recap.hp}\n${recap.alamat}`) : null
@@ -223,6 +226,7 @@ export async function recapCandidates(days: number) {
       GROUP BY m.jid
      HAVING SUM(m.direction = 'out' AND m.sender_type IN ('cs', 'owner')) > 0
         AND SUM(m.direction = 'in') > 0 AND COUNT(*) >= 4
+        AND NOT EXISTS (SELECT 1 FROM whatsapp_contacts vc WHERE vc.jid = m.jid AND vc.role IN ('vendor', 'lainnya'))
         AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.created_at >= ?
           AND b.status <> 'pending')
       ORDER BY MAX(m.created_at) DESC
