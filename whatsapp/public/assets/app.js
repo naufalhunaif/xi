@@ -160,6 +160,10 @@
   let stickToLatest = true
   let readRequestPending = false
   let lastAcknowledgedId = 0
+  // Room = pelanggan + nomor penerima (v3.6.24); line 1 = nomor utama.
+  const roomLine = (value) => (Number(value) > 1 ? Number(value) : 1)
+  const roomParam = (line) => (roomLine(line) > 1 ? `&line=${roomLine(line)}` : '')
+  const roomHref = (jid, line) => `${appUrl}/?jid=${encodeURIComponent(jid)}${roomParam(line)}`
   async function acknowledgeVisibleRoom() {
     if (!messages?.dataset.jid || document.hidden || !document.hasFocus() || readRequestPending)
       return
@@ -172,7 +176,7 @@
     try {
       await api('/api/contacts/read', {
         method: 'POST',
-        body: JSON.stringify({ jid: messages.dataset.jid, throughId }),
+        body: JSON.stringify({ jid: messages.dataset.jid, line: roomLine(messages.dataset.line), throughId }),
       })
       lastAcknowledgedId = throughId
       await updateContacts()
@@ -486,14 +490,14 @@
     updatingMessages = true
     let catchUp = false
     try {
-      const data = await api(`/api/messages?jid=${encodeURIComponent(jid)}&latest=1`)
+      const data = await api(`/api/messages?jid=${encodeURIComponent(jid)}${roomParam(messages.dataset.line)}&latest=1`)
       const wasEmpty = loadedMessages.length === 0
       // Refresh recent statuses, but page forward from our cursor too: a burst
       // larger than the latest page must not leave a permanent hole in the room.
       const newer =
         messageCursor === null
           ? null
-          : await api(`/api/messages?jid=${encodeURIComponent(jid)}&after=${messageCursor}`)
+          : await api(`/api/messages?jid=${encodeURIComponent(jid)}${roomParam(messages.dataset.line)}&after=${messageCursor}`)
       const merged = new Map(loadedMessages.map((message) => [String(message.id), message]))
       for (const message of data.messages || []) merged.set(String(message.id), message)
       for (const message of newer?.messages || []) merged.set(String(message.id), message)
@@ -531,7 +535,7 @@
     loadingOlderMessages = true
     try {
       const data = await api(
-        `/api/messages?jid=${encodeURIComponent(jid)}&before=${encodeURIComponent(oldestId)}`
+        `/api/messages?jid=${encodeURIComponent(jid)}${roomParam(messages.dataset.line)}&before=${encodeURIComponent(oldestId)}`
       )
       const merged = new Map(loadedMessages.map((message) => [String(message.id), message]))
       for (const message of data.messages || []) merged.set(String(message.id), message)
@@ -754,7 +758,9 @@
   setTimeout(syncInboxMore, 1500)
   /* ───── Pilih chat → tandai dibaca / belum dibaca (v3.6.16) ───── */
   const selecting = () => contacts?.dataset.selecting === 'true'
-  const selectedJids = () => [...(contacts?.querySelectorAll('.wa-contact.selected') || [])].map((row) => row.dataset.jid)
+  const selectedRooms = () =>
+    [...(contacts?.querySelectorAll('.wa-contact.selected') || [])].map((row) => ({ jid: row.dataset.jid, line: roomLine(row.dataset.line) }))
+  const roomKey = (jid, line) => `${jid}|${roomLine(line)}`
   function setSelecting(on) {
     if (!contacts) return
     contacts.dataset.selecting = String(on)
@@ -766,7 +772,7 @@
   function updateBulkBar() {
     const bar = byId('inboxBulk')
     if (!bar) return
-    const count = selectedJids().length
+    const count = selectedRooms().length
     bar.hidden = !selecting()
     const visible = visibleRows()
     const allPicked = visible.length > 0 && visible.every((row) => row.classList.contains('selected'))
@@ -825,10 +831,10 @@
     updateBulkBar()
   })
   async function bulkReadState(state) {
-    const jids = selectedJids()
-    if (!jids.length) return
+    const rooms = selectedRooms()
+    if (!rooms.length) return
     try {
-      await api('/api/contacts/read-state', { method: 'POST', body: JSON.stringify({ jids, state }) })
+      await api('/api/contacts/read-state', { method: 'POST', body: JSON.stringify({ rooms, state }) })
       setSelecting(false)
       await updateContacts()
     } catch (error) {
@@ -924,8 +930,8 @@
   let contactsRequestVersion = 0
   function renderContacts(items) {
     if (!contacts) return
-    const selectedJid = contacts.dataset.selectedJid || ''
-    const picked = new Set(selectedJids())
+    const selectedKey = roomKey(contacts.dataset.selectedJid || '', contacts.dataset.selectedLine)
+    const picked = new Set(selectedRooms().map((room) => roomKey(room.jid, room.line)))
     contacts.replaceChildren()
     if (!items.length) {
       const empty = document.createElement('div')
@@ -938,9 +944,10 @@
     for (const contact of items) {
       const name = contact.contact_name || fallbackName(contact.jid)
       const link = document.createElement('a')
-      link.className = `wa-contact ${contact.jid === selectedJid ? 'active' : ''}${picked.has(contact.jid) ? ' selected' : ''}`
+      const key = roomKey(contact.jid, contact.line_id)
+      link.className = `wa-contact ${key === selectedKey ? 'active' : ''}${picked.has(key) ? ' selected' : ''}`
       link.classList.toggle('ai-running', contact.ai_running === true)
-      link.href = `${appUrl}/?jid=${encodeURIComponent(contact.jid)}`
+      link.href = roomHref(contact.jid, contact.line_id)
       link.dataset.jid = contact.jid
       link.dataset.mode = contact.handling_mode || 'ai'
       link.dataset.payment = String(Boolean(contact.needs_payment))
@@ -1047,7 +1054,8 @@
       renderContacts(data.contacts || [])
       renderInboxLines(data.lines || [])
       const selected = (data.contacts || []).find(
-        (contact) => contact.jid === contacts.dataset.selectedJid
+        (contact) =>
+          contact.jid === contacts.dataset.selectedJid && roomLine(contact.line_id) === roomLine(contacts.dataset.selectedLine)
       )
       updateRoomMode(selected?.handling_mode || 'ai', Boolean(selected), Boolean(selected?.ai_excluded), Boolean(selected?.schedule_paused))
       updateRoomDetails(selected)
@@ -1327,6 +1335,7 @@
     const bodyInput = form.elements.namedItem('body')
     const payload = {
       jid: form.elements.namedItem('jid').value,
+      line: roomLine(form.elements.namedItem('line')?.value),
       body: bodyInput.value,
       replyToId: form.elements.namedItem('replyToId').value,
       replyToMessageId: form.elements.namedItem('replyToMessageId').value,

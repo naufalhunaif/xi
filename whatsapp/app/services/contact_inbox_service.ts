@@ -7,6 +7,7 @@ type InboxMessage = {
   id: number
   jid: string
   message_line_id: number | null
+  line: number
   contact_name: string | null
   phone_jid: string | null
   body: string
@@ -22,8 +23,32 @@ type InboxMessage = {
   priority: number
 }
 
-/** Workspace read state is separate from WhatsApp delivery/read receipts. */
-export async function markRoomRead(jid: string, throughId: number) {
+/**
+ * Room = pelanggan (jid) + nomor penerima (line; 1 = nomor utama). Satu pelanggan yang chat ke
+ * dua nomor toko tampil sebagai dua room (v3.6.24). Pesan tanpa line_id = nomor utama.
+ */
+export const roomLine = (value: unknown) => {
+  const id = Number(value)
+  return Number.isSafeInteger(id) && id > 1 ? id : 1
+}
+export const lineSql = (alias: string) => `COALESCE(${alias}.line_id, 1)`
+
+/** Workspace read state is separate from WhatsApp delivery/read receipts. Penanda baca per room (jid + nomor). */
+/**
+ * Sebelum penanda lama per kontak (workspace_read_id) dinaikkan, bekukan posisi baca room
+ * nomor lain milik pelanggan yang sama — agar menandai room nomor 2 tidak ikut "membaca" room nomor 1.
+ */
+async function freezeOtherLines(jid: string) {
+  await db.rawQuery(
+    `INSERT IGNORE INTO whatsapp_room_reads (jid, line_id, read_id, updated_at)
+     SELECT m.jid, ${lineSql('m')}, COALESCE(c.workspace_read_id, 0), ?
+     FROM whatsapp_messages m LEFT JOIN whatsapp_contacts c ON c.jid = m.jid
+     WHERE m.jid = ? GROUP BY m.jid, ${lineSql('m')}`,
+    [new Date(), jid]
+  )
+}
+
+export async function markRoomRead(jid: string, throughId: number, line = 1) {
   await initializeDatabase()
   if (
     !/^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid) ||
@@ -37,6 +62,14 @@ export async function markRoomRead(jid: string, throughId: number) {
     .where('id', throughId)
     .first()
   if (!message) throw new Error('Pesan tidak ditemukan di room ini.')
+  const lineId = roomLine(line)
+  await freezeOtherLines(jid)
+  await db.rawQuery(
+    `INSERT INTO whatsapp_room_reads (jid, line_id, read_id, updated_at)
+     VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE read_id = GREATEST(read_id, VALUES(read_id)), updated_at = VALUES(updated_at)`,
+    [jid, lineId, throughId, new Date()]
+  )
+  // Penanda lama (per kontak) ikut naik: dipakai pengiriman tanda baca ke WhatsApp & data lama.
   await db.rawQuery(
     `INSERT INTO whatsapp_contacts (jid, workspace_read_id, updated_at)
     VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE workspace_read_id = GREATEST(workspace_read_id, VALUES(workspace_read_id))`,
@@ -49,26 +82,44 @@ export async function markRoomRead(jid: string, throughId: number) {
  * Dibaca = penanda ke pesan terakhir. Belum dibaca = penanda ke sebelum pesan masuk terakhir,
  * sehingga satu pesan terhitung belum dibaca (seperti "Tandai belum dibaca" di WhatsApp).
  */
-export async function setRoomsReadState(jids: string[], state: 'read' | 'unread') {
+export async function setRoomsReadState(rooms: Array<string | { jid: string; line?: unknown }>, state: 'read' | 'unread') {
   await initializeDatabase()
-  const valid = [...new Set(jids.map(String))].filter((jid) => /^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid)).slice(0, 2000)
-  if (!valid.length) throw new Error('Room tidak valid.')
+  const wanted = new Map<string, { jid: string; line: number }>()
+  for (const item of rooms) {
+    const jid = String(typeof item === 'string' ? item : item?.jid || '')
+    if (!/^[^@\s]+@(?:s\.whatsapp\.net|lid|ig)$/.test(jid)) continue
+    const line = roomLine(typeof item === 'string' ? 1 : item.line)
+    wanted.set(`${jid}|${line}`, { jid, line })
+    if (wanted.size >= 2000) break
+  }
+  if (!wanted.size) throw new Error('Room tidak valid.')
+  const jids = [...new Set([...wanted.values()].map((room) => room.jid))]
   const result = await db.rawQuery(
-    `SELECT jid, MAX(id) AS last_id, MAX(CASE WHEN direction = 'in' THEN id ELSE 0 END) AS last_in_id
-     FROM whatsapp_messages WHERE jid IN (${valid.map(() => '?').join(',')}) GROUP BY jid`,
-    valid
+    `SELECT jid, ${lineSql('whatsapp_messages')} AS line, MAX(id) AS last_id,
+       MAX(CASE WHEN direction = 'in' THEN id ELSE 0 END) AS last_in_id
+     FROM whatsapp_messages WHERE jid IN (${jids.map(() => '?').join(',')}) GROUP BY jid, ${lineSql('whatsapp_messages')}`,
+    jids
   )
   let changed = 0
   for (const row of result[0] as any[]) {
+    const room = wanted.get(`${row.jid}|${roomLine(row.line)}`)
+    if (!room) continue
     const lastId = Number(row.last_id) || 0
     const lastIn = Number(row.last_in_id) || 0
     if (state === 'unread' && !lastIn) continue
     const readId = state === 'read' ? lastId : Math.max(0, lastIn - 1)
+    await freezeOtherLines(room.jid)
     await db.rawQuery(
-      `INSERT INTO whatsapp_contacts (jid, workspace_read_id, updated_at)
-       VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE workspace_read_id = VALUES(workspace_read_id), updated_at = VALUES(updated_at)`,
-      [String(row.jid), readId, new Date()]
+      `INSERT INTO whatsapp_room_reads (jid, line_id, read_id, updated_at)
+       VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE read_id = VALUES(read_id), updated_at = VALUES(updated_at)`,
+      [room.jid, room.line, readId, new Date()]
     )
+    if (state === 'read')
+      await db.rawQuery(
+        `INSERT INTO whatsapp_contacts (jid, workspace_read_id, updated_at)
+         VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE workspace_read_id = GREATEST(workspace_read_id, VALUES(workspace_read_id)), updated_at = VALUES(updated_at)`,
+        [room.jid, readId, new Date()]
+      )
     changed++
   }
   return changed
@@ -120,11 +171,11 @@ export async function latestInboxMessages() {
   // Nama: kontak ini, pasangan LID ↔ nomor HP (dua arah), lalu nama WA terakhir dari
   // pesan masuk (pesan keluar tidak membawa nama pelanggan).
   const result = await db.rawQuery(`WITH successful_replies AS (
-      SELECT jid, id, created_at,
-        ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
+      SELECT jid, ${lineSql('whatsapp_messages')} AS line, id, created_at,
+        ROW_NUMBER() OVER (PARTITION BY jid, ${lineSql('whatsapp_messages')} ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages WHERE direction = 'out' AND status IN ('sent', 'delivered', 'read')
     )
-    SELECT m.id, m.jid, m.line_id AS message_line_id,
+    SELECT m.id, m.jid, m.line_id AS message_line_id, ${lineSql('m')} AS line,
       COALESCE(NULLIF(c.name, ''), NULLIF(pc.name, ''),
         (SELECT NULLIF(x.name, '') FROM whatsapp_contacts x WHERE x.phone_jid = m.jid
           AND x.jid <> m.jid AND x.name IS NOT NULL AND x.name <> '' LIMIT 1),
@@ -134,9 +185,9 @@ export async function latestInboxMessages() {
       COALESCE(NULLIF(c.phone_jid, ''), CASE WHEN m.jid LIKE '%@s.whatsapp.net' THEN m.jid END) AS phone_jid,
       m.body, m.media_type,
       m.direction, m.created_at,
-      (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid
-        AND u.direction = 'in' AND u.id > COALESCE(c.workspace_read_id, 0)) AS unread_count,
-      (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid AND u.direction = 'in'
+      (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid AND ${lineSql('u')} = ${lineSql('m')}
+        AND u.direction = 'in' AND u.id > COALESCE(rr.read_id, c.workspace_read_id, 0)) AS unread_count,
+      (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid AND ${lineSql('u')} = ${lineSql('m')} AND u.direction = 'in'
         AND (r.id IS NULL OR u.created_at > r.created_at
           OR (u.created_at = r.created_at AND u.id > r.id))) AS unanswered_count,
       (${paymentSql}) AS needs_payment,
@@ -145,14 +196,16 @@ export async function latestInboxMessages() {
       (SELECT pr.score FROM whatsapp_beta3_priority pr WHERE pr.jid = m.jid
         AND pr.created_at >= NOW() - INTERVAL 1 DAY) AS priority
     FROM whatsapp_messages m
-    JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid ORDER BY created_at DESC, id DESC) AS position
+    JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid, ${lineSql('whatsapp_messages')} ORDER BY created_at DESC, id DESC) AS position
       FROM whatsapp_messages) ranked ON ranked.id = m.id AND ranked.position = 1
     LEFT JOIN whatsapp_contacts c ON c.jid = m.jid
     LEFT JOIN whatsapp_contacts pc ON pc.jid = c.phone_jid AND pc.jid <> m.jid
-    LEFT JOIN successful_replies r ON r.jid = m.jid AND r.position = 1
+    LEFT JOIN whatsapp_room_reads rr ON rr.jid = m.jid AND rr.line_id = ${lineSql('m')}
+    LEFT JOIN successful_replies r ON r.jid = m.jid AND r.line = ${lineSql('m')} AND r.position = 1
     ORDER BY m.created_at DESC, m.id DESC`)
   return (result[0] as InboxMessage[]).map((message) => ({
     ...message,
+    line: roomLine(message.line),
     unread_count: Number(message.unread_count),
     unanswered_count: Number(message.unanswered_count),
     needs_payment: Boolean(Number(message.needs_payment)),

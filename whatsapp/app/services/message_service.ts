@@ -64,6 +64,8 @@ export async function queueOutgoingMessage(input: {
   /** 'ai' = template yang dikirim AI/sistem otomatis; 'system' = template tombol CS tanpa
    *  memindah chat ke mode CS; bawaan 'cs' = pesan CS manual (chat pindah ke mode CS). */
   sender?: 'cs' | 'ai' | 'system'
+  /** Nomor toko yang dipakai room (1 = utama). Tanpa ini: nomor terakhir yang dipakai pelanggan. */
+  line?: number
 }) {
   if (!isDirectContactJid(input.jid)) throw new Error('Kontak tidak valid.')
   if ((!input.body && !input.media) || input.body.length > (input.media ? 1024 : 4096))
@@ -81,10 +83,11 @@ export async function queueOutgoingMessage(input: {
   if ((input.replyToId || input.replyToMessageId) && (!target || target.jid !== input.jid))
     throw new Error('Pesan reply tidak ditemukan di room ini.')
 
-  // Balasan keluar dari nomor yang dipakai pelanggan (NULL = nomor utama).
-  const owner = await db.from('whatsapp_contacts').where('jid', input.jid).select('line_id').first()
+  // Balasan keluar dari nomor room ini; bila tidak disebut, nomor yang terakhir dipakai pelanggan (NULL = utama).
+  const owner = input.line ? null : await db.from('whatsapp_contacts').where('jid', input.jid).select('line_id').first()
+  const line = input.line ? Number(input.line) : Number(owner?.line_id)
   await db.table('whatsapp_messages').insert({
-    line_id: Number(owner?.line_id) > 1 ? Number(owner.line_id) : null,
+    line_id: line > 1 ? line : null,
     message_id: `queued-${randomUUID()}`,
     jid: input.jid,
     contact_name: null,

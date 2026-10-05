@@ -214,11 +214,11 @@
               </button>
             </div>
 
-            <div id="contacts" class="wa-contacts" data-selected-jid="{{ selectedJid }}">
+            <div id="contacts" class="wa-contacts" data-selected-jid="{{ selectedJid }}" data-selected-line="{{ selectedLine || 1 }}">
               @each(contact in contacts)
                 <a
-                  class="wa-contact {{ contact.jid === selectedJid ? 'active' : '' }} {{ contact.ai_running ? 'ai-running' : '' }}"
-                  href="{{ appUrl }}/?jid={{ contact.jid }}"
+                  class="wa-contact {{ contact.jid === selectedJid && (contact.line_id || 1) === (selectedLine || 1) ? 'active' : '' }} {{ contact.ai_running ? 'ai-running' : '' }}"
+                  href="{{ appUrl }}/?jid={{ contact.jid }}{{ contact.line_id > 1 ? '&line=' + contact.line_id : '' }}"
                   data-jid="{{ contact.jid }}"
                   data-mode="{{ contact.handling_mode }}"
                   data-payment="{{ contact.needs_payment ? 'true' : 'false' }}"
@@ -437,6 +437,7 @@
               id="messages"
               class="wa-messages"
               data-jid="{{ selectedJid }}"
+              data-line="{{ selectedLine || 1 }}"
               data-last-id="{{ messages.length ? messages[messages.length - 1].id : 0 }}"
             >
               <div id="messageList" class="wa-message-list {{ messages.length ? 'wa-ssr-pending' : '' }}">
@@ -616,6 +617,7 @@
                 </svg>
               </button>
               <input name="jid" type="hidden" value="{{ selectedJid }}" />
+              <input name="line" type="hidden" value="{{ selectedLine || 1 }}" />
               <input name="replyToId" type="hidden" value="" />
               <input name="replyToMessageId" type="hidden" value="" />
               <input

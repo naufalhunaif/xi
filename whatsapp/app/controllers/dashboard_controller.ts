@@ -43,7 +43,7 @@ import {
 import { createHash } from 'node:crypto'
 import { queueOutgoingMessage, setHandlingMode } from '#services/message_service'
 import { presentedAnalysisStatus } from '#services/analysis_retry_service'
-import { latestInboxMessages, markRoomRead, setRoomsReadState } from '#services/contact_inbox_service'
+import { latestInboxMessages, markRoomRead, roomLine, setRoomsReadState } from '#services/contact_inbox_service'
 import { readConnectionStatus } from '#services/connection_status_service'
 import { setAiExcluded } from '#services/ai_exclusion_service'
 import { readFile, stat } from 'node:fs/promises'
@@ -51,6 +51,13 @@ import { createReadStream } from 'node:fs'
 import { storeCsMedia, removeCsMedia, csMediaPath, type CsMedia } from '#services/cs_media_service'
 
 const ROOM_PAGE_SIZE = 50
+
+/** Room = pelanggan + nomor penerima; line 1 = nomor utama (line_id kosong atau 1). */
+function whereLine<T extends { where: any; whereNull: any }>(query: T, line: number): T {
+  if (line > 1) query.where('line_id', line)
+  else query.where((inner: any) => inner.whereNull('line_id').orWhere('line_id', '<=', 1))
+  return query
+}
 
 function displayPhone(jid: string | null | undefined) {
   const digits = /^(\d{6,15})(?::\d+)?@s\.whatsapp\.net$/.exec(String(jid || ''))?.[1]
@@ -167,9 +174,9 @@ export default class DashboardController {
         // Tanpa nama: tampilkan nomor HP (bila sudah terpetakan), bukan ID internal.
         contact_name: profile?.name || message.contact_name || displayPhone(message.phone_jid),
         // Nomor penerima room: dari kontak (claimRoom), bila kosong dari pesan terakhir.
-        line_label: lineLabel(profile?.line_id ?? message.message_line_id),
-        line_sim: String(message.jid).endsWith('@ig') ? 0 : lineSim(profile?.line_id ?? message.message_line_id),
-        line_id: Number(profile?.line_id ?? message.message_line_id) > 1 ? Number(profile?.line_id ?? message.message_line_id) : 1,
+        line_label: lineLabel(message.line),
+        line_sim: String(message.jid).endsWith('@ig') ? 0 : lineSim(message.line),
+        line_id: message.line,
         profile_picture_url: profile?.profile_picture_url || null,
         activity:
           activityIsFresh && !schedulePaused
@@ -210,12 +217,15 @@ export default class DashboardController {
     await ensureDefaults()
     const [connection, contacts, inboxLines] = await Promise.all([readConnectionStatus(), this.contacts(), this.inboxLines()])
     const requestedJid = String(request.input('jid', '')).slice(0, 190)
-    const selectedContact = contacts.find((contact) => contact.jid === requestedJid) || null
+    const requestedLine = roomLine(request.input('line', 1))
+    const selectedContact =
+      contacts.find((contact) => contact.jid === requestedJid && contact.line_id === requestedLine) ||
+      (requestedLine === 1 ? contacts.find((contact) => contact.jid === requestedJid) : null) ||
+      null
     const selectedJid = String(selectedContact?.jid || '')
+    const selectedLine = selectedContact?.line_id || 1
     const roomMessages = selectedJid
-      ? await db
-          .from('whatsapp_messages')
-          .where('jid', selectedJid)
+      ? await whereLine(db.from('whatsapp_messages').where('jid', selectedJid), selectedLine)
           .orderBy('created_at', 'desc')
           .orderBy('id', 'desc')
           .limit(ROOM_PAGE_SIZE)
@@ -228,6 +238,7 @@ export default class DashboardController {
       contacts,
       inboxLines,
       selectedJid,
+      selectedLine,
       selectedContact,
       messages,
       account: session.get('account'),
@@ -346,18 +357,17 @@ export default class DashboardController {
     const after = Math.max(0, Number(request.input('after', 0)) || 0)
     const before = Math.max(0, Number(request.input('before', 0)) || 0)
     const jid = String(request.input('jid', '')).slice(0, 190)
+    const line = roomLine(request.input('line', 1))
     const latest = request.input('latest') === '1'
     let messages: Record<string, any>[] = []
     let hasMore = false
     let syncCursor: number | undefined
     if (jid) {
-      const query = db.from('whatsapp_messages').where('jid', jid)
+      const query = whereLine(db.from('whatsapp_messages').where('jid', jid), line)
       if (latest || before) {
         if (before) {
           // History is chronological; older messages can have higher IDs after backfill.
-          const anchor = await db
-            .from('whatsapp_messages')
-            .where('jid', jid)
+          const anchor = await whereLine(db.from('whatsapp_messages').where('jid', jid), line)
             .where('id', before)
             .first()
           if (!anchor) return response.json({ messages: [], hasMore: false })
@@ -369,9 +379,7 @@ export default class DashboardController {
         } else {
           // Capture the ingestion watermark before reading the latest page, so arrivals
           // during the query are still included by the subsequent ID-based delta poll.
-          const last = await db
-            .from('whatsapp_messages')
-            .where('jid', jid)
+          const last = await whereLine(db.from('whatsapp_messages').where('jid', jid), line)
             .max('id as cursor')
             .first()
           syncCursor = Number(last?.cursor || 0)
@@ -400,6 +408,7 @@ export default class DashboardController {
       .trim()
       .slice(0, 190)
     const body = String(request.input('body', '') ?? '').trim()
+    const line = roomLine(request.input('line', 1))
     const replyToId = Math.max(0, Number(request.input('replyToId', 0)) || 0)
     const replyToMessageId = String(request.input('replyToMessageId', '') ?? '')
       .trim()
@@ -413,7 +422,7 @@ export default class DashboardController {
         if (!file.isValid || !file.tmpPath) throw new Error('File tidak valid atau melebihi 16 MB.')
         media = await storeCsMedia(await readFile(file.tmpPath), file.clientName)
       }
-      await queueOutgoingMessage({ jid, body, replyToId, replyToMessageId, media })
+      await queueOutgoingMessage({ jid, line, body, replyToId, replyToMessageId, media })
       return response.json({ ok: true })
     } catch (error) {
       if (media) {
@@ -555,7 +564,11 @@ export default class DashboardController {
   }
   async contactRead({ request, response }: HttpContext) {
     try {
-      await markRoomRead(String(request.input('jid', '')), Number(request.input('throughId')))
+      await markRoomRead(
+        String(request.input('jid', '')),
+        Number(request.input('throughId')),
+        roomLine(request.input('line', 1))
+      )
       return response.json({ ok: true })
     } catch (error) {
       return response.unprocessableEntity({
@@ -566,9 +579,15 @@ export default class DashboardController {
   /** Pilihan di kotak masuk: tandai dibaca / belum dibaca. */
   async contactsReadState({ request, response }: HttpContext) {
     const jids = Array.isArray(request.input('jids')) ? request.input('jids').map(String) : []
+    const rooms = Array.isArray(request.input('rooms'))
+      ? request
+          .input('rooms')
+          .filter((room: unknown) => room && typeof room === 'object')
+          .map((room: { jid?: unknown; line?: unknown }) => ({ jid: String(room.jid || ''), line: roomLine(room.line) }))
+      : []
     const state = request.input('state') === 'unread' ? 'unread' : 'read'
     try {
-      const changed = await setRoomsReadState(jids, state)
+      const changed = await setRoomsReadState([...jids, ...rooms], state)
       return response.json({ ok: true, changed })
     } catch (error) {
       return response.unprocessableEntity({ error: error instanceof Error ? error.message : 'Room tidak valid.' })
