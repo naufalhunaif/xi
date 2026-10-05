@@ -733,6 +733,38 @@
     byId('inboxBulkRead').disabled = !count
     byId('inboxBulkUnread').disabled = !count
   }
+  /* Posisi gulir daftar chat dipertahankan saat room dibuka/ditutup (halaman dimuat ulang),
+     dan room aktif selalu terlihat — tanpa ini klik room paling bawah melempar daftar ke atas. */
+  const SCROLL_KEY = `${appUrl}:inbox-scroll`
+  const saveInboxScroll = () => {
+    // Di layar sempit daftar tersembunyi saat room terbuka (tinggi 0): jangan menimpa posisi yang tersimpan.
+    if (!contacts || !contacts.clientHeight) return
+    try {
+      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ list: contacts.scrollTop, page: window.scrollY, at: Date.now() }))
+    } catch {}
+  }
+  let scrollRestored = false
+  function restoreInboxScroll() {
+    if (!contacts || scrollRestored) return
+    scrollRestored = true
+    let saved = null
+    try {
+      saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || 'null')
+    } catch {}
+    if (saved && Date.now() - Number(saved.at) < 10 * 60_000) {
+      contacts.scrollTop = Number(saved.list) || 0
+      if (Number(saved.page) > 0 && contacts.dataset.selectedJid === '') window.scrollTo(0, Number(saved.page))
+    }
+    const active = contacts.querySelector('.wa-contact.active')
+    if (!active) return
+    const row = active.getBoundingClientRect()
+    const box = contacts.getBoundingClientRect()
+    if (row.top < box.top || row.bottom > box.bottom) active.scrollIntoView({ block: 'nearest' })
+  }
+  contacts?.addEventListener('click', (event) => {
+    if (!selecting() && event.target.closest('.wa-contact')) saveInboxScroll()
+  })
+  byId('roomBack')?.addEventListener('click', saveInboxScroll)
   byId('inboxSelect')?.addEventListener('click', () => setSelecting(!selecting()))
   byId('inboxBulkCancel')?.addEventListener('click', () => setSelecting(false))
   contacts?.addEventListener('click', (event) => {
@@ -2171,6 +2203,7 @@
   window.setInterval(updateStatus, 2000)
   window.setInterval(updateMessages, 2500)
   window.setInterval(updateContacts, 3000)
+  restoreInboxScroll()
   window.setInterval(updateOAuth, 3000)
   window.setInterval(updateClaudeOAuth, 3000)
   window.setInterval(updateMcpOAuth, 3000)

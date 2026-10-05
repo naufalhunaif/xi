@@ -170,3 +170,8 @@ Perubahan v3.6.6:
 - Tombol centang di judul kotak masuk mengaktifkan mode pilih: tiap baris chat diberi kotak centang (CSS `::before`, tanpa markup), klik baris memilih (bukan membuka). Bilah aksi: "{0} dipilih · Tandai dibaca · Tandai belum dibaca · ×". Pilihan bertahan saat daftar disegarkan.
 - `POST /api/contacts/read-state {jids, state}` → `setRoomsReadState`: dibaca = `workspace_read_id` ke pesan terakhir; belum dibaca = ke sebelum pesan masuk terakhir (1 pesan terhitung belum dibaca, seperti WhatsApp). Room tanpa pesan masuk tidak bisa ditandai belum dibaca.
 - Bersinggungan: membuka room tetap menandai dibaca otomatis (`acknowledgeVisibleRoom`), jadi "belum dibaca" untuk room yang sedang terbuka hanya bertahan sampai room itu dibuka lagi. Tes: `tests/unit/inbox_read_state.spec.ts`.
+
+## v3.6.17 — posisi daftar chat dipertahankan
+
+- Membuka room memuat ulang halaman, sehingga daftar chat selalu kembali ke atas. Kini posisi gulir `#contacts` disimpan di `sessionStorage` saat room diklik (dan saat tombol kembali di layar sempit), dipulihkan saat halaman dimuat (≤ 10 menit); room aktif yang di luar pandangan digulir ke `nearest`. Di layar sempit daftar tersembunyi saat room terbuka (tinggi 0) → tidak menimpa posisi tersimpan.
+- Alternatif yang tidak diambil: membuka room tanpa muat ulang (SPA) — lebih luas dampaknya (judul room, keranjang, mode penanganan semuanya SSR).
