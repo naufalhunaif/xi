@@ -57,7 +57,7 @@ async function latestWaVersion() {
 }
 import { databaseAuthState, clearAuthRows } from '#services/baileys_auth_service'
 import { currentLine, setCurrentLine, lineColumns, lineOf } from '#services/line_context'
-import { listLines, readLine, removeLineNow, updateLine } from '#services/line_service'
+import { claimLine, lineHeld, listLines, readLine, releaseLine, removeLineNow, touchLine, updateLine } from '#services/line_service'
 import { spawn, type ChildProcess } from 'node:child_process'
 import * as beta3Reply from '#beta3/reply_service'
 import * as beta3Order from '#beta3/order_service'
@@ -195,6 +195,10 @@ export default class WhatsappListen extends BaseCommand {
   declare line?: number
 
   private lineChildren = new Map<number, ChildProcess>()
+  /** worker_id sewa tiap proses nomor tambahan yang dinyalakan proses ini. */
+  private lineWorkerIds = new Map<number, string>()
+  private lineHeldLogged = new Set<number>()
+  private workerId = ''
   private lastLineSuperviseAt = 0
   private get primary() {
     return currentLine() === 1
@@ -238,6 +242,7 @@ export default class WhatsappListen extends BaseCommand {
     const initialScope = await activeWorkspace()
     if (initialScope.id) this.sessionScope = initialScope
     const workerId = randomUUID()
+    this.workerId = workerId
     await startWorkerHeartbeat(workerId)
     await registerWorkspaceWorker(workerId)
     const heartbeatTimer = setInterval(() => {
@@ -254,8 +259,10 @@ export default class WhatsappListen extends BaseCommand {
       if (this.igTimer) clearInterval(this.igTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
       this.pendingTurns.clear()
-      for (const child of this.lineChildren.values()) child.kill('SIGTERM')
       this.socket?.end(undefined)
+      // Proses nomor tambahan dimatikan dan DITUNGGU (maks 4 detik): bila proses utama keluar lebih dulu,
+      // anak yang tertinggal memegang sesi nomor itu dan proses baru akan saling tendang (reconnect terus).
+      await this.stopLineChildren()
     })
     this.logger.info(`Listener WhatsApp aktif (pid=${process.pid}, build=${process.cwd()})`)
     const startedAt = Date.now()
@@ -264,7 +271,7 @@ export default class WhatsappListen extends BaseCommand {
       // Setelah pemulihan backup: mulai ulang (Supervisor menjalankan lagi dengan data baru).
       if (await restartRequestedSince(startedAt)) {
         this.logger.info('Data dipulihkan dari backup; worker dimulai ulang.')
-        for (const child of this.lineChildren.values()) child.kill('SIGTERM')
+        void this.stopLineChildren()
         this.socket?.end(undefined)
         setTimeout(() => process.exit(0), 1500)
         return
@@ -466,20 +473,49 @@ export default class WhatsappListen extends BaseCommand {
     for (const [id, child] of this.lineChildren) {
       if (!wanted.has(id) && child.exitCode === null) child.kill('SIGTERM')
     }
+    const own = new Set(this.lineWorkerIds.values())
     for (const id of wanted) {
       const running = this.lineChildren.get(id)
       if (running && running.exitCode === null && running.signalCode === null) continue
+      // Proses lain (mis. anak dari worker lama yang belum mati) masih memegang nomor ini:
+      // jangan nyalakan proses kedua — dua sesi untuk satu nomor saling menendang.
+      const row = lines.find((line) => line.id === id)
+      if (row && lineHeld(row, own)) {
+        if (!this.lineHeldLogged.has(id)) {
+          this.lineHeldLogged.add(id)
+          this.logger.info(`Nomor tambahan #${id}: masih dipegang proses lain; menunggu proses itu berhenti.`)
+        }
+        continue
+      }
+      this.lineHeldLogged.delete(id)
+      const lineWorkerId = randomUUID()
       const child = spawn(process.execPath, [process.argv[1], 'whatsapp:listen', `--line=${id}`], {
         cwd: process.cwd(),
-        env: process.env,
+        env: { ...process.env, WA_LINE_WORKER_ID: lineWorkerId, WA_PARENT_WORKER_ID: this.workerId },
         stdio: ['ignore', 'inherit', 'inherit'],
       })
       child.on('exit', () => {
-        if (this.lineChildren.get(id) === child) this.lineChildren.delete(id)
+        if (this.lineChildren.get(id) === child) {
+          this.lineChildren.delete(id)
+          this.lineWorkerIds.delete(id)
+        }
       })
       this.lineChildren.set(id, child)
+      this.lineWorkerIds.set(id, lineWorkerId)
       this.logger.info(`Nomor tambahan #${id}: proses dimulai (pid ${child.pid}).`)
     }
+  }
+
+  /** SIGTERM ke semua proses nomor tambahan, tunggu sampai keluar (maks 4 detik), sisanya SIGKILL. */
+  private async stopLineChildren() {
+    const children = [...this.lineChildren.values()].filter((child) => child.exitCode === null && child.signalCode === null)
+    for (const child of children) child.kill('SIGTERM')
+    if (!children.length) return
+    await Promise.race([
+      Promise.all(children.map((child) => new Promise<void>((resolve) => child.once('exit', () => resolve())))),
+      wait(4000),
+    ])
+    for (const child of children) if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
   }
 
   /**
@@ -503,12 +539,48 @@ export default class WhatsappListen extends BaseCommand {
       setTimeout(() => process.exit(0), 3000).unref()
     })
     const lineStartedAt = Date.now()
+    // Sewa nomor: hanya satu proses per nomor. Proses yang kalah sewa berhenti tanpa menyentuh sesi.
+    const lineWorkerId = String(process.env.WA_LINE_WORKER_ID || randomUUID())
+    const parentWorkerId = String(process.env.WA_PARENT_WORKER_ID || '')
+    if (!(await claimLine(line, lineWorkerId))) {
+      this.logger.info(`Nomor tambahan #${line}: masih dipegang proses lain; proses ini berhenti.`)
+      process.exit(0)
+    }
+    let lastParentCheck = 0
+    const releaseAndExit = async (why: string) => {
+      this.logger.info(`Nomor tambahan #${line}: ${why}`)
+      this.stopping = true
+      try {
+        this.socket?.end(undefined)
+      } catch {}
+      await releaseLine(line, lineWorkerId).catch(() => {})
+      setTimeout(() => process.exit(0), 1500).unref()
+    }
+    process.on('SIGTERM', () => void releaseLine(line, lineWorkerId).catch(() => {}))
     while (!this.stopping) {
       if (await restartRequestedSince(lineStartedAt)) break
       try {
         const row = await readLine(line)
         if (!row) break
-        await updateLine(line, { heartbeat_at: new Date() })
+        if (!(await touchLine(line, lineWorkerId))) {
+          await releaseAndExit('sewa nomor diambil proses lain; proses ini berhenti.')
+          break
+        }
+        // Worker utama yang menyalakan proses ini sudah berganti/mati → berhenti agar worker baru
+        // menyalakan proses yang segar (kode terbaru), tanpa dua proses untuk satu nomor.
+        if (parentWorkerId && Date.now() - lastParentCheck > 10_000) {
+          lastParentCheck = Date.now()
+          const parent = await db.from('whatsapp_connection').where('id', 1).select('worker_id', 'worker_heartbeat_at').first()
+          const beat = parent?.worker_heartbeat_at ? Date.now() - new Date(parent.worker_heartbeat_at).getTime() : Infinity
+          if (parent && parent.worker_id !== parentWorkerId && beat < 30_000) {
+            await releaseAndExit('worker utama sudah berganti; proses ini berhenti.')
+            break
+          }
+          if (parent && !parent.worker_id && Date.now() - lineStartedAt > 60_000) {
+            await releaseAndExit('worker utama berhenti; proses ini ikut berhenti.')
+            break
+          }
+        }
         if (!row.desired_connected) {
           await this.removeLine()
           break
@@ -537,6 +609,7 @@ export default class WhatsappListen extends BaseCommand {
       }
       await wait(1500)
     }
+    await releaseLine(line, lineWorkerId).catch(() => {})
     process.exit(0)
   }
 

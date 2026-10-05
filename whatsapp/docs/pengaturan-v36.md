@@ -175,3 +175,13 @@ Perubahan v3.6.6:
 
 - Membuka room memuat ulang halaman, sehingga daftar chat selalu kembali ke atas. Kini posisi gulir `#contacts` disimpan di `sessionStorage` saat room diklik (dan saat tombol kembali di layar sempit), dipulihkan saat halaman dimuat (≤ 10 menit); room aktif yang di luar pandangan digulir ke `nearest`. Di layar sempit daftar tersembunyi saat room terbuka (tinggi 0) → tidak menimpa posisi tersimpan.
 - Alternatif yang tidak diambil: membuka room tanpa muat ulang (SPA) — lebih luas dampaknya (judul room, keranjang, mode penanganan semuanya SSR).
+
+## v3.6.18 — filter nomor di kotak masuk; nomor tambahan tidak lagi saling tendang
+
+- **Baris nomor** di atas judul kotak masuk, hanya bila ada nomor tambahan: "Semua nomor · …1234 · …5678" (4 digit terakhir). Filter berdasarkan `whatsapp_contacts.line_id` (`data-line` di baris; 1 = nomor utama); room Instagram ikut semua nomor. Pilihan diingat (`?ln=`, `localStorage wa-inbox-line`). `/api/contacts` kini mengembalikan `lines` juga.
+- **Reconnect berulang pada nomor tambahan** — penyebab yang ditemukan: dua proses memegang sesi nomor yang sama (anak dari worker lama yang tertinggal saat worker utama mati mendadak/crash; Supervisor hanya mematikan grup saat *ia* yang menghentikan) → WhatsApp menendang bergantian (kode 440 conflict) → "Menghubungkan" terus. Perbaikan:
+  - **Sewa per nomor** (`whatsapp_lines.worker_id` + `heartbeat_at`, 20 detik): proses nomor mengklaim sewa saat mulai (`claimLine`); kalah sewa → berhenti tanpa menyentuh sesi. Tiap putaran memperpanjang sewa (`touchLine`); bila diambil proses lain → berhenti.
+  - Supervisor internal (`superviseLines`) tidak menyalakan proses kedua selama sewa nomor masih segar oleh proses lain.
+  - Proses nomor memantau worker utama (`WA_PARENT_WORKER_ID` vs `whatsapp_connection.worker_id`): bila worker utama berganti → berhenti rapi agar worker baru menyalakan proses segar (kode terbaru).
+  - Worker utama saat berhenti menunggu proses anak keluar (maks 4 detik) sebelum keluar; `deploy/run.sh worker` mematikan proses `--line=` tertinggal di bawah folder aplikasi sebelum worker mulai.
+- Diagnosis bila masih terjadi: `/var/log/wa/worker.err.log` baris "Koneksi #N tertutup (kode …)": 440 = sesi ganda, 408 = timeout jaringan, 515 = WhatsApp minta mulai ulang (normal sesekali), 401/403 = sesi dilepas dari HP.

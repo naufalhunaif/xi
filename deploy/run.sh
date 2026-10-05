@@ -19,5 +19,15 @@ export PATH="$PWD/node_modules/.bin:$PATH"
 node "$RUN_SCRIPT_DIR/whatsapp-release-cleanup.mjs" --quiet || true
 case "${1:-web}" in
   web) exec node bin/server.js ;;
-  worker) exec node ace.js whatsapp:listen ;;
+  worker)
+    # Proses nomor tambahan yang tertinggal dari worker lama (worker lama dimatikan paksa / timeout
+    # Supervisor) masih memegang sesi nomornya → proses baru dan lama saling tendang (reconnect terus).
+    # Matikan yang cwd-nya di bawah folder aplikasi ini saja.
+    WA_ROOT="$(cd -P -- "$RUN_SCRIPT_DIR/../whatsapp" && pwd -P)"
+    for pid in $(pgrep -f "ace.js whatsapp:listen --line=" 2>/dev/null || true); do
+      [[ "$pid" == "$$" ]] && continue
+      cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+      [[ -n "$cwd" && "$cwd" == "$WA_ROOT/"* ]] && kill -TERM "$pid" 2>/dev/null || true
+    done
+    exec node ace.js whatsapp:listen ;;
 esac

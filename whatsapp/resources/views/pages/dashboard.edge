@@ -156,6 +156,12 @@
       @if(page === 'chat')
         <div class="wa-chat-grid">
           <aside class="wa-panel wa-contact-panel">
+            <div id="inboxLines" class="wa-inbox-lines" role="group" aria-label="Nomor" data-i18n-aria-label="Nomor" {{ inboxLines && inboxLines.length ? '' : 'hidden' }}>
+              <button type="button" data-line="all" aria-pressed="true" data-i18n="Semua nomor">Semua nomor</button>
+              @each(line in (inboxLines || []))
+                <button type="button" data-line="{{ line.id }}" aria-pressed="false">{{ line.label }}</button>
+              @end
+            </div>
             <div class="wa-inbox-heading">
               <strong>Chat</strong>
               <div id="inboxChannels" class="wa-inbox-channels" role="group" aria-label="Saluran" data-i18n-aria-label="Saluran" hidden>
@@ -218,6 +224,7 @@
                   data-order="{{ contact.has_order ? 'true' : 'false' }}"
                   data-done="{{ contact.done_order ? 'true' : 'false' }}"
                   data-unanswered="{{ contact.unanswered_count }}"
+                  data-line="{{ contact.line_id || 1 }}"
                 >
                   @if(contact.profile_picture_url)
                     <img

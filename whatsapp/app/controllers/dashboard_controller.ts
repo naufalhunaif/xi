@@ -165,6 +165,7 @@ export default class DashboardController {
         // Tanpa nama: tampilkan nomor HP (bila sudah terpetakan), bukan ID internal.
         contact_name: profile?.name || message.contact_name || displayPhone(message.phone_jid),
         line_label: lineLabel(profile?.line_id),
+        line_id: Number(profile?.line_id) > 1 ? Number(profile.line_id) : 1,
         profile_picture_url: profile?.profile_picture_url || null,
         activity:
           activityIsFresh && !schedulePaused
@@ -203,7 +204,7 @@ export default class DashboardController {
 
   async index({ view, session, request }: HttpContext) {
     await ensureDefaults()
-    const [connection, contacts] = await Promise.all([readConnectionStatus(), this.contacts()])
+    const [connection, contacts, inboxLines] = await Promise.all([readConnectionStatus(), this.contacts(), this.inboxLines()])
     const requestedJid = String(request.input('jid', '')).slice(0, 190)
     const selectedContact = contacts.find((contact) => contact.jid === requestedJid) || null
     const selectedJid = String(selectedContact?.jid || '')
@@ -221,6 +222,7 @@ export default class DashboardController {
       page: 'chat',
       connection,
       contacts,
+      inboxLines,
       selectedJid,
       selectedContact,
       messages,
@@ -532,9 +534,20 @@ export default class DashboardController {
     }
     return response.json({ hits: [...seen.values()] })
   }
+  /** Daftar nomor untuk filter kotak masuk (hanya bila ada nomor tambahan): utama = id 1. */
+  private async inboxLines() {
+    const lines = (await listLines().catch(() => [])).filter((line) => line.desired_connected)
+    if (!lines.length) return []
+    const last4 = (phone: unknown) => (phone ? `…${String(phone).slice(-4)}` : '')
+    return [
+      { id: 1, label: last4(workspaceScope().phone) || 'Main' },
+      ...lines.map((line) => ({ id: line.id, label: last4(line.phone) || `#${line.id}` })),
+    ]
+  }
   async contactsList({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
-    return response.json({ contacts: await this.contacts() })
+    const [contacts, lines] = await Promise.all([this.contacts(), this.inboxLines()])
+    return response.json({ contacts, lines })
   }
   async contactRead({ request, response }: HttpContext) {
     try {

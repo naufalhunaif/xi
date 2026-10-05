@@ -17,6 +17,8 @@ export function ensureLinesTable() {
       created_at DATETIME NOT NULL,
       updated_at DATETIME NOT NULL
     ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+    // v3.6.18: satu proses per nomor (sewa) — mencegah dua proses memegang sesi yang sama.
+    await db.rawQuery(`ALTER TABLE whatsapp_lines ADD COLUMN IF NOT EXISTS worker_id CHAR(36) NULL AFTER heartbeat_at`)
   })().catch((error) => {
     ready = undefined
     throw error
@@ -33,6 +35,40 @@ export type LineRow = {
   last_error: string | null
   auth_version: string
   heartbeat_at: Date | null
+  worker_id: string | null
+}
+
+/** Sewa nomor tambahan: proses hidup ditandai heartbeat ≤ LEASE_MS; lewat itu proses lain boleh mengambil alih. */
+export const LINE_LEASE_MS = 20_000
+
+/** Ambil sewa nomor untuk proses ini. false = proses lain masih memegangnya (heartbeat segar). */
+export async function claimLine(id: number, workerId: string) {
+  await ensureLinesTable()
+  const result = await db.rawQuery(
+    `UPDATE whatsapp_lines SET worker_id = ?, heartbeat_at = NOW(), updated_at = NOW()
+     WHERE id = ? AND (worker_id IS NULL OR worker_id = ? OR heartbeat_at IS NULL OR heartbeat_at < NOW() - INTERVAL ${Math.round(LINE_LEASE_MS / 1000)} SECOND)`,
+    [workerId, id, workerId]
+  )
+  return Number((result[0] as any)?.affectedRows || 0) > 0
+}
+
+/** Perpanjang sewa; false = sewa sudah diambil proses lain (proses ini harus berhenti). */
+export async function touchLine(id: number, workerId: string) {
+  const result = await db.rawQuery(
+    `UPDATE whatsapp_lines SET heartbeat_at = NOW() WHERE id = ? AND worker_id = ?`,
+    [id, workerId]
+  )
+  return Number((result[0] as any)?.affectedRows || 0) > 0
+}
+
+export async function releaseLine(id: number, workerId: string) {
+  await db.rawQuery(`UPDATE whatsapp_lines SET worker_id = NULL WHERE id = ? AND worker_id = ?`, [id, workerId])
+}
+
+/** Nomor yang sedang dipegang proses hidup (untuk supervisor: jangan nyalakan proses kedua). */
+export function lineHeld(line: Pick<LineRow, 'worker_id' | 'heartbeat_at'>, ownWorkerIds: Set<string>) {
+  if (!line.worker_id || ownWorkerIds.has(line.worker_id) || !line.heartbeat_at) return false
+  return Date.now() - new Date(line.heartbeat_at).getTime() < LINE_LEASE_MS
 }
 
 export async function listLines(): Promise<LineRow[]> {

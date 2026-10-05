@@ -607,7 +607,32 @@
     // Tautan lama ?unanswered=1 tetap membuka tab Belum dibalas.
     const key = params.get('unanswered') === '1' ? 'unanswered' : params.get('inbox')
     const channel = params.get('ch')
-    return { filter: inboxKeys.includes(key) ? key : 'all', channel: ['wa', 'ig'].includes(channel) ? channel : 'all' }
+    const line = params.get('ln')
+    return {
+      filter: inboxKeys.includes(key) ? key : 'all',
+      channel: ['wa', 'ig'].includes(channel) ? channel : 'all',
+      line: /^\d+$/.test(line || '') ? line : 'all',
+    }
+  }
+  // Nomor (bila lebih dari satu): room WhatsApp milik nomor itu; room Instagram ikut semua nomor.
+  const inLine = (row, line) => line === 'all' || isIgRow(row) || String(row.dataset.line || '1') === line
+  function renderInboxLines(lines) {
+    const box = byId('inboxLines')
+    if (!box || !Array.isArray(lines)) return
+    const key = JSON.stringify(lines)
+    box.hidden = !lines.length
+    if (box.dataset.key === key) return
+    box.dataset.key = key
+    const all = box.querySelector('[data-line="all"]')
+    box.replaceChildren(all)
+    for (const line of lines) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.dataset.line = String(line.id)
+      button.textContent = line.label
+      box.append(button)
+    }
+    applyInboxFilters()
   }
   // Saluran: WhatsApp / Instagram (room Instagram ber-jid "@ig").
   const isIgRow = (row) => String(row.dataset.jid || '').endsWith('@ig')
@@ -624,8 +649,11 @@
         button.setAttribute('aria-pressed', String(button.dataset.channel === state.channel))
       )
     }
-    for (const row of allRows) if (!inChannel(row, state.channel)) row.hidden = true
-    const rows = allRows.filter((row) => inChannel(row, state.channel))
+    byId('inboxLines')?.querySelectorAll('[data-line]').forEach((button) =>
+      button.setAttribute('aria-pressed', String(button.dataset.line === state.line))
+    )
+    for (const row of allRows) if (!inChannel(row, state.channel) || !inLine(row, state.line)) row.hidden = true
+    const rows = allRows.filter((row) => inChannel(row, state.channel) && inLine(row, state.line))
     const matches = (row, key) =>
       key === 'all' ||
       (key === 'unanswered' && Number(row.dataset.unanswered) > 0) ||
@@ -812,14 +840,27 @@
     } catch {}
     applyInboxFilters()
   })
-  // Pilihan saluran terakhir diingat di perangkat ini.
+  byId('inboxLines')?.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-line]')
+    if (!button) return
+    const url = new URL(location.href)
+    if (button.dataset.line === 'all') url.searchParams.delete('ln')
+    else url.searchParams.set('ln', button.dataset.line)
+    history.replaceState(null, '', url)
+    try {
+      localStorage.setItem('wa-inbox-line', button.dataset.line)
+    } catch {}
+    applyInboxFilters()
+  })
+  // Pilihan saluran & nomor terakhir diingat di perangkat ini.
   try {
     const saved = localStorage.getItem('wa-inbox-channel')
+    const savedLine = localStorage.getItem('wa-inbox-line')
     const url = new URL(location.href)
-    if (!url.searchParams.has('ch') && (saved === 'wa' || saved === 'ig')) {
-      url.searchParams.set('ch', saved)
-      history.replaceState(null, '', url)
-    }
+    if (!url.searchParams.has('ch') && (saved === 'wa' || saved === 'ig')) url.searchParams.set('ch', saved)
+    if (!url.searchParams.has('ln') && /^\d+$/.test(savedLine || '') && byId('inboxLines')?.querySelector(`[data-line="${savedLine}"]`))
+      url.searchParams.set('ln', savedLine)
+    history.replaceState(null, '', url)
   } catch {}
   window.addEventListener('popstate', applyInboxFilters)
   const inboxSearch = byId('inboxSearch')
@@ -885,6 +926,7 @@
       link.dataset.order = String(Boolean(contact.has_order))
       link.dataset.done = String(Boolean(contact.done_order))
       link.dataset.unanswered = String(Number(contact.unanswered_count) || 0)
+      link.dataset.line = String(Number(contact.line_id) || 1)
       link.dataset.preview = contact.activity || cleanPreview(contact.body)
       link.dataset.search = normalizeSearch(`${name} ${contact.contact_name || ''} ${contact.body || ''}`)
       link.dataset.digits = `${searchDigits(contact.jid)} ${searchDigits(contact.phone_jid)}`
@@ -981,6 +1023,7 @@
       const data = await api('/api/contacts')
       if (version !== contactsRequestVersion) return
       renderContacts(data.contacts || [])
+      renderInboxLines(data.lines || [])
       const selected = (data.contacts || []).find(
         (contact) => contact.jid === contacts.dataset.selectedJid
       )

@@ -1923,5 +1923,6 @@ window.waLocales.id = {
   "Tandai dibaca": "Tandai dibaca",
   "Tandai belum dibaca": "Tandai belum dibaca",
   "Gagal menyimpan.": "Gagal menyimpan.",
+  "Semua nomor": "Semua nomor",
   "jid wajib.": "jid wajib.",
 }
