@@ -150,3 +150,7 @@ Perubahan v3.6.6:
 - Filter jenis Semua · Postingan (feed+carousel) · Reels · Story, berlaku di daftar maupun grid, berdampingan dengan tab status yang sudah ada.
 - Angka performa: TTL insight dipendekkan (2 mnt < 1 hari, 5 mnt < 3 hari, 15 mnt < 14 hari, 30 mnt sisanya) dan semua yang usang diambil ulang setiap permintaan (sebelumnya maks 8 per permintaan sehingga banyak yang tertinggal). Halaman menyegarkan sendiri tiap 60 detik selama terlihat dan dialog tertutup; suka & komentar selalu segar karena ikut daftar media. Halaman lama yang sudah digulir tetap dipertahankan saat penyegaran.
 - Bersinggungan: `#igpList` (tabel) tetap; `#igpTableWrap` disembunyikan saat grid. `loadMore` tetap hanya untuk tab Semua/Terbit. Kunci katalog baru: "Tampilan", "Tampilan daftar", "Tampilan grid". Lebih banyak panggilan insight ke Meta per jam untuk postingan baru — bila kena batas, angka lama tetap dipakai (galat tidak menghapus data).
+
+## v3.6.12 — perbaikan grid Instagram
+
+- Grid kosong bila ada reels/carousel: ikon jenis (SVG) diberi `className` lewat `Object.assign` → `className` SVG hanya-baca → galat menghentikan render. Kini `setAttribute('class', …)`. Pelajaran: untuk elemen SVG selalu pakai `setAttribute('class')`/`classList`.

@@ -379,8 +379,13 @@
       card.dataset.status = row.status
       card.title = row.caption ? row.caption.replace(/\s+/g, ' ').slice(0, 160) : ''
       card.append(thumbOf(row, 'wa-igp-tile-img'))
-      if (row.kind === 'reels' || row.video) card.append(Object.assign(icon('play'), { className: 'wa-igp-tile-type' }))
-      else if (row.kind === 'carousel' || row.count > 1) card.append(Object.assign(icon('layers'), { className: 'wa-igp-tile-type' }))
+      // SVG: className hanya-baca → pakai atribut class.
+      const typeIcon = row.kind === 'reels' || row.video ? 'play' : row.kind === 'carousel' || row.count > 1 ? 'layers' : ''
+      if (typeIcon) {
+        const mark = icon(typeIcon)
+        mark.setAttribute('class', 'wa-igp-tile-type')
+        card.append(mark)
+      }
       if (row.status === 'published') {
         const bar = el('span', undefined, 'wa-igp-tile-stats')
         const labels = { likes: t('Suka'), comments: t('Komentar'), shares: t('Bagikan'), saved: t('Simpan') }
