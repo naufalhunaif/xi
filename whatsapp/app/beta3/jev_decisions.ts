@@ -624,7 +624,7 @@ export async function contactRole(jid: string, chat: Line[]) {
       peran_kontak: {
         type: 'choice',
         instructions:
-          'Siapa lawan chat ini bagi toko jas? pelanggan = orang yang bertanya/memesan/membayar jas ke toko. vendor = pihak yang MENJUAL ke toko atau menyediakan jasa (kain, bahan, kancing, benang, bordir, konveksi, ekspedisi, iklan) — toko yang bertanya harga/stok/memesan/membayar ke mereka. lainnya = tim internal, keluarga, pribadi, grup, spam.',
+          'Siapa lawan chat ini bagi toko jas? pelanggan = orang yang bertanya/memesan/membayar jas ke toko, termasuk yang pesanannya DIANTAR tim toko, diambil di toko, menanyakan alamat/pengantaran, atau bilang "sudah diterima". vendor = pihak yang MENJUAL ke toko atau menyediakan jasa (kain, bahan, kancing, benang, bordir, konveksi, iklan) — toko yang bertanya harga/stok bahan, memesan bahan, atau membayar ke mereka. lainnya = tim internal, keluarga, pribadi, grup, spam. Ragu antara pelanggan dan vendor → pelanggan.',
         criteria: {
           pelanggan: 'Lawan chat membeli/bertanya produk toko',
           vendor: 'Toko membeli bahan/jasa dari lawan chat',

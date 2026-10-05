@@ -74,7 +74,19 @@ export async function scanShipments(batch = 3000) {
       .select('id', 'message_id', 'jid', 'body', 'created_at')
     if (!rows.length) return
     const accounts = await accountNumbers()
+    // Chat vendor/lainnya ("kain sudah diterima") bukan pengiriman pesanan pelanggan (v3.6.33).
+    const notCustomers = new Set<string>(
+      (
+        await db
+          .from('whatsapp_contacts')
+          .whereIn('role', ['vendor', 'lainnya'])
+          .whereIn('jid', [...new Set((rows as any[]).map((row) => String(row.jid)))])
+          .select('jid')
+          .catch(() => [])
+      ).map((row: any) => String(row.jid))
+    )
     for (const row of rows as any[]) {
+      if (notCustomers.has(String(row.jid))) continue
       if (!row.message_id) continue
       const body = String(row.body || '')
       let awb = detectAwb(body, accounts)

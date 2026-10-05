@@ -67,7 +67,7 @@ export const JEV_THRESHOLD: Record<JevDecision, number> = {
   harga_konteks: 0.8,
   bukti_transfer: 0.9,
   kirim_sendiri: 0.85,
-  peran_kontak: 0.85,
+  peran_kontak: 0.95,
 }
 
 export type JevNoul = {

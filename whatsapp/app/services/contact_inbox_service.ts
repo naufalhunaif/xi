@@ -3,6 +3,7 @@ import { initializeDatabase } from '#services/init_model'
 import { ensureLeanTables } from '#beta3/tables'
 import { scanShipments } from '#beta3/shipments'
 import { reconcileCsTotals } from '#beta3/order_service'
+import { repairAutoRoles } from '#beta3/contact_role'
 
 let reconciled = false
 
@@ -163,6 +164,8 @@ export async function latestInboxMessages() {
   if (!reconciled) {
     reconciled = true
     void reconcileCsTotals().catch(() => 0)
+    // v3.6.33: pelanggan yang keliru ditandai vendor/lainnya otomatis dikembalikan.
+    void repairAutoRoles().catch(() => 0)
   }
   const resiSql = (alias: string, after = '') =>
     `EXISTS (SELECT 1 FROM whatsapp_beta3_shipments ${alias} WHERE ${alias}.jid = m.jid${after})`

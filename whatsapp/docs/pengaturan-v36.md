@@ -257,3 +257,8 @@ Perubahan v3.6.6:
 
 - Lihat `docs/cs-pelajaran.md` #19. Kode: `adoptCsTotal`, `reconcileCsTotals`, `applyCsPaymentConfirm` (`order_service.ts`); `markLeanOrderPaid`/`setLeanPaidAmount` mengadopsi total CS bila nominal dana ≠ total; listener memanggil `applyCsPaymentConfirm` setelah pesan CS terkirim (bila bukan pesan total); `contact_inbox_service` menjalankan `reconcileCsTotals` sekali per proses; berat tarif dari `grams ?? weight_grams` (`reply_service.ts`).
 - Bersinggungan: order lunas dari konfirmasi CS di chat ikut diantrekan ke grup produksi seperti tombol "Lunas". Nominal yang lebih besar dari total hanya diterima bila ada total CS yang cocok; selain itu tetap dibatasi total seperti sebelumnya.
+
+## v3.6.33 — pelanggan tidak lagi tertandai vendor
+
+- Lihat `docs/cs-pelajaran.md` #20. Kode: `hasCustomerHistory`, `repairAutoRoles` (`contact_role.ts`, dijalankan sekali per proses dari `contact_inbox_service`), penanda `role-excluded:<jid>` (pengecualian AI karena peran otomatis), ambang `peran_kontak` 0,95, `scanShipments` melewati vendor/lainnya.
+- Bersinggungan: kontak yang dikembalikan ke pelanggan berada di mode CS (AI tidak langsung membalas sampai diaktifkan/ada balasan CS), sama seperti setelah mencabut "Jangan dibalas AI".

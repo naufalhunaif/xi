@@ -444,3 +444,15 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. `applyCsPaymentConfirm` (listener, saat pesan CS terkirim): kalimat konfirmasi dana + Jev `dana_masuk` yakin → order menunggu pembayaran dicatat lunas saat itu juga. Tanpa Jev tidak otomatis (keputusan uang).
 3. Antar/ambil: kata "diambil di store", "datang ke toko/store", "sudah diterima" ikut dikenali (v3.6.31 sudah: diantar, diambil, kurir toko).
 4. Berat tarif dibaca dari `grams` atau `weight_grams`.
+
+## #20 · Okt 2026 · pelanggan yang pesanannya diantar ditandai vendor (diterapkan v3.6.33)
+
+**Laporan pemilik:** chat Mauldy — pelanggan yang pesanannya diantar tim — bertanda VENDOR (AI ikut berhenti membalas).
+
+**Penyebab:** penilaian peran (Jev `peran_kontak`, v3.6.31) hanya melihat 14 pesan terakhir; percakapan antar/alamat/"sudah diterima" mirip urusan dengan pemasok, dan riwayat transaksi pelanggan tidak dipertimbangkan.
+
+**Perubahan**
+1. Bukti transaksi menang: kontak yang punya order (tidak batal), pengiriman (resi atau diantar tim), atau bukti bayar tidak pernah ditandai vendor/lainnya otomatis (`hasCustomerHistory`).
+2. Jev: ambang 0,95; instruksi menyebut pesanan diantar/diambil/alamat/"sudah diterima" = pelanggan, ragu = pelanggan.
+3. Perbaikan sekali jalan (`repairAutoRoles`, saat kotak masuk dibuka): peran otomatis vendor/lainnya yang punya riwayat pelanggan → pelanggan; yang tanpa riwayat ditanyakan ulang ke Jev dengan instruksi baru, tetap vendor hanya bila Jev yakin. Pengecualian AI yang dibuat oleh penandaan otomatis ikut dicabut (mode CS, AI bisa diaktifkan lagi). Peran yang diatur manual CS tidak disentuh.
+4. Pemindai pengiriman melewati chat vendor/lainnya ("kain sudah diterima" bukan pengiriman pesanan).
