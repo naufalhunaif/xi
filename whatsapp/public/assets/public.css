@@ -1,16 +1,76 @@
-:root{--bg:#f7f7f5;--card:#fff;--text:#1d1f1d;--muted:#6b716c;--line:#e4e6e3;--accent:#18865b}
-@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#171719;--text:#e6ebe7;--muted:#9aa59d;--line:#2c2c30;--accent:#88d9ad}}
-*{box-sizing:border-box}
-body{margin:0;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:32px 16px;background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
-main{width:min(460px,100%);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:28px}
-.brand{display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;font-weight:600;font-size:18px}
-h1{margin:18px 0 6px;font-size:20px;font-weight:600}
-p{margin:0 0 12px;color:var(--muted)}
-ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
-li{display:grid;grid-template-columns:18px 1fr;gap:8px;color:var(--text)}
-li::before{content:"";width:6px;height:6px;margin:9px 0 0 4px;border-radius:50%;background:var(--accent)}
-.button{display:block;margin-top:22px;padding:10px 14px;border-radius:6px;background:var(--accent);color:#fff;text-align:center;text-decoration:none;font-weight:500}
-@media(prefers-color-scheme:dark){.button{color:#06150e}}
-footer{display:flex;gap:16px;font-size:12px;color:var(--muted)}
-footer a{color:inherit;text-decoration:none}footer a:hover{color:var(--text)}
-small{display:block;margin-top:18px;color:var(--muted);font-size:12px}
+/* Halaman publik (beranda tanpa login, Privacy, Terms) — gaya Wireframe yang sama dengan login (v3.6.28):
+   latar off-white hangat, kartu putih radius 8 bergaris tipis, label monospace, tombol hitam. */
+:root {
+  color-scheme: light dark;
+  --bg: #edebe5;
+  --card: #fff;
+  --text: #151515;
+  --muted: #6b6b66;
+  --line: #e2e0d9;
+  --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a18; --card: #242422; --text: #ecebe6; --muted: #9c9b94; --line: #2e2e2b; }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 32px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.55 var(--sans);
+}
+main {
+  width: min(520px, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 26px 28px 28px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 21px;
+  letter-spacing: -0.01em;
+}
+.brand svg { width: 24px; height: 24px; }
+.kicker {
+  display: block;
+  margin: 2px 0 0 34px;
+  font: 400 10.5px/1.4 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 { margin: 22px 0 6px; font: 400 20px/1.25 var(--sans); letter-spacing: -0.01em; }
+h2 { margin: 20px 0 6px; font: 400 10.5px/1.4 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+p { margin: 0 0 12px; color: var(--text); }
+ul { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; color: var(--text); }
+li::before { content: ""; width: 6px; height: 6px; margin: 9px 0 0 2px; border-radius: 50%; background: var(--text); }
+.button {
+  display: block;
+  margin-top: 22px;
+  padding: 11px 14px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--bg);
+  text-align: center;
+  text-decoration: none;
+  font-weight: 500;
+}
+.button:hover { opacity: 0.88; }
+footer { display: flex; gap: 18px; font: 400 10.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+footer a { color: inherit; text-decoration: none; }
+footer a:hover { color: var(--text); }
+small { display: block; margin-top: 18px; font: 400 10.5px/1.4 var(--mono); letter-spacing: 0.08em; color: var(--muted); }

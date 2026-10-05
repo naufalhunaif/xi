@@ -231,3 +231,8 @@ Perubahan v3.6.6:
 
 - Sebelumnya `wire.css` hanya mengubah bentuk di mode terang (`html:not([data-theme='dark'])`), jadi di mode gelap (sistem Mac gelap → `theme.js` auto) halaman `/` dan lainnya masih tampil dengan tema gelap lama (hijau, bubble lama). Kini aturan bentuk berlaku dua tema (`html[data-theme]`, mengalahkan `theme.css` karena dimuat terakhir) dan mode gelap punya token grafit sendiri: halaman `#1a1a18`, kartu `#242422`, garis `#2e2e2b`, teks `#ecebe6`; tombol utama, kontak aktif, tab terpilih, menu pengaturan aktif memakai warna teks (bukan hijau). Hijau/merah/kuning tetap untuk status (terhubung, lunas, gagal).
 - Bersinggungan: `theme.css` tidak diubah; token `--wa-page/--wa-surface/--wa-raised/--wa-hover` di `html[data-theme='dark']` ditimpa oleh `wire.css`. Pilihan tema (auto/terang/gelap) di Pengaturan tetap ada.
+
+## v3.6.28 — halaman `/` tanpa login (beranda publik) ikut tema Wireframe, berbahasa Inggris
+
+- Halaman `/` saat belum login bukan halaman login, melainkan beranda publik dari `legal_controller.ts` (`landingPage`, dipakai `account_auth_middleware`), beserta `/privacy` dan `/terms` — ini yang masih memakai gaya lama (hijau, Indonesia). Kini `public.css` memakai token Wireframe yang sama dengan login (off-white/grafit, kartu radius 8, label monospace, tombol warna teks), teks Inggris (Sign in, Home/Privacy/Terms, Privacy Policy, Terms of Service), `lang="en"`, dan `public.css?v=<versi>`.
+- Bersinggungan: isi kebijakan privasi/syarat (dipakai untuk Google OAuth & Meta) diterjemahkan apa adanya; tautan `#hapus-data` tetap.
