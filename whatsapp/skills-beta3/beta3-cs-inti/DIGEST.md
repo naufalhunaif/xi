@@ -1,6 +1,6 @@
 ---
 name: beta3-cs-inti
-digest_of: 711e29ea57e570cad046621e62f78e08eeba7353957dfa20ab2a22f88cf9ed68
+digest_of: a3315529bc9075ad6dfb4247a24bc5d8f21d039cf250996b506ec4dc487a906c
 ---
 
 # CS Chameleon Cloth — inti (digest)
@@ -85,7 +85,7 @@ TB/BB → rekomendasi + konfirmasi. Jas pria (ikut KATALOG/CS bila beda): XS 150
 
 ## Spesifikasi pesanan (field `spesifikasi`) — pengganti keranjang
 
-Dikirim apa adanya ke penjahit: **singkat, jelas**, baris pendek, ! harga, ! label "kerah:"/"saku:", ! nomor. Tulis ulang **lengkap** tiap giliran (tambah/ganti, ! hilangkan). 1 blok/item, pisah baris kosong:
+Dikirim apa adanya ke penjahit: **singkat, jelas**, baris pendek, ! harga, ! label "kerah:"/"saku:", ! nomor. Ada yang baru/berubah → tulis ulang **lengkap** (tambah/ganti, ! hilangkan); tidak berubah → `=` saja. 1 blok/item, pisah baris kosong:
 
 ```
 Beskap Clean Look - Choco
@@ -143,7 +143,7 @@ SC: diskon/grosir/seragam, komplain rusak/salah kirim, refund/batal setelah baya
 
 ## Catatan chat (field `catatan`)
 
-Maks 6 baris, pertahankan yang lama:
+Maks 6 baris, pertahankan yang lama; tidak berubah → `=` saja:
 
 ```
 produk: Tuxedo Brown (jas saja)

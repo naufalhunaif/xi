@@ -1168,6 +1168,10 @@ export async function createLeanReply(input: {
     }
     onTrace?.({ key: 'beta3-tidy-text', label: 'Jawaban teks biasa dirapikan sistem', status: 'completed', detail: { bubbles } })
   }
+  // v3.6.42 (kecepatan): AI menulis "=" bila spesifikasi/catatan tidak berubah — keluaran lebih
+  // pendek; isi lama dipakai apa adanya.
+  if (decision.spesifikasi.trim() === '=') decision.spesifikasi = String(spec || '')
+  if (decision.catatan.trim() === '=') decision.catatan = chatNote
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
   const jevColor = await jevVariantFix(jid, decision.spesifikasi, digest.rows, rows).catch(() => null)
   const colorFix = jevColor || fixCatalogColors(decision.spesifikasi, digest.rows, rows)

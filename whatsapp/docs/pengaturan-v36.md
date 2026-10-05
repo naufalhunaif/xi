@@ -321,3 +321,11 @@ Perubahan v3.6.6:
 - Total menulis REG/YES/JTR, bukan kode CTC/CTCYES/CTCJTR.
 - Form tanpa No. telp memakai nomor WhatsApp chat (kontak @lid tetap ditanyakan).
 - Settings → Usage → Recent runs: status berupa ikon terisi (centang hijau = selesai, silang merah = gagal).
+
+## v3.6.42 — Balasan lebih cepat (model sama)
+
+- **Gambar:** pesan bergambar tidak lagi mencoba akun lain dari penyedia yang baru gagal membaca gambar di permintaan itu. Catatan: 3 kegagalan ChatGPT 6 Okt adalah akun #6/#8/#9 yang habis kuota (dijeda otomatis sampai 26 Okt), jadi tidak terulang.
+- **Batas tunggu:** balasan chat menunggu maks. 50 dtk per akun lalu pindah ke akun berikutnya; akun terakhir tetap 120 dtk (tidak ada lagi tunggu 100+ dtk sebelum dicoba akun lain).
+- **Keluaran lebih pendek:** AI menulis `=` untuk spesifikasi/catatan yang tidak berubah (sistem memakai isi lama); alasan maks. ±12 kata. SKILL.md & DIGEST.md ikut menyebut aturan ini.
+- **Penalaran rendah** untuk balasan chat bila Pengaturan AI = Otomatis (Haiku tidak diubah; pilihan manual pemilik tetap dipakai). Rekap, digest, uji, dll. tidak berubah.
+- Model per tingkat tidak diubah.

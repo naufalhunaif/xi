@@ -40,6 +40,8 @@ export type LeanProviderSettings = {
   claudeSpeed: string
   claudeReasoning: string
   claudeBin: string
+  /** v3.6.42: batas tunggu satu percobaan (ms); kosong = TIMEOUT_MS. */
+  timeoutMs?: number
 }
 
 export type LeanProviderResult = {
@@ -51,6 +53,9 @@ export type LeanProviderResult = {
 }
 
 const TIMEOUT_MS = 120_000
+/** Batas tunggu balasan chat per akun (bukan akun terakhir) sebelum pindah akun. */
+const REPLY_TIMEOUT_MS = 50_000
+const REPLY_PHASES = new Set(['beta3-reply'])
 // Alias selalu menunjuk Flash terbaru (model 2.5 kini tertutup untuk API key baru).
 export const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest'
 /** Cadangan saat model Gemini pilihan sedang penuh (dicoba berurutan, akun sama). */
@@ -103,6 +108,33 @@ const blockedList = (value: string) => value.split(',').map((item) => item.trim(
 const STOP_CODES = new Set(['AI_CONTEXT_LIMIT', 'AI_SCHEMA_INVALID', 'DATABASE_UNAVAILABLE'])
 
 /**
+ * Pengaturan satu percobaan: tugas ringan → penalaran rendah (Haiku dibiarkan); balasan chat
+ * (v3.6.42) → penalaran rendah bila "Otomatis" dan batas tunggu 50 dtk kecuali akun terakhir.
+ */
+export function leanTuning(
+  settings: LeanProviderSettings,
+  input: { phase: string; tier: AutoTier | null; last: boolean }
+): LeanProviderSettings {
+  const autoEffort = (value: string) => !value || value === 'auto'
+  const chatReply = REPLY_PHASES.has(input.phase)
+  const base = chatReply ? { ...settings, timeoutMs: input.last ? TIMEOUT_MS : REPLY_TIMEOUT_MS } : settings
+  if (input.tier === 'light')
+    return {
+      ...base,
+      chatgptReasoning: autoEffort(settings.chatgptReasoning) ? 'low' : settings.chatgptReasoning,
+      // Haiku tidak mendukung pengaturan effort; biarkan bawaan agar tidak gagal.
+      claudeReasoning: settings.claudeReasoning,
+    }
+  if (input.tier && chatReply)
+    return {
+      ...base,
+      chatgptReasoning: autoEffort(settings.chatgptReasoning) ? 'low' : settings.chatgptReasoning,
+      claudeReasoning: autoEffort(settings.claudeReasoning) ? 'low' : settings.claudeReasoning,
+    }
+  return base
+}
+
+/**
  * Banyak akun AI: dicoba sesuai urutan di Pengaturan → AI. Akun yang habis kuota
  * atau perlu login dijeda sementara, lalu otomatis dipakai lagi setelah pulih.
  */
@@ -133,7 +165,12 @@ export async function runLeanProvider(
     })
   }
   let lastError: unknown
-  for (const account of accounts) {
+  // v3.6.42 (kecepatan): balasan chat memakai batas tunggu lebih pendek per akun (akun terakhir
+  // tetap penuh), penalaran rendah bila "Otomatis", dan pesan bergambar tidak mencoba akun lain
+  // dari penyedia yang baru gagal membaca gambar di permintaan ini.
+  const failedWithImage = new Set<string>()
+  for (const [index, account] of accounts.entries()) {
+    if (imagePaths.length && failedWithImage.has(account.provider) && index < accounts.length - 1) continue
     await recordAiEvent(account.id, 'start', phase, '', null, jid).catch(() => {})
     // Laporan limit Claude selama run → sisa kuota akun ini di Pengaturan → Usage.
     const quota = new Map<string, QuotaWindow>()
@@ -158,15 +195,7 @@ export async function runLeanProvider(
         : []
       const wanted = fixed || ladder.find((model) => !blocked.includes(model)) || ''
       // Tugas ringan pada mode otomatis: penalaran rendah (kecuali pemilik mengatur sendiri).
-      const tuned =
-        tier === 'light'
-          ? {
-              ...settings,
-              chatgptReasoning: !settings.chatgptReasoning || settings.chatgptReasoning === 'auto' ? 'low' : settings.chatgptReasoning,
-              // Haiku tidak mendukung pengaturan effort; biarkan bawaan agar tidak gagal.
-              claudeReasoning: settings.claudeReasoning,
-            }
-          : settings
+      const tuned = leanTuning(settings, { phase, tier, last: index === accounts.length - 1 })
       const attempt = (useDefault: boolean) =>
         withAiAccount(aiAccountRef(account), () =>
           runLeanOnce(
@@ -228,6 +257,7 @@ export async function runLeanProvider(
         jid
       ).catch(() => {})
       if (STOP_CODES.has(detail.code)) throw error
+      if (imagePaths.length && !SWITCHABLE.has(detail.code)) failedWithImage.add(account.provider)
       // Kuota habis / perlu login → akun dijeda. Gangguan lain → cukup coba akun berikutnya.
       // Kuota/login → jeda lama; gangguan lain → jeda singkat agar tidak dicoba tiap pesan.
       await markAiAccountLimited(
@@ -378,7 +408,8 @@ function collect(
   provider: 'chatgpt' | 'claude',
   stdin: string,
   onEvent: (event: Record<string, any>) => void,
-  extract: (event: Record<string, any>) => string | undefined
+  extract: (event: Record<string, any>) => string | undefined,
+  timeoutMs = TIMEOUT_MS
 ) {
   return new Promise<string>((resolve, reject) => {
     let output = ''
@@ -420,7 +451,7 @@ function collect(
             : 'ChatGPT terlalu lama merespons.'
         )
       )
-    }, TIMEOUT_MS)
+    }, timeoutMs)
     observeProviderProcess(child, provider)
     child.stdout?.on('data', (chunk) => {
       output += String(chunk)
@@ -494,10 +525,16 @@ async function runCodexLean(
     ],
     { env: { ...codexOAuthEnv() }, stdio: ['pipe', 'pipe', 'pipe'] }
   )
-  return collect(child, 'chatgpt', prompt.user, onEvent, (event) =>
-    event.type === 'item.completed' && event.item?.type === 'agent_message'
-      ? String(event.item.text || '')
-      : undefined
+  return collect(
+    child,
+    'chatgpt',
+    prompt.user,
+    onEvent,
+    (event) =>
+      event.type === 'item.completed' && event.item?.type === 'agent_message'
+        ? String(event.item.text || '')
+        : undefined,
+    settings.timeoutMs
   )
 }
 
@@ -584,12 +621,18 @@ async function spawnClaude(
       stdio: ['pipe', 'pipe', 'pipe'],
     }
   )
-  return collect(child, 'claude', user, onEvent, (event) =>
-    event.type === 'result'
-      ? event.structured_output
-        ? JSON.stringify(event.structured_output)
-        : String(event.result || '')
-      : undefined
+  return collect(
+    child,
+    'claude',
+    user,
+    onEvent,
+    (event) =>
+      event.type === 'result'
+        ? event.structured_output
+          ? JSON.stringify(event.structured_output)
+          : String(event.result || '')
+        : undefined,
+    settings.timeoutMs
   )
 }
 

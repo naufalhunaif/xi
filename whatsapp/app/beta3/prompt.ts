@@ -43,7 +43,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     catatan: {
       type: 'string',
       description:
-        'Catatan chat untuk giliran berikutnya, maksimal 6 baris: produk, size (TB/BB), bagian yang dipesan WAJIB ditulis (jas saja / jas+celana / jas+celana+rompi — termasuk yang dibahas CS atau terlihat di foto referensi), alamat, tahap, menunggu apa.',
+        'Catatan chat untuk giliran berikutnya, maksimal 6 baris: produk, size (TB/BB), bagian yang dipesan WAJIB ditulis (jas saja / jas+celana / jas+celana+rompi — termasuk yang dibahas CS atau terlihat di foto referensi), alamat, tahap, menunggu apa. Tidak ada yang berubah dari CATATAN CHAT → isi "=" saja.',
     },
     tahap: { type: 'string', enum: [...LEAN_STAGES] },
     serah_cs: {
@@ -51,11 +51,11 @@ export const LEAN_OUTPUT_SCHEMA = {
       description:
         'true hanya bila kebutuhan pelanggan di luar wewenang (komplain, diskon, grosir, hal yang skill sebut tanya CS). Saat true, pesan boleh kosong.',
     },
-    alasan: { type: 'string', description: 'Satu kalimat alasan keputusan untuk audit CS.' },
+    alasan: { type: 'string', description: 'Satu kalimat pendek (maks. 12 kata) alasan keputusan untuk audit CS.' },
     spesifikasi: {
       type: 'string',
       description:
-        'Catatan untuk penjahit, ditulis ulang LENGKAP tiap giliran, baris pendek tanpa harga/label/nomor: per item "Produk - Warna", "Jas, Celana" (yang dibuat), "Size M/31", "Tinggi 164/68" bila ada, lalu tiap detail custom satu baris dengan kata sehari-hari (mis. "Kerah shawl", "Kancing 1", "Tanpa saku dada"). Ukuran badan custom satu baris: "Ukuran badan: dada 96, pinggang 80, lengan 60". Model dari gambar pelanggan: tulis "Model sesuai gambar" lalu bagiannya. Warna ditulis PERSIS seperti permintaan/gambar pelanggan (mis. "Broken White"), jangan diganti ke warna katalog terdekat; bila tiap bagian beda warna/bahan, tulis per bagian (mis. "Rompi broken white", "Kerah senada"). Item dipisah baris kosong. Bila pelanggan minta dikirim sebelum tanggal tertentu DAN toko menyanggupi/mengusahakan, tambah baris terakhir "Dikirim sebelum: <tanggal>" (mis. "Dikirim sebelum: 1 Oktober"). Kosong bila pelanggan belum memilih apa pun.',
+        'Catatan untuk penjahit. Tidak ada yang baru/berubah dari SPESIFIKASI PESANAN SAAT INI → isi "=" saja. Ada perubahan → tulis ulang LENGKAP, baris pendek tanpa harga/label/nomor: per item "Produk - Warna", "Jas, Celana" (yang dibuat), "Size M/31", "Tinggi 164/68" bila ada, lalu tiap detail custom satu baris dengan kata sehari-hari (mis. "Kerah shawl", "Kancing 1", "Tanpa saku dada"). Ukuran badan custom satu baris: "Ukuran badan: dada 96, pinggang 80, lengan 60". Model dari gambar pelanggan: tulis "Model sesuai gambar" lalu bagiannya. Warna ditulis PERSIS seperti permintaan/gambar pelanggan (mis. "Broken White"), jangan diganti ke warna katalog terdekat; bila tiap bagian beda warna/bahan, tulis per bagian (mis. "Rompi broken white", "Kerah senada"). Item dipisah baris kosong. Bila pelanggan minta dikirim sebelum tanggal tertentu DAN toko menyanggupi/mengusahakan, tambah baris terakhir "Dikirim sebelum: <tanggal>" (mis. "Dikirim sebelum: 1 Oktober"). Kosong bila pelanggan belum memilih apa pun.',
     },
     referensi: {
       type: 'array',
@@ -288,7 +288,7 @@ export function buildLeanPrompt(input: {
     [
       'spesifikasi',
       input.spec
-        ? `SPESIFIKASI PESANAN SAAT INI (tulis ulang lengkap di field spesifikasi, tambahkan detail baru, jangan hilangkan yang lama kecuali pelanggan mengubahnya):\n${input.spec}`
+        ? `SPESIFIKASI PESANAN SAAT INI (tidak berubah → field spesifikasi "="; berubah → tulis ulang lengkap, tambahkan detail baru, jangan hilangkan yang lama kecuali pelanggan mengubahnya):\n${input.spec}`
         : 'SPESIFIKASI PESANAN: belum ada. Begitu pelanggan memilih produk/warna/size/detail, mulai isi field spesifikasi.',
     ],
     ['riwayat', renderHistory(input.history)],
