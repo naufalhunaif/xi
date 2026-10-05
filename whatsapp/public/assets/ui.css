@@ -568,3 +568,9 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-jev-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .workspace-ui .wa-jev-actions select { min-width: 0; max-width: 100%; flex: 1 1 160px; }
 .workspace-ui .wa-jev-actions .wa-pill { white-space: normal; height: auto; line-height: 1.4; padding-block: 3px; }
+
+/* v3.6.41 — status di Proses terbaru: ikon terisi. */
+.workspace-ui .wa-run-status { width: 16px; height: 16px; display: block; }
+.workspace-ui .wa-run-status circle { fill: #1f9d55; }
+.workspace-ui .wa-run-status.fail circle { fill: #d64545; }
+.workspace-ui .wa-run-status path { fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }

@@ -313,3 +313,11 @@ Perubahan v3.6.6:
 
 - Settings → Kualitas → Kasus uji: pilihan model di samping **Jalankan semua**: Model otomatis (seperti balasan), Model paling kuat (Claude Opus / ChatGPT Sol), Paling kuat · Claude, Paling kuat · ChatGPT. Dipakai untuk membandingkan skill ringkas (digest) vs skill asli di model yang sama.
 - API: `POST /api/beta3/tests/run` menerima `tier: "heavy"` dan `provider: "claude" | "chatgpt"`.
+
+## v3.6.41 — Total, rekening ganda, ikon status
+
+- Total otomatis: produk bernama terpanjang menang (mis. "Tuxedo Double Breasted" tidak lagi jatuh ke "Tuxedo - Maroon"); celana/rompi dicek pada baris berharga; bagian yang sudah dipilih tidak ditanyakan ulang. Detail: `docs/cs-pelajaran.md` #22.
+- Pengiriman pesan: tidak ada lagi pesan terkirim dua kali karena salinan "owner" dari WhatsApp (balapan pencatatan id).
+- Total menulis REG/YES/JTR, bukan kode CTC/CTCYES/CTCJTR.
+- Form tanpa No. telp memakai nomor WhatsApp chat (kontak @lid tetap ditanyakan).
+- Settings → Usage → Recent runs: status berupa ikon terisi (centang hijau = selesai, silang merah = gagal).

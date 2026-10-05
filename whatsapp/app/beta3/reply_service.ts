@@ -702,6 +702,16 @@ export async function createLeanReply(input: {
     }
   }
   const form = typedForm || typedLookback || pasted
+  // v3.6.41: No. telp di form kosong → pakai nomor WhatsApp chat ini (seperti CS: "pakai nomor ini
+  // aja"), jangan ditanyakan sambil total dikirim. Kontak @lid (tanpa nomor) tetap ditanyakan AI.
+  let phoneFromWa = false
+  if (form && !form.phone) {
+    const waPhone = phoneFromJid(jid)
+    if (waPhone) {
+      form.phone = `0${waPhone.replace(/^62/, '')}`
+      phoneFromWa = true
+    }
+  }
 
   // Pertanyaan ongkir bebas ("ongkir ke cinyawang berapa"): kode cari tujuan lalu tarif.
   // Lanjutannya ("kalo ke jakarta?", "mampang", "jakarta selatan") dikenali 30 menit.
@@ -924,6 +934,7 @@ export async function createLeanReply(input: {
       ')' +
       (missed ? ' — form ini dikirim pelanggan sebelumnya (saat CS membalas) dan baru tercatat sekarang; lanjutkan prosesnya sendiri, jangan menunggu CS' : '') +
       '. Jangan menulis total atau rekening di pesan — sistem yang mengirimnya. ' +
+      (phoneFromWa ? 'No. telp di form kosong: sistem memakai nomor WhatsApp chat ini — jangan menanyakan nomor telp. ' : '') +
       'Isi field order (rincian per item dengan nama persis KATALOG + harga, subtotal, layanan ongkir yang dipilih pelanggan). ' +
       'Kalau ada TB/BB dan size yang dipilih terlihat tidak cocok, konfirmasi size dulu (satu pertanyaan). ' +
       (rateText
@@ -1398,11 +1409,16 @@ export async function createLeanReply(input: {
       decision.pesan = decision.pesan
         .map((bubble) => bubble.replace(/,?\s*(ini|berikut)\s+totalnya.*$/i, '').trim())
         .filter((bubble) => bubble && !/\b(ini|berikut)\b[^.?!]*\btotal/i.test(bubble))
-      const asked = decision.pesan.some((bubble) => /\?/.test(bubble) && parts.some((part) => new RegExp(part, 'i').test(bubble)))
-      if (!asked)
+      // v3.6.41: bagian yang sudah dipilih pelanggan (ada di spesifikasi) tidak ditanyakan lagi —
+      // total ditahan untuk dihitung (rincian/harga belum cocok katalog), bukan "mau jas saja?".
+      const open = parts.filter((part) => !new RegExp(`\\b${part}`, 'i').test(String(spec || '')))
+      const asked = decision.pesan.some((bubble) => /\?/.test(bubble) && open.some((part) => new RegExp(part, 'i').test(bubble)))
+      if (open.length && !asked)
         decision.pesan.push(
-          `mau jas saja atau sekalian ${parts.length > 1 ? 'celana dan rompinya' : `${parts[0]}nya`} ${style?.address || 'bos'}? biar totalnya pas`
+          `mau jas saja atau sekalian ${open.length > 1 ? 'celana dan rompinya' : `${open[0]}nya`} ${style?.address || 'bos'}? biar totalnya pas`
         )
+      if (!open.length && !decision.pesan.length)
+        decision.pesan.push(`siap ${style?.address || 'bos'}, datanya sudah masuk ya, totalnya saya hitung dulu`)
     }
     // Setelan tanpa nomor celana: tanya dulu (kalimat CS), total menyusul setelah dijawab.
     if (!verdict.ok && verdict.reason === 'nomor celana belum diketahui' && !decision.serah_cs) {

@@ -469,3 +469,25 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 1. Pola antar-sendiri + "ta/tak antar/anter", "sudah antar"; pindai ulang sekali (`rescanSelfDeliveries`, 120 hari, hanya chat yang punya order dan bukan vendor).
 2. Order dari chat vendor/lainnya hanya tampil di tab baru **Vendor** (badge "Pembelian bahan", tanpa tombol order pelanggan), tidak dihitung di tab lain, tidak dikirim ke grup produksi, tidak dibuat oleh Rekap dari chat, dan chat vendor tidak bertanda order di kotak masuk.
 3. Perbaikan data sekali per proses berjalan berurutan (total CS → peran vendor keliru → antar-sendiri lama) saat kotak masuk atau halaman Order dibuka pertama kali.
+
+## #22 · Okt 2026 · uji pemilik: total salah (jas saja), rekening terkirim dua kali, "Ongkir CTC" (diterapkan v3.6.41)
+
+**Percakapan uji:** pelanggan kirim foto Tuxedo Double Breasted maroon (AI: pre-order 535.000), minta sekalian celana (AI: 755.000), size S/31, celana panjang 102, REG ke Patimuan, form tanpa No. telp.
+
+**Yang salah**
+1. Total otomatis "Tuxedo Double Breasted - Maroon … Total 485.000 + 9.000" — harga produk lain ("Tuxedo - Maroon") dan celana tidak dihitung.
+2. Pesan rekening masuk dua kali (sekali "AI", sekali "CS").
+3. Baris ongkir "CTC 9.000" padahal pelanggan memilih REG.
+4. AI menanyakan No. telp sementara total & rekening dikirim bersamaan.
+
+**Penyebab**
+1. Rincian dari spesifikasi dicocokkan longgar: baris berisi "tuxedo" + "maroon" jatuh ke produk "Tuxedo" warna Maroon. Pemeriksaan celana/rompi memakai seluruh rincian, dan baris detail "Jas, Celana" dianggap sudah mencakup celana.
+2. Balapan pengiriman: salinan pesan dari WhatsApp tercatat sebagai "owner" sebelum pesan antrean diberi id-nya → pencatatan gagal (id kembar) → dianggap gagal kirim → dikirim ulang (fitur kirim ulang v3.6.29).
+3. Kode JNE dalam kota (CTC) ditulis apa adanya.
+4. Form tanpa No. telp.
+
+**Perubahan**
+1. Produk dengan nama terpanjang yang cocok menentukan baris; warna yang tidak ada di produk itu = di luar katalog (total ditahan, bukan memakai produk lain). Bagian celana/rompi dicek pada baris berharga saja; bagian yang sudah dipilih pelanggan tidak ditanyakan ulang ("mau jas saja?"), total ditahan untuk dihitung.
+2. Setelah WhatsApp mengonfirmasi terkirim, pesan tidak pernah dikirim ulang; salinan "owner" ber-id sama dilebur. Percobaan ulang lebih dulu memeriksa salinan "owner" dengan isi sama (sudah terkirim → tidak dikirim lagi).
+3. Total menampilkan REG/YES/JTR untuk CTC/CTCYES/CTCJTR.
+4. No. telp kosong → nomor WhatsApp chat itu dipakai, AI diberi tahu untuk tidak menanyakannya.

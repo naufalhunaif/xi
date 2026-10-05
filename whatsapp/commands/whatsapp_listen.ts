@@ -1900,6 +1900,9 @@ export default class WhatsappListen extends BaseCommand {
       .limit(20)
     for (const message of queued) {
       let sentMessageId = ''
+      // v3.6.41: percobaan ulang — pesan yang sama mungkin SUDAH terkirim (WhatsApp mengirim
+      // balik salinannya sebagai pesan "owner"). Pakai salinan itu, jangan kirim dua kali.
+      if (Number(message.send_attempts || 0) > 0 && (await this.adoptEchoedSend(message))) continue
       try {
         let quoted: WAMessage | undefined
         if (message.reply_to_message_id) {
@@ -1927,22 +1930,7 @@ export default class WhatsappListen extends BaseCommand {
           quoted ? { quoted } : undefined
         )
         if (!sent?.key.id) throw new Error('Pengiriman belum dikonfirmasi.')
-        const sentId = sent.key.id
-        sentMessageId = sentId
-        if (sentId !== message.message_id) {
-          await db
-            .from('whatsapp_reactions')
-            .where('target_message_id', message.message_id)
-            .update({ target_message_id: sentId })
-          await db
-            .from('whatsapp_messages')
-            .where('reply_to_message_id', message.message_id)
-            .update({ reply_to_message_id: sentId })
-        }
-        await db
-          .from('whatsapp_messages')
-          .where('id', message.id)
-          .update({ status: 'sent', message_id: sentId })
+        sentMessageId = sent.key.id
       } catch (error) {
         // Gagal kirim (koneksi putus sesaat, dua pesan beruntun): coba lagi sampai 3x di putaran
         // berikutnya; alasannya disimpan supaya tampak di chat (v3.6.29).
@@ -1955,6 +1943,11 @@ export default class WhatsappListen extends BaseCommand {
         if (attempts < 3) this.logger.info(`Kirim ulang (${attempts}/3) ${message.jid}: ${reason}`)
         continue
       }
+      // v3.6.41: pesan SUDAH terkirim. Pencatatan sesudahnya tidak boleh membuatnya dikirim ulang:
+      // salinan "owner" yang lebih dulu masuk (id sama) dihapus, lalu baris ini memakai id itu.
+      await this.markSent(message, sentMessageId).catch((error) =>
+        this.logger.info(`Pesan terkirim tapi pencatatan gagal ${message.jid}: ${String(error).slice(0, 200)}`)
+      )
       // A mode-update error must not turn an already sent message into a failed send.
       if (message.sender_type === 'cs') {
         // Total yang diketik CS di chat langsung memperbarui order (v3.6.30).
@@ -2703,6 +2696,62 @@ export default class WhatsappListen extends BaseCommand {
       imagePaths: images.map((image) => image.path),
       imageIds: images.map((image) => image.id),
     })
+  }
+
+  /** Tandai pesan antrean terkirim dengan id WhatsApp-nya; salinan "owner" ber-id sama dilebur. */
+  private async markSent(message: Record<string, any>, sentId: string) {
+    // Salinan pesan kita sendiri yang lebih dulu dicatat listener sebagai "owner".
+    await db
+      .from('whatsapp_messages')
+      .where('message_id', sentId)
+      .whereNot('id', message.id)
+      .where('direction', 'out')
+      .where('sender_type', 'owner')
+      .delete()
+    if (sentId !== message.message_id) {
+      await db.from('whatsapp_reactions').where('target_message_id', message.message_id).update({ target_message_id: sentId })
+      await db.from('whatsapp_messages').where('reply_to_message_id', message.message_id).update({ reply_to_message_id: sentId })
+    }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await db.from('whatsapp_messages').where('id', message.id).update({ status: 'sent', message_id: sentId })
+        return
+      } catch {
+        // Salinan "owner" masuk tepat di antara hapus & simpan: hapus lagi lalu ulangi.
+        await db
+          .from('whatsapp_messages')
+          .where('message_id', sentId)
+          .whereNot('id', message.id)
+          .where('sender_type', 'owner')
+          .delete()
+          .catch(() => {})
+      }
+    }
+    // Apa pun yang terjadi, pesan ini sudah terkirim: jangan pernah masuk antrean lagi.
+    await db.from('whatsapp_messages').where('id', message.id).update({ status: 'sent' })
+  }
+
+  /**
+   * Percobaan ulang: bila sudah ada salinan "owner" dengan isi sama di chat itu sejak pesan ini
+   * dibuat, pesan sebenarnya sudah terkirim — pakai salinan itu (true = jangan kirim lagi).
+   */
+  private async adoptEchoedSend(message: Record<string, any>) {
+    const body = String(message.body || '').trim()
+    if (!body || message.media_url) return false
+    const echo = await db
+      .from('whatsapp_messages')
+      .where('jid', message.jid)
+      .where('direction', 'out')
+      .where('sender_type', 'owner')
+      .where('body', body)
+      .where('created_at', '>=', new Date(new Date(message.created_at).getTime() - 5_000))
+      .orderBy('id', 'asc')
+      .first()
+      .catch(() => null)
+    if (!echo?.message_id) return false
+    await this.markSent(message, String(echo.message_id))
+    this.logger.info(`Pesan antrean ${message.id} ternyata sudah terkirim; tidak dikirim ulang.`)
+    return true
   }
 
   private async canSendAiReply(jid: string, socket: WASocket) {

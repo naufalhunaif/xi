@@ -557,12 +557,20 @@ export function renderTotalMessage(input: {
   const total = input.subtotal + input.shippingCost
   const lines = [
     input.items.trim(),
-    `Ongkir${input.shippingService ? ` ${input.shippingService}` : ''} ${rupiah(input.shippingCost)}`,
+    `Ongkir${input.shippingService ? ` ${serviceLabel(input.shippingService)}` : ''} ${rupiah(input.shippingCost)}`,
     '',
     `Total ${rupiah(input.subtotal)} + ${rupiah(input.shippingCost)} = ${rupiah(total)} bos`,
   ]
   if (input.preorder) lines.push(`Pre order bisa DP dulu sekitar ${PREORDER_DP_PERCENT}%, pelunasan saat siap kirim`)
   return lines.join('\n')
+}
+
+/** Nama layanan untuk pelanggan: kode JNE dalam kota (CTC/CTCYES/CTCJTR) = REG/YES/JTR yang ia pilih. */
+export function serviceLabel(service: string) {
+  const code = String(service || '').trim().toUpperCase()
+  if (code === 'CTC') return 'REG'
+  if (/^CTC(YES|JTR)$/.test(code)) return code.slice(3)
+  return String(service || '').trim()
 }
 
 export function renderPaymentMessage(
@@ -1190,17 +1198,25 @@ export function matchAutoTotal(
       .filter((word) => word.length >= 2)
   let sum = 0
   const items: string[] = []
+  const productNames = [...new Set(rows.map((row) => row.product))]
   for (const line of lines) {
     const text = norm(line)
     const lineWords = new Set(words(line))
+    // v3.6.41: produk dengan nama terpanjang yang cocok menentukan barisnya. "Tuxedo Double
+    // Breasted - Maroon" tidak boleh jatuh ke "Tuxedo - Maroon" (produk lain, harga lain) hanya
+    // karena warnanya ada di sana; warna yang tidak ada di produk itu = di luar katalog.
+    const named = productNames
+      .filter((product) => text.includes(norm(product)) || words(product).every((word) => lineWords.has(word)))
+      .sort((a, b) => words(b).length - words(a).length || b.length - a.length)[0]
+    const pool = named ? rows.filter((row) => row.product === named) : rows
     // Persis dulu, lalu longgar: semua kata nama produk (+ warna) ada di baris, urutan bebas.
     const row =
-      rows.find(
+      pool.find(
         (candidate) =>
           text.includes(norm(candidate.product)) &&
           (!candidate.color || text.includes(norm(candidate.color)))
       ) ||
-      rows.find(
+      pool.find(
         (candidate) =>
           words(candidate.product).every((word) => lineWords.has(word)) &&
           words(candidate.color).every((word) => lineWords.has(word))
@@ -1316,10 +1332,13 @@ export async function verifyAutoTotal(
   const options = order.shipping_options ? JSON.parse(String(order.shipping_options)) : null
   if (!options?.prices?.length) return { ok: false, reason: 'tarif ongkir belum ada di order' }
   if (pantsNumberMissing(String(spec ?? order.spec ?? ''), draft.rincian)) return { ok: false, reason: 'nomor celana belum diketahui' }
-  const missing = partsMissingFromItems(String(spec ?? order.spec ?? ''), draft.rincian, hints)
-  if (missing.length) return { ok: false, reason: `item belum lengkap: ${missing.join(', ')}` }
   const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices, chosenService)
   if (!result.ok) return result
+  // v3.6.41: bagian (celana/rompi) dicek pada baris yang BERHARGA, bukan seluruh rincian —
+  // rincian dari spesifikasi memuat "Jas, Celana" sebagai baris detail tanpa harga, sehingga
+  // dulu total jas saja lolos (kasus uji 6 Okt: Tuxedo Double Breasted + celana → 485.000).
+  const missing = partsMissingFromItems(String(spec ?? order.spec ?? ''), result.items, hints)
+  if (missing.length) return { ok: false, reason: `item belum lengkap: ${missing.join(', ')}` }
   return {
     ok: true,
     total: {

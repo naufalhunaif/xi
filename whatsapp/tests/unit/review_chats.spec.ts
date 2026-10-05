@@ -6,7 +6,7 @@ import { completePhotos, polishText, polishWithPhotos } from '#beta3/reply_polis
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
 import { keepCustomInChat, CUSTOM_REPLY, dropRepeatedWait } from '#beta3/reply_guards'
-import { partsMissingFromItems, orderPartsOf, parseCsTotalMessage } from '#beta3/order_service'
+import { partsMissingFromItems, orderPartsOf, parseCsTotalMessage, matchAutoTotal, serviceLabel } from '#beta3/order_service'
 import { looksSelfDelivery, detectAwb } from '#beta3/shipments'
 import { normalizeStage, type LeanDecision } from '#beta3/prompt'
 import { goalStatus } from '#beta3/reply_service'
@@ -263,5 +263,30 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     // v3.6.34 (Mauldi): bahasa Jawa "ta antar" = kami antar.
     assert.isTrue(looksSelfDelivery('Terimakasih mas, pesanan sudah ta antar ya'))
     assert.isFalse(looksSelfDelivery('Assalamualaikum mas, ini untuk pesanannya mau di antar jam berapa ya?'))
+  })
+
+  // v3.6.41 (uji 6 Okt): foto Tuxedo Double Breasted maroon (pre-order 535.000) + celana (setelan
+  // 755.000) → total otomatis 485.000 jas saja ("Tuxedo - Maroon"), "Ongkir CTC".
+  test('total: produk bernama terpanjang menang; warna di luar produk itu tidak dicocokkan ke produk lain', ({ assert }) => {
+    const catalog = [
+      { product: 'Tuxedo', color: 'Maroon', price: 485000, note: '', active: true },
+      { product: 'Tuxedo Double Breasted', color: 'Black', price: 535000, note: '', active: true },
+    ]
+    const prices = [{ service: 'CTC', price: 9000 }, { service: 'CTCYES', price: 11000 }]
+    const spec = 'Tuxedo Double Breasted - Maroon\nJas, Celana\nSize S/31\nTinggi 167/56\nKerah shawl senada'
+    // Dari spesifikasi (subtotal 0): warna maroon tidak ada di Tuxedo Double Breasted → ditahan.
+    const held = matchAutoTotal({ rincian: spec, subtotal: 0, layanan: '' }, catalog, prices, ['reg aja'])
+    assert.isFalse(held.ok)
+    // Produk yang memang ada tetap cocok.
+    const ok = matchAutoTotal({ rincian: 'Tuxedo Double Breasted - Black size S', subtotal: 0, layanan: '' }, catalog, prices, ['reg aja'])
+    assert.isTrue(ok.ok)
+    assert.equal(ok.ok && ok.subtotal, 535000)
+    // Celana di spesifikasi tetapi baris berharga hanya jas → belum lengkap.
+    assert.deepEqual(partsMissingFromItems(spec, 'Tuxedo Double Breasted - Black size S'), ['celana'])
+    assert.deepEqual(partsMissingFromItems(spec, 'Setelan Tuxedo Double Breasted Maroon 755.000'), [])
+    // Kode JNE dalam kota ditampilkan sebagai nama yang dipilih pelanggan.
+    assert.equal(serviceLabel('CTC'), 'REG')
+    assert.equal(serviceLabel('CTCYES'), 'YES')
+    assert.equal(serviceLabel('REG'), 'REG')
   })
 })
