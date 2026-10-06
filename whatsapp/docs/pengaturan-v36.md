@@ -365,3 +365,8 @@ Perubahan v3.6.6:
 
 - Gambar yang dikirim CS (web atau HP) kini dilihat AI sekali dan dicocokkan ke katalog; di riwayat tampil "contoh dari toko: Produk - Warna". Bila pelanggan menyetujui foto itu, produk & harga pesanan mengikuti katalog (bukan sebutan warna pelanggan seperti "ash grey").
 - Total otomatis menerima pre-order warna lain dari seri bahan yang sama dengan harga produk seri itu (sesuai aturan katalog); warna tanpa kain di seri itu tetap menunggu CS.
+
+## v3.6.53 — Tab Menunggu total / Menunggu bayar terisi lagi
+
+- Order pelanggan langganan yang masih menunggu total atau menunggu bayar tidak lagi dianggap "sudah dikirim" hanya karena ada resi dari pembelian sebelumnya di chat yang sama (dulu langsung masuk Selesai, sehingga tab Menunggu total/bayar dan angkanya selalu 0). Resi lama tetap menutup order rekap yang sudah lunas; resi baru sesudah order dibuat tetap memindahkan order ke Selesai.
+- Daftar chat ikut sama: chat dengan order rekap yang masih menunggu total/bayar sesudah resi terakhir tidak lagi masuk Selesai.

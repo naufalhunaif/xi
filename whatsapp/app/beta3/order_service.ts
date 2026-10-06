@@ -326,17 +326,20 @@ export async function nextOrderNumber() {
 
 /**
  * Order yang sudah dikirim = tab Selesai (sama dengan tab Selesai di chat): ada resi di chat setelah
- * order dibuat (order rekap: resi kapan pun), apa pun status yang tercatat — pesanan yang ditangani CS
- * sering tidak lewat tombol konfirmasi. Order lunas lama (>45 hari) juga dianggap selesai.
+ * order dibuat (order rekap yang sudah lunas: resi kapan pun), apa pun status yang tercatat — pesanan yang
+ * ditangani CS sering tidak lewat tombol konfirmasi. Order lunas lama (>45 hari) juga dianggap selesai.
+ * v3.6.53: order rekap yang masih menunggu total/bayar TIDAK dianggap terkirim oleh resi lama (pembelian
+ * sebelumnya di chat yang sama) — sebelumnya tab Menunggu total/bayar selalu kosong untuk pelanggan langganan.
  */
+const OLD_RESI_OK = `(o.source = 'rekap' AND o.status NOT IN ('pending', 'awaiting_payment'))`
 const SHIPPED_SQL = `(o.status <> 'cancelled' AND (EXISTS (SELECT 1 FROM whatsapp_beta3_shipments s2 WHERE s2.jid = o.jid
-    AND (s2.created_at >= o.created_at OR o.source = 'rekap'))
+    AND (s2.created_at >= o.created_at OR ${OLD_RESI_OK}))
     OR (o.status = 'paid' AND o.updated_at < NOW() - INTERVAL 45 DAY)))`
 /** v3.6.34: order dari chat vendor/lainnya = pembelian bahan oleh toko, bukan order pelanggan. */
 const VENDOR_SQL = `EXISTS (SELECT 1 FROM whatsapp_contacts vc WHERE vc.jid = o.jid AND vc.role IN ('vendor', 'lainnya'))`
 const SHIPPED_AWB_SQL = `(SELECT s.awb FROM whatsapp_beta3_shipments s WHERE s.jid = o.jid
-    AND (s.created_at >= o.created_at OR o.source = 'rekap')
-    ORDER BY CASE WHEN o.source = 'rekap' THEN -UNIX_TIMESTAMP(s.created_at) ELSE UNIX_TIMESTAMP(s.created_at) END LIMIT 1)`
+    AND (s.created_at >= o.created_at OR ${OLD_RESI_OK})
+    ORDER BY CASE WHEN ${OLD_RESI_OK} THEN -UNIX_TIMESTAMP(s.created_at) ELSE UNIX_TIMESTAMP(s.created_at) END LIMIT 1)`
 
 export async function listLeanOrders(status?: string, q?: string) {
   await ensureLeanTables()

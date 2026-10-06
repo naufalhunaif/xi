@@ -204,14 +204,15 @@ export async function latestInboxMessages(query: InboxQuery = {}) {
   const resiSql = (alias: string, after = '') =>
     `EXISTS (SELECT 1 FROM whatsapp_beta3_shipments ${alias} WHERE ${alias}.jid = m.jid${after})`
   const lastResiSql = `(SELECT MAX(rl.created_at) FROM whatsapp_beta3_shipments rl WHERE rl.jid = m.jid)`
-  const shippedSql = `(${resiSql('rs', ' AND rs.created_at >= b.created_at')} OR (b.source = 'rekap' AND ${resiSql('r2')}))`
+  const shippedSql = `(${resiSql('rs', ' AND rs.created_at >= b.created_at')} OR (b.source = 'rekap' AND b.status NOT IN ('pending', 'awaiting_payment') AND ${resiSql('r2')}))`
   // Order = pesanan yang sudah dibayar (DP/lunas) dan belum dikirim. Belum bayar = belum order
   // (masih tanya-tanya / menunggu pembayaran), jadi tidak masuk tab ini.
   const orderSql = `NOT EXISTS (SELECT 1 FROM whatsapp_contacts cvo WHERE cvo.jid = m.jid AND cvo.role IN ('vendor', 'lainnya'))
         AND EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid
           AND b.status = 'paid' AND b.updated_at >= NOW() - INTERVAL 45 DAY AND NOT ${shippedSql})`
   const doneSql = `(${resiSql('r5')}
-          AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders n WHERE n.jid = m.jid AND n.source <> 'rekap'
+          AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_orders n WHERE n.jid = m.jid
+            AND (n.source <> 'rekap' OR n.status IN ('pending', 'awaiting_payment'))
             AND n.status <> 'cancelled' AND n.created_at > ${lastResiSql})
           AND NOT EXISTS (SELECT 1 FROM whatsapp_beta3_specs ns WHERE ns.jid = m.jid AND ns.spec <> ''
             AND ns.updated_at > ${lastResiSql}))
