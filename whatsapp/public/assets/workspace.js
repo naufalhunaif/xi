@@ -13,6 +13,11 @@
   let failures = 0
   let suspended = false
   let failure = null
+  // v3.6.50: detak jantung saat sehat cukup tiap 30 dtk (dulu 2 dtk); saat terputus dicoba
+  // terus dengan jeda 5 → 10 → 20 → 30 dtk (dulu berhenti setelah 3 kali gagal).
+  const HEARTBEAT_MS = 30_000
+  const RETRY_MAX_MS = 30_000
+  let lastProbe = 0
   const controllers = new Set()
   const t = (value) => window.waI18n?.t(value) || value
   const online = () => navigator.onLine !== false
@@ -42,21 +47,38 @@
     retry.hidden = !paused
     retry.disabled = checking
   }
-  function failed(url, kind, response, probe) {
-    if (failure?.kind === 'csp_blocked' && kind === 'network_error' && failures >= 3) return
-    // Parallel errors belong to one failure wave, not separate retry attempts.
-    if (!recovering || probe) {
-      failures += 1
-      retryAt = Date.now() + Math.min(60_000, 10_000 * 2 ** (failures - 1))
-    }
-    recovering = true
+  function note(url, kind, response) {
     const requestId = response?.headers.get('X-Request-ID') || ''
     failure = {
       kind, path: url.pathname, status: response?.status || 0,
       requestId: /^[A-Za-z0-9_-]{1,100}$/.test(requestId) ? requestId : '',
       at: new Date().toISOString(),
     }
+  }
+  /**
+   * v3.6.50: satu permintaan gagal/lambat TIDAK lagi membekukan seluruh halaman. Hanya permintaan
+   * itu yang gagal; koneksi diperiksa sekali (detak /api/workspace). Mode "menghubungkan ulang"
+   * hanya bila pemeriksaan itu juga gagal.
+   */
+  function suspect(url, kind, response) {
+    note(url, kind, response)
+    if (!recovering) void check(true)
+  }
+  function failed(url, kind, response) {
+    if (failure?.kind === 'csp_blocked' && kind === 'network_error' && failures >= 3) return
+    failures += 1
+    retryAt = Date.now() + Math.min(RETRY_MAX_MS, 5_000 * 2 ** (failures - 1))
+    recovering = true
+    note(url, kind, response)
     renderNetwork()
+  }
+  function restored() {
+    if (!recovering) return
+    recovering = false
+    failures = 0
+    retryAt = 0
+    renderNetwork()
+    window.dispatchEvent(new Event('wa:network-restored'))
   }
   function unavailable() {
     return new Response(JSON.stringify({ code: 'CONNECTION_UNAVAILABLE', error: t('Koneksi belum pulih. Coba lagi.') }), {
@@ -82,15 +104,14 @@
       throw new Error(t('Sesi berakhir. Silakan masuk kembali.'))
     }
     if (!online()) {
-      if (!recovering) failed(url, 'offline', null, false)
+      if (!recovering) failed(url, 'offline', null)
       return unavailable()
     }
-    // Only check() can probe a failed connection. Never queue or replay mutations.
-    if (recovering) return unavailable()
+    // Saat menghubungkan ulang, permintaan tetap diteruskan (tidak ditahan); yang berhasil
+    // langsung memulihkan halaman. Mutasi tidak pernah diantrikan atau diulang.
     return request(input, init, url)
   }
   async function request(input, init, url, probe = false) {
-    const recoveryProbe = probe && recovering
     const headers = new Headers(
       init?.headers || (input instanceof Request ? input.headers : undefined)
     )
@@ -115,8 +136,10 @@
       })
     } catch (error) {
       // Do not replay a POST: it may already have reached the server.
-      if (!changing && !suspended && !signal?.aborted && (timedOut || error.name !== 'AbortError'))
-        failed(url, timedOut ? 'timeout' : 'network_error', null, recoveryProbe)
+      if (!changing && !suspended && !signal?.aborted && (timedOut || error.name !== 'AbortError')) {
+        if (probe) failed(url, timedOut ? 'timeout' : 'network_error', null)
+        else suspect(url, timedOut ? 'timeout' : 'network_error', null)
+      }
       throw error
     } finally {
       clearTimeout(timeout)
@@ -137,25 +160,22 @@
       location.replace(`${app}/`)
       throw new Error('Workspace changed')
     }
-    if (response.status >= 500 || response.status === 429) {
-      failed(url, response.headers.get('X-WhatsApp-Auth') === 'unavailable' ? 'auth_unavailable' : 'http_error', response, recoveryProbe)
-    } else if (probe) {
+    const kind = response.headers.get('X-WhatsApp-Auth') === 'unavailable' ? 'auth_unavailable' : 'http_error'
+    if (probe) {
       // The heartbeat must prove both authentication and workspace identity.
-      if (response.status === 204 && current === version) {
-        if (recovering && !recoveryProbe) return response
-        const restored = recovering
-        recovering = false
-        failures = 0
-        retryAt = 0
-        renderNetwork()
-        if (restored) window.dispatchEvent(new Event('wa:network-restored'))
-      } else failed(url, 'unexpected_response', response, recoveryProbe)
-    }
+      if (response.status === 204 && current === version) restored()
+      else failed(url, response.status >= 500 || response.status === 429 ? kind : 'unexpected_response', response)
+    } else if (response.status >= 500 || response.status === 429) suspect(url, kind, response)
+    else if (recovering) restored()
     return response
   }
   async function check(manual = false) {
-    if (checking || changing || suspended || !online() || document.hidden) return
-    if (!manual && recovering && (failures >= 3 || Date.now() < retryAt)) return
+    if (checking || changing || suspended || !online()) return
+    if (!manual) {
+      if (document.hidden) return
+      if (recovering ? Date.now() < retryAt : Date.now() - lastProbe < HEARTBEAT_MS) return
+    }
+    lastProbe = Date.now()
     checking = true
     renderNetwork()
     try {
@@ -174,7 +194,7 @@
       const url = new URL(event.blockedURI)
       if (url.origin !== base.origin || !url.pathname.startsWith(apiPrefix) ||
           !['connect-src', 'default-src'].includes(event.effectiveDirective)) return
-      if (!recovering) failed(url, 'csp_blocked', null, false)
+      if (!recovering) failed(url, 'csp_blocked', null)
       failure = { ...failure, kind: 'csp_blocked', directive: event.effectiveDirective }
       failures = 3
       renderNetwork()
@@ -207,11 +227,12 @@
   window.addEventListener('pageshow', () => { suspended = false; void check() })
   window.addEventListener('online', () => void check(true))
   window.addEventListener('offline', () => {
-    if (!recovering && !changing) failed(new URL(`${app}/api/workspace`), 'offline', null, false)
+    if (!recovering && !changing) failed(new URL(`${app}/api/workspace`), 'offline', null)
     else renderNetwork()
   })
   document.addEventListener('ui-language:change', renderNetwork)
+  // Kembali ke tab saat terputus → langsung dicoba (tidak menunggu jeda).
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) void check()
+    if (!document.hidden) void check(recovering)
   })
 })()

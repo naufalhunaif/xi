@@ -508,3 +508,22 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 1. Harga yang disebut toko dibaca dari seluruh percakapan 30 hari; rincian yang jumlahnya persis total yang sudah disebut toko (755.000) diterima; giliran form membaca riwayat panjang (60).
 2. Instruksi: beberapa pesan berurutan → semua pertanyaan dijawab.
 3. Susulan yang menyebut total/DP/rekening/transfer dibatalkan bila total belum terkirim.
+
+## #24 · Okt 2026 · chat dari CS dilanjutkan AI: "ini totalnya" lalu diam (diterapkan v3.6.50)
+
+**Percakapan:** CS menangani dari awal (foto jas abu tua, XL habis → PO, jas+celana+rompi, celana menyesuaikan, form order, "ongkir mau pakai apa?"). Empat hari kemudian pelanggan menjawab "Yg yes ya mas" dan AI melanjutkan.
+
+**Yang salah**
+1. AI memahami semuanya (set 3 bagian Ash Grey XL PO, alamat Cilacap, YES) lalu menjawab "siap bos, datanya sudah masuk ya, ini totalnya" — tetapi total tidak pernah dikirim. CS menghitung manual 905.000 + ongkir 22.000.
+2. Susulan 20 menit kemudian menyinggung pembayaran padahal total belum ada.
+
+**Penyebab**
+1. Rekap otomatis chat CS (5 Okt) mencatat order "menunggu bayar" walau total kosong. Sistem menganggap status itu = total sudah dikirim, sehingga total tidak dihitung, pengaman janji "ini totalnya" dilewati, dan susulan bayar lolos.
+2. Form dikirim saat CS menangani, jadi ongkir ke alamat itu tidak pernah dicek.
+3. Warna Ash Grey tidak ada di katalog dan harga PO belum pernah disebut di chat: total memang tidak bisa dihitung otomatis — jawaban yang benar "totalnya saya hitung dulu ya bos" (order menunggu CS).
+
+**Perubahan (v3.6.50)**
+1. Rekap chat CS: "menunggu bayar" hanya bila total ada; tanpa total = pending. Angka yang tidak terbaca rekap tidak menghapus total yang sudah tercatat. Order rekap lama yang "menunggu bayar" tanpa total & tanpa dana dikembalikan ke pending.
+2. Giliran AI: order "menunggu bayar" tanpa total dibuka lagi dan dihitung; order tanpa tarif ongkir dicek ongkirnya dari alamat di order.
+3. Pengaman janji total & pembatalan susulan bayar memakai "total benar-benar sudah terkirim" (total/dana tercatat), bukan sekadar status; pesanan lama yang sudah selesai (> 7 hari) tidak dihitung.
+4. Tes: `tests/unit/handover_total.spec.ts`.

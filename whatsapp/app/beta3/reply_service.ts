@@ -24,6 +24,8 @@ import {
   updatePendingOrderRates,
   orderPartsOf,
   reopenLeanOrderForChange,
+  reopenUntotaledOrder,
+  totalWasSent,
   type VerifiedAutoTotal,
 } from '#beta3/order_service'
 import {
@@ -1319,6 +1321,11 @@ export async function createLeanReply(input: {
   if (!totalOrderId) {
     const pending = await latestLeanOrder(jid)
     if (pending && pending.status === 'pending') totalOrderId = Number(pending.id)
+    // v3.6.50: order "menunggu bayar" tanpa total (rekap chat CS lama) = total belum pernah dikirim.
+    else if (pending && pending.status === 'awaiting_payment' && !totalWasSent(pending) && (await reopenUntotaledOrder(Number(pending.id)))) {
+      totalOrderId = Number(pending.id)
+      onTrace?.({ key: 'beta3-total', label: 'Order dari rekap CS belum punya total · dihitung sekarang', status: 'completed', detail: {} })
+    }
     // Total sudah terkirim, belum dibayar, lalu item berubah (tambah rompi/celana): buka lagi
     // dan hitung total baru di giliran ini — janji "saya cek ulang" ditepati sistem (v3.6.29).
     else if (
@@ -1342,7 +1349,26 @@ export async function createLeanReply(input: {
       : null
     // Tarif lama menyimpan berat sebagai weight_grams (dari MCP); yang baru juga grams.
     const storedGrams = Number(storedRates?.grams ?? (storedRates as any)?.weight_grams ?? 0)
-    if (current && mcp.url && storedRates?.prices?.length && storedGrams !== gramsNow) {
+    // v3.6.50: order tanpa tarif (dibuat dari rekap chat CS / alamat dikirim saat CS menangani):
+    // ongkir dicek sekarang dari alamat di order, supaya total bisa dihitung.
+    if (current && mcp.url && !storedRates?.prices?.length && (current.district || current.regency || current.address)) {
+      try {
+        const lastResolved = parseJson<LastShipping>(await readLeanState(lastKey))?.resolved
+        const fresh = await ratesForAddress(
+          { district: String(current.district || ''), regency: String(current.regency || ''), postalCode: String(current.postal_code || '') },
+          lastResolved || null,
+          mcp,
+          gramsNow,
+          String(current.address || '')
+        )
+        if (fresh?.prices?.length) {
+          await updatePendingOrderRates(totalOrderId, { ...fresh, grams: gramsNow })
+          onTrace?.({ key: 'beta3-rates', label: `Ongkir dicek dari alamat order · ${gramsNow} g`, status: 'completed', detail: fresh })
+        }
+      } catch (error) {
+        onTrace?.({ key: 'beta3-rates', label: 'Ongkir dari alamat order gagal', status: 'completed', detail: { error: error instanceof Error ? error.message : String(error) } })
+      }
+    } else if (current && mcp.url && storedRates?.prices?.length && storedGrams !== gramsNow) {
       try {
         const lastResolved = parseJson<LastShipping>(await readLeanState(lastKey))?.resolved
         const fresh = await ratesForAddress(
@@ -1466,7 +1492,11 @@ export async function createLeanReply(input: {
       status: 'completed',
       detail: { draft, fromAi: Boolean(decision.order), verdict },
     })
-  } else if (!decision.serah_cs && (await latestLeanOrder(jid))?.status !== 'awaiting_payment') {
+  } else if (
+    !decision.serah_cs &&
+    // v3.6.50: "menunggu bayar" baru dianggap sudah ada total bila totalnya memang tercatat.
+    !(await latestLeanOrder(jid).then((latest) => latest?.status === 'awaiting_payment' && totalWasSent(latest)))
+  ) {
     // Belum ada form/order: total + rekening tidak akan terkirim otomatis. Jangan janji
     // "ini totalnya saya kirimkan"; minta data pengiriman, atau tunggu CS bila alamat sudah ada.
     const jevPromise = /total|rekening/i.test(decision.pesan.join(' '))
@@ -1502,7 +1532,7 @@ export async function createLeanReply(input: {
   // v3.6.43: susulan tidak menyebut total/DP/rekening sebelum total benar-benar dikirim.
   if (decision.susulan && !autoTotal && susulanNeedsTotal(decision.susulan)) {
     const latest = await latestLeanOrder(jid).catch(() => null)
-    if (!latest || !['awaiting_payment', 'paid', 'sent'].includes(String(latest.status))) {
+    if (!totalWasSent(latest)) {
       onTrace?.({ key: 'beta3-nudge-plan', label: 'Susulan dibatalkan · menyebut total yang belum dikirim', status: 'completed', detail: { susulan: decision.susulan } })
       decision.susulan = ''
     }

@@ -24,12 +24,15 @@ export async function readAiAccountQuotas() {
   const settings = await readSettings()
   const command = codexCommand(settings.codexBin || env.get('CODEX_BIN'))
   const now = Date.now()
-  await Promise.all(
-    accounts
-      .filter((account) => account.provider === 'chatgpt' && account.enabled)
-      .filter((account) => now - (lastRead.get(account.id) || 0) >= REFRESH_MS)
-      .map(async (account) => {
-        lastRead.set(account.id, now)
+  // v3.6.50: kuota ChatGPT dibaca lewat program ChatGPT (±8 dtk). Dulu halaman menunggu; kini
+  // dibaca di latar dan halaman langsung mendapat data tersimpan terakhir (diperbarui ≤ 2 menit).
+  const stale = accounts
+    .filter((account) => account.provider === 'chatgpt' && account.enabled)
+    .filter((account) => now - (lastRead.get(account.id) || 0) >= REFRESH_MS)
+  for (const account of stale) lastRead.set(account.id, now)
+  if (stale.length)
+    void Promise.all(
+      stale.map(async (account) => {
         try {
           const raw = await withAiAccount(aiAccountRef(account), () =>
             readCodexQuota(command, codexOAuthArguments(), codexOAuthEnv())
@@ -39,7 +42,7 @@ export async function readAiAccountQuotas() {
           // Kuota tidak terbaca (belum login / layanan sibuk): tampilkan data terakhir.
         }
       })
-  )
+    )
   const used = await aiTokenUsage(now - SPREAD_WINDOW_MS).catch(() => new Map<number, number>())
   return Promise.all(
     accounts.map(async (account) => {

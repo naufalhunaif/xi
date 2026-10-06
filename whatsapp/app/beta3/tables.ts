@@ -149,6 +149,11 @@ export const LEAN_TABLE_STATEMENTS = [
     value TEXT NULL,
     updated_at DATETIME NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // v3.6.50: rekap chat CS dulu menandai "menunggu bayar" walau total belum pernah dikirim. Order
+  // seperti itu dikembalikan ke pending (tanpa total & tanpa dana masuk) supaya totalnya dihitung.
+  `UPDATE whatsapp_beta3_orders SET status = 'pending'
+    WHERE source = 'rekap' AND status = 'awaiting_payment'
+      AND (total IS NULL OR total = 0) AND (paid_amount IS NULL OR paid_amount = 0)`,
 ]
 
 const ready = new Set<string>()

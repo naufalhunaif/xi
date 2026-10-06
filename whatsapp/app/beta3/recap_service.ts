@@ -176,12 +176,20 @@ export async function saveRecap(jid: string, recap: ChatRecap) {
     .orderBy('id', 'desc')
     .first()
   if (active) {
+    // Angka yang tidak terbaca di rekap (0) tidak menghapus angka yang sudah tercatat (mis. total CS).
+    if (!recap.total) {
+      delete values.total
+      delete values.subtotal
+    }
+    if (!recap.ongkir) delete values.shipping_cost
+    if (!recap.layanan) delete values.shipping_service
+    const hasTotal = Boolean(recap.total || Number(active.total || 0))
     await db
       .from('whatsapp_beta3_orders')
       .where('id', active.id)
       .update({
         ...values,
-        status: paid ? 'paid' : 'awaiting_payment',
+        status: paid ? 'paid' : hasTotal ? 'awaiting_payment' : 'pending',
         order_number: active.order_number || (paid ? await nextOrderNumber() : null),
       })
     if (paid) await writeOrderSpec(jid, '')
@@ -200,7 +208,9 @@ export async function saveRecap(jid: string, recap: ChatRecap) {
   const [id] = await db.table('whatsapp_beta3_orders').insert({
     jid,
     ...values,
-    status: paid ? 'paid' : 'awaiting_payment',
+    // v3.6.50: "menunggu bayar" hanya bila total memang sudah ada. Tanpa total = pending, supaya
+    // AI yang melanjutkan chat menghitung & mengirim totalnya (kasus 6 Okt: "ini totalnya" lalu diam).
+    status: paid ? 'paid' : recap.total ? 'awaiting_payment' : 'pending',
     order_number: paid ? await nextOrderNumber() : null,
     group_status: 'none',
     source: 'rekap',

@@ -41,6 +41,19 @@ async function connected(account: AiAccount) {
   )
 }
 
+/**
+ * v3.6.50: status login dicek lewat program AI (±0,5 dtk per akun). Daftar akun di Pengaturan
+ * memakai hasil ≤ 30 dtk; login/ubah/hapus akun langsung mengosongkannya.
+ */
+const connectedCache = new Map<number, { at: number; value: boolean }>()
+async function connectedCached(account: AiAccount) {
+  const hit = connectedCache.get(account.id)
+  if (hit && Date.now() - hit.at < 30_000) return hit.value
+  const value = await connected(account).catch(() => false)
+  connectedCache.set(account.id, { at: Date.now(), value })
+  return value
+}
+
 /** AI boleh aktif selama ada minimal satu akun AI yang aktif dan tersambung, apa pun jenisnya. */
 export async function anyAiAccountReady() {
   const accounts = (await listAiAccounts()).filter((account) => account.enabled)
@@ -124,7 +137,7 @@ export default class AiAccountsController {
     response.header('Cache-Control', 'no-store')
     const accounts = await listAiAccounts()
     const [states, used, spread] = await Promise.all([
-      Promise.all(accounts.map((a) => connected(a).catch(() => false))),
+      Promise.all(accounts.map((a) => connectedCached(a))),
       aiTokenUsage(Date.now() - SPREAD_WINDOW_MS),
       aiSpreadMode(),
     ])
@@ -180,6 +193,7 @@ export default class AiAccountsController {
   }
 
   async store({ request, response }: HttpContext) {
+    connectedCache.clear()
     const provider = String(request.input('provider') || '') as AiProviderName
     if (!AI_ACCOUNT_PROVIDERS.includes(provider))
       return response.unprocessableEntity({ error: 'Pilih ChatGPT, Claude, atau Gemini.' })
@@ -196,6 +210,7 @@ export default class AiAccountsController {
   }
 
   async update({ params, request, response }: HttpContext) {
+    connectedCache.clear()
     const account = await found(params)
     const values: Record<string, unknown> = {}
     if (request.input('scope') !== undefined)
@@ -229,6 +244,7 @@ export default class AiAccountsController {
   }
 
   async destroy({ params, response }: HttpContext) {
+    connectedCache.clear()
     const account = await found(params)
     await deleteAiAccount(account.id)
     // Akun utama memakai folder login workspace bersama; hanya akun tambahan yang punya folder sendiri.
@@ -251,6 +267,7 @@ export default class AiAccountsController {
   }
 
   async loginStatus({ params, response }: HttpContext) {
+    connectedCache.clear()
     response.header('Cache-Control', 'no-store')
     const account = await found(params)
     if (account.provider === 'gemini') return response.json({ connected: Boolean(account.apiKey) })
@@ -263,6 +280,7 @@ export default class AiAccountsController {
   }
 
   async loginStart({ params, request, response }: HttpContext) {
+    connectedCache.clear()
     const account = await found(params)
     if (account.provider === 'gemini')
       return response.unprocessableEntity({ error: 'Gemini memakai API key, bukan login.' })
@@ -278,6 +296,7 @@ export default class AiAccountsController {
   }
 
   async loginVerify({ params, request, response }: HttpContext) {
+    connectedCache.clear()
     const account = await found(params)
     if (account.provider !== 'claude') return response.unprocessableEntity({ error: 'Hanya untuk Claude.' })
     try {

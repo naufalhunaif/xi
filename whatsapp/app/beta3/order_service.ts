@@ -402,6 +402,36 @@ export async function latestLeanOrder(jid: string) {
   return db.from('whatsapp_beta3_orders').where('jid', jid).orderBy('id', 'desc').first()
 }
 
+/**
+ * v3.6.50: total sudah benar-benar dikirim ke pelanggan? Status saja tidak cukup — rekap chat CS
+ * dulu bisa berstatus "menunggu bayar" tanpa total. Dipakai pengaman janji total & susulan bayar.
+ */
+export function totalWasSent(
+  order: { status?: unknown; total?: unknown; paid_amount?: unknown; updated_at?: unknown } | null | undefined,
+  now = Date.now()
+) {
+  if (!order) return false
+  const status = String(order.status || '')
+  if (status === 'awaiting_payment') return Number(order.total || 0) > 0 || Number(order.paid_amount || 0) > 0
+  // Order lunas/terkirim hanya dihitung bila masih berjalan (≤ 7 hari); pesanan lama yang sudah
+  // selesai bukan total untuk percakapan baru (pelanggan langganan).
+  const updated = order.updated_at ? new Date(String(order.updated_at)).getTime() : 0
+  return ['paid', 'sent'].includes(status) && Number.isFinite(updated) && now - updated <= 7 * 86_400_000
+}
+
+/** Order "menunggu bayar" tanpa total & tanpa dana (data lama) → pending lagi agar totalnya dihitung. */
+export async function reopenUntotaledOrder(id: number) {
+  await ensureLeanTables()
+  const changed = await db
+    .from('whatsapp_beta3_orders')
+    .where('id', id)
+    .where('status', 'awaiting_payment')
+    .where((query) => query.whereNull('total').orWhere('total', 0))
+    .where((query) => query.whereNull('paid_amount').orWhere('paid_amount', 0))
+    .update({ status: 'pending', updated_at: new Date() })
+  return Number(changed) > 0
+}
+
 export async function readLeanOrder(id: number) {
   await ensureLeanTables()
   return db.from('whatsapp_beta3_orders').where('id', id).first()
