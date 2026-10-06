@@ -206,18 +206,106 @@ export async function classifyImages(jid: string, rows: Array<{ message_id: stri
 }
 
 /**
+ * v3.6.52 — gambar yang dikirim CS (web atau HP) adalah produk yang DITAWARKAN toko ("ada seperti
+ * ini bos"). Dulu tidak pernah dilihat AI, sehingga sebutan pelanggan ("ash grey") dipakai sebagai
+ * produk. Kini dicocokkan sekali ke KATALOG; hasilnya tampil di riwayat sebagai
+ * "contoh dari toko: <Produk> - <Warna>". Tidak cocok → keterangan ciri saja.
+ */
+export const STORE_IMAGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    produk: {
+      type: 'array',
+      description:
+        'Satu per gambar, urut sesuai lampiran: "Produk - Warna" PERSIS dari daftar KATALOG yang paling cocok (model & warna), atau "" bila tidak yakin / bukan foto pakaian.',
+      items: { type: 'string' },
+    },
+    keterangan: {
+      type: 'array',
+      description: 'Satu per gambar (maks 12 kata): ciri pakaian (warna, kerah, kancing, bahan doff/kilap). Tanpa harga.',
+      items: { type: 'string' },
+    },
+  },
+  required: ['produk', 'keterangan'],
+  additionalProperties: false,
+} as const
+
+/** Daftar katalog ringkas untuk pencocokan foto: satu baris per produk, warnanya dipisah koma. */
+export function storeImageCatalog(rows: Array<{ product: string; color: string; material?: string; active?: boolean }>) {
+  const byProduct = new Map<string, Set<string>>()
+  for (const row of rows) {
+    if (row.active === false) continue
+    const key = `${row.product}${row.material ? ` [bahan ${row.material}]` : ''}`
+    if (!byProduct.has(key)) byProduct.set(key, new Set())
+    byProduct.get(key)!.add(row.color)
+  }
+  return [...byProduct].map(([product, colors]) => `${product}: ${[...colors].join(', ')}`).join('\n').slice(0, 9000)
+}
+
+/** Teks catatan gambar CS: produk katalog yang cocok (nama persis) atau ciri saja. */
+export function storeImageNote(
+  match: { product: string; color: string } | undefined,
+  description: string
+) {
+  const ciri = String(description || '').replace(/\b\d{1,3}(?:[.,]\d{3})+\b/g, '').replace(/\s+/g, ' ').trim()
+  if (match) return `contoh dari toko: ${match.product} - ${match.color}`.slice(0, 200)
+  return ciri ? `contoh dari toko (tidak cocok katalog): ${ciri}`.slice(0, 200) : 'contoh dari toko'
+}
+
+const storeClassifying = new Set<string>()
+export async function classifyStoreImages(jid: string, rows: Array<{ message_id: string; media_url: string }>) {
+  const todo = rows.filter((row) => row.media_url && !storeClassifying.has(row.message_id)).slice(0, 3)
+  if (!todo.length) return
+  todo.forEach((row) => storeClassifying.add(row.message_id))
+  try {
+    const paths = todo.map((row) => app.makePath('public', 'media', basename(String(row.media_url).split('?')[0])))
+    const [{ runLeanProvider }, { readSettings }, { catalogDigest, findCatalogVariant }] = await Promise.all([
+      import('#beta3/provider'),
+      import('#services/settings_service'),
+      import('#beta3/catalog_service'),
+    ])
+    const [raw, digest] = await Promise.all([readSettings(true), catalogDigest()])
+    const result = await runLeanProvider(
+      { ...raw, aiProvider: raw.aiProvider === 'claude' ? 'claude' : 'chatgpt' } as any,
+      {
+        system:
+          'Gambar-gambar ini dikirim CS toko jas ke pelanggan sebagai contoh produk yang ditawarkan. Cocokkan tiap gambar dengan produk & warna di KATALOG (model dan warna paling mirip). Jawab hanya JSON sesuai schema.',
+        user: `KATALOG (Produk [bahan]: warna, …):\n${storeImageCatalog(digest.rows)}\n\nAda ${todo.length} gambar terlampir, urut.`,
+      },
+      paths,
+      'beta3-image',
+      STORE_IMAGE_SCHEMA,
+      { jid }
+    )
+    const parsed = JSON.parse(result.text) as { produk?: string[]; keterangan?: string[] }
+    for (const [index, row] of todo.entries()) {
+      const label = String(parsed.produk?.[index] || '').trim()
+      const match = label ? findCatalogVariant(digest.rows, label) : undefined
+      await saveImageKind(jid, row.message_id, 'contoh', storeImageNote(match, String(parsed.keterangan?.[index] || '')))
+    }
+  } catch {
+    // Gagal dilihat: tandai agar tidak dicoba terus; riwayat tetap "[image]".
+    for (const row of todo) await saveImageKind(jid, row.message_id, 'contoh', '?').catch(() => {})
+  } finally {
+    todo.forEach((row) => storeClassifying.delete(row.message_id))
+  }
+}
+
+/**
  * Keterangan gambar pelanggan untuk riwayat AI ("[image: Peak Suit Black, harga 450.000]").
  * Gambar yang belum punya keterangan dilihat AI (maks 4, terbaru), ditunggu sebentar saja;
  * yang belum selesai tetap diproses di latar untuk giliran berikutnya.
  */
 export async function imageNotes(
   jid: string,
-  rows: Array<{ message_id: string; media_url?: string | null; media_type?: string | null; direction?: string }>,
+  rows: Array<{ message_id: string; media_url?: string | null; media_type?: string | null; direction?: string; sender_type?: string | null }>,
   skip: Set<string> = new Set(),
   waitMs = 15_000
 ) {
   await ensureLeanTables()
-  const images = rows.filter((row) => row.direction === 'in' && row.media_type === 'image' && row.message_id)
+  const isStore = (row: { direction?: string; sender_type?: string | null }) =>
+    row.direction === 'out' && ['cs', 'owner'].includes(String(row.sender_type || ''))
+  const images = rows.filter((row) => (row.direction === 'in' || isStore(row)) && row.media_type === 'image' && row.message_id)
   if (!images.length) return new Map<string, string>()
   const load = async () =>
     new Map<string, { kind: string; note: string }>(
@@ -230,13 +318,22 @@ export async function imageNotes(
       ).map((row: any) => [String(row.message_id), { kind: String(row.kind), note: String(row.note || '') }])
     )
   let known = await load()
-  const missing = images
-    .filter((row) => !skip.has(String(row.message_id)) && row.media_url && !known.get(String(row.message_id))?.note)
+  const unseen = images.filter((row) => !skip.has(String(row.message_id)) && row.media_url && !known.get(String(row.message_id))?.note)
+  const missing = unseen
+    .filter((row) => !isStore(row))
     .slice(-4)
     .map((row) => ({ message_id: String(row.message_id), media_url: String(row.media_url) }))
-  if (missing.length) {
-    const job = classifyImages(jid, missing).catch(() => null)
-    await Promise.race([job, new Promise((resolve) => setTimeout(resolve, waitMs))])
+  const storeMissing = unseen
+    .filter(isStore)
+    .slice(-3)
+    .map((row) => ({ message_id: String(row.message_id), media_url: String(row.media_url) }))
+  if (missing.length || storeMissing.length) {
+    // Berurutan (bukan bersamaan): satu proses AI pada satu waktu, hemat RAM server kecil.
+    const jobs = (async () => {
+      if (missing.length) await classifyImages(jid, missing).catch(() => null)
+      if (storeMissing.length) await classifyStoreImages(jid, storeMissing).catch(() => null)
+    })()
+    await Promise.race([jobs, new Promise((resolve) => setTimeout(resolve, waitMs))])
     known = await load()
   }
   const label = { bukti: 'bukti transfer', ukuran: 'tabel ukuran' } as Record<string, string>

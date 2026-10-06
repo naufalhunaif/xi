@@ -360,3 +360,8 @@ Perubahan v3.6.6:
 
 - Total ("Total 905.000 + 22.000 = 927.000 bos") dan konfirmasi dana yang diketik CS **dari HP** kini memperbarui order seperti yang diketik dari web (dulu hanya dari web → order tetap tanpa total, AI mengira total belum dikirim). "A + B = C" dibaca subtotal A + ongkir B.
 - Order yang belum bertotal (termasuk order rekap) mengambil total CS yang sudah ada di chat: saat aplikasi mulai (sekali) dan saat AI membalas — AI tidak menghitung/menjanjikan total lagi bila CS sudah mengirimnya. Order rekap tidak mengambil total pesanan sebelumnya di chat yang sama.
+
+## v3.6.52 — Foto yang dikirim CS jadi acuan produk
+
+- Gambar yang dikirim CS (web atau HP) kini dilihat AI sekali dan dicocokkan ke katalog; di riwayat tampil "contoh dari toko: Produk - Warna". Bila pelanggan menyetujui foto itu, produk & harga pesanan mengikuti katalog (bukan sebutan warna pelanggan seperti "ash grey").
+- Total otomatis menerima pre-order warna lain dari seri bahan yang sama dengan harga produk seri itu (sesuai aturan katalog); warna tanpa kain di seri itu tetap menunggu CS.

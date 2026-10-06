@@ -1198,6 +1198,8 @@ export function matchAutoTotal(
     price: number | null
     note: string
     active: boolean
+    material?: string
+    materialAvailable?: boolean
   }>,
   prices: Array<{ service: string; price: number }>,
   /** Teks lain tempat mencari nama layanan bila draft.layanan kosong (catatan, spesifikasi, pesan). */
@@ -1240,7 +1242,7 @@ export function matchAutoTotal(
       .sort((a, b) => words(b).length - words(a).length || b.length - a.length)[0]
     const pool = named ? rows.filter((row) => row.product === named) : rows
     // Persis dulu, lalu longgar: semua kata nama produk (+ warna) ada di baris, urutan bebas.
-    const row =
+    let row =
       pool.find(
         (candidate) =>
           text.includes(norm(candidate.product)) &&
@@ -1251,6 +1253,20 @@ export function matchAutoTotal(
           words(candidate.product).every((word) => lineWords.has(word)) &&
           words(candidate.color).every((word) => lineWords.has(word))
       )
+    // v3.6.52: pre-order warna lain dari SERI BAHAN yang sama (mis. "Vest Signature - Light Gray":
+    // kain Scuro Light Gray ada di produk Signature lain) → harga produk seri itu, sesuai aturan KATALOG.
+    if (!row && named) {
+      const materials = new Set(pool.map((candidate) => candidate.material).filter(Boolean))
+      const fabric = catalog.find(
+        (candidate) =>
+          candidate.material &&
+          materials.has(candidate.material) &&
+          candidate.materialAvailable !== false &&
+          candidate.color &&
+          words(candidate.color).every((word) => lineWords.has(word))
+      )
+      if (fabric) row = pool.find((candidate) => candidate.material === fabric.material)
+    }
     const qty = Math.max(1, Number(line.match(/(\d+)\s*(?:x|pcs|pc|buah)\b/i)?.[1] || 1))
     const linePrices = parsePrices(line)
     if (!row) {

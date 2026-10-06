@@ -529,3 +529,17 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 4. Tes: `tests/unit/handover_total.spec.ts`.
 
 **Lanjutan (v3.6.51):** sesudah v3.6.50 order #15 tetap tanpa total. Penyebab: total CS ("Total 905.000 + 22.000 =927.000 bos") diketik dari HP, sedangkan pencatatan total CS hanya untuk pesan yang dikirim dari web. Kini total & konfirmasi dana yang diketik dari HP juga dicatat; "A + B = C" dibaca sebagai subtotal + ongkir; order (termasuk rekap) yang belum bertotal mengambil total CS dari chat saat aplikasi mulai dan saat AI membalas.
+
+## #25 · Okt 2026 · foto dari CS = produk yang ditawarkan (diterapkan v3.6.52)
+
+**Percakapan:** pelanggan minta "jas doff warna kaya gini, abu2 agak tua" (foto). Warna itu tidak ada; CS mengirim foto produk "ada seperti ini bos", pelanggan setuju ("Boleh mas gapapa"), PO jas+celana+rompi. Di form pelanggan menulis "warna ash grey".
+
+**Yang salah:** AI menulis produk "Ash Grey" (tidak ada di katalog) dan menjumlah harga satuan seri biasa 485.000 + 220.000 + 175.000 = 880.000. CS menghitung 905.000 = seri Signature (500.000 + 220.000 + 185.000) — produk di foto CS.
+
+**Penyebab:** hanya gambar dari pelanggan yang dilihat AI; gambar dari CS (web/HP) tampil di riwayat sebagai "[image]" tanpa keterangan. Sebutan warna dari pelanggan lalu dipakai sebagai produk.
+
+**Perubahan (v3.6.52)**
+1. Gambar dari CS dilihat sekali dan dicocokkan ke KATALOG (produk & warna); di riwayat AI tampil "[image: contoh dari toko: Produk - Warna]". Dikerjakan berurutan dengan pemilahan gambar pelanggan (satu proses AI pada satu waktu).
+2. Instruksi: foto CS = produk yang ditawarkan; bila pelanggan setuju, itulah produk pesanan (nama & harga katalog); sebutan warna pelanggan yang tidak ada di katalog hanya keterangan di spesifikasi.
+3. Total: pre-order warna lain dari seri bahan yang SAMA (mis. "Vest Signature - Light Gray", kain Scuro Light Gray ada) dihitung dengan harga produk seri itu; warna tanpa kain di seri itu tetap menunggu CS.
+4. Tes: `tests/unit/store_images.spec.ts`.
