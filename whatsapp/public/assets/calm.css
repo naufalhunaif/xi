@@ -559,4 +559,7 @@ html[data-theme='dark'] .workspace-ui #usageTrend {
   height: 100%;
   min-height: 120px;
   align-self: stretch;
+  /* v3.6.45: ukuran dari kotak, bukan dari viewBox SVG — tanpa ini tinggi ikut viewBox yang
+     dihitung dari tinggi itu sendiri, sehingga grafik bertambah tinggi setiap digambar ulang. */
+  contain: size;
 }

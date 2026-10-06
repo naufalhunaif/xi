@@ -459,7 +459,7 @@
               @end
               @each(message in messages)
                 <article
-                  class="message {{ message.direction === 'out' ? 'out' : 'in' }} source-{{ message.sender_type || (message.direction === 'out' ? 'cs' : 'customer') }} {{ message.media_type ? 'has-media' : '' }}"
+                  class="message {{ message.direction === 'out' ? 'out' : 'in' }} source-{{ message.sender_type === 'owner' ? 'owner source-cs' : (message.sender_type || (message.direction === 'out' ? 'cs' : 'customer')) }} {{ message.media_type ? 'has-media' : '' }}"
                   data-id="{{ message.id }}"
                   data-message-id="{{ message.message_id }}"
                   data-body="{{ message.body }}"

@@ -338,3 +338,8 @@ Perubahan v3.6.6:
 - **Pengaman:** tanpa sambungan dorong, browser bertanya tiap 3 dtk (tetap murah); dengan sambungan, tiap 15 dtk. Muat ulang penuh tiap 5 menit atau saat ada tanda perubahan besar.
 - API lama `GET /api/contacts` tanpa parameter tetap ada (daftar penuh).
 - Bersinggungan: query kotak masuk (`latestInboxMessages`) kini memakai parameter; tanda tanya literal di SQL ditulis `\?`.
+
+## v3.6.45 — Grafik tren token stabil, bubble CS seragam
+
+- Settings → Usage → Daily token trend: tinggi grafik tidak lagi bertambah setiap digambar ulang. Penyebab: tinggi SVG ikut viewBox, sedangkan viewBox dihitung dari tinggi tampil (lingkaran umpan balik). Kini ukuran SVG dari kotaknya (`contain: size`) dan viewBox = ukuran tampil nyata.
+- Chat: balasan CS yang dikirim dari HP (tercatat "owner") tampil sama dengan balasan CS dari web (warna & label CS).

@@ -112,9 +112,10 @@
       color,
       values: dates.map((date) => Number(byDate.get(date)?.by?.[key] || 0)),
     })).filter((line) => line.values.some((v) => v > 0))
-    // viewBox mengikuti ukuran nyata supaya teks sumbu tidak melar.
-    const W = Math.max(300, Math.round(svg.clientWidth || 600))
-    const H = Math.max(120, Math.round(svg.clientHeight || 160))
+    // viewBox = ukuran tampil nyata (teks sumbu tidak melar). v3.6.45: ukuran tampil tidak lagi
+    // bergantung pada viewBox (CSS contain: size), jadi grafik tidak makin tinggi tiap digambar ulang.
+    const W = Math.max(200, Math.round(svg.clientWidth || 600))
+    const H = Math.max(100, Math.round(svg.clientHeight || 160))
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
     const pad = { l: 40, r: 10, t: 10, b: 22 }
     const max = Math.max(1, ...series.flatMap((line) => line.values))

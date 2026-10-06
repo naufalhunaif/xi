@@ -211,7 +211,9 @@
     const senderType = message.sender_type || (message.direction === 'out' ? 'cs' : 'customer')
     const comment = igComment(message)
     const hasMedia = Boolean(message.media_type)
-    article.className = `message ${message.direction === 'out' ? 'out' : 'in'} source-${senderType} ${hasMedia ? 'has-media' : ''} ${comment ? 'ig-comment' : ''}`
+    // v3.6.45: balasan CS dari HP (owner) tampil sama dengan balasan CS dari web.
+    const sourceClass = senderType === 'owner' ? 'source-owner source-cs' : `source-${senderType}`
+    article.className = `message ${message.direction === 'out' ? 'out' : 'in'} ${sourceClass} ${hasMedia ? 'has-media' : ''} ${comment ? 'ig-comment' : ''}`
     article.dataset.id = String(message.id)
     article.dataset.messageId = message.message_id
     article.dataset.body = message.body || message.media_type || 'Media'
