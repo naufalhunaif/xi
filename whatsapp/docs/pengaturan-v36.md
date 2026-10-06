@@ -370,3 +370,7 @@ Perubahan v3.6.6:
 
 - Order pelanggan langganan yang masih menunggu total atau menunggu bayar tidak lagi dianggap "sudah dikirim" hanya karena ada resi dari pembelian sebelumnya di chat yang sama (dulu langsung masuk Selesai, sehingga tab Menunggu total/bayar dan angkanya selalu 0). Resi lama tetap menutup order rekap yang sudah lunas; resi baru sesudah order dibuat tetap memindahkan order ke Selesai.
 - Daftar chat ikut sama: chat dengan order rekap yang masih menunggu total/bayar sesudah resi terakhir tidak lagi masuk Selesai.
+
+## v3.6.54 — Perbaikan build v3.6.53
+
+- v3.6.53 gagal dibangun di server (kesalahan tipe di tes baru); isi perbaikan sama, kini lolos pemeriksaan tipe.

@@ -34,7 +34,7 @@ test.group('tab Order: resi lama tidak menutup order rekap yang belum bayar (v3.
     assert.deepEqual(ids(await listLeanOrders('pending', '620000000779')), [waitTotal])
     assert.deepEqual(ids(await listLeanOrders('awaiting_payment', '620000000779')), [waitPay])
     assert.deepEqual(ids(await listLeanOrders('done', '620000000779')), [paidOld])
-    const rows = await listLeanOrders('all', '620000000779')
+    const rows = (await listLeanOrders('all', '620000000779')) as any[]
     assert.isNull(rows.find((r: any) => r.id === waitPay).shipped_awb)
     assert.equal(rows.find((r: any) => r.id === paidOld).shipped_awb, '000000000001')
 
