@@ -1231,6 +1231,14 @@ export function matchAutoTotal(
         items.push(line)
         continue
       }
+      // v3.6.43: rincian pre-order (jas + celana 535.000 + 220.000) yang jumlahnya persis total
+      // yang SUDAH disebut toko ("sekalian dengan celana totalnya 755.000") diterima apa adanya;
+      // jumlah akhir tetap wajib sama dengan subtotal (dicek di bawah).
+      if (linePrices.length && draft.subtotal > 0 && statedPrices.includes(draft.subtotal)) {
+        sum += linePrices[linePrices.length - 1] * qty
+        items.push(line)
+        continue
+      }
       // Baris detail tanpa harga (size, warna, bahan, pre order, …) dilewati; baris yang
       // terlihat seperti produk lain tetap menahan total supaya tidak ada item terlewat.
       const detail =

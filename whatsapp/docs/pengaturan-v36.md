@@ -322,10 +322,10 @@ Perubahan v3.6.6:
 - Form tanpa No. telp memakai nomor WhatsApp chat (kontak @lid tetap ditanyakan).
 - Settings → Usage → Recent runs: status berupa ikon terisi (centang hijau = selesai, silang merah = gagal).
 
-## v3.6.42 — Balasan lebih cepat (model sama)
+## v3.6.43 — Total pre-order terkirim, server lebih ringan (v3.6.42 dibatalkan)
 
-- **Gambar:** pesan bergambar tidak lagi mencoba akun lain dari penyedia yang baru gagal membaca gambar di permintaan itu. Catatan: 3 kegagalan ChatGPT 6 Okt adalah akun #6/#8/#9 yang habis kuota (dijeda otomatis sampai 26 Okt), jadi tidak terulang.
-- **Batas tunggu:** balasan chat menunggu maks. 50 dtk per akun lalu pindah ke akun berikutnya; akun terakhir tetap 120 dtk (tidak ada lagi tunggu 100+ dtk sebelum dicoba akun lain).
-- **Keluaran lebih pendek:** AI menulis `=` untuk spesifikasi/catatan yang tidak berubah (sistem memakai isi lama); alasan maks. ±12 kata. SKILL.md & DIGEST.md ikut menyebut aturan ini.
-- **Penalaran rendah** untuk balasan chat bila Pengaturan AI = Otomatis (Haiku tidak diubah; pilihan manual pemilik tetap dipakai). Rekap, digest, uji, dll. tidak berubah.
-- Model per tingkat tidak diubah.
+- Isi v3.6.42 (batas tunggu 50 dtk, "=" untuk spesifikasi/catatan, penalaran rendah) **tidak ikut** — pemilik kembali ke v3.6.41; versi ini = v3.6.41 + perbaikan di bawah.
+- Total otomatis: harga yang disebut toko dibaca dari seluruh percakapan 30 hari; rincian yang jumlahnya sama dengan total yang sudah disebut toko diterima; giliran form membaca 60 pesan. Detail: `docs/cs-pelajaran.md` #23.
+- Beberapa pesan pelanggan berurutan: AI diminta menjawab semua pertanyaan.
+- Susulan tidak menyebut total/DP/rekening sebelum total terkirim.
+- **Server terasa lambat:** kotak masuk menanyakan daftar chat tiap 3 dtk per tab (±1 dtk kerja server, ±400 KB, lalu seluruh daftar digambar ulang). Kini: hasil dipakai bersama 2 dtk untuk semua tab, browser hanya mengunduh & menggambar ulang bila isinya berubah (ETag/304), dan tab yang tidak dilihat berhenti menanyai server (langsung diperbarui saat dibuka lagi).

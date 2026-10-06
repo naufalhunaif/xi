@@ -96,6 +96,13 @@ function displayPhone(jid: string | null | undefined) {
   return `+62 ${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7)}`.replace(/-$/, '')
 }
 
+/** v3.6.43: daftar kotak masuk yang baru disusun, dipakai bersama sebentar (per workspace). */
+const CONTACTS_CACHE_MS = 2000
+const contactsCache = new Map<string, { at: number; body: string; etag: string }>()
+export function clearContactsCache() {
+  contactsCache.clear()
+}
+
 export default class DashboardController {
   private async decorateMessages(messages: Record<string, any>[]) {
     if (!messages.length) return messages
@@ -593,12 +600,27 @@ export default class DashboardController {
       ...lines.map((line, index) => ({ id: line.id, sim: index + 2, label: full(line.phone) || `#${line.id}` })),
     ]
   }
-  async contactsList({ response }: HttpContext) {
+  async contactsList({ request, response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
-    const [contacts, lines] = await Promise.all([this.contacts(), this.inboxLines()])
-    return response.json({ contacts, lines })
+    // v3.6.43 (server terasa lambat): kotak masuk menanyakan daftar ini tiap 3 dtk per tab, dan
+    // menyusunnya ±1 dtk (565 chat, ±400 KB). Hasil dipakai bersama 2 dtk untuk semua tab, dan
+    // bila isinya sama dengan yang sudah dimiliki browser cukup dijawab 304 (tanpa kirim & render ulang).
+    const key = `${workspaceScope().prefix}|${workspaceScope().id}`
+    const cached = contactsCache.get(key)
+    let entry = cached && Date.now() - cached.at < CONTACTS_CACHE_MS ? cached : null
+    if (!entry) {
+      const [contacts, lines] = await Promise.all([this.contacts(), this.inboxLines()])
+      const body = JSON.stringify({ contacts, lines })
+      entry = { at: Date.now(), body, etag: `"${createHash('sha1').update(body).digest('base64url')}"` }
+      contactsCache.set(key, entry)
+    }
+    response.header('ETag', entry.etag)
+    if (request.header('if-none-match') === entry.etag) return response.status(304).send('')
+    response.header('Content-Type', 'application/json; charset=utf-8')
+    return response.send(entry.body)
   }
   async contactRead({ request, response }: HttpContext) {
+    contactsCache.clear()
     try {
       await markRoomRead(
         String(request.input('jid', '')),
@@ -614,6 +636,7 @@ export default class DashboardController {
   }
   /** Pilihan di kotak masuk: tandai dibaca / belum dibaca. */
   async contactsReadState({ request, response }: HttpContext) {
+    contactsCache.clear()
     const jids = Array.isArray(request.input('jids')) ? request.input('jids').map(String) : []
     const rooms = Array.isArray(request.input('rooms'))
       ? request
@@ -630,6 +653,7 @@ export default class DashboardController {
     }
   }
   async contactMode({ request, response }: HttpContext) {
+    contactsCache.clear()
     const jid = String(request.input('jid', '')).trim().slice(0, 190)
     const mode = request.input('mode') === 'cs' ? 'cs' : request.input('mode') === 'ai' ? 'ai' : ''
     try {
@@ -656,6 +680,7 @@ export default class DashboardController {
   }
   /** Peran kontak diatur CS: pelanggan / vendor / lainnya (v3.6.31). */
   async contactRole({ request, response }: HttpContext) {
+    contactsCache.clear()
     try {
       const { setContactRole } = await import('#beta3/contact_role')
       const role = String(request.input('role', '') ?? '').trim()
@@ -666,6 +691,7 @@ export default class DashboardController {
     }
   }
   async contactExclusion({ request, response }: HttpContext) {
+    contactsCache.clear()
     try {
       await setAiExcluded(String(request.input('jid', '') ?? '').trim(), request.input('excluded'))
       return response.json({ ok: true })

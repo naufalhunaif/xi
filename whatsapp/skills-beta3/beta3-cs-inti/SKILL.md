@@ -104,7 +104,7 @@ Cara ukur kalau ditanya: "Cukup biasa pakai size apa, atau tinggi dan berat bada
 
 ## Spesifikasi pesanan (field `spesifikasi`) — pengganti keranjang
 
-Ini catatan yang dikirim apa adanya ke penjahit di grup produksi. Tulis **singkat dan jelas** seperti CS menulis ke penjahit: baris pendek, tanpa harga, tanpa label "kerah:"/"saku:", tanpa nomor urut. Ada yang baru/berubah di giliran ini → tulis ulang **lengkap** (tambahkan detail baru, ganti yang pelanggan ubah, jangan hilangkan yang lain); tidak ada yang berubah → isi `=` saja. Satu blok per item (pisahkan dengan baris kosong):
+Ini catatan yang dikirim apa adanya ke penjahit di grup produksi. Tulis **singkat dan jelas** seperti CS menulis ke penjahit: baris pendek, tanpa harga, tanpa label "kerah:"/"saku:", tanpa nomor urut. Tulis ulang **lengkap** tiap giliran; tambahkan detail baru, ganti yang pelanggan ubah, jangan hilangkan yang lain. Satu blok per item (pisahkan dengan baris kosong):
 
 ```
 Beskap Clean Look - Choco
@@ -166,7 +166,7 @@ Kalau pelanggan hanya bilang "oke"/"siap"/stiker tanpa kebutuhan baru, atau CS m
 
 ## Catatan chat (field `catatan`)
 
-Maksimal 6 baris, pertahankan yang lama, ganti yang berubah; tidak ada yang berubah → isi `=` saja:
+Maksimal 6 baris, pertahankan yang lama, ganti yang berubah:
 
 ```
 produk: Tuxedo Brown (jas saja)

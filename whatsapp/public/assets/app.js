@@ -1071,12 +1071,25 @@
     applyInboxFilters()
     updateBulkBar()
   }
-  async function updateContacts() {
+  // v3.6.43: daftar kotak masuk hanya diunduh & digambar ulang bila isinya berubah (ETag/304).
+  let contactsEtag = ''
+  async function updateContacts(force = false) {
     if (!contacts) return
     const version = ++contactsRequestVersion
     try {
-      const data = await api('/api/contacts')
+      const response = await fetch(`${appUrl}/api/contacts`, {
+        cache: 'no-store',
+        headers: {
+          accept: 'application/json',
+          'x-csrf-token': csrf,
+          ...(contactsEtag && force !== true ? { 'if-none-match': contactsEtag } : {}),
+        },
+      })
+      if (response.status === 304) return
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(t(data.error || 'Permintaan gagal.'))
       if (version !== contactsRequestVersion) return
+      contactsEtag = response.headers.get('etag') || ''
       renderContacts(data.contacts || [])
       renderInboxLines(data.lines || [])
       const selected = (data.contacts || []).find(
@@ -2362,11 +2375,22 @@
   updateCodexStatus()
   updateClaudeStatus()
   updateProviderPanels()
-  window.setInterval(updateStatus, 2000)
-  window.setInterval(updateMessages, 2500)
-  window.setInterval(updateContacts, 3000)
+  // v3.6.43: tab yang tidak dilihat tidak ikut menanyai server (banyak tab/HP = beban berlipat);
+  // begitu dibuka lagi langsung diperbarui.
+  const whenVisible = (fn) => () => {
+    if (!document.hidden) fn()
+  }
+  window.setInterval(whenVisible(updateStatus), 2000)
+  window.setInterval(whenVisible(updateMessages), 2500)
+  window.setInterval(whenVisible(updateContacts), 3000)
   restoreInboxScroll()
-  window.setInterval(updateOAuth, 3000)
-  window.setInterval(updateClaudeOAuth, 3000)
-  window.setInterval(updateMcpOAuth, 3000)
+  window.setInterval(whenVisible(updateOAuth), 3000)
+  window.setInterval(whenVisible(updateClaudeOAuth), 3000)
+  window.setInterval(whenVisible(updateMcpOAuth), 3000)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return
+    updateStatus()
+    updateMessages()
+    updateContacts()
+  })
 })()

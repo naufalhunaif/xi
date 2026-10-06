@@ -127,14 +127,21 @@ export function selectLeanSkill(skills: Array<{ name: string; content: string }>
   return chosen
 }
 
+/** Susulan yang menyebut total / DP / rekening / transfer (butuh total yang sudah terkirim). */
+export function susulanNeedsTotal(text: string) {
+  return /\b(total\w*|dp|rekening|rek|transfer|tf|pelunasan|lunas|bayar\w*)\b/i.test(String(text || ''))
+}
+
 function stageFromNote(note: string) {
   const match = note.match(/tahap\s*[:=]\s*([a-z_]+)/i)
   return match ? match[1].toLowerCase() : ''
 }
 
-async function history(jid: string, currentIds: Set<string>): Promise<LeanHistoryRow[]> {
+async function history(jid: string, currentIds: Set<string>, long = false): Promise<LeanHistoryRow[]> {
   const active = await latestLeanOrder(jid).catch(() => null)
-  const limit = active && ['pending', 'awaiting_payment'].includes(String(active.status)) ? HISTORY_LIMIT_ORDER : HISTORY_LIMIT
+  // v3.6.43: form order masuk giliran ini (order baru dibuat sesudah riwayat dibaca) → riwayat
+  // panjang juga, supaya harga & pilihan yang dibahas sebelumnya tidak terpotong.
+  const limit = long || (active && ['pending', 'awaiting_payment'].includes(String(active.status))) ? HISTORY_LIMIT_ORDER : HISTORY_LIMIT
   const rows = await db
     .from('whatsapp_messages')
     .select('message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at', 'reply_to_message_id')
@@ -521,7 +528,7 @@ export async function createLeanReply(input: {
     listLeanExamples(),
     readCustomerNote(jid),
     readBeta3ChatNote(jid),
-    history(jid, new Set(input.messageIds)),
+    history(jid, new Set(input.messageIds), Boolean(parseOrderForm(input.text) || parseLooseAddress(input.text))),
     readOrderSpec(jid),
     listRules(),
   ])
@@ -1168,10 +1175,6 @@ export async function createLeanReply(input: {
     }
     onTrace?.({ key: 'beta3-tidy-text', label: 'Jawaban teks biasa dirapikan sistem', status: 'completed', detail: { bubbles } })
   }
-  // v3.6.42 (kecepatan): AI menulis "=" bila spesifikasi/catatan tidak berubah — keluaran lebih
-  // pendek; isi lama dipakai apa adanya.
-  if (decision.spesifikasi.trim() === '=') decision.spesifikasi = String(spec || '')
-  if (decision.catatan.trim() === '=') decision.catatan = chatNote
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
   const jevColor = await jevVariantFix(jid, decision.spesifikasi, digest.rows, rows).catch(() => null)
   const colorFix = jevColor || fixCatalogColors(decision.spesifikasi, digest.rows, rows)
@@ -1365,9 +1368,23 @@ export async function createLeanReply(input: {
         ? decision.order
         : { rincian: specNow, subtotal: 0, layanan: '' }
     // Harga yang sudah disebut toko di chat (CS/AI), untuk pre-order atau produk di luar katalog.
-    const statedPrices = rows
-      .filter((row) => row.direction === 'out' && row.body)
-      .flatMap((row) => parsePrices(String(row.body)))
+    // v3.6.43: dibaca dari seluruh percakapan 30 hari terakhir (dulu hanya riwayat 20 pesan, sehingga
+    // "harganya 535.000" yang disebut lebih awal tidak terbaca dan total pre-order tertahan).
+    const storeBodies = await db
+      .from('whatsapp_messages')
+      .where('jid', jid)
+      .where('direction', 'out')
+      .whereNotNull('body')
+      .whereNotIn('status', ['failed', 'queued'])
+      .where('created_at', '>=', new Date(Date.now() - 30 * 86_400_000))
+      .orderBy('id', 'desc')
+      .limit(400)
+      .select('body')
+      .catch(() => [] as Array<{ body: string }>)
+    const statedPrices = [
+      ...rows.filter((row) => row.direction === 'out' && row.body).map((row) => String(row.body)),
+      ...(storeBodies as Array<{ body: string }>).map((row) => String(row.body || '')),
+    ].flatMap((body) => parsePrices(body))
     // Pilihan layanan hanya dari pesan PELANGGAN (bukan catatan AI yang memuat daftar ongkir).
     const lastOngkir = rows.map((row, index) => (row.direction === 'out' && /ongkir/i.test(String(row.body || '')) ? index : -1)).reduce((a, b) => Math.max(a, b), -1)
     const customerText = [
@@ -1480,6 +1497,14 @@ export async function createLeanReply(input: {
     if (repeated.changed) {
       decision.pesan = repeated.pesan
       onTrace?.({ key: 'beta3-total', label: repeated.pesan.length ? 'Janji tunggu tidak diulang' : 'Diam · janji tunggu sudah dikirim', status: 'completed', detail: {} })
+    }
+  }
+  // v3.6.43: susulan tidak menyebut total/DP/rekening sebelum total benar-benar dikirim.
+  if (decision.susulan && !autoTotal && susulanNeedsTotal(decision.susulan)) {
+    const latest = await latestLeanOrder(jid).catch(() => null)
+    if (!latest || !['awaiting_payment', 'paid', 'sent'].includes(String(latest.status))) {
+      onTrace?.({ key: 'beta3-nudge-plan', label: 'Susulan dibatalkan · menyebut total yang belum dikirim', status: 'completed', detail: { susulan: decision.susulan } })
+      decision.susulan = ''
     }
   }
   // Total/pembayaran yang dikerjakan CS langsung di chat ikut tercatat di order.

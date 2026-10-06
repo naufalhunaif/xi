@@ -491,3 +491,20 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. Setelah WhatsApp mengonfirmasi terkirim, pesan tidak pernah dikirim ulang; salinan "owner" ber-id sama dilebur. Percobaan ulang lebih dulu memeriksa salinan "owner" dengan isi sama (sudah terkirim → tidak dikirim lagi).
 3. Total menampilkan REG/YES/JTR untuk CTC/CTCYES/CTCJTR.
 4. No. telp kosong → nomor WhatsApp chat itu dipakai, AI diberi tahu untuk tidak menanyakannya.
+
+## #23 · Okt 2026 · uji pemilik sesi 2: total pre-order tidak terkirim, pertanyaan terlewat (diterapkan v3.6.43)
+
+**Percakapan uji:** "Ada model apa aja" + "Custom bisa?" berurutan; foto Tuxedo Double Breasted maroon (AI: bisa dibuatkan 535.000); sekalian celana (AI: total 755.000); S/31; REG; form.
+
+**Yang salah**
+1. Form masuk → "totalnya saya hitung dulu ya bos" lalu berhenti (tunggu_cs). AI sudah menyusun rincian benar: 535.000 + 220.000 = 755.000, REG.
+2. "Ada model apa aja" tidak dijawab (hanya custom).
+3. Susulan terjadwal menyebut "DP … setengah dari total" padahal total belum pernah dikirim.
+
+**Penyebab**
+1. Harga di luar katalog (pre-order) harus pernah disebut toko; yang dibaca hanya 20 pesan terakhir, dan "harganya 535.000" pesan ke-21. Saat form masuk, riwayat yang dibaca AI juga masih 20 pesan (order baru dibuat sesudahnya).
+
+**Perubahan**
+1. Harga yang disebut toko dibaca dari seluruh percakapan 30 hari; rincian yang jumlahnya persis total yang sudah disebut toko (755.000) diterima; giliran form membaca riwayat panjang (60).
+2. Instruksi: beberapa pesan berurutan → semua pertanyaan dijawab.
+3. Susulan yang menyebut total/DP/rekening/transfer dibatalkan bila total belum terkirim.
