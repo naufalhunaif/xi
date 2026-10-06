@@ -1981,4 +1981,5 @@ window.waLocales.en = {
   "Model paling kuat": "Strongest model",
   "Paling kuat \u00b7 Claude": "Strongest \u00b7 Claude",
   "Paling kuat \u00b7 ChatGPT": "Strongest \u00b7 ChatGPT",
+  "Tindakan lain": "More actions",
 }

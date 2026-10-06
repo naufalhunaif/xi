@@ -357,44 +357,12 @@
                 data-mode="{{ selectedContact ? selectedContact.handling_mode : 'ai' }}"
                 {{ selectedContact ? '' : 'hidden' }}
                data-i18n-aria-label="Tindakan percakapan">
-                <button id="roomModeButton" class="button" type="button" data-i18n-auto {{ selectedContact?.schedule_paused ? 'disabled' : '' }}>
-                  {{ selectedContact?.handling_mode === 'cs' ? 'Aktifkan AI' : 'Ambil alih' }}
-                </button>
-                <button
-                  id="roomExclusionButton"
-                  class="wa-setting-icon wa-icon-exclude"
-                  type="button"
-                  aria-label="Jangan dibalas AI"
-                  title="Jangan dibalas AI"
-                  aria-pressed="{{ selectedContact?.ai_excluded ? 'true' : 'false' }}"
-                 data-i18n="Jangan dibalas AI" data-i18n-aria-label="Jangan dibalas AI" data-i18n-title="Jangan dibalas AI">
-                  Jangan dibalas AI
-                </button>
-                <button
-                  id="roomRoleButton"
-                  class="wa-setting-icon wa-icon-role"
-                  type="button"
-                  data-role="{{ selectedContact?.role || '' }}"
-                  aria-pressed="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'true' : 'false' }}"
-                  aria-label="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}"
-                  title="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}"
-                  data-i18n="Vendor" data-i18n-aria-label="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}" data-i18n-title="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}">
-                  Vendor
-                </button>
-                <button id="contactDeleteButton" class="wa-icon-button wa-contact-delete-trigger" type="button"
-                  aria-label="Hapus data pelanggan" title="Hapus data pelanggan"
-                  data-i18n-aria-label="Hapus data pelanggan" data-i18n-title="Hapus data pelanggan">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-                    <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
-                  </svg>
-                </button>
                 <button id="roomSearchButton" class="wa-icon-button" type="button" aria-label="Cari di chat ini" title="Cari di chat ini"
                   aria-controls="roomSearchBar" aria-expanded="false" data-i18n-aria-label="Cari di chat ini" data-i18n-title="Cari di chat ini">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
                     <circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" />
                   </svg>
                 </button>
-                <span class="wa-room-action-divider" aria-hidden="true"></span>
                 <button
                   id="cartOpen"
                   class="wa-icon-button wa-cart-trigger"
@@ -428,6 +396,39 @@
                     </svg>
                   </span>
                 </button>
+                {{-- v3.6.49: yang penting saja (cari, pesanan); tindakan lain di menu ⋯ --}}
+                <div class="wa-room-more">
+                  <button id="roomMoreButton" class="wa-icon-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="roomMoreMenu"
+                    aria-label="Tindakan lain" title="Tindakan lain" data-i18n-aria-label="Tindakan lain" data-i18n-title="Tindakan lain">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                      <circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" />
+                    </svg>
+                  </button>
+                  <div id="roomMoreMenu" class="wa-room-menu" role="menu" aria-label="Tindakan lain" data-i18n-aria-label="Tindakan lain" hidden>
+                    <button id="roomModeButton" class="wa-room-menu-item ico-ai" type="button" role="menuitem" data-i18n-auto {{ selectedContact?.schedule_paused ? 'disabled' : '' }}>{{ selectedContact?.handling_mode === 'cs' ? 'Aktifkan AI' : 'Ambil alih' }}</button>
+                    <button
+                      id="roomExclusionButton"
+                      class="wa-room-menu-item wa-menu-check ico-exclude"
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-pressed="{{ selectedContact?.ai_excluded ? 'true' : 'false' }}"
+                      aria-checked="{{ selectedContact?.ai_excluded ? 'true' : 'false' }}"
+                      title="Jangan dibalas AI"
+                     data-i18n-title="Jangan dibalas AI"><span data-i18n="Jangan dibalas AI">Jangan dibalas AI</span></button>
+                    <button
+                      id="roomRoleButton"
+                      class="wa-room-menu-item wa-menu-check ico-role"
+                      type="button"
+                      role="menuitemcheckbox"
+                      data-role="{{ selectedContact?.role || '' }}"
+                      aria-pressed="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'true' : 'false' }}"
+                      aria-checked="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'true' : 'false' }}"
+                      title="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}"
+                      data-i18n-title="{{ ['vendor', 'lainnya'].includes(selectedContact?.role) ? 'Tandai kembali sebagai pelanggan' : 'Tandai sebagai vendor' }}"><span data-i18n="Vendor">Vendor</span></button>
+                    <hr aria-hidden="true" />
+                    <button id="contactDeleteButton" class="wa-room-menu-item wa-contact-delete-trigger ico-delete" type="button" role="menuitem"><span data-i18n="Hapus data pelanggan">Hapus data pelanggan</span></button>
+                  </div>
+                </div>
               </div>
             </div>
             <section id="roomHandlingDetails" class="wa-handling-details" role="region" aria-labelledby="roomHandlingDetailsTitle" hidden>

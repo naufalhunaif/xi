@@ -1285,6 +1285,58 @@
       button.disabled = false
     }
   })
+  // v3.6.49: header room hanya Cari & Pesanan; tindakan lain di menu ⋯ (mengambang).
+  ;(() => {
+    const more = byId('roomMoreButton')
+    const menu = byId('roomMoreMenu')
+    if (!more || !menu) return
+    const items = () => [...menu.querySelectorAll('button:not([disabled])')]
+    const open = (focusFirst = false) => {
+      menu.hidden = false
+      more.setAttribute('aria-expanded', 'true')
+      if (focusFirst) items()[0]?.focus()
+    }
+    const close = (restore = false) => {
+      if (menu.hidden) return
+      menu.hidden = true
+      more.setAttribute('aria-expanded', 'false')
+      if (restore) more.focus()
+    }
+    more.addEventListener('click', () => (menu.hidden ? open() : close()))
+    more.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        open(true)
+      }
+    })
+    // Pilih tindakan → menu tertutup (aksinya tetap dijalankan oleh pendengar tombol masing-masing).
+    menu.addEventListener('click', (event) => {
+      if (event.target.closest('button')) setTimeout(() => close(), 0)
+    })
+    menu.addEventListener('keydown', (event) => {
+      const list = items()
+      const index = list.indexOf(document.activeElement)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        close(true)
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        const step = event.key === 'ArrowDown' ? 1 : -1
+        list[(index + step + list.length) % list.length]?.focus()
+      } else if (event.key === 'Tab') close()
+    })
+    document.addEventListener('pointerdown', (event) => {
+      if (!menu.hidden && !event.target.closest('.wa-room-more')) close()
+    })
+    // Tanda centang mengikuti status tombol (aria-pressed diubah oleh kode lain).
+    for (const id of ['roomExclusionButton', 'roomRoleButton']) {
+      const button = byId(id)
+      if (!button) continue
+      const sync = () => button.setAttribute('aria-checked', button.getAttribute('aria-pressed') === 'true' ? 'true' : 'false')
+      new MutationObserver(sync).observe(button, { attributes: true, attributeFilter: ['aria-pressed'] })
+      sync()
+    }
+  })()
   let roomDetailsContact = null
   function closeRoomDetails(restoreFocus = false) {
     const panel = byId('roomHandlingDetails')

@@ -343,3 +343,9 @@ Perubahan v3.6.6:
 
 - Settings → Usage → Daily token trend: tinggi grafik tidak lagi bertambah setiap digambar ulang. Penyebab: tinggi SVG ikut viewBox, sedangkan viewBox dihitung dari tinggi tampil (lingkaran umpan balik). Kini ukuran SVG dari kotaknya (`contain: size`) dan viewBox = ukuran tampil nyata.
 - Chat: balasan CS yang dikirim dari HP (tercatat "owner") tampil sama dengan balasan CS dari web (warna & label CS).
+
+## v3.6.49 — Header chat lebih bersih (v3.6.46–v3.6.48 dibatalkan)
+
+- v3.6.46–v3.6.48 (alur/peta orkestra) dihapus; kode kembali ke v3.6.45, lalu perubahan ini.
+- Header room hanya menampilkan **Cari** dan **Pesanan**. Tindakan lain (Ambil alih / Aktifkan AI, Jangan dibalas AI, Vendor, Hapus data pelanggan) pindah ke menu **⋯** yang mengambang. Status aktif (Jangan dibalas AI, Vendor) ditandai centang. Menu tertutup setelah memilih, klik di luar, atau Esc; bisa dengan panah keyboard.
+- HP: ketiga tombol tetap sebaris di samping nama (tidak lagi memakan satu baris).
