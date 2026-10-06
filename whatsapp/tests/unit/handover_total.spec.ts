@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import db from '#services/workspace_database'
 import { saveRecap, type ChatRecap } from '#beta3/recap_service'
 import { ensureLeanTables, LEAN_TABLE_STATEMENTS } from '#beta3/tables'
-import { reopenUntotaledOrder, totalWasSent } from '#beta3/order_service'
+import { adoptCsTotal, parseCsTotalMessage, reconcileCsTotals, reopenUntotaledOrder, totalWasSent } from '#beta3/order_service'
 
 // v3.6.50 — kasus 6 Okt (cs-pelajaran #24): chat dipegang CS, rekap otomatis mencatat order
 // "menunggu bayar" padahal total belum pernah dikirim. AI yang melanjutkan bilang "ini totalnya"
@@ -23,6 +23,7 @@ const recap = (over: Partial<ChatRecap> = {}): ChatRecap => ({
 })
 const clean = async () => {
   await db.from('whatsapp_beta3_orders').where('jid', JID).delete()
+  await db.from('whatsapp_messages').where('jid', JID).delete()
 }
 
 test.group('peralihan CS → AI: total belum terkirim (v3.6.50)', (group) => {
@@ -82,5 +83,39 @@ test.group('peralihan CS → AI: total belum terkirim (v3.6.50)', (group) => {
     assert.isTrue(totalWasSent({ status: 'paid', updated_at: new Date(now - 2 * 86_400_000) }, now))
     // Pelanggan langganan: order bulan lalu sudah terkirim → percakapan baru belum punya total.
     assert.isFalse(totalWasSent({ status: 'sent', updated_at: new Date(now - 30 * 86_400_000) }, now))
+  })
+
+  // v3.6.51: total CS diketik dari HP (pemilik) tidak tercatat → order tetap tanpa total.
+  test('total CS dua pesan dari HP: "Total 905.000 + 22.000 =927.000" terbaca (ongkir dari penjumlahan)', ({ assert }) => {
+    assert.deepEqual(parseCsTotalMessage('Total 905.000 + 22.000 =927.000 bos'), {
+      items: '',
+      subtotal: 905000,
+      shippingCost: 22000,
+      total: 927000,
+    })
+    // Baris rincian tanpa kata "total" bukan pesan total.
+    assert.isNull(parseCsTotalMessage('Jas, Celana, Rompi 905.000, ongkir 2kg, 2 x 11.000 = 22.000'))
+  })
+
+  test('order rekap tanpa total + total CS dari HP di chat → total tercatat, menunggu bayar', async ({ assert }) => {
+    const created = new Date(Date.now() - 3600_000)
+    const [id] = await db.table('whatsapp_beta3_orders').insert({
+      jid: JID, items: 'Jas', status: 'pending', source: 'rekap', group_status: 'none', created_at: created, updated_at: created,
+    })
+    const message = (mid: string, body: string, at: Date) => ({
+      message_id: mid, jid: JID, direction: 'out', sender_type: 'owner', body, status: 'sent', created_at: at,
+    })
+    await db.table('whatsapp_messages').insert([
+      message('HT-1', 'Jas, Celana, Rompi 905.000, ongkir 2kg, 2 x 11.000 = 22.000', new Date()),
+      message('HT-2', 'Total 905.000 + 22.000 =927.000 bos', new Date()),
+    ])
+    assert.isAbove(await reconcileCsTotals(), 0)
+    const order = await db.from('whatsapp_beta3_orders').where('id', id).first()
+    assert.equal(order.status, 'awaiting_payment')
+    assert.equal(Number(order.total), 927000)
+    assert.equal(Number(order.shipping_cost), 22000)
+    assert.isTrue(totalWasSent(order))
+    // Sudah sama → tidak diubah lagi.
+    assert.isNull(await adoptCsTotal(id))
   })
 })

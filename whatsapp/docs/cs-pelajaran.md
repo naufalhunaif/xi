@@ -527,3 +527,5 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. Giliran AI: order "menunggu bayar" tanpa total dibuka lagi dan dihitung; order tanpa tarif ongkir dicek ongkirnya dari alamat di order.
 3. Pengaman janji total & pembatalan susulan bayar memakai "total benar-benar sudah terkirim" (total/dana tercatat), bukan sekadar status; pesanan lama yang sudah selesai (> 7 hari) tidak dihitung.
 4. Tes: `tests/unit/handover_total.spec.ts`.
+
+**Lanjutan (v3.6.51):** sesudah v3.6.50 order #15 tetap tanpa total. Penyebab: total CS ("Total 905.000 + 22.000 =927.000 bos") diketik dari HP, sedangkan pencatatan total CS hanya untuk pesan yang dikirim dari web. Kini total & konfirmasi dana yang diketik dari HP juga dicatat; "A + B = C" dibaca sebagai subtotal + ongkir; order (termasuk rekap) yang belum bertotal mengambil total CS dari chat saat aplikasi mulai dan saat AI membalas.

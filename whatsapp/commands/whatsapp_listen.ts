@@ -1950,18 +1950,7 @@ export default class WhatsappListen extends BaseCommand {
       )
       // A mode-update error must not turn an already sent message into a failed send.
       if (message.sender_type === 'cs') {
-        // Total yang diketik CS di chat langsung memperbarui order (v3.6.30).
-        try {
-          const applied = await beta3.applyCsTotalMessage(message.jid, String(message.body || ''))
-          if (applied) this.logger.info(`Order ${applied.orderId} diperbarui dari total CS: ${applied.total}`)
-          // Konfirmasi dana dari CS di chat (Jev yakin) → lunas saat itu juga (v3.6.32).
-          else {
-            const paid = await beta3.applyCsPaymentConfirm(message.jid, String(message.body || ''), storeConfirmedPayment)
-            if (paid) this.logger.info(`Order ${paid.orderId} lunas dari konfirmasi CS: ${paid.amount}`)
-          }
-        } catch {
-          /* Pencatatan opsional; jangan mengganggu pengiriman. */
-        }
+        await this.noteHumanOrderMessage(message.jid, String(message.body || ''))
         await resumeAiAfterHumanReply(message.jid)
         // Jawaban CS menjadi kandidat contoh untuk AI, tanpa mengedit skill.
         try {
@@ -2065,6 +2054,24 @@ export default class WhatsappListen extends BaseCommand {
     this.queueTurn(jid, { id, text, message, media, mediaDownload }, settings.turnWindowMs)
   }
 
+  /**
+   * Total / konfirmasi dana yang diketik CS di chat langsung memperbarui order (v3.6.30, v3.6.32).
+   * v3.6.51: juga untuk pesan yang dikirim dari HP (pemilik) — dulu hanya dari web, sehingga total
+   * CS dari HP tidak tercatat dan AI mengira total belum pernah dikirim.
+   */
+  private async noteHumanOrderMessage(jid: string, body: string) {
+    try {
+      const applied = await beta3.applyCsTotalMessage(jid, body)
+      if (applied) this.logger.info(`Order ${applied.orderId} diperbarui dari total CS: ${applied.total}`)
+      else {
+        const paid = await beta3.applyCsPaymentConfirm(jid, body, storeConfirmedPayment)
+        if (paid) this.logger.info(`Order ${paid.orderId} lunas dari konfirmasi CS: ${paid.amount}`)
+      }
+    } catch {
+      /* Pencatatan opsional; jangan mengganggu pengiriman. */
+    }
+  }
+
   private async recordOwnMessage(message: WAMessage, id: string, jid: string) {
     const text = this.textOf(message)
     const media = await this.prepareMedia(message)
@@ -2092,6 +2099,7 @@ export default class WhatsappListen extends BaseCommand {
       status: 'sent',
       created_at: this.messageDate(message),
     })
+    if (text) await this.noteHumanOrderMessage(jid, text)
     await resumeAiAfterHumanReply(jid)
   }
 

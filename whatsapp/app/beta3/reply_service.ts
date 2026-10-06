@@ -26,6 +26,7 @@ import {
   reopenLeanOrderForChange,
   reopenUntotaledOrder,
   totalWasSent,
+  adoptCsTotal,
   type VerifiedAutoTotal,
 } from '#beta3/order_service'
 import {
@@ -1338,6 +1339,14 @@ export async function createLeanReply(input: {
     ) {
       totalOrderId = Number(pending.id)
       onTrace?.({ key: 'beta3-total', label: 'Item berubah setelah total · dihitung ulang', status: 'completed', detail: { before: spec, after: specNow } })
+    }
+  }
+  // v3.6.51: CS sudah mengirim total di chat (mis. dari HP) → catat, jangan hitung/janjikan lagi.
+  if (totalOrderId && !orderId) {
+    const adopted = await adoptCsTotal(totalOrderId).catch(() => null)
+    if (adopted) {
+      onTrace?.({ key: 'beta3-total', label: `Total sudah dikirim CS di chat · ${adopted.total}`, status: 'completed', detail: adopted })
+      totalOrderId = null
     }
   }
   if (totalOrderId) {

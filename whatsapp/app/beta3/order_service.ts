@@ -1445,7 +1445,13 @@ export function parseCsTotalMessage(body: string) {
   const total = parsePrices(totalSegment).pop() || 0
   const ongkirSegment = segments.find((segment) => /^ongkir\b/i.test(segment))
   // null = ongkir tidak disebut (dipakai ongkir order yang sudah ada).
-  const shippingCost: number | null = ongkirSegment ? parsePrices(ongkirSegment).pop() || 0 : null
+  let shippingCost: number | null = ongkirSegment ? parsePrices(ongkirSegment).pop() || 0 : null
+  // v3.6.51: "Total 905.000 + 22.000 = 927.000" tanpa baris ongkir (rincian & ongkir di pesan
+  // sebelumnya) → angka kedua = ongkir bila jumlahnya cocok.
+  if (shippingCost === null) {
+    const parts = parsePrices(totalSegment)
+    if (parts.length === 3 && parts[0] + parts[1] === parts[2] && parts[1] < parts[0]) shippingCost = parts[1]
+  }
   const itemLines = segments.filter(
     (segment) =>
       !/^(total|ongkir)\b/i.test(segment) &&
@@ -1501,13 +1507,26 @@ export async function applyCsTotalMessage(jid: string, body: string) {
 export async function adoptCsTotal(orderId: number, amount?: number) {
   await ensureLeanTables()
   const order = await readLeanOrder(orderId)
-  if (!order || !['paid', 'awaiting_payment'].includes(String(order.status))) return null
+  if (!order || !['paid', 'awaiting_payment', 'pending'].includes(String(order.status))) return null
+  if (order.status === 'pending' && Number(order.paid_amount || 0) > 0) return null
+  // Order dari rekap chat CS dibuat SESUDAH percakapannya: total CS bisa lebih dulu (≤ 14 hari).
+  let since = new Date(new Date(order.created_at).getTime() - (order.source === 'rekap' ? 14 * 86_400_000 : 0))
+  if (order.source === 'rekap') {
+    // Jangan sampai mengambil total pesanan sebelumnya di chat yang sama.
+    const previous = await db
+      .from('whatsapp_beta3_orders')
+      .where('jid', String(order.jid))
+      .where('id', '<', orderId)
+      .max('updated_at as at')
+      .first()
+    if (previous?.at && new Date(previous.at) > since) since = new Date(previous.at)
+  }
   const rows = await db
     .from('whatsapp_messages')
     .where('jid', String(order.jid))
     .where('direction', 'out')
     .whereIn('sender_type', ['cs', 'owner'])
-    .where('created_at', '>=', order.created_at)
+    .where('created_at', '>=', since)
     .whereNotIn('status', ['failed', 'queued'])
     .orderBy('id', 'desc')
     .limit(60)
@@ -1535,6 +1554,10 @@ export async function adoptCsTotal(orderId: number, amount?: number) {
       shipping_cost: shippingCost || null,
       total: parsed.total,
       cs_note: order.status === 'paid' ? (Number(order.paid_amount || 0) >= parsed.total ? 'Lunas' : order.cs_note) : 'total dikirim CS di chat',
+      // v3.6.51: order pending yang totalnya sudah dikirim CS (mis. dari HP) → menunggu bayar.
+      ...(order.status === 'pending'
+        ? { status: 'awaiting_payment', auto_total_reason: null, order_number: order.order_number || (await nextOrderNumber()) }
+        : {}),
       updated_at: new Date(),
     })
   return { orderId, total: parsed.total, shippingCost, subtotal }
@@ -1545,13 +1568,15 @@ export async function reconcileCsTotals() {
   await ensureLeanTables()
   const orders = await db
     .from('whatsapp_beta3_orders')
-    .whereIn('status', ['paid', 'awaiting_payment'])
+    .whereIn('status', ['paid', 'awaiting_payment', 'pending'])
     .where('created_at', '>=', new Date(Date.now() - 90 * 86_400_000))
     .select('id', 'status', 'total', 'paid_amount')
   let fixed = 0
   for (const order of orders as any[]) {
     const paid = Number(order.paid_amount || 0)
     if (order.status === 'paid' && (!paid || paid === Number(order.total || 0))) continue
+    // v3.6.51: order pending hanya bila belum punya total (total CS dari HP dulu tidak tercatat).
+    if (order.status === 'pending' && Number(order.total || 0) > 0) continue
     const result = await adoptCsTotal(Number(order.id), order.status === 'paid' ? paid : undefined).catch(() => null)
     if (result) fixed++
   }
