@@ -43,7 +43,8 @@ import {
 import { createHash } from 'node:crypto'
 import { queueOutgoingMessage, setHandlingMode } from '#services/message_service'
 import { presentedAnalysisStatus } from '#services/analysis_retry_service'
-import { latestInboxMessages, markRoomRead, roomLine, setRoomsReadState } from '#services/contact_inbox_service'
+import { latestInboxMessages, markRoomRead, roomLine, setRoomsReadState, type InboxQuery } from '#services/contact_inbox_service'
+import { changedRooms, currentCursor, decodeCursor, encodeCursor, subscribeInbox, touchRoom } from '#services/inbox_changes'
 import { readConnectionStatus } from '#services/connection_status_service'
 import { setAiExcluded } from '#services/ai_exclusion_service'
 import { readFile, stat } from 'node:fs/promises'
@@ -98,6 +99,8 @@ function displayPhone(jid: string | null | undefined) {
 
 /** v3.6.43: daftar kotak masuk yang baru disusun, dipakai bersama sebentar (per workspace). */
 const CONTACTS_CACHE_MS = 2000
+/** v3.6.44: room pada muatan pertama kotak masuk. */
+const INBOX_FIRST_PAGE = 60
 const contactsCache = new Map<string, { at: number; body: string; etag: string }>()
 export function clearContactsCache() {
   contactsCache.clear()
@@ -152,8 +155,8 @@ export default class DashboardController {
     }))
   }
 
-  private async contacts() {
-    const messages = await latestInboxMessages()
+  private async contacts(query: InboxQuery = {}) {
+    const messages = await latestInboxMessages(query)
     if (!messages.length) return []
     const profiles = await db.from('whatsapp_contacts').whereIn(
       'jid',
@@ -258,9 +261,17 @@ export default class DashboardController {
 
   async index({ view, session, request }: HttpContext) {
     await ensureDefaults()
-    const [connection, contacts, inboxLines] = await Promise.all([readConnectionStatus(), this.contacts(), this.inboxLines()])
+    // v3.6.44: halaman pertama kotak masuk saja (60 room terbaru); sisanya dimuat browser di belakang.
+    const [connection, contacts, inboxLines] = await Promise.all([
+      readConnectionStatus(),
+      this.contacts({ limit: INBOX_FIRST_PAGE }),
+      this.inboxLines(),
+    ])
     const requestedJid = String(request.input('jid', '')).slice(0, 190)
     const requestedLine = roomLine(request.input('line', 1))
+    // Room yang dibuka lewat tautan tetapi di luar halaman pertama: ambil room itu saja.
+    if (requestedJid && !contacts.some((contact) => contact.jid === requestedJid))
+      contacts.push(...(await this.contacts({ jids: [requestedJid] }).catch(() => [])))
     const selectedContact =
       contacts.find((contact) => contact.jid === requestedJid && contact.line_id === requestedLine) ||
       (requestedLine === 1 ? contacts.find((contact) => contact.jid === requestedJid) : null) ||
@@ -602,6 +613,26 @@ export default class DashboardController {
   }
   async contactsList({ request, response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
+    // v3.6.44 — pembaruan per kejadian: hanya room yang berubah sejak cursor.
+    const since = decodeCursor(request.input('since'))
+    if (since) {
+      const change = await changedRooms(since)
+      if (change.full) return response.json({ full: true, cursor: encodeCursor(change.cursor) })
+      const rows = change.jids.length ? await this.contacts({ jids: change.jids }) : []
+      return response.json({ contacts: rows, jids: change.jids, cursor: encodeCursor(change.cursor) })
+    }
+    // Muat bertahap: halaman room terbaru (cursor diambil SEBELUM menyusun, supaya perubahan
+    // selama memuat ikut terbaca di pembaruan berikutnya).
+    const limit = Math.max(0, Math.min(500, Number(request.input('limit')) || 0))
+    if (limit) {
+      const offset = Math.max(0, Number(request.input('offset')) || 0)
+      const cursor = await currentCursor()
+      const [rows, lines] = await Promise.all([
+        this.contacts({ limit, offset }),
+        offset ? Promise.resolve(undefined) : this.inboxLines(),
+      ])
+      return response.json({ contacts: rows, lines, cursor: encodeCursor(cursor), more: rows.length >= limit })
+    }
     // v3.6.43 (server terasa lambat): kotak masuk menanyakan daftar ini tiap 3 dtk per tab, dan
     // menyusunnya ±1 dtk (565 chat, ±400 KB). Hasil dipakai bersama 2 dtk untuk semua tab, dan
     // bila isinya sama dengan yang sudah dimiliki browser cukup dijawab 304 (tanpa kirim & render ulang).
@@ -619,8 +650,49 @@ export default class DashboardController {
     response.header('Content-Type', 'application/json; charset=utf-8')
     return response.send(entry.body)
   }
+  /**
+   * v3.6.44 — dorong kejadian kotak masuk (Server-Sent Events). Browser menerima "changed" lalu
+   * mengambil room yang berubah saja. nginx: X-Accel-Buffering no; detak tiap 20 dtk.
+   */
+  async inboxEvents({ request, response }: HttpContext) {
+    const { PassThrough } = await import('node:stream')
+    const stream = new PassThrough()
+    response.header('Content-Type', 'text/event-stream; charset=utf-8')
+    response.header('Cache-Control', 'no-store, no-transform')
+    response.header('Connection', 'keep-alive')
+    response.header('X-Accel-Buffering', 'no')
+    let pending: NodeJS.Timeout | null = null
+    const send = (text: string) => {
+      if (!stream.destroyed) stream.write(text)
+    }
+    send('retry: 3000\n\n')
+    send('event: ready\ndata: {}\n\n')
+    const unsubscribe = subscribeInbox(() => {
+      // Beberapa perubahan beruntun digabung (±300 ms).
+      if (pending) return
+      pending = setTimeout(() => {
+        pending = null
+        send(`event: changed\ndata: ${Date.now()}\n\n`)
+      }, 300)
+    })
+    const heartbeat = setInterval(() => send(': ping\n\n'), 20_000)
+    // Sambungan diperbarui tiap 10 menit (EventSource menyambung lagi sendiri).
+    const lifetime = setTimeout(() => stream.end(), 10 * 60_000)
+    const close = () => {
+      clearInterval(heartbeat)
+      clearTimeout(lifetime)
+      if (pending) clearTimeout(pending)
+      unsubscribe()
+      if (!stream.destroyed) stream.end()
+    }
+    request.request.on('close', close)
+    stream.on('close', close)
+    response.stream(stream)
+  }
+
   async contactRead({ request, response }: HttpContext) {
     contactsCache.clear()
+    touchRoom(String(request.input('jid', '')))
     try {
       await markRoomRead(
         String(request.input('jid', '')),
@@ -645,6 +717,7 @@ export default class DashboardController {
           .map((room: { jid?: unknown; line?: unknown }) => ({ jid: String(room.jid || ''), line: roomLine(room.line) }))
       : []
     const state = request.input('state') === 'unread' ? 'unread' : 'read'
+    for (const jid of [...jids, ...rooms.map((room: { jid: string }) => room.jid)]) touchRoom(jid)
     try {
       const changed = await setRoomsReadState([...jids, ...rooms], state)
       return response.json({ ok: true, changed })
@@ -654,6 +727,7 @@ export default class DashboardController {
   }
   async contactMode({ request, response }: HttpContext) {
     contactsCache.clear()
+    touchRoom(String(request.input('jid', '')).trim())
     const jid = String(request.input('jid', '')).trim().slice(0, 190)
     const mode = request.input('mode') === 'cs' ? 'cs' : request.input('mode') === 'ai' ? 'ai' : ''
     try {
@@ -681,6 +755,7 @@ export default class DashboardController {
   /** Peran kontak diatur CS: pelanggan / vendor / lainnya (v3.6.31). */
   async contactRole({ request, response }: HttpContext) {
     contactsCache.clear()
+    touchRoom(String(request.input('jid', '') ?? '').trim())
     try {
       const { setContactRole } = await import('#beta3/contact_role')
       const role = String(request.input('role', '') ?? '').trim()
@@ -692,6 +767,7 @@ export default class DashboardController {
   }
   async contactExclusion({ request, response }: HttpContext) {
     contactsCache.clear()
+    touchRoom(String(request.input('jid', '') ?? '').trim())
     try {
       await setAiExcluded(String(request.input('jid', '') ?? '').trim(), request.input('excluded'))
       return response.json({ ok: true })

@@ -947,20 +947,62 @@
   }
   applyInboxFilters()
   let contactsRequestVersion = 0
-  function renderContacts(items) {
+  // v3.6.44 — kotak masuk berbasis kejadian: data room disimpan di browser; hanya room yang
+  // berubah yang digambar ulang (bukan seluruh daftar tiap 3 dtk).
+  const contactData = new Map()
+  const contactOrder = (contact) => [new Date(contact.created_at).getTime() || 0, Number(contact.id) || 0]
+  function renderContacts(items, append = false) {
     if (!contacts) return
     const selectedKey = roomKey(contacts.dataset.selectedJid || '', contacts.dataset.selectedLine)
     const picked = new Set(selectedRooms().map((room) => roomKey(room.jid, room.line)))
-    contacts.replaceChildren()
-    if (!items.length) {
-      const empty = document.createElement('div')
-      empty.className = 'wa-empty'
-      empty.textContent = t('Belum ada kontak')
-      contacts.append(empty)
+    if (!append) {
+      contacts.replaceChildren()
+      contactData.clear()
+    }
+    if (!items.length && !contacts.querySelector('.wa-contact')) {
+      if (!contacts.querySelector('.wa-empty')) {
+        const empty = document.createElement('div')
+        empty.className = 'wa-empty'
+        empty.textContent = t('Belum ada kontak')
+        contacts.append(empty)
+      }
       applyInboxFilters()
       return
     }
+    contacts.querySelector('.wa-empty')?.remove()
     for (const contact of items) {
+      const key = roomKey(contact.jid, contact.line_id)
+      // Halaman berikutnya bisa memuat room yang sudah diperbarui lewat kejadian: yang lebih baru dipakai.
+      if (append && contactData.has(key)) continue
+      contactData.set(key, contact)
+      contacts.append(buildContactRow(contact, selectedKey, picked))
+    }
+    applyInboxFilters()
+    updateBulkBar()
+  }
+  /** Ganti room milik kontak yang berubah, sisipkan sesuai urutan pesan terakhir. */
+  function applyContactDelta(items, jids) {
+    if (!contacts) return
+    const changed = new Set(jids)
+    const selectedKey = roomKey(contacts.dataset.selectedJid || '', contacts.dataset.selectedLine)
+    const picked = new Set(selectedRooms().map((room) => roomKey(room.jid, room.line)))
+    for (const row of [...contacts.querySelectorAll('.wa-contact')]) if (changed.has(row.dataset.jid)) row.remove()
+    for (const [key, contact] of [...contactData]) if (changed.has(contact.jid)) contactData.delete(key)
+    if (items.length) contacts.querySelector('.wa-empty')?.remove()
+    for (const contact of items) {
+      contactData.set(roomKey(contact.jid, contact.line_id), contact)
+      const link = buildContactRow(contact, selectedKey, picked)
+      const [at, id] = contactOrder(contact)
+      const before = [...contacts.querySelectorAll('.wa-contact')].find(
+        (row) => Number(row.dataset.at) < at || (Number(row.dataset.at) === at && Number(row.dataset.mid) < id)
+      )
+      contacts.insertBefore(link, before || null)
+    }
+    applyInboxFilters()
+    updateBulkBar()
+  }
+  function buildContactRow(contact, selectedKey, picked) {
+    {
       const name = contact.contact_name || fallbackName(contact.jid)
       const link = document.createElement('a')
       const key = roomKey(contact.jid, contact.line_id)
@@ -1066,36 +1108,90 @@
         meta.append(role)
       } else if (contact.handling_mode === 'cs') meta.append(mode)
       link.append(avatar, content, meta)
-      contacts.append(link)
+      const [at, id] = contactOrder(contact)
+      link.dataset.at = String(at)
+      link.dataset.mid = String(id)
+      return link
     }
-    applyInboxFilters()
-    updateBulkBar()
   }
-  // v3.6.43: daftar kotak masuk hanya diunduh & digambar ulang bila isinya berubah (ETag/304).
-  let contactsEtag = ''
-  async function updateContacts(force = false) {
-    if (!contacts) return
+  // v3.6.44: muat bertahap (60 room, lalu sisanya di belakang), selanjutnya hanya room yang berubah.
+  const INBOX_FULL_MS = 5 * 60_000
+  let contactsCursor = ''
+  let contactsLoadedAt = 0
+  let contactsUpdatedAt = 0
+  let fullLoading = false
+  let deltaBusy = false
+  let deltaPending = false
+  async function loadAllContacts() {
+    if (fullLoading) return
+    fullLoading = true
     const version = ++contactsRequestVersion
     try {
-      const response = await fetch(`${appUrl}/api/contacts`, {
-        cache: 'no-store',
-        headers: {
-          accept: 'application/json',
-          'x-csrf-token': csrf,
-          ...(contactsEtag && force !== true ? { 'if-none-match': contactsEtag } : {}),
-        },
-      })
-      if (response.status === 304) return
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(t(data.error || 'Permintaan gagal.'))
+      const first = await api('/api/contacts?limit=60')
       if (version !== contactsRequestVersion) return
-      contactsEtag = response.headers.get('etag') || ''
-      renderContacts(data.contacts || [])
-      renderInboxLines(data.lines || [])
-      const selected = (data.contacts || []).find(
-        (contact) =>
-          contact.jid === contacts.dataset.selectedJid && roomLine(contact.line_id) === roomLine(contacts.dataset.selectedLine)
-      )
+      renderContacts(first.contacts || [])
+      if (first.lines) renderInboxLines(first.lines)
+      contactsCursor = first.cursor || ''
+      contactsLoadedAt = Date.now()
+      contactsUpdatedAt = Date.now()
+      refreshSelectedRoom()
+      let offset = (first.contacts || []).length
+      let more = Boolean(first.more)
+      while (more && version === contactsRequestVersion) {
+        const page = await api(`/api/contacts?limit=200&offset=${offset}`)
+        if (version !== contactsRequestVersion) return
+        const rows = page.contacts || []
+        renderContacts(rows, true)
+        offset += rows.length
+        more = Boolean(page.more) && rows.length > 0
+      }
+      refreshSelectedRoom()
+    } catch {
+    } finally {
+      fullLoading = false
+      if (deltaPending) {
+        deltaPending = false
+        void updateContacts()
+      }
+    }
+  }
+  async function updateContacts() {
+    if (!contacts) return
+    if (!contactsCursor || Date.now() - contactsLoadedAt > INBOX_FULL_MS) return loadAllContacts()
+    if (fullLoading || deltaBusy) {
+      deltaPending = true
+      return
+    }
+    deltaBusy = true
+    try {
+      const data = await api(`/api/contacts?since=${encodeURIComponent(contactsCursor)}`)
+      contactsUpdatedAt = Date.now()
+      if (data.full) {
+        contactsCursor = ''
+        deltaBusy = false
+        return loadAllContacts()
+      }
+      contactsCursor = data.cursor || contactsCursor
+      const jids = data.jids || []
+      if (jids.length) {
+        applyContactDelta(data.contacts || [], jids)
+        if (jids.includes(contacts.dataset.selectedJid)) refreshSelectedRoom()
+      }
+    } catch {
+    } finally {
+      deltaBusy = false
+      if (deltaPending && !fullLoading) {
+        deltaPending = false
+        void updateContacts()
+      }
+    }
+  }
+  function refreshSelectedRoom() {
+    if (!contacts) return
+    {
+      const selected = contactData.get(roomKey(contacts.dataset.selectedJid || '', contacts.dataset.selectedLine))
+      // Room terpilih belum termuat (halaman berikutnya masih diambil): biarkan tampilan dari server.
+      if (!selected && fullLoading) return
       updateRoomMode(selected?.handling_mode || 'ai', Boolean(selected), Boolean(selected?.ai_excluded), Boolean(selected?.schedule_paused))
       updateRoomRole(selected?.role || '')
       updateRoomDetails(selected)
@@ -1135,7 +1231,7 @@
           currentAvatar?.replaceWith(avatar)
         }
       }
-    } catch {}
+    }
   }
   function updateRoomMode(mode, visible = true, excluded = false, schedulePaused = false) {
     const handling = byId('roomHandling')
@@ -2382,13 +2478,39 @@
   }
   window.setInterval(whenVisible(updateStatus), 2000)
   window.setInterval(whenVisible(updateMessages), 2500)
-  window.setInterval(whenVisible(updateContacts), 3000)
+  // v3.6.44: kejadian didorong server (SSE) → daftar diperbarui seketika; tanpa SSE bertanya tiap 3 dtk,
+  // dengan SSE hanya pengaman tiap 15 dtk.
+  let inboxStream = null
+  const streamOpen = () => inboxStream?.readyState === 1
+  function connectInboxStream() {
+    if (!contacts || inboxStream || typeof EventSource !== 'function') return
+    inboxStream = new EventSource(`${appUrl}/api/inbox/events`)
+    inboxStream.addEventListener('changed', () => {
+      if (document.hidden) return
+      void updateContacts()
+      void updateMessages()
+    })
+    inboxStream.addEventListener('ready', () => void updateContacts())
+  }
+  function disconnectInboxStream() {
+    inboxStream?.close()
+    inboxStream = null
+  }
+  window.setInterval(
+    whenVisible(() => {
+      if (Date.now() - contactsUpdatedAt >= (streamOpen() ? 15_000 : 3000)) void updateContacts()
+    }),
+    3000
+  )
+  connectInboxStream()
   restoreInboxScroll()
   window.setInterval(whenVisible(updateOAuth), 3000)
   window.setInterval(whenVisible(updateClaudeOAuth), 3000)
   window.setInterval(whenVisible(updateMcpOAuth), 3000)
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return
+    // Tab tidak dilihat: sambungan kejadian ditutup (tidak membebani server), dibuka lagi saat kembali.
+    if (document.hidden) return disconnectInboxStream()
+    connectInboxStream()
     updateStatus()
     updateMessages()
     updateContacts()

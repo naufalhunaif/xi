@@ -83,7 +83,7 @@ async function orchestraCustomers(now: number) {
   const cached = customerCache.get(key)
   if (cached && now - cached.at < 15_000) return cached.data
   const inbox = workspaceScope().id
-    ? ((await latestInboxMessages().catch(() => [])) as any[]).filter((row) => !String(row.jid).endsWith('@g.us')).slice(0, 80)
+    ? ((await latestInboxMessages({ limit: 100 }).catch(() => [])) as any[]).filter((row) => !String(row.jid).endsWith('@g.us')).slice(0, 80)
     : []
   const handled = await lastAccountByJid(
     inbox.map((row) => String(row.jid)),

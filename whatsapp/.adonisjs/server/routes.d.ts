@@ -92,6 +92,7 @@ export type ScannedRoutes = {
     'dashboard.quotas': { paramsTuple?: []; params?: {} }
     'dashboard.trace': { paramsTuple?: []; params?: {} }
     'dashboard.contacts_list': { paramsTuple?: []; params?: {} }
+    'dashboard.inbox_events': { paramsTuple?: []; params?: {} }
     'dashboard.search_messages': { paramsTuple?: []; params?: {} }
     'dashboard.contact_read': { paramsTuple?: []; params?: {} }
     'dashboard.contacts_read_state': { paramsTuple?: []; params?: {} }
@@ -207,6 +208,7 @@ export type ScannedRoutes = {
     'dashboard.quotas': { paramsTuple?: []; params?: {} }
     'dashboard.trace': { paramsTuple?: []; params?: {} }
     'dashboard.contacts_list': { paramsTuple?: []; params?: {} }
+    'dashboard.inbox_events': { paramsTuple?: []; params?: {} }
     'dashboard.search_messages': { paramsTuple?: []; params?: {} }
     'dashboard.ai_exclusions': { paramsTuple?: []; params?: {} }
     'dashboard.messages': { paramsTuple?: []; params?: {} }
@@ -283,6 +285,7 @@ export type ScannedRoutes = {
     'dashboard.quotas': { paramsTuple?: []; params?: {} }
     'dashboard.trace': { paramsTuple?: []; params?: {} }
     'dashboard.contacts_list': { paramsTuple?: []; params?: {} }
+    'dashboard.inbox_events': { paramsTuple?: []; params?: {} }
     'dashboard.search_messages': { paramsTuple?: []; params?: {} }
     'dashboard.ai_exclusions': { paramsTuple?: []; params?: {} }
     'dashboard.messages': { paramsTuple?: []; params?: {} }

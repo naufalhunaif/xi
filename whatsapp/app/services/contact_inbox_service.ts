@@ -142,16 +142,43 @@ export async function setRoomsReadState(rooms: Array<string | { jid: string; lin
   return changed
 }
 
-export async function latestInboxMessages() {
+/**
+ * v3.6.44 (kotak masuk ringan): `jids` = hanya room milik kontak itu (pembaruan per kejadian);
+ * `limit`/`offset` = halaman room terbaru (muat bertahap). Tanpa opsi = semua room (seperti dulu).
+ */
+export type InboxQuery = { jids?: string[]; limit?: number; offset?: number }
+
+export async function latestInboxMessages(query: InboxQuery = {}) {
   await initializeDatabase()
   await ensureLeanTables()
+  if (query.jids && !query.jids.length) return []
+  let jids = query.jids
+  let ids: number[] | null = null
+  if (query.limit) {
+    // Halaman room terbaru dulu (murah: hanya id pesan terakhir per room), lalu baris lengkap
+    // dihitung untuk room di halaman itu saja.
+    const page = await db.rawQuery(
+      `SELECT ranked.id, ranked.jid FROM (
+         SELECT id, jid, created_at,
+           ROW_NUMBER() OVER (PARTITION BY jid, ${lineSql('whatsapp_messages')} ORDER BY created_at DESC, id DESC) AS position
+         FROM whatsapp_messages${jids ? ` WHERE jid IN (${jids.map(() => '?').join(',')})` : ''}
+       ) ranked WHERE ranked.position = 1 ORDER BY ranked.created_at DESC, ranked.id DESC LIMIT ? OFFSET ?`,
+      [...(jids || []), Math.max(1, Math.min(500, query.limit)), Math.max(0, query.offset || 0)]
+    )
+    const rows = page[0] as Array<{ id: number; jid: string }>
+    if (!rows.length) return []
+    ids = rows.map((row) => Number(row.id))
+    jids = [...new Set(rows.map((row) => String(row.jid)))]
+  }
+  const jidFilter = (column: string) => (jids ? ` AND ${column} IN (${jids.map(() => '?').join(',')})` : '')
+  const jidBindings = jids || []
   // Pembayaran = pelanggan sudah bayar dan menunggu konfirmasi CS: kirim gambar setelah
   // total dikirim, atau AI mencatat tahap bukti_dikirim (belum ada order lunas sesudahnya).
   // v3.6.30: gambar dihitung bukti hanya bila hasil pilah isinya "bukti" atau belum dipilah (note '?' = gagal dilihat);
   // foto jas/model/ukuran sesudah rekening bukan pembayaran.
   const notProofSql = (alias: string) =>
     `NOT EXISTS (SELECT 1 FROM whatsapp_beta3_proofs k WHERE k.message_id = ${alias}.message_id
-              AND k.kind <> 'bukti' AND k.note <> '?')`
+              AND k.kind <> 'bukti' AND k.note <> '\\?')`  // \\? = tanda tanya biasa (bukan parameter knex)
   const paymentSql = `NOT EXISTS (SELECT 1 FROM whatsapp_contacts cv WHERE cv.jid = m.jid AND cv.role IN ('vendor', 'lainnya'))
         AND (EXISTS (SELECT 1 FROM whatsapp_beta3_orders b WHERE b.jid = m.jid AND b.status = 'awaiting_payment'
           AND EXISTS (SELECT 1 FROM whatsapp_messages p WHERE p.jid = m.jid AND p.direction = 'in'
@@ -197,7 +224,7 @@ export async function latestInboxMessages() {
   const result = await db.rawQuery(`WITH successful_replies AS (
       SELECT jid, ${lineSql('whatsapp_messages')} AS line, id, created_at,
         ROW_NUMBER() OVER (PARTITION BY jid, ${lineSql('whatsapp_messages')} ORDER BY created_at DESC, id DESC) AS position
-      FROM whatsapp_messages WHERE direction = 'out' AND status IN ('sent', 'delivered', 'read')
+      FROM whatsapp_messages WHERE direction = 'out' AND status IN ('sent', 'delivered', 'read')${jidFilter('jid')}
     )
     SELECT m.id, m.jid, m.line_id AS message_line_id, ${lineSql('m')} AS line,
       COALESCE(NULLIF(c.name, ''), NULLIF(pc.name, ''),
@@ -221,12 +248,13 @@ export async function latestInboxMessages() {
         AND pr.created_at >= NOW() - INTERVAL 1 DAY) AS priority
     FROM whatsapp_messages m
     JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY jid, ${lineSql('whatsapp_messages')} ORDER BY created_at DESC, id DESC) AS position
-      FROM whatsapp_messages) ranked ON ranked.id = m.id AND ranked.position = 1
+      FROM whatsapp_messages WHERE 1 = 1${jidFilter('jid')}) ranked ON ranked.id = m.id AND ranked.position = 1
     LEFT JOIN whatsapp_contacts c ON c.jid = m.jid
     LEFT JOIN whatsapp_contacts pc ON pc.jid = c.phone_jid AND pc.jid <> m.jid
     LEFT JOIN whatsapp_room_reads rr ON rr.jid = m.jid AND rr.line_id = ${lineSql('m')}
     LEFT JOIN successful_replies r ON r.jid = m.jid AND r.line = ${lineSql('m')} AND r.position = 1
-    ORDER BY m.created_at DESC, m.id DESC`)
+    ${ids ? `WHERE m.id IN (${ids.map(() => '?').join(',')})` : ''}
+    ORDER BY m.created_at DESC, m.id DESC`, [...jidBindings, ...jidBindings, ...(ids || [])])
   return (result[0] as InboxMessage[]).map((message) => ({
     ...message,
     line: roomLine(message.line),

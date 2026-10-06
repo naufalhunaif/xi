@@ -329,3 +329,12 @@ Perubahan v3.6.6:
 - Beberapa pesan pelanggan berurutan: AI diminta menjawab semua pertanyaan.
 - Susulan tidak menyebut total/DP/rekening sebelum total terkirim.
 - **Server terasa lambat:** kotak masuk menanyakan daftar chat tiap 3 dtk per tab (±1 dtk kerja server, ±400 KB, lalu seluruh daftar digambar ulang). Kini: hasil dipakai bersama 2 dtk untuk semua tab, browser hanya mengunduh & menggambar ulang bila isinya berubah (ETag/304), dan tab yang tidak dilihat berhenti menanyai server (langsung diperbarui saat dibuka lagi).
+
+## v3.6.44 — Kotak masuk berbasis kejadian (muat bertahap, hanya yang berubah, dorong dari server)
+
+- **Muat bertahap:** halaman kotak masuk dan muatan pertama hanya 60 room terbaru; sisanya diambil di belakang per 200 (filter & hitungan lengkap setelah selesai). Room yang dibuka lewat tautan tetap dimuat walau di luar 60.
+- **Hanya yang berubah:** browser bertanya `GET /api/contacts?since=<cursor>` dan menerima room yang berubah saja (pesan baru, status kirim 5 menit terakhir, kontak/mode/peran/aktivitas, tanda baca, goal, order, catatan/spesifikasi, resi, bukti, prioritas, aksi CS). Baris itu saja yang digambar ulang dan naik sesuai urutan. Lebih dari 120 room sekaligus atau pengaturan berubah → muat ulang penuh.
+- **Dorong dari server:** `GET /api/inbox/events` (Server-Sent Events). Satu pemeriksaan murah per workspace tiap 1,5 dtk (bukan per tab); ada perubahan → semua tab diberi tahu, lalu mengambil room yang berubah (±1–2 dtk). Detak tiap 20 dtk, sambungan diperbarui tiap 10 menit, `X-Accel-Buffering: no` untuk nginx. Tab yang tidak dilihat menutup sambungannya.
+- **Pengaman:** tanpa sambungan dorong, browser bertanya tiap 3 dtk (tetap murah); dengan sambungan, tiap 15 dtk. Muat ulang penuh tiap 5 menit atau saat ada tanda perubahan besar.
+- API lama `GET /api/contacts` tanpa parameter tetap ada (daftar penuh).
+- Bersinggungan: query kotak masuk (`latestInboxMessages`) kini memakai parameter; tanda tanya literal di SQL ditulis `\?`.

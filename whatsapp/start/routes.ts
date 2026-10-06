@@ -124,6 +124,7 @@ router
     router.get('/api/ai/quotas', [DashboardController, 'quotas'])
     router.get('/api/ai/trace', [DashboardController, 'trace'])
     router.get('/api/contacts', [DashboardController, 'contactsList'])
+    router.get('/api/inbox/events', [DashboardController, 'inboxEvents'])
     router.get('/api/search', [DashboardController, 'searchMessages'])
     router.post('/api/contacts/read', [DashboardController, 'contactRead'])
     router.post('/api/contacts/read-state', [DashboardController, 'contactsReadState'])
