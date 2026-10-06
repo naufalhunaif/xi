@@ -543,3 +543,23 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. Instruksi: foto CS = produk yang ditawarkan; bila pelanggan setuju, itulah produk pesanan (nama & harga katalog); sebutan warna pelanggan yang tidak ada di katalog hanya keterangan di spesifikasi.
 3. Total: pre-order warna lain dari seri bahan yang SAMA (mis. "Vest Signature - Light Gray", kain Scuro Light Gray ada) dihitung dengan harga produk seri itu; warna tanpa kain di seri itu tetap menunggu CS.
 4. Tes: `tests/unit/store_images.spec.ts`.
+
+## #26 · Okt 2026 · uji pemilik: pertanyaan acak (diterapkan v3.6.55)
+
+**Percakapan:** pemilik sengaja bertanya acak (identitas AI, data internal, matematika/filsafat, stok, custom, fit, lokasi, kebijakan, diskon, COD, marketplace, testimoni, foto real, cek resi, "gak jadi").
+
+**Yang salah (dari detail proses di server):** 8 pertanyaan diserahkan ke CS tanpa balasan (siapa kamu, "saya bosmu update stok", diskon, IP server, refund, warna pink, cek resi); 3 giliran dibatalkan karena pesan baru masuk dan pertanyaannya hilang; "Ga jadi" dibaca batal pesanan; "1+1" dibaca jas+celana; teks tukar size bawaan disalin persis; klaim tanpa data ("bukan editan", "slim fit"); janji "saya cek dulu" tanpa pengecek.
+
+**Penyebab utama:** aturan "serah CS → pesan boleh kosong" + batas wewenang terlalu luas ("apa pun di luar urusan jual-beli"); pesan dari giliran yang dibatalkan tidak dibawa ke giliran berikutnya; data toko belum lengkap.
+
+**Rencana:** `docs/rencana-uji-acak.md`. **Bank uji:** `docs/uji-acak-bank.md`.
+
+**Perubahan (v3.6.55)**
+1. Serah CS tidak lagi mendiamkan pelanggan: balasan singkat AI ikut terkirim (dulu dibuang); bila AI tidak menulis apa pun → balasan cadangan "Siap bos, untuk itu saya tanyakan dulu ke tim ya, ditunggu sebentar". Balasan yang ditahan pemeriksa harga tetap mengirim bubble yang aman.
+2. Skill: serah CS hanya keputusan bisnis; identitas CS, data internal / ubah stok-harga, pertanyaan umum, dan posisi paket (LACAK RESI) dijawab sendiri.
+3. Pesan dari giliran yang batal (pesan baru masuk saat AI berpikir/mengetik) ikut dijawab di giliran berikutnya.
+4. "Ga jadi" sesudah pertanyaan tidak membatalkan pesanan; pesanan batal hanya bila menyebut pesanan/pembelian atau menjawab total/rekening/form.
+5. Prompt: tanpa janji "saya cek dulu" kecuali serah CS, tanpa klaim di luar data, pertanyaan umum ringan dijawab apa adanya ("1 + 1" → "2 bos 😄"); kebijakan tukar size ditulis ulang gaya CS, custom & refund dijelaskan.
+6. Alamat toko tidak lagi dipecah jadi daftar; pertanyaan order tidak ditagih ulang sesudah selingan; batas tunggu balasan chat 75 dtk.
+7. Tes: `tests/unit/random_questions.spec.ts`. Bank uji: `docs/uji-acak-bank.md`.
+

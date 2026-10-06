@@ -1,4 +1,5 @@
 // Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { bubblesFromText, repairJson } from '#beta3/reply_tidy'
 import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -51,6 +52,15 @@ export type LeanProviderResult = {
 }
 
 const TIMEOUT_MS = 120_000
+/**
+ * v3.6.55 — balasan chat tanpa gambar: batas 75 dtk (balasan normal 13–38 dtk; dulu sekali macet
+ * 120 dtk sebelum pindah ke akun/model berikutnya). Tugas lain & balasan bergambar tetap 120 dtk.
+ */
+export const REPLY_TIMEOUT_MS = 75_000
+const timeoutScope = new AsyncLocalStorage<number>()
+export function providerTimeout(phase: string, imageCount: number) {
+  return phase === 'beta3-reply' && !imageCount ? REPLY_TIMEOUT_MS : TIMEOUT_MS
+}
 // Alias selalu menunjuk Flash terbaru (model 2.5 kini tertutup untuk API key baru).
 export const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest'
 /** Cadangan saat model Gemini pilihan sedang penuh (dicoba berurutan, akun sama). */
@@ -338,12 +348,13 @@ async function runLeanOnce(
           cacheWrite: (usage?.cacheWrite || 0) + next.cacheWrite,
         }
     }
-    const text =
+    const text = await timeoutScope.run(providerTimeout(phase, imagePaths.length), () =>
       provider === 'claude'
-        ? await runClaudeLean(tuned, prompt, workingDirectory, schema, imagePaths, observe)
+        ? runClaudeLean(tuned, prompt, workingDirectory, schema, imagePaths, observe)
         : provider === 'gemini'
-          ? await runGeminiLean(model, account.apiKey || '', prompt, schema, imagePaths, observe)
-          : await runCodexLean(tuned, prompt, workingDirectory, schemaPath, imagePaths, observe)
+          ? runGeminiLean(model, account.apiKey || '', prompt, schema, imagePaths, observe)
+          : runCodexLean(tuned, prompt, workingDirectory, schemaPath, imagePaths, observe)
+    )
     status = 'completed'
     return { text, usage, durationMs: Date.now() - started, provider, model: actual || model || 'bawaan' }
   } finally {
@@ -420,7 +431,7 @@ function collect(
             : 'ChatGPT terlalu lama merespons.'
         )
       )
-    }, TIMEOUT_MS)
+    }, timeoutScope.getStore() || TIMEOUT_MS)
     observeProviderProcess(child, provider)
     child.stdout?.on('data', (chunk) => {
       output += String(chunk)
@@ -643,7 +654,7 @@ async function runGeminiLean(
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(TIMEOUT_MS),
+          signal: AbortSignal.timeout(timeoutScope.getStore() || TIMEOUT_MS),
         }
       )
     } catch (error) {

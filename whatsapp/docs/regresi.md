@@ -16,6 +16,7 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
    - `npx tsc --noEmit` bersih.
    - `node ace test unit` → **semua lulus** (tidak ada "gagal yang sudah biasa").
    - Ada perubahan tampilan: cek Playwright 1440 px & 390 px.
+   - **Tidak boleh dilewati**, sekecil apa pun perubahannya (termasuk file tes): v3.6.53 gagal dibangun di server karena cek tipe dilewati. Rencana pengaman otomatis (gerbang rilis, laporan harian perilaku AI, cek kesehatan + rollback setelah update, satu aturan satu tempat, peta keterkaitan) belum dikerjakan.
 5. Tes yang butuh database ada di `tests/unit/beta3_flow.spec.ts`; tes lain murni (tanpa jaringan).
 
 ## Beta 3 — order & total
@@ -59,7 +60,12 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 | Daftar model dengan harga berbeda tidak diringkas jadi "Ini fotonya"; pengantar singkat hanya bila harganya satu | `review_chats.spec` · #13 |
 | Catatan harga dari seri Jev hanya bila cocok dengan seri yang disebut di chat; teks chat lebih dipercaya | `beta3.spec` · pola harga |
 | Jev menerima konteks penuh (10 baris × 500 huruf, layanan & pesan toko terakhir) — tidak dipotong demi token | `jev.spec` · skor Jev mulai 0 |
-| Kebijakan tukar size dari Pengaturan masuk prompt dan dikirim apa adanya | `beta3.spec` · pelajaran chat CS |
+| Kebijakan tukar size dari Pengaturan masuk prompt; v3.6.55 (diminta pemilik): syaratnya ditulis ulang gaya CS (tidak disalin persis); custom tidak bisa tukar; refund → tanya tim (tetap dibalas) | `beta3.spec` · pelajaran chat CS, `random_questions.spec` |
+| v3.6.55: diserahkan ke CS tetap dibalas singkat (balasan AI; kosong → balasan cadangan); ditahan pemeriksa harga → bubble tanpa harga tak dikenal tetap terkirim. WhatsApp & Instagram memakai satu aturan (`bubblesToSend`) | `random_questions.spec` |
+| v3.6.55: serah CS hanya keputusan bisnis (diskon/grosir, komplain, refund, tukar sesudah terima, telepon, ancaman, warna di luar katalog yang tetap diminta); identitas CS, data internal / ubah stok-harga lewat chat, pertanyaan umum, lacak resi dijawab sendiri | `random_questions.spec` · skill |
+| v3.6.55: pesan baru masuk sebelum balasan terkirim → pesan giliran itu ikut dijawab di giliran berikutnya (tidak hilang) | `random_questions.spec` · antrean |
+| v3.6.55: alamat ("Jl. …, Kec. …, Cilacap") tidak dipecah jadi daftar; singkatan bertitik (Jl., No., Kec.) bukan akhir kalimat | `random_questions.spec` · format |
+| v3.6.55: pertanyaan order yang sama tidak ditagih ulang dalam 6 balasan terakhir; batas tunggu balasan chat tanpa gambar 75 dtk | `random_questions.spec` |
 | Pertanyaan yang baru ditanyakan tidak diulang | `beta3.spec` · form order |
 | Prompt lengkap tetap di bawah 10 ribu token | `beta3.spec` · prompt dan keluaran |
 | Model "Otomatis" memilih model per tugas | `beta3.spec` · model otomatis |
@@ -70,7 +76,7 @@ Setiap baris punya tes; kalau tes gagal, berarti ada perilaku lama yang rusak.
 |---|---|
 | Jev mati / tanpa kunci / gagal / lewat batas waktu → tidak ada keputusan, cara lama dipakai | `jev.spec` · tanpa kunci / gagal-timeout |
 | Jawaban Jev di bawah ambang yakin tidak dipakai, tetap dicatat (used = 0) | `jev.spec` · pemahaman giliran |
-| v3.5.11: tanda terima → dibalas singkat oleh AI (v3.5.18); topik Jev hanya menambah bagian prompt, pola kata/gambar/tahap tetap berlaku (v3.5.18); "sudah tf" tanpa foto → bukti_dikirim; tunda/batal → tanpa susulan, batal menutup order belum dibayar; dana masuk butuh AI + Jev | `jev.spec` · keputusan tambahan, `beta3.spec` · topik dari Jev |
+| v3.5.11: tanda terima → dibalas singkat oleh AI (v3.5.18); topik Jev hanya menambah bagian prompt, pola kata/gambar/tahap tetap berlaku (v3.5.18); "sudah tf" tanpa foto → bukti_dikirim; tunda/batal → tanpa susulan, batal menutup order belum dibayar (v3.6.55: hanya bila menyebut pesanan/pembelian atau menjawab total/rekening/form — "ga jadi" sesudah pertanyaan tidak membatalkan pesanan); dana masuk butuh AI + Jev | `jev.spec` · keputusan tambahan, `beta3.spec` · topik dari Jev |
 | Prioritas Jev ≥ 4 → badge "Penting" di daftar chat (24 jam, masih menunggu balasan atau mode CS) | `beta3_flow.spec` · prioritas chat |
 | Data pelanggan (telepon, rekening, email) disamarkan sebelum dikirim ke Jev | `jev.spec` · disamarkan |
 | Layanan ongkir pilihan Jev dipakai untuk total; "belum memilih" = total ditahan | `jev.spec` · layanan pilihan Jev |

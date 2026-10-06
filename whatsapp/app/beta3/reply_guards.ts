@@ -58,3 +58,29 @@ export function dropRepeatedWait(pesan: string[], lastOutgoing: string, customer
   const kept = pesan.filter((bubble) => !WAIT_PROMISE.test(bubble))
   return { pesan: kept, changed: kept.length !== pesan.length }
 }
+
+const ORDER_WORD = /\b(pesan|pesen|pesanan|order|orderan|beli|ambil|jas|setelan|celana|rompi)\b/i
+const CANCEL_WORD = /\b(batal|batalkan|cancel|(?:gak|ga|gk|nggak|ngga|enggak|tidak|ndak)\s*jadi|gajadi|gjd)\b/i
+const COMMIT = /\b(total|rekening|transfer|tf|form|alamat|ongkir|order|pesanan|dp|lunas)\b/i
+
+/**
+ * v3.6.55 — "gak jadi" membatalkan PESANAN hanya bila jelas menyebut pesanan/pembelian, atau
+ * menjawab langkah order dari toko (total, rekening, form, ongkir). "Cek resi …" lalu "ga jadi"
+ * = pertanyaannya yang batal, pesanan & catatan tetap.
+ */
+export function cancelsOrder(text: string, rows: Array<{ direction: string; body?: string | null; current?: boolean }>) {
+  const lines = String(text || '').split('\n').map((line) => line.trim()).filter(Boolean)
+  const last = lines[lines.length - 1] || ''
+  if (CANCEL_WORD.test(last) && ORDER_WORD.test(last)) return true
+  // Pelanggan sendiri yang bicara terakhir (pertanyaan di giliran yang sama) → yang batal pertanyaannya.
+  if (lines.length > 1) return false
+  const previous = [...rows].reverse().find((row) => !row.current && row.body)
+  return previous?.direction === 'out' && COMMIT.test(String(previous.body || ''))
+}
+
+/** v3.6.55 — pesan giliran yang batal ditaruh di depan antrean giliran berikutnya (tanpa dobel). */
+export function prependMissing<T extends { id: string }>(queue: T[], items: T[]) {
+  const known = new Set(queue.map((item) => item.id))
+  queue.unshift(...items.filter((item) => !known.has(item.id)))
+  return queue
+}

@@ -49,7 +49,9 @@ export function renderExchangePolicy(text: string) {
     '<<<',
     text.trim(),
     '>>>',
-    'Ditanya SEBELUM beli ("kalau kekecilan bisa tukar?", "bisa retur?") → kirim teks di atas persis sebagai satu bubble, tanpa diubah atau diringkas. ' +
+    'Ditanya SEBELUM beli ("kalau kekecilan bisa tukar?", "bisa retur?") → sebut syaratnya dengan gaya bicaramu sendiri (singkat, daftar syarat boleh), jangan menyalin pembuka/emoji teks di atas. ' +
+      'Pesanan custom tidak bisa tukar size: ditanya "custom tapi tidak sesuai" → jelaskan itu, dan bahwa ukuran custom dicatat dari data pelanggan supaya pas. ' +
+      'Refund/uang kembali tidak diatur di sini → jangan dijanjikan; jawab singkat "untuk refund saya tanyakan dulu ke tim ya bos", serah_cs = true. ' +
       'Minta tukar size SETELAH barang diterima → sebut singkat syarat yang relevan, serah_cs = true. Jangan menjanjikan apa pun di luar syarat ini.',
   ].join('\n')
 }

@@ -49,7 +49,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     serah_cs: {
       type: 'boolean',
       description:
-        'true hanya bila kebutuhan pelanggan di luar wewenang (komplain, diskon, grosir, hal yang skill sebut tanya CS). Saat true, pesan boleh kosong.',
+        'true hanya untuk keputusan bisnis di luar wewenang (komplain, diskon, grosir, refund, hal yang skill sebut serah CS). Saat true, pesan TETAP diisi satu kalimat singkat untuk pelanggan sesuai topiknya — pelanggan tidak boleh didiamkan.',
     },
     alasan: { type: 'string', description: 'Satu kalimat alasan keputusan untuk audit CS.' },
     spesifikasi: {
@@ -190,6 +190,8 @@ export type LeanDecision = {
   alasan: string
   susulan: string
   spesifikasi: string
+  /** v3.6.55: bubble yang aman dikirim saat balasan ditahan pemeriksa harga (tanpa harga tak dikenal). */
+  aman?: string[]
 }
 
 export type LeanHistoryRow = {
@@ -301,11 +303,12 @@ export function buildLeanPrompt(input: {
     ],
     [
       'keluaran',
-      'Custom (gambar/model/ukuran dari pelanggan): catat semua detail di spesifikasi, tandai gambar di referensi (bagian: kerah, badan, saku, dst; seluruh model = "model"). Custom bukan alasan serah_cs: catat, jawab "siap bos, dicatat ya", jangan menyebut biaya sendiri (biaya tambahan dikabari saat total). serah_cs hanya bila warna/bahan tidak ada di KATALOG/BAHAN TERSEDIA. Ukuran badan custom tetap dibandingkan dengan size chart.\n' +
+      'Custom (gambar/model/ukuran dari pelanggan): catat semua detail di spesifikasi, tandai gambar di referensi (bagian: kerah, badan, saku, dst; seluruh model = "model"). Custom bukan alasan serah_cs: catat, jawab "siap bos, dicatat ya", jangan menyebut biaya sendiri (biaya tambahan dikabari saat total). Warna/bahan tidak ada → tawarkan yang ada; serah_cs hanya bila tetap diminta. Ukuran badan custom tetap dibandingkan dengan size chart.\n' +
         'Inisiatif (maks satu per balasan, SETELAH pertanyaan pelanggan dijawab): kirim foto (field foto) bila pelanggan membahas model/warna yang belum dilihatnya; tawarkan sekalian celana/setelan saat memilih jas; tanyakan tinggi & berat bila size belum jelas; tawarkan form order bila model & size sudah jelas. Jangan berinisiatif bila pelanggan sedang komplain atau minta CS.\n' +
         'Pengiriman hanya via JNE (REG/YES); ekspedisi lain (J&T, SiCepat, dll) tidak tersedia. Kargo JNE (JTR) minimal 8 kg, hanya untuk pesanan besar.\n' +
         'PESAN PELANGGAN SEKARANG bisa berisi beberapa pesan berurutan: jawab SEMUA pertanyaannya (mis. "ada model apa aja" + "custom bisa?" → sebut daftar model per seri DAN jawab custom), digabung dalam 1–2 bubble.\n' +
-        'Gambar dari CS (manusia) berlabel "contoh dari toko: Produk - Warna" = produk yang DITAWARKAN toko (mis. "ada seperti ini bos" saat warna yang diminta tidak ada). Bila pelanggan menyetujuinya, itulah produk pesanan: pakai nama & harga persis dari KATALOG di spesifikasi dan rincian order; sebutan warna dari pelanggan yang tidak ada di KATALOG (mis. "ash grey") hanya ditulis sebagai keterangan di spesifikasi, bukan nama produk.\n' +
+        'Gambar CS berlabel "contoh dari toko: Produk - Warna" = produk yang DITAWARKAN toko; bila pelanggan setuju, itulah produk pesanan (nama & harga KATALOG di spesifikasi dan order); sebutan warna pelanggan yang tidak ada di KATALOG (mis. "ash grey") hanya keterangan di spesifikasi.\n' +
+        'Tanpa janji "saya cek dulu" kecuali serah_cs; tanpa klaim di luar data. "1 + 1" → "2 bos 😄", bukan harga. "Gak jadi" sesudah pertanyaan = hanya pertanyaan itu batal.\n' +
         'Pahami maksud pelanggan dari seluruh RIWAYAT, bukan hanya pesan terakhir; jangan menanyakan ulang hal yang sudah jelas. Ditanya harga dan produknya sudah jelas (dikutip, baru dikirim fotonya, atau sudah disebut) → langsung sebut harganya dari KATALOG. Produk belum jelas → sebut kisaran harga dari KATALOG sambil menanyakan modelnya.\n' +
         'Balas sebagai JSON sesuai schema: pesan (array bubble), foto (nama varian katalog), catatan, tahap, serah_cs, alasan, susulan, spesifikasi. Jangan menulis apa pun di luar JSON.',
     ],

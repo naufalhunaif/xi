@@ -8,7 +8,7 @@ import { markGoalDelivery, recordAnalysisFailure } from '#services/analysis_retr
 import { aiFailureDetail } from '#services/ai_failure_service'
 import { startTrace } from '#services/trace_service'
 import { setHandlingMode, resumeAiAfterHumanReply } from '#services/message_service'
-import { createLeanReply, finishLeanGoal, claimLeanNudge } from '#beta3/reply_service'
+import { bubblesToSend, createLeanReply, finishLeanGoal, claimLeanNudge } from '#beta3/reply_service'
 import { sendLeanTotal } from '#beta3/order_service'
 import { writeBeta3ChatNote } from '#beta3/tables'
 import { learnFromHumanReply } from '#beta3/examples_service'
@@ -265,7 +265,8 @@ async function runTurn(
         return false
       }
     }
-    const bubbles = decision.serah_cs ? [] : decision.pesan
+    // v3.6.55: diserahkan ke CS tetap dikirim balasan singkatnya.
+    const bubbles = bubblesToSend(decision)
     if (comment) {
       // Komentar: hanya SATU balasan pribadi per komentar → semua bubble digabung.
       const body = bubbles.join('\n')

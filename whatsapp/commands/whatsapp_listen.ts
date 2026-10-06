@@ -62,6 +62,7 @@ import { currentLine, setCurrentLine, lineColumns, lineOf } from '#services/line
 import { claimLine, lineHeld, listLines, readLine, releaseLine, removeLineNow, touchLine, updateLine } from '#services/line_service'
 import { spawn, type ChildProcess } from 'node:child_process'
 import * as beta3Reply from '#beta3/reply_service'
+import { prependMissing } from '#beta3/reply_guards'
 import * as beta3Order from '#beta3/order_service'
 import * as beta3Tables from '#beta3/tables'
 import { measureCatalogColors } from '#beta3/image_color'
@@ -2208,13 +2209,22 @@ export default class WhatsappListen extends BaseCommand {
         )
       } else statusNotes.push(`[Pelanggan membalas ${status.description}; jawab berdasarkan isi status itu.]`)
     }
-    await this.runBeta3Turn(jid, goalRun, turnSocket, settings, {
+    const outcome = await this.runBeta3Turn(jid, goalRun, turnSocket, settings, {
       text: [text, ...statusNotes].filter(Boolean).join('\n'),
       messageIds: items.map((item) => item.id),
       keys: items.map((item) => item.message.key),
       imagePaths: imagesB3.map((image) => image.path),
       imageIds: imagesB3.map((image) => image.id),
     })
+    // v3.6.55: balasan batal karena pesan baru masuk → pesan giliran ini ikut ke giliran berikutnya
+    // (dulu hilang: "Slim fit 57 size M?" tidak pernah dijawab).
+    if (outcome === 'cancelled') this.carryOverTurn(jid, items)
+  }
+
+  private carryOverTurn(jid: string, items: PendingMessage[]) {
+    const pending = this.pendingTurns.get(jid)
+    if (!pending) return
+    prependMissing(pending.items, items)
   }
 
   private async runBeta3Turn(
@@ -2230,7 +2240,7 @@ export default class WhatsappListen extends BaseCommand {
       imageIds?: string[]
       note?: string
     }
-  ) {
+  ): Promise<'cancelled' | void> {
     // Room Instagram (mis. coba ulang analisis): dikerjakan worker Instagram, bukan soket WhatsApp.
     if (jid.endsWith('@ig')) {
       await db.rawQuery(
@@ -2273,7 +2283,7 @@ export default class WhatsappListen extends BaseCommand {
       if (!(await canSend())) {
         await pauseGoalRun(run, 'Konteks, koneksi, atau status AI berubah.')
         await trace?.finish('cancelled', { reason: 'Konteks berubah; balasan lama dibatalkan.' })
-        return
+        return 'cancelled'
       }
       if (!(await markGoalDelivery(run))) return
       let firstMessageId: string | undefined
@@ -2333,7 +2343,8 @@ export default class WhatsappListen extends BaseCommand {
         })
       }
       // Urutan seperti CS: jawaban pertama → foto → pertanyaan berikutnya.
-      const bubbles = decision.serah_cs ? [] : decision.pesan
+      // v3.6.55: diserahkan ke CS tetap dikirim balasan singkatnya (dulu pelanggan didiamkan).
+      const bubbles = beta3.bubblesToSend(decision)
       let aborted = false
       const sendPhotos = async () => {
         for (const photo of reply.photos) {
@@ -2366,6 +2377,12 @@ export default class WhatsappListen extends BaseCommand {
         }
         trace?.emit({ key: `send-${index + 1}`, label: 'Balasan terkirim', status: 'completed' })
         if (index === 0) await sendPhotos()
+      }
+      if (aborted && !firstMessageId) {
+        // Pesan baru masuk sebelum bubble pertama terkirim: tidak ada yang terkirim → ulang di giliran berikutnya.
+        await pauseGoalRun(run, 'Pesan baru masuk sebelum balasan terkirim.')
+        await trace?.finish('cancelled', { reason: 'Pesan baru masuk sebelum balasan terkirim; dijawab bersama pesan berikutnya.' })
+        return 'cancelled'
       }
       if (!aborted && reply.autoTotal && !decision.serah_cs) {
         // Total + rekening dikirim sistem (bukan AI) setelah rincian lolos verifikasi katalog.

@@ -1,17 +1,27 @@
 // Perapian daftar lintas model: deretan pilihan dalam satu kalimat jadi satu per baris.
 const PRICE = /\d{1,3}(?:\.\d{3})+|\b\d+\s?(?:rb|ribu|k|jt|juta)\b/i
 const ADDRESS = /^(?:ya\s+)?(?:bos|kak|kakak|gan|sis|bro|mas|mbak|om|min)[.!]?$/i
+// v3.6.55: alamat ("Jl. Patimuan - Kedungreja, Cinyawang, Cilacap") bukan daftar pilihan.
+const PLACE = /\b(?:jl|jln|jalan|gg|gang|kec|kecamatan|kab|kabupaten|kel|kelurahan|desa|ds|dusun|rt|rw|kota|alamat|lokasi|maps)\b/i
+// Singkatan bertitik tidak mengakhiri kalimat ("Jl. Patimuan", "No. 5", "Kec. Patimuan").
+const ABBREV = /\b(?:jl|jln|gg|no|kec|kab|kel|ds|rt|rw|dr|ir|hj?|st|dll|dsb|tgl)\.$/i
 
 /** Deretan ≥3 pilihan dalam satu kalimat → satu pilihan per baris. */
 export function tidyLists(text: string): string {
   if (!text || text.includes('\n')) return text
-  const sentences = text.split(/(?<=[.!?])\s+/)
+  const sentences: string[] = []
+  for (const piece of text.split(/(?<=[.!?])\s+/)) {
+    const last = sentences[sentences.length - 1]
+    if (last !== undefined && ABBREV.test(last)) sentences[sentences.length - 1] = `${last} ${piece}`
+    else sentences.push(piece)
+  }
   const out: string[] = []
   for (const sentence of sentences) out.push(tidySentence(sentence))
   return out.join(' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 function tidySentence(sentence: string): string {
+  if (PLACE.test(sentence)) return sentence
   const end = sentence.match(/[.!?]$/)?.[0] || ''
   const body = end ? sentence.slice(0, -1) : sentence
   // "pembuka: A, B, C" → pembuka lalu satu pilihan per baris.

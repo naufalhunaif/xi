@@ -64,7 +64,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { dropRepeatedWait, keepCustomInChat } from '#beta3/reply_guards'
+import { cancelsOrder, dropRepeatedWait, keepCustomInChat } from '#beta3/reply_guards'
 import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -466,7 +466,8 @@ export function dropRepeatedQuestions(pesan: string[], rows: LeanHistoryRow[]) {
       .trim()
   const recent = rows
     .filter((row) => row.direction === 'out' && !row.current && row.body)
-    .slice(-3)
+    // v3.6.55: 6 balasan terakhir (dulu 3) — sesudah selingan topik lain, pertanyaan order tidak ditagih ulang.
+    .slice(-6)
     .map((row) => norm(String(row.body)))
   const kept = pesan.filter((body) => {
     if (!body.includes('?')) return true
@@ -1236,6 +1237,7 @@ export async function createLeanReply(input: {
   if (understanding.follow === 'tunda' || understanding.follow === 'batal') decision.susulan = ''
   if (
     understanding.follow === 'batal' &&
+    cancelsOrder(input.text, rows) &&
     pendingForJev &&
     ['pending', 'awaiting_payment'].includes(String(pendingForJev.status)) &&
     !Number(pendingForJev.paid_amount || 0)
@@ -1265,6 +1267,8 @@ export async function createLeanReply(input: {
     const unknown = unknownPrices(decision.pesan, allowed)
     if (unknown.length) {
       decision.serah_cs = true
+      // v3.6.55: bubble tanpa harga tak dikenal tetap dikirim (pelanggan tidak didiamkan).
+      decision.aman = decision.pesan.filter((bubble) => !unknownPrices([bubble], allowed).length)
       decision.alasan = `Pemeriksa harga: ${unknown.map((value) => value.toLocaleString('id-ID')).join(', ')} tidak ada di katalog/ongkir, balasan ditahan untuk CS. ${decision.alasan}`.slice(0, 500)
       onTrace?.({
         key: 'beta3-guard',
@@ -1584,6 +1588,10 @@ export async function createLeanReply(input: {
   const photos = resolvePhotos(digest.rows, decision.foto)
   // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
   if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')
+  // v3.6.55: diserahkan ke CS tetap dibalas singkat — dulu pesan dibuang dan pelanggan didiamkan.
+  if (ensureHandoffReply(decision)) {
+    onTrace?.({ key: 'beta3-handoff-reply', label: 'Serah CS · balasan singkat dari sistem (AI tidak menulis balasan)', status: 'completed', detail: {} })
+  }
   return {
     decision,
     autoTotal,
@@ -1595,6 +1603,27 @@ export async function createLeanReply(input: {
     orderId,
     skillName: skill.name,
   }
+}
+
+/** Balasan cadangan saat diserahkan ke CS dan AI tidak menulis apa pun. */
+export const HANDOFF_REPLY = 'Siap bos, untuk itu saya tanyakan dulu ke tim ya, ditunggu sebentar'
+
+/**
+ * v3.6.55 — bubble yang benar-benar dikirim ke pelanggan (satu aturan untuk WhatsApp & Instagram).
+ * Diserahkan ke CS: balasan singkat AI tetap dikirim; bila ditahan pemeriksa harga, hanya bubble
+ * tanpa harga tak dikenal.
+ */
+export function bubblesToSend(decision: Pick<LeanDecision, 'serah_cs' | 'pesan' | 'aman'>) {
+  if (!decision.serah_cs) return decision.pesan
+  return decision.aman ?? decision.pesan
+}
+
+/** Diserahkan ke CS tapi tidak ada yang bisa dikirim → balasan singkat cadangan. true bila diisi. */
+export function ensureHandoffReply(decision: Pick<LeanDecision, 'serah_cs' | 'pesan' | 'aman'>) {
+  if (!decision.serah_cs || bubblesToSend(decision).length) return false
+  if (decision.aman) decision.aman = [HANDOFF_REPLY]
+  else decision.pesan = [HANDOFF_REPLY]
+  return true
 }
 
 export const LEAN_NUDGE_DELAY_MS = 20 * 60_000

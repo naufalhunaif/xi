@@ -374,3 +374,13 @@ Perubahan v3.6.6:
 ## v3.6.54 — Perbaikan build v3.6.53
 
 - v3.6.53 gagal dibangun di server (kesalahan tipe di tes baru); isi perbaikan sama, kini lolos pemeriksaan tipe.
+
+## v3.6.55 — Pertanyaan acak: tidak ada pelanggan yang didiamkan
+
+- Chat yang diserahkan ke CS kini tetap dibalas singkat oleh AI (mis. "untuk diskon pesanan banyak saya tanyakan ke tim dulu ya bos"); dulu balasannya dibuang dan pelanggan didiamkan.
+- Yang diserahkan ke CS hanya keputusan bisnis (diskon/grosir, komplain, refund, tukar sesudah barang diterima, telepon, ancaman, warna di luar katalog yang tetap diminta). Pertanyaan "siapa kamu", data internal / minta ubah stok-harga lewat chat, pertanyaan umum, dan cek resi dijawab AI sendiri.
+- Pertanyaan tidak hilang lagi saat pelanggan mengirim pesan baru ketika AI masih menyiapkan balasan.
+- "Gak jadi" sesudah pertanyaan hanya membatalkan pertanyaan itu, bukan pesanan.
+- Syarat tukar size ditulis dengan gaya CS (tidak disalin persis); pesanan custom & refund dijelaskan.
+- Alamat toko tidak lagi terpecah jadi poin-poin; pertanyaan order yang sama tidak ditagih ulang; balasan yang macet dipindah ke akun/model lain setelah 75 detik (dulu 120).
+
