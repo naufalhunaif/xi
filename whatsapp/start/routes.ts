@@ -93,6 +93,7 @@ router
     router.get('/api/beta3/sim/:id', [Beta3Controller, 'simRun'])
     router.post('/api/beta3/sim/run', [Beta3Controller, 'startSim'])
     router.post('/api/beta3/sim/learn', [Beta3Controller, 'simLearn'])
+    router.post('/api/beta3/sim/stop', [Beta3Controller, 'simStop'])
     router.get('/api/beta3/customer', [Beta3Controller, 'customer'])
     router.post('/api/beta3/customer', [Beta3Controller, 'saveCustomer'])
     router.get('/api/lines', [LinesController, 'index'])

@@ -735,6 +735,35 @@ async function ensureSimTable() {
 let running = false
 
 /** Putaran berjalan di latar; hasil disimpan per percakapan supaya bisa dipantau. */
+/** v3.6.94 — Uji berhenti bila akun AI terbaik sudah terpakai sebanyak ini (sisa untuk pelanggan sungguhan). */
+export const SIM_QUOTA_LIMIT = 60
+let stopRequested = ''
+/** Hentikan uji yang sedang berjalan (selesai sesudah percakapan yang sedang diproses). */
+export function stopSimRun(reason = 'Dihentikan') {
+  if (!running) return { stopped: false }
+  stopRequested = reason
+  return { stopped: true }
+}
+type QuotaAccount = { provider: string; enabled: boolean; limitedUntil: number; windows: Array<{ usedPercent: number | null; expired?: boolean }> }
+/** Sisa kuota: aman bila ada akun ChatGPT/Claude siap yang terpakai < SIM_QUOTA_LIMIT. */
+export function quotaHeadroom(accounts: QuotaAccount[], limit = SIM_QUOTA_LIMIT) {
+  // Belum ada akun terdaftar (mode penyedia tunggal lama): tidak dibatasi.
+  if (!accounts.length) return { ok: true, used: 0, reason: '' }
+  const ready = accounts.filter((account) => account.enabled && account.provider !== 'gemini' && !account.limitedUntil)
+  if (!ready.length) return { ok: false, used: 100, reason: 'Tidak ada akun AI yang siap' }
+  const used = Math.min(
+    ...ready.map((account) => Math.max(0, ...account.windows.filter((window) => !window.expired).map((window) => Number(window.usedPercent ?? 0))))
+  )
+  return used >= limit
+    ? { ok: false, used, reason: 'Kuota AI menipis — uji dihentikan agar pelanggan tetap dilayani' }
+    : { ok: true, used, reason: '' }
+}
+async function simQuotaHeadroom() {
+  const { readAiAccountQuotas } = await import('#services/ai_account_quota')
+  const accounts = (await readAiAccountQuotas().catch(() => null)) as QuotaAccount[] | null
+  return accounts ? quotaHeadroom(accounts) : { ok: true, used: 0, reason: '' }
+}
+
 export async function startSimRun(
   settings: LeanSettings,
   input: {
@@ -749,6 +778,8 @@ export async function startSimRun(
 ) {
   await ensureSimTable()
   if (running) return { started: false, reason: 'Uji sedang berjalan.' }
+  const headroom = await simQuotaHeadroom()
+  if (!headroom.ok) return { started: false, reason: headroom.reason }
   const all = await loadScenarios()
   const generated = input.generate?.count
     ? generateScenarios((await catalogDigest()).rows, Math.min(500, Math.max(1, input.generate.count)), input.generate.seed)
@@ -780,14 +811,24 @@ export async function startSimRun(
     started_at: new Date(),
   })
   running = true
+  stopRequested = ''
   void (async () => {
     const results: SimResult[] = []
     try {
       const facts = await judgeFacts(settings).catch(() => '')
       // v3.6.79: beberapa percakapan sekaligus (maks 4) supaya uji banyak skenario lebih cepat.
       const queue = [...picked]
+      let checked = 0
       const one = async () => {
-        while (queue.length) {
+        while (queue.length && !stopRequested) {
+          // Kuota dicek tiap 5 percakapan: uji tidak boleh menghabiskan jatah pelanggan.
+          if (++checked % 5 === 0) {
+            const headroom = await simQuotaHeadroom()
+            if (!headroom.ok) {
+              stopRequested = headroom.reason
+              break
+            }
+          }
           const scenario = queue.shift()!
           const live = (turns: SimTurn[]) =>
             db
@@ -815,7 +856,14 @@ export async function startSimRun(
         }
       }
       await Promise.all(Array.from({ length: Math.min(6, Math.max(1, input.parallel || 1)) }, one))
-      await db.from('whatsapp_beta3_sim_runs').where('id', id).update({ status: 'done', finished_at: new Date(), current: null })
+      await db
+        .from('whatsapp_beta3_sim_runs')
+        .where('id', id)
+        .update(
+          stopRequested
+            ? { status: 'stopped', finished_at: new Date(), current: null, label: `${String(input.label || 'Uji')} · ${stopRequested}`.slice(0, 190) }
+            : { status: 'done', finished_at: new Date(), current: null }
+        )
     } catch (error) {
       await db
         .from('whatsapp_beta3_sim_runs')

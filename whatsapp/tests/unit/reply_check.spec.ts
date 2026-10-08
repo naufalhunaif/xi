@@ -932,3 +932,21 @@ test.group('Beta3 · cari lokasi di peta (v3.6.92)', () => {
     assert.deepEqual(parseMapUrl('https://www.google.com/maps/place/Toko+X/@-6.3006,106.6365,17z'), { lat: -6.3006, lon: 106.6365, name: 'Toko X' })
   })
 })
+
+test.group('Beta3 · uji tidak menghabiskan kuota (v3.6.94)', () => {
+  test('berhenti bila akun terbaik sudah ≥ 60%; Gemini & akun jeda tidak dihitung', async ({ assert }) => {
+    const { quotaHeadroom, stopSimRun } = await import('#beta3/simulator')
+    const account = (provider: string, used: number, extra: Record<string, unknown> = {}) => ({
+      provider,
+      enabled: true,
+      limitedUntil: 0,
+      windows: [{ usedPercent: used, expired: false }],
+      ...extra,
+    })
+    assert.isFalse(quotaHeadroom([account('chatgpt', 100), account('claude', 61)]).ok)
+    assert.isTrue(quotaHeadroom([account('chatgpt', 100), account('claude', 47)]).ok)
+    assert.isFalse(quotaHeadroom([account('gemini', 0), account('claude', 10, { limitedUntil: Date.now() + 60_000 })]).ok)
+    assert.isTrue(quotaHeadroom([account('claude', 90, { windows: [{ usedPercent: 90, expired: true }] })]).ok)
+    assert.deepEqual(stopSimRun(), { stopped: false })
+  })
+})

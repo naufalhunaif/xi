@@ -2085,4 +2085,8 @@ window.waLocales.en = {
   "Semua jawaban CS manusia di chat nyata jadi contoh untuk AI. 1 dari 5 chat disimpan khusus untuk uji.": "Every human CS answer in real chats becomes an example for the AI. 1 in 5 chats is kept aside for testing only.",
   "Mempelajari chat CS…": "Learning from CS chats…",
   "Dipelajari: {added} contoh baru dari {chats} chat ({pairs} tanya-jawab).": "Learned: {added} new examples from {chats} chats ({pairs} Q&A pairs).",
+  "Hentikan uji": "Stop test",
+  "Uji dihentikan sesudah percakapan yang sedang diproses.": "The test stops after the conversations in progress.",
+  "Kuota AI menipis — uji dihentikan agar pelanggan tetap dilayani": "AI quota is running low — testing stopped so customers keep getting replies",
+  "Tidak ada akun AI yang siap": "No AI account is ready",
 }

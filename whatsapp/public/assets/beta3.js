@@ -340,6 +340,7 @@
     list.replaceChildren()
     const busy = run?.status === 'running'
     byId('beta3SimRun').disabled = busy
+    if (byId('beta3SimStop')) byId('beta3SimStop').hidden = !busy
     byId('beta3SimCustomRun').disabled = busy
     if (!run) {
       byId('beta3SimSummary').textContent = t('Belum pernah dijalankan.')
@@ -364,6 +365,16 @@
     }
   }
   byId('beta3SimRun').addEventListener('click', () => startSim({}))
+  // v3.6.94: hentikan uji (selesai sesudah percakapan yang sedang diproses).
+  byId('beta3SimStop')?.addEventListener('click', async () => {
+    try {
+      await api('/api/beta3/sim/stop', 'POST', {})
+      notice(t('Uji dihentikan sesudah percakapan yang sedang diproses.'))
+      await loadSim()
+    } catch (error) {
+      notice(error.message, true)
+    }
+  })
   byId('beta3SimReal').addEventListener('click', () => {
     const count = Math.max(1, Math.min(300, Number(byId('beta3SimGenCount').value) || 70))
     startSim({ real: count, parallel: 5 })
