@@ -5,7 +5,7 @@ import { estimateTokens } from '#services/prompt_size_service'
 import type { TraceSink } from '#services/trace_service'
 import { catalogDigest, findCatalogVariant, renderCatalogDigest, type LeanCatalogRow } from '#beta3/catalog_service'
 import { listLeanExamples, pickExamples, seedLeanExamples } from '#beta3/examples_service'
-import { readCustomerNote, readOrderSpec, writeOrderSpec } from '#beta3/customer_service'
+import { memoryFromChat, readCustomerNote, readOrderSpec, writeOrderSpec } from '#beta3/customer_service'
 import {
   parseOrderForm,
   parseLooseAddress,
@@ -69,7 +69,7 @@ import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, ski
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
 import { lookupPlace, mapLink, parseAddress, type PlaceLookup } from '#beta3/place_lookup'
-import { fastAnswer, fastIntent, needsContext } from '#beta3/fast_reply'
+import { fastAnswer, fastIntent, fastShipping, needsContext, pureShippingAsk } from '#beta3/fast_reply'
 /** Tahap awal: jalur kilat untuk harga umum, lama pengerjaan, cara order. */
 const FAST_EARLY = ['', 'lain', 'selesai', 'tanya_model', 'tanya_size']
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
@@ -840,6 +840,7 @@ export async function createLeanReply(input: {
   const genericPlace = (value: string | null) => Boolean(value && /^(?:alamat|ini|itu|sini|situ|sana|rumah|kantor|saya|aku|tempat|lokasi|yang|di|ke|\s)+$/i.test(value))
   const place = (mapLink(input.text) && linkPlace) || (genericPlace(extracted) ? null : extracted) || (choiceHit ? last?.place || choiceHit.label : null) || linkPlace
   let geoFound: PlaceLookup | null = null
+  let shipFast: { block: string; many: boolean; geo: string } | null = null
   if (place && mcp.url) {
     try {
       let note = ''
@@ -917,6 +918,13 @@ export async function createLeanReply(input: {
         toolNotes.push(
           `LOKASI (dicari di peta): ${geoFound.display} → kecamatan ${resolved.label}. Konfirmasi singkat seperti CS: "${geoFound.display.split(',').slice(0, 4).join(',').trim()} alamat ini ya?" lalu sebut ongkir/estimasinya; jangan tanya kecamatan lagi.`
         )
+      const block = resolved ? note.match(/<<<ONGKIR\n([\s\S]+?)\nONGKIR>>>/)?.[1] : ''
+      if (block)
+        shipFast = {
+          block,
+          many: !/hanya satu layanan/.test(note),
+          geo: geoFound ? geoFound.display.split(',').slice(0, 3).join(',').trim() : '',
+        }
       if (note) {
         toolNotes.push(note)
         onTrace?.({
@@ -936,6 +944,31 @@ export async function createLeanReply(input: {
     }
   }
 
+  // v3.6.96 — Ongkir kilat: pesan hanya soal ongkir & tujuan ketemu → jawab langsung dari data ekspedisi.
+  if (shipFast && !form && !loose && FAST_EARLY.includes(stage) && pureShippingAsk(input.text, askedPlace)) {
+    const pesan = fastShipping({ ...shipFast, address: style?.address || 'bos', seed: `${jid}|${rows.length}` })
+    onTrace?.({ key: 'beta3-fast', label: 'Jalur kilat · ongkir (0 token)', status: 'completed', detail: { pesan } })
+    return {
+      decision: {
+        pesan,
+        foto: [],
+        catatan: chatNote,
+        tahap: (stage || 'lain') as LeanDecision['tahap'],
+        serah_cs: false,
+        alasan: 'Jalur kilat: ongkir',
+        susulan: '',
+        spesifikasi: String(spec || ''),
+      },
+      autoTotal: null,
+      photos: [],
+      promptTokens: 0,
+      promptSections: [],
+      usage: null,
+      durationMs: 0,
+      orderId: null,
+      skillName: skill.name,
+    }
+  }
   // Lacak resi: pelanggan menanyakan posisi paket → resi dari pesan ini atau dari pesan
   // toko terakhir yang menyebut resi, lalu track_awb (cache 30 menit).
   const asksTracking =
@@ -1251,7 +1284,8 @@ export async function createLeanReply(input: {
     corrections: examples.filter((example) => example.source === 'koreksi').slice(-12),
     styleGuide: style ? styleGuide(style) : '',
     rules: renderRules(rules),
-    customerNote,
+    // v3.6.96: belum ada catatan order → ingatan dari chat ini (alamat form, size, tinggi/berat).
+    customerNote: customerNote || Object.entries(memoryFromChat(rows)).map(([label, value]) => `${label}: ${value}`).join('\n'),
     chatNote,
     spec,
     history: rows,

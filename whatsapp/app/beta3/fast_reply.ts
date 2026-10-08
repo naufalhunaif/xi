@@ -80,7 +80,12 @@ const minPrice = (rows: LeanCatalogRow[], test: (row: LeanCatalogRow) => boolean
 export function storeParts(store: string) {
   const text = String(store || '')
   const address = (text.match(/—\s*([^\n]+?)\.?\s*(?:\n|$)/)?.[1] || '').replace(/^CHAMELEON CLOTH\s+/i, '').replace(/,\s*Central Java/i, ', Jawa Tengah').trim()
-  const hours = (text.match(/buka\s+(.+?)\s+WIB/i)?.[1] || '').replace(/:/g, '.').trim()
+  // Nama hari lengkap ("Min tutup" → "Minggu tutup"; "Min" juga kata sapaan yang diganti perapi gaya).
+  const days: Record<string, string> = { Sen: 'Senin', Sel: 'Selasa', Rab: 'Rabu', Kam: 'Kamis', Jum: 'Jumat', Sab: 'Sabtu', Min: 'Minggu' }
+  const hours = (text.match(/buka\s+(.+?)\s+WIB/i)?.[1] || '')
+    .replace(/:/g, '.')
+    .replace(/\b(Sen|Sel|Rab|Kam|Jum|Sab|Min)\b/g, (day) => days[day])
+    .trim()
   return { address, hours }
 }
 
@@ -203,4 +208,30 @@ export function needsContext(rows: LeanHistoryRow[]) {
   if (current.some((row) => row.replyTo || row.mediaType)) return true
   const previous = rows.filter((row) => !row.current).slice(-3)
   return previous.some((row) => row.direction === 'in' && row.mediaType === 'image')
+}
+
+const SHIP_ASK = /\b(ongkir\w*|ongkos\s*kirim|biaya\s*kirim|kirim\s+ke|dikirim\s+ke|ke\s+\w+\s+(?:berapa|brp|kena))\b/i
+const NOT_ONLY_SHIPPING =
+  /\b(harga|size|ukuran|warna|ready|redy|stok|stock|jas|setelan|stelan|celana|vest|rompi|beskap|kemeja|custom|rek\w*|tf|transfer|total|bayar|dp|diskon|grosir|resi|pesanan|orderan|sudah|udah|jadi|lama)\b/i
+/**
+ * v3.6.96 — Pesan ini hanya soal ongkir / jawaban nama tempat (sesudah toko bertanya kecamatan)?
+ * Bila tujuan ketemu, ongkir dijawab langsung dari data ekspedisi (jalur kilat).
+ */
+export function pureShippingAsk(text: string, askedPlace: boolean) {
+  const value = String(text || '').trim()
+  if (!value || value.length > 120 || NOT_ONLY_SHIPPING.test(value)) return false
+  if (SHIP_ASK.test(value)) return true
+  return askedPlace && value.split(/\s+/).length <= 6 && !/\?/.test(value)
+}
+
+/** Kalimat ongkir kilat dari blok ekspedisi (variasi kalimat, tanpa template kaku). */
+export function fastShipping(input: { block: string; many: boolean; geo: string; address: string; seed: string }) {
+  const a = input.address || 'bos'
+  const pickOne = (options: string[]) => options[hash(input.seed) % options.length]
+  const block = input.many ? input.block : `${input.block} ${a}`
+  const out: string[] = []
+  if (input.geo) out.push(pickOne([`${input.geo} alamat ini ya ${a}?`, `Ini ya ${a}, ${input.geo}?`, `Alamatnya ${input.geo} ya ${a}?`]))
+  out.push(block)
+  if (input.many) out.push(pickOne([`Mau pakai yang mana ${a}?`, `Pilih yang mana ${a}?`, `Mau yang reguler atau yang cepat ${a}?`]))
+  return out
 }

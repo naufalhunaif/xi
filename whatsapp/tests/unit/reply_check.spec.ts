@@ -992,7 +992,7 @@ test.group('Beta3 · jalur kilat (v3.6.95)', () => {
       'TOKO: CHAMELEON CLOTH — CHAMELEON CLOTH Jl. Contoh No 1, Cinyawang, Patimuan, Cilacap, Central Java, 53264.\nOrder lewat chat/website bisa 24 jam. Toko fisik buka Sen-Jum 09:00-17:00, Sab 09:00-15:00, Min tutup WIB (untuk yang mau datang).'
     assert.deepEqual(storeParts(store), {
       address: 'Jl. Contoh No 1, Cinyawang, Patimuan, Cilacap, Jawa Tengah, 53264',
-      hours: 'Sen-Jum 09.00-17.00, Sab 09.00-15.00, Min tutup',
+      hours: 'Senin-Jumat 09.00-17.00, Sabtu 09.00-15.00, Minggu tutup',
     })
     const facts = {
       store,
@@ -1020,5 +1020,45 @@ test.group('Beta3 · jalur kilat (v3.6.95)', () => {
     assert.notEqual(again[0], once[0])
     assert.include(fastAnswer('lama_pengerjaan', 'brp lama', facts)![0], '5-10 hari kerja')
     assert.isNull(fastAnswer('rekening', 'norek', { ...facts, payment: '' }))
+  })
+})
+
+test.group('Beta3 · ongkir kilat (v3.6.96)', () => {
+  test('hanya soal ongkir → dijawab dari data ekspedisi; ada maksud lain → AI', async ({ assert }) => {
+    const { pureShippingAsk, fastShipping } = await import('#beta3/fast_reply')
+    assert.isTrue(pureShippingAsk('kak ongkir ke ice bsd tangerang berapa ya', false))
+    assert.isTrue(pureShippingAsk('kirim ke medan kena berapa', false))
+    assert.isTrue(pureShippingAsk('warudoyong sukabumi', true))
+    assert.isFalse(pureShippingAsk('warudoyong sukabumi', false))
+    assert.isFalse(pureShippingAsk('harga jas sama ongkir ke medan berapa', false))
+    assert.isFalse(pureShippingAsk('berapa lama sampai ke makassar? sudah dikirim?', false))
+    const many = fastShipping({ block: 'Ongkir ke Pagedangan, Tangerang:\nREG 19.000 (2-3 hari)\nYES 25.000 (1 hari)', many: true, geo: 'Indonesia Convention Exhibition, 1, Jalan BSD Grand Boulevard', address: 'bos', seed: 'x' })
+    assert.lengthOf(many, 3)
+    assert.include(many[0], 'Indonesia Convention Exhibition')
+    assert.include(many[1], 'REG 19.000')
+    const one = fastShipping({ block: 'Untuk pengiriman ke Patimuan, Cilacap ongkirnya 10.000, estimasi 1 hari', many: false, geo: '', address: 'bos', seed: 'y' })
+    assert.deepEqual(one, ['Untuk pengiriman ke Patimuan, Cilacap ongkirnya 10.000, estimasi 1 hari bos'])
+  })
+})
+
+test.group('Beta3 · ingatan pelanggan dari chat lama (v3.6.96)', () => {
+  test('form terakhir, size, tinggi/berat; data order tidak ditimpa', async ({ assert }) => {
+    const { memoryFromChat, mergeChatMemory } = await import('#beta3/customer_service')
+    const rows = [
+      { direction: 'in', body: 'tinggi 170 berat 65, biasa pakai M' },
+      { direction: 'out', body: 'siap bos' },
+      { direction: 'in', body: 'celana no 32 ya' },
+      { direction: 'in', body: 'Nama : Budi Contoh\nAlamat lengkap : Jl. Contoh No 1\nKecamatan : Pagedangan\nKabupaten : Tangerang\nKode Pos : 15339\nNo telp : 0800' },
+    ]
+    const facts = memoryFromChat(rows)
+    assert.equal(facts['Nama'], 'Budi Contoh')
+    assert.include(facts['Alamat'], 'Pagedangan')
+    assert.equal(facts['Size jas'], 'M')
+    assert.equal(facts['Celana'], 'no 32')
+    assert.equal(facts['Tinggi/berat'], '170 cm / 65 kg')
+    const merged = mergeChatMemory('Alamat: Jl. Order Resmi, Cilacap\nOrder terakhir: #1', facts)
+    assert.include(merged, 'Alamat: Jl. Order Resmi, Cilacap')
+    assert.notInclude(merged, 'Jl. Contoh No 1')
+    assert.include(merged, 'Size jas: M')
   })
 })

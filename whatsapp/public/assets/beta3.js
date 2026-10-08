@@ -396,7 +396,8 @@
       node.textContent = t('Dipelajari: {added} contoh baru dari {chats} chat ({pairs} tanya-jawab).')
         .replace('{added}', state.result.added)
         .replace('{chats}', state.result.chats)
-        .replace('{pairs}', state.result.pairs)
+        .replace('{pairs}', state.result.pairs) +
+        (state.result.customers ? ` · ${t('ingatan {0} pelanggan', state.result.customers)}` : '')
     } else if (state.error) {
       node.hidden = false
       node.textContent = state.error

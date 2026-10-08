@@ -22,6 +22,7 @@ import { runLeanProvider } from '#beta3/provider'
 import { allowedPrices, unknownPrices } from '#beta3/quality_service'
 import { reviewNudge } from '#beta3/reply_check'
 import { addLeanExample, listLeanExamples } from '#beta3/examples_service'
+import { memoryFromChat, mergeChatMemory, readCustomerNote, writeCustomerNote } from '#beta3/customer_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { STORE_BASICS, bubblesToSend, createLeanReply, type LeanSettings } from '#beta3/reply_service'
 import { renderProductionEstimate, type LeanHistoryRow } from '#beta3/prompt'
@@ -526,10 +527,30 @@ export async function learnAllRealChats(days = 365) {
       added++
     }
   }
-  return { chats, pairs, added }
+  // v3.6.96: ingatan per pelanggan dari chat lama (alamat form, size, tinggi/berat) — semua chat, termasuk chat uji.
+  let customers = 0
+  for (const { jid } of jids) {
+    const rows = (await db
+      .from('whatsapp_messages')
+      .select('direction', 'body')
+      .where('jid', jid)
+      .where('direction', 'in')
+      .whereNotNull('body')
+      .orderBy('id', 'asc')
+      .limit(800)) as Array<{ direction: string; body: string | null }>
+    const facts = memoryFromChat(rows)
+    if (!Object.keys(facts).length) continue
+    const previous = await readCustomerNote(jid)
+    const next = mergeChatMemory(previous, facts)
+    if (next !== previous) {
+      await writeCustomerNote(jid, next)
+      customers++
+    }
+  }
+  return { chats, pairs, added, customers }
 }
 
-type LearnState = { running: boolean; startedAt?: string; finishedAt?: string; result?: { chats: number; pairs: number; added: number }; error?: string }
+type LearnState = { running: boolean; startedAt?: string; finishedAt?: string; result?: { chats: number; pairs: number; added: number; customers?: number }; error?: string }
 const learning = new Map<string, LearnState>()
 /** Status belajar dari semua chat nyata (per workspace). */
 export function realLearningStatus(): LearnState {

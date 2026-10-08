@@ -1,6 +1,8 @@
 // Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
 import db from '#services/workspace_database'
 import { ensureLeanTables } from '#beta3/tables'
+import { parseOrderForm } from '#beta3/order_service'
+import { extractBodyMeasure } from '#beta3/mcp'
 
 /**
  * Memori pelanggan = catatan pendek per nomor (maks ±10 baris), seperti CS
@@ -77,4 +79,35 @@ export async function writeOrderSpec(jid: string, spec: string) {
     [jid, value, new Date()]
   )
   return value
+}
+
+/**
+ * v3.6.96 — Ingatan dari chat lama (seperti CS yang ingat pelanggannya): form order terakhir, tinggi/berat,
+ * size jas dan nomor celana yang pernah disebut pelanggan. Dipakai bila belum ada catatan dari order.
+ */
+export function memoryFromChat(rows: Array<{ direction: string; body?: string | null }>) {
+  const facts: Record<string, string> = {}
+  for (const row of rows) {
+    if (row.direction !== 'in') continue
+    const text = String(row.body || '')
+    const form = parseOrderForm(text)
+    if (form) {
+      facts['Nama'] = form.customerName
+      facts['Alamat'] = [form.address, form.district, form.regency, form.postalCode].filter(Boolean).join(', ')
+    }
+    const body = extractBodyMeasure(text)
+    if (body) facts['Tinggi/berat'] = `${body.height} cm / ${body.weight} kg`
+    const size = text.match(/\b(?:size|ukuran|uk|pakai|biasa)\s*(xs|s|m|l|xl|xxl|[2-5]xl)\b/i)?.[1]
+    if (size) facts['Size jas'] = size.toUpperCase()
+    const pants = text.match(/\bcelana\w*\s+(?:no\.?\s*|nomor\s+|size\s+|ukuran\s+)?(2[6-9]|3\d|4[0-6])\b/i)?.[1]
+    if (pants) facts['Celana'] = `no ${pants}`
+  }
+  return facts
+}
+
+/** Tambahkan ingatan dari chat lama ke catatan pelanggan tanpa menimpa data dari order. */
+export function mergeChatMemory(previous: string, facts: Record<string, string>) {
+  const known = new Set(previous.split('\n').map((line) => line.split(':')[0]?.trim().toLowerCase()).filter(Boolean))
+  const fresh = Object.fromEntries(Object.entries(facts).filter(([label]) => !known.has(label.toLowerCase())))
+  return Object.keys(fresh).length ? mergeCustomerNote(previous, fresh) : previous
 }

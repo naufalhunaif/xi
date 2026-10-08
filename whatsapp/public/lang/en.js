@@ -2089,4 +2089,5 @@ window.waLocales.en = {
   "Uji dihentikan sesudah percakapan yang sedang diproses.": "The test stops after the conversations in progress.",
   "Kuota AI menipis — uji dihentikan agar pelanggan tetap dilayani": "AI quota is running low — testing stopped so customers keep getting replies",
   "Tidak ada akun AI yang siap": "No AI account is ready",
+  "ingatan {0} pelanggan": "memory for {0} customers",
 }
