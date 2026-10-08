@@ -85,6 +85,7 @@ import {
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
+import { renderPaymentMessage } from '#beta3/order_service'
 import { alignPhotos, CHECK_LABEL, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
@@ -1374,6 +1375,16 @@ export async function createLeanReply(input: {
         status: 'failed',
         detail: { unknown, pesan: decision.pesan },
       })
+    }
+  }
+  // v3.6.83: pelanggan minta rekening (Jev) → rekening RESMI dari Pengaturan ditambahkan apa adanya
+  // (uji chat nyata: AI menjawab "rekeningnya nanti" lalu menawarkan model lagi).
+  if (understanding.asksAccount && !decision.serah_cs) {
+    const methods = settings.paymentMethods.filter((method) => method.enabled)
+    const payment = renderPaymentMessage(methods.map((method) => ({ bank: method.name, number: method.destination, holder: (method as { accountName?: string }).accountName || '' })))
+    if (payment && !decision.pesan.some((bubble) => methods.some((method) => bubble.includes(method.destination)))) {
+      decision.pesan = [...decision.pesan.filter((bubble) => !/rekening\w*\s+(?:nanti|menyusul|saya kirim)/i.test(bubble)), payment]
+      onTrace?.({ key: 'beta3-account', label: 'Pelanggan minta rekening · rekening resmi ditambahkan', status: 'completed', detail: {} })
     }
   }
   // v3.6.79: tautan karangan (mis. link maps yang tidak ada di data toko) tidak dikirim.

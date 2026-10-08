@@ -2076,5 +2076,9 @@ window.waLocales.en = {
   "rasa {0}/5": "human {0}/5",
   "Susulan bila pelanggan diam: {0}": "Follow-up if the customer goes quiet: {0}",
   "Susulan dibatalkan pemeriksa: {0} · {1}": "Follow-up cancelled by the checker: {0} · {1}",
-  "Rasa bahasa: {0}": "Tone: {0}"
+  "Rasa bahasa: {0}": "Tone: {0}",
+  "{0} jawaban CS asli ditambahkan ke Contoh jawaban CS": "{0} real CS answers added to CS reply examples",
+  "Tambah ke Aturan toko": "Add to store rules",
+  "Ditambahkan": "Added",
+  "Aturan dari CS asli: {0}": "Rule from the real CS: {0}"
 }

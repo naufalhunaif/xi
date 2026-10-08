@@ -417,8 +417,8 @@ test.group('chat nyata → skenario; jawaban "kab" untuk pilihan tujuan (v3.6.80
       { ...base, direction: 'out', sender_type: 'ai', body: 'siap', created_at: at(7) },
     ])
     assert.deepEqual(segments, [
-      { teks: 'min\ntuxedo item brp', gambar: undefined, jawaban: ['485.000 bos'] },
-      { teks: 'yg ini ada?', gambar: '/media/w2_a.jpg', jawaban: ['ada bos'] },
+      { teks: 'min\ntuxedo item brp', gambar: undefined, jawaban: ['485.000 bos'], mulai: 0 },
+      { teks: 'yg ini ada?', gambar: '/media/w2_a.jpg', jawaban: ['ada bos'], mulai: 3 },
     ])
   })
 
@@ -513,5 +513,26 @@ test.group('janji total: tidak mengulang format data pengiriman (v3.6.82)', () =
     assert.deepEqual(again.pesan, ['Siap bos', 'Ditunggu data pengirimannya ya bos'])
     const source = await readFile('app/beta3/reply_service.ts', 'utf8')
     assert.include(source, "'beta3-total-rewrite'")
+  })
+})
+
+test.group('jawaban CS chat nyata = kebenaran (v3.6.83)', () => {
+  test('bertentangan → pertanyaan + jawaban CS asli jadi contoh (sekali saja); rekening resmi saat diminta', async ({ assert }) => {
+    const { learnFromRealChat } = await import('#beta3/simulator')
+    const asal = [{ teks: 'Setelan jas utk anak 8 tahun ada? (uji)', jawaban: ['Mohon maaf kak, untuk anak belum bisa ya'] }]
+    await db.from('whatsapp_beta3_examples').where('customer_text', asal[0].teks).delete()
+    try {
+      assert.equal(await learnFromRealChat(asal), 1)
+      assert.equal(await learnFromRealChat(asal), 0)
+      const row = await db.from('whatsapp_beta3_examples').where('customer_text', asal[0].teks).first()
+      assert.equal(row.source, 'chat-nyata')
+      assert.equal(row.cs_text, 'Mohon maaf kak, untuk anak belum bisa ya')
+    } finally {
+      await db.from('whatsapp_beta3_examples').where('customer_text', asal[0].teks).delete()
+    }
+    const source = await readFile('app/beta3/reply_service.ts', 'utf8')
+    assert.include(source, "key: 'beta3-account'")
+    const sim = await readFile('app/beta3/simulator.ts', 'utf8')
+    assert.include(sim, 'tidak bisa = tidak bisa')
   })
 })

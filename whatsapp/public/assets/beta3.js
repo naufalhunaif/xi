@@ -291,6 +291,24 @@
     if (result.manusia) summary.append(el('span', t('rasa {0}/5', result.manusia), 'wa-sim-score'))
     head.append(summary)
     if (result.rasa) head.append(el('p', t('Rasa bahasa: {0}', result.rasa), 'wa-sim-feel'))
+    if (result.dipelajari) head.append(el('p', t('{0} jawaban CS asli ditambahkan ke Contoh jawaban CS', result.dipelajari), 'wa-sim-feel'))
+    if (result.aturan) {
+      const rule = el('p', undefined, 'wa-sim-rule')
+      const add = el('button', t('Tambah ke Aturan toko'), 'wa-mini wa-sim-rule-add')
+      add.type = 'button'
+      add.addEventListener('click', async (event) => {
+        event.preventDefault()
+        try {
+          await api('/api/beta3/rules', 'POST', { text: result.aturan })
+          add.disabled = true
+          add.textContent = t('Ditambahkan')
+        } catch (error) {
+          notice(error.message, true)
+        }
+      })
+      rule.append(el('span', t('Aturan dari CS asli: {0}', result.aturan)), add)
+      head.append(rule)
+    }
     if (result.masalah?.length) {
       const issues = el('ul', undefined, 'wa-sim-issues')
       for (const text of result.masalah) issues.append(el('li', text))

@@ -19,6 +19,7 @@ import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { runLeanProvider } from '#beta3/provider'
 import { allowedPrices, unknownPrices } from '#beta3/quality_service'
 import { reviewNudge } from '#beta3/reply_check'
+import { addLeanExample, listLeanExamples } from '#beta3/examples_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { bubblesToSend, createLeanReply, type LeanSettings } from '#beta3/reply_service'
 import { renderProductionEstimate, type LeanHistoryRow } from '#beta3/prompt'
@@ -31,6 +32,10 @@ export type SimScenario = {
   maksud: string
   /** Pesan pelanggan per giliran; bisa dengan gambar ("Produk - Warna" dari katalog, atau URL https). */
   giliran: Array<string | SimMessage>
+  /** Chat nyata: pertanyaan asli + jawaban CS manusia per giliran (kebenaran toko). */
+  asal?: Array<{ teks: string; jawaban: string[] }>
+  /** Chat nyata: pesan sebelum giliran pertama (konteks yang dilihat CS waktu itu). */
+  riwayat?: Array<{ arah: 'in' | 'out'; teks: string; gambar?: boolean }>
   harap?: {
     /** false = harus dijawab AI sendiri (tidak diserahkan ke CS). */
     serah_cs?: boolean
@@ -79,6 +84,10 @@ export type SimResult = {
   /** Rasa manusia 1–5 dari penilai (v3.6.80) + catatannya (v3.6.82). */
   manusia?: number | null
   rasa?: string
+  /** Chat nyata: aturan toko dari jawaban CS yang dilanggar AI (saran untuk Aturan toko). */
+  aturan?: string
+  /** Chat nyata: contoh jawaban CS asli yang ditambahkan supaya AI belajar. */
+  dipelajari?: number
   masalah: string[]
   giliran: SimTurn[]
 }
@@ -175,10 +184,12 @@ const JUDGE_SCHEMA = {
     nilai: { type: 'integer', description: '1 (buruk) – 5 (seperti CS terbaik)' },
     manusia: { type: 'integer', description: 'Rasa manusia 1 (kaku seperti bot) – 5 (seperti CS manusia terbaik toko ini)' },
     rasa: { type: 'string', description: 'Satu-dua kalimat: bagian mana yang terasa bot/kaku dan contoh kalimat yang lebih manusia. Kosong bila sudah natural.' },
+    bertentangan_cs: { type: 'boolean', description: 'true bila balasan AI bertentangan dengan jawaban CS manusia (chat nyata) soal kebijakan/kemampuan toko.' },
+    aturan: { type: 'string', description: 'Bila bertentangan: satu kalimat aturan toko umum dari jawaban CS (mis. "Toko tidak membuat jas anak-anak"). Kosong bila tidak ada.' },
     lulus: { type: 'boolean' },
     masalah: { type: 'array', items: { type: 'string' } },
   },
-  required: ['nilai', 'manusia', 'rasa', 'lulus', 'masalah'],
+  required: ['nilai', 'manusia', 'rasa', 'bertentangan_cs', 'aturan', 'lulus', 'masalah'],
 }
 
 async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTurn[], facts: string) {
@@ -188,6 +199,7 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
       system: [
         'Kamu auditor CS toko jas Chameleon Cloth. Nilai percakapan uji antara pelanggan dan AI CS. Balas HANYA JSON sesuai skema.',
         'Periksa ketat: (1) maksud pelanggan dipahami walau bahasanya tidak baku/daerah/salah ketik/tidak langsung; (2) setiap angka harga, warna, size ready, dan info toko benar menurut FAKTA; (3) foto yang dikirim persis sesuai yang diucapkan/dijanjikan balasan (tidak kurang, tidak lebih, tidak beda); (4) tidak mengarang, tidak mengulang pertanyaan yang sudah dijawab, tidak menyerahkan ke CS bila jawabannya ada di FAKTA; (5) gaya chat CS singkat dan sopan.',
+        'Chat nyata: "CS manusia waktu itu" adalah KEBENARAN toko untuk kebijakan, kemampuan, dan prosedur (tidak bisa = tidak bisa, tidak melayani = tidak melayani). Hanya angka harga/stok yang mengikuti FAKTA saat ini bila berbeda. Balasan AI yang bertentangan dengan CS manusia = masalah + bertentangan_cs=true.',
         'Baris "(susulan bila pelanggan diam: …)" dikirim otomatis bila pelanggan tidak membalas: nilai juga perlu tidaknya dan rasa manusianya (tidak menagih, tidak mengulang, nyambung).',
         'Baris "(data alat untuk AI — …)" adalah hasil alat toko (ongkir, size, resi) yang dibaca AI: angka yang cocok dengan data itu BENAR, bukan karangan.',
         'Rasa manusia (nilai manusia): balasan harus terasa seperti CS manusia toko ini — santai, singkat, hangat, bahasa chat sehari-hari, menjawab dulu baru bertanya, tidak kaku, tidak bertele-tele, tidak memakai daftar/format bila cukup satu kalimat, tidak mengulang sapaan atau kalimat template. Bila ada "Jawaban CS manusia waktu itu", jadikan acuan gaya (isi harga/stok tetap ikut FAKTA saat ini). Rasa robotik ≤ 2 = masalah.',
@@ -205,6 +217,8 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
     nilai?: number
     manusia?: number
     rasa?: string
+    bertentangan_cs?: boolean
+    aturan?: string
     lulus?: boolean
     masalah?: string[]
   }
@@ -213,7 +227,9 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
     nilai: Math.max(1, Math.min(5, Math.round(Number(parsed.nilai) || 1))),
     manusia: human,
     rasa: String(parsed.rasa || '').slice(0, 500),
-    lulus: parsed.lulus === true && human >= 3,
+    bertentanganCs: parsed.bertentangan_cs === true,
+    aturan: String(parsed.aturan || '').trim().slice(0, 300),
+    lulus: parsed.lulus === true && human >= 3 && parsed.bertentangan_cs !== true,
     masalah: (parsed.masalah || []).map(String).filter(Boolean).slice(0, 8),
   }
 }
@@ -348,6 +364,15 @@ export async function runScenario(
 ): Promise<SimResult> {
   const state = newSimState(scenario.id)
   const start = Date.now() - scenario.giliran.length * 90_000
+  // Chat nyata: konteks sebelumnya ikut, seperti yang dilihat CS waktu itu.
+  for (const [index, item] of (scenario.riwayat || []).entries())
+    state.rows.push({
+      direction: item.arah,
+      senderType: item.arah === 'in' ? 'customer' : 'cs',
+      body: item.teks,
+      mediaType: item.gambar ? 'image' : null,
+      createdAt: new Date(start - ((scenario.riwayat?.length || 0) - index) * 120_000),
+    })
   try {
     for (const [index, message] of scenario.giliran.entries()) {
       const turn = await runSimTurn(state, message, settings, new Date(start + index * 90_000))
@@ -371,6 +396,8 @@ export async function runScenario(
     let nilai: number | null = null
     let manusia: number | null = null
     let rasa = ''
+    let aturan = ''
+    let dipelajari = 0
     let judged = true
     if (options.judge !== false && !turns.some((turn) => turn.error)) {
       try {
@@ -378,6 +405,10 @@ export async function runScenario(
         nilai = verdict.nilai
         manusia = verdict.manusia
         rasa = verdict.rasa
+        if (verdict.bertentanganCs && scenario.asal?.length) {
+          aturan = verdict.aturan
+          dipelajari = await learnFromRealChat(scenario.asal).catch(() => 0)
+        }
         judged = verdict.lulus
         masalah.push(...verdict.masalah.map((item) => `Penilai: ${item}`))
       } catch (error) {
@@ -386,32 +417,52 @@ export async function runScenario(
       }
     }
     const hard = masalah.filter((item) => !item.startsWith('Penilai'))
-    return { id: scenario.id, judul: scenario.judul, lulus: !hard.length && judged, nilai, manusia, rasa, masalah, giliran: turns }
+    return { id: scenario.id, judul: scenario.judul, lulus: !hard.length && judged, nilai, manusia, rasa, aturan, dipelajari, masalah, giliran: turns }
   } finally {
     await cleanupSim(state.jid)
   }
 }
 
+/**
+ * v3.6.83 — Jawaban CS manusia di chat nyata = kebenaran toko. AI bertentangan → pasangan
+ * (pertanyaan asli, jawaban CS) masuk Contoh jawaban CS (sumber "chat-nyata"), dipakai AI di chat berikutnya.
+ */
+export async function learnFromRealChat(asal: Array<{ teks: string; jawaban: string[] }>) {
+  const existing = new Set((await listLeanExamples()).map((example) => example.customerText.trim().toLowerCase()))
+  let added = 0
+  for (const item of asal) {
+    const customerText = item.teks.trim()
+    const csText = item.jawaban.join('\n').trim()
+    if (!customerText || !csText || existing.has(customerText.toLowerCase())) continue
+    await addLeanExample({ situation: 'Dari chat nyata', customerText, csText, tags: 'chat-nyata', source: 'chat-nyata' })
+    existing.add(customerText.toLowerCase())
+    added++
+  }
+  return added
+}
+
 /* ---------------- Skenario dari chat nyata (v3.6.80) ---------------- */
 
 type RealRow = { jid: string; direction: string; sender_type: string | null; body: string | null; media_type: string | null; media_url: string | null; created_at: Date | string }
-type RealSegment = { teks: string; gambar?: string; jawaban: string[] }
+type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number }
 
 /** Potong chat menjadi giliran: pesan pelanggan beruntun → balasan CS manusia (cs/owner) sesudahnya. */
 export function realSegments(rows: RealRow[]) {
   const segments: RealSegment[] = []
   let asked: RealRow[] = []
   let answered: string[] = []
+  let askedAt = 0
   const flush = () => {
     const texts = asked.map((row) => String(row.body || '').trim()).filter(Boolean)
     const image = asked.find((row) => row.media_type === 'image' && row.media_url)?.media_url || undefined
-    if ((texts.length || image) && answered.length) segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered })
+    if ((texts.length || image) && answered.length) segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered, mulai: askedAt })
     asked = []
     answered = []
   }
-  for (const row of rows) {
+  for (const [index, row] of rows.entries()) {
     if (row.direction === 'in') {
       if (answered.length) flush()
+      if (!asked.length) askedAt = index
       if (row.media_type && row.media_type !== 'image') continue
       asked.push(row)
     } else if (asked.length && ['cs', 'owner'].includes(String(row.sender_type || '')) && row.body) {
@@ -443,7 +494,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
     .groupBy('jid')
     .orderByRaw('RAND(?)', [seed])
     .limit(Math.min(400, count * 3))) as Array<{ jid: string }>
-  const pool: Array<{ jid: string; segments: RealSegment[] }> = []
+  const pool: Array<{ jid: string; segments: RealSegment[]; rows: RealRow[] }> = []
   for (const { jid } of jids) {
     const rows = (await db
       .from('whatsapp_messages')
@@ -454,7 +505,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
       .orderBy('id', 'asc')
       .limit(120)) as RealRow[]
     const segments = realSegments(rows).filter((segment) => segment.teks.length >= 2 || segment.gambar)
-    if (segments.length) pool.push({ jid, segments })
+    if (segments.length) pool.push({ jid, segments, rows })
     if (pool.length >= count * 2) break
   }
   const out: SimScenario[] = []
@@ -476,8 +527,13 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
     const reference = picked
       .map((segment, turn) => `Giliran ${turn + 1} — CS manusia waktu itu: ${segment.jawaban.join(' / ')}`)
       .concat(combined && other ? [`Pertanyaan tambahan (digabung) — CS manusia waktu itu: ${other.jawaban.join(' / ')}`] : [])
+    const before = chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 12), picked[0].mulai ?? 0)
     out.push({
       id: `real-${out.length + 1}-s${seed}`,
+      asal: picked.map((segment) => ({ teks: segment.teks, jawaban: segment.jawaban })),
+      riwayat: before
+        .filter((row) => row.body || row.media_type === 'image')
+        .map((row) => ({ arah: row.direction === 'in' ? ('in' as const) : ('out' as const), teks: String(row.body || '').slice(0, 600), gambar: row.media_type === 'image' })),
       judul: `${combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
       maksud: [
         'Pertanyaan dari chat nyata toko. Jawab semua maksudnya dengan benar menurut FAKTA saat ini, dengan rasa bahasa CS manusia.',

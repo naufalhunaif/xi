@@ -71,6 +71,7 @@ export const JEV_DECISIONS = {
   peran_kontak: 'Peran kontak (pelanggan / vendor)',
   hati: 'Maksud, rasa & momen pelanggan (Hati CS)',
   cek_balasan: 'Pemeriksa balasan sebelum kirim (foto, maksud, fakta)',
+  minta_rekening: 'Pelanggan meminta nomor rekening',
 } as const
 export type JevDecision = keyof typeof JEV_DECISIONS
 
@@ -101,6 +102,7 @@ export const JEV_THRESHOLD: Record<JevDecision, number> = {
   peran_kontak: 0.95,
   hati: 0.8,
   cek_balasan: 0.75,
+  minta_rekening: 0.85,
 }
 
 export type JevNoul = {

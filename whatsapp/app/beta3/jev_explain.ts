@@ -147,6 +147,11 @@ const INFO: Record<string, Info> = {
     source: 'toko',
     effect: () => 'Checked before sending. A confident problem makes the AI rewrite the reply once with the checker note.',
   },
+  minta_rekening: {
+    question: () => 'Is the customer asking for the bank account number?',
+    labels: yesNo,
+    effect: (answer) => (answer === 'ya' ? 'The official payment details from Settings are added to the reply.' : 'Nothing changes.'),
+  },
   janji_total: {
     question: () => 'Does the AI reply promise to send the total/bank account?',
     labels: yesNo,

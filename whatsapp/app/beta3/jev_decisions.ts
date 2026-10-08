@@ -50,6 +50,8 @@ export type TurnUnderstanding = {
   difficulty?: number
   /** Pelanggan menyatakan sudah transfer/bayar. */
   paidClaim?: boolean
+  /** v3.6.83: pelanggan meminta nomor rekening / tujuan transfer. */
+  asksAccount?: boolean
   /** Lanjut, menunda (nanti/pikir-pikir), atau membatalkan. */
   follow?: 'lanjut' | 'tunda' | 'batal'
   /** 1–5: seberapa penting/mendesak chat ini untuk ditangani toko. */
@@ -136,6 +138,7 @@ export async function understandTurn(input: {
     topik: await jevOn('topik'),
     kesulitan: await jevOn('kesulitan'),
     sudah_tf: Boolean(input.awaitingPayment) && (await jevOn('sudah_tf')),
+    minta_rekening: await jevOn('minta_rekening'),
     lanjut: await jevOn('lanjut'),
     urgensi: await jevOn('urgensi'),
     hati: await jevOn('hati'),
@@ -232,6 +235,11 @@ export async function understandTurn(input: {
         'Rumit: komplain, custom, negosiasi, banyak syarat, pembayaran bermasalah, atau perlu menimbang riwayat panjang',
       ],
     }
+  if (on.minta_rekening)
+    questions.minta_rekening = {
+      type: 'noul',
+      instructions: 'Apakah pesan_terbaru pelanggan meminta nomor rekening atau menanyakan transfer ke mana?',
+    }
   if (on.sudah_tf)
     questions.sudah_tf = {
       type: 'noul',
@@ -302,7 +310,7 @@ export async function understandTurn(input: {
   if (!answers) return {}
   const result: TurnUnderstanding = {}
   const take = async (
-    key: 'maksud' | 'form' | 'serah_cs' | 'setuju' | 'layanan' | 'sudah_tf' | 'lanjut',
+    key: 'maksud' | 'form' | 'serah_cs' | 'setuju' | 'layanan' | 'sudah_tf' | 'lanjut' | 'minta_rekening',
     apply: () => void
   ) => {
     const answer = answers[key]
@@ -339,6 +347,7 @@ export async function understandTurn(input: {
     await logDecision({ jid: input.jid, decision: 'kesulitan', answer: answers.kesulitan, used: sure, input: input.text })
   }
   await take('sudah_tf', () => (result.paidClaim = yes(answers.sudah_tf)))
+  await take('minta_rekening', () => (result.asksAccount = yes(answers.minta_rekening)))
   await take('lanjut', () => (result.follow = choiceOf(answers.lanjut) as TurnUnderstanding['follow']))
   for (const key of ['seri', 'barang'] as const) {
     const answer = answers[key]
