@@ -395,6 +395,14 @@
     if (turn.error) out.push(el('div', turn.error, 'wa-sim-room-note err'))
     const meta = [checkerNote(turn), turn.ms ? `${(turn.ms / 1000).toFixed(1)} s` : ''].filter(Boolean).join(' · ')
     if (meta) out.push(el('div', meta, 'wa-sim-room-meta'))
+    if (turn.draf) {
+      const box = el('details', undefined, 'wa-sim-room-draft')
+      box.append(
+        el('summary', t('Draf sebelum diperbaiki')),
+        el('pre', [...turn.draf.pesan, ...turn.draf.foto.map((caption) => `🖼 ${caption}`), '', ...turn.draf.masalah.map((item) => `✗ ${item}`)].join('\n'))
+      )
+      out.push(box)
+    }
     return out
   }
   async function loadRoom() {

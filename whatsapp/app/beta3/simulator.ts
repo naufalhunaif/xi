@@ -17,7 +17,7 @@ import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { runLeanProvider } from '#beta3/provider'
 import { allowedPrices, unknownPrices } from '#beta3/quality_service'
 import { bubblesToSend, createLeanReply, type LeanSettings } from '#beta3/reply_service'
-import type { LeanHistoryRow } from '#beta3/prompt'
+import { renderProductionEstimate, type LeanHistoryRow } from '#beta3/prompt'
 import { generateScenarios } from '#beta3/sim_generator'
 
 export type SimScenario = {
@@ -53,6 +53,8 @@ export type SimTurn = {
   fotoUrl?: string[]
   /** Data alat yang dipakai AI giliran ini (ongkir, size, resi, ukuran) — untuk penilai. */
   alat?: string[]
+  /** Draf AI sebelum ditulis ulang pemeriksa (bila ada) + catatan pemeriksanya. */
+  draf?: { pesan: string[]; foto: string[]; masalah: string[] }
   balasan: string[]
   foto: string[]
   total?: string
@@ -119,7 +121,7 @@ export function deterministicIssues(
   const handed = turns.find((turn) => turn.serah_cs)
   if (harap.serah_cs === false && handed) issues.push(`Diserahkan ke CS padahal bisa dijawab (${handed.alasan || 'tanpa alasan'}).`)
   if (harap.serah_cs === true && !handed) issues.push('Seharusnya diserahkan ke CS.')
-  const text = turns.flatMap((turn) => [...turn.balasan, turn.total || '']).join('\n')
+  const text = turns.flatMap((turn) => [...turn.balasan, ...turn.foto, turn.total || '']).join('\n')
   for (const pattern of harap.sebut || [])
     if (!new RegExp(pattern, 'i').test(text)) issues.push(`Balasan tidak menyebut: ${pattern}`)
   for (const pattern of harap.tidak_sebut || [])
@@ -194,13 +196,15 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
 }
 
 /** Fakta lengkap untuk penilai: profil toko, katalog, pola harga, grosir. */
-export async function judgeFacts() {
+export async function judgeFacts(settings?: LeanSettings) {
   const digest = await catalogDigest()
+  const production = settings?.production ? renderProductionEstimate(settings.production) : ''
   const wholesaleText = String((await readLeanState('wholesale').catch(() => '')) || '')
   return [
     String((await readLeanState('store_profile').catch(() => '')) || ''),
     renderWholesaleRule(wholesaleDiscounts(wholesaleText)) || wholesaleText,
     renderPricePattern(pricePattern(digest.rows)),
+    production,
     digest.text,
   ]
     .filter(Boolean)
@@ -254,6 +258,14 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
       simulate: true,
       onTrace: (event) => {
         if (event.status !== 'running' && event.label) jejak.push(`${event.status === 'failed' ? '✗' : '·'} ${event.label}`)
+        if (event.key === 'beta3-check' && event.status === 'failed' && event.detail) {
+          const detail = event.detail as { masalah?: Array<{ detail: string }>; draf?: { pesan?: string[]; foto?: string[] } }
+          turn.draf = {
+            pesan: detail.draf?.pesan || [],
+            foto: detail.draf?.foto || [],
+            masalah: (detail.masalah || []).map((item) => item.detail),
+          }
+        }
         if (TOOL_TRACES.has(event.key) && event.status === 'completed' && event.detail)
           (turn.alat ||= []).push(`${event.label}: ${JSON.stringify(event.detail).slice(0, 1500)}`)
       },
@@ -322,7 +334,7 @@ export async function runScenario(
     let judged = true
     if (options.judge !== false && !turns.some((turn) => turn.error)) {
       try {
-        const verdict = await judge(settings, scenario, turns, options.facts || (await judgeFacts()))
+        const verdict = await judge(settings, scenario, turns, options.facts || (await judgeFacts(settings)))
         nilai = verdict.nilai
         judged = verdict.lulus
         masalah.push(...verdict.masalah.map((item) => `Penilai: ${item}`))
@@ -399,7 +411,7 @@ export async function startSimRun(
   void (async () => {
     const results: SimResult[] = []
     try {
-      const facts = await judgeFacts().catch(() => '')
+      const facts = await judgeFacts(settings).catch(() => '')
       // v3.6.79: beberapa percakapan sekaligus (maks 4) supaya uji banyak skenario lebih cepat.
       const queue = [...picked]
       const one = async () => {

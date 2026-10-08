@@ -268,7 +268,7 @@
   {
     "id": "rompi-tiga-potong",
     "judul": "Three piece (jas + celana + rompi)",
-    "maksud": "Pelanggan mau three piece. Benar: jas 485.000 + celana 220.000 + rompi 175.000 = 880.000 (reguler); hitungan benar.",
+    "maksud": "Pelanggan mau three piece. Benar (pakai harga SETELAN katalog + rompi): reguler setelan 705.000 + rompi 175.000 = 880.000; Signature setelan 725.000 + rompi 185.000 = 910.000; Premium setelan 955.000 + rompi 200.000 = 1.155.000.",
     "giliran": ["kalo three piece sm rompinya jadi brp totalnya"],
     "harap": { "serah_cs": false, "sebut": ["880\\.000|175\\.000"] }
   },

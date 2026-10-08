@@ -2069,5 +2069,6 @@ window.waLocales.en = {
   "{0} giliran": "{0} turns",
   "Tulis pesan sebagai pelanggan. Tidak ada yang dikirim ke WhatsApp.": "Write as the customer. Nothing is sent to WhatsApp.",
   "Balasan sebelumnya masih diproses.": "The previous reply is still being processed.",
-  "Pesan kosong.": "Empty message."
+  "Pesan kosong.": "Empty message.",
+  "Draf sebelum diperbaiki": "Draft before the fix"
 }

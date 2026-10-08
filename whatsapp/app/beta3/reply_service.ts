@@ -85,7 +85,7 @@ import {
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
-import { alignPhotos, CHECK_LABEL, checkReply, mergeUsage, revisionNote, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, CHECK_LABEL, checkReply, mergeUsage, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
 /**
@@ -1213,7 +1213,7 @@ export async function createLeanReply(input: {
     history: rows,
     decision,
     rows: digest.rows,
-    extraFacts: [store, priceText].filter(Boolean),
+    extraFacts: [store, priceText, ...toolNotes].filter(Boolean),
     settings,
   }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
   if (check.issues.length) {
@@ -1367,6 +1367,20 @@ export async function createLeanReply(input: {
         status: 'failed',
         detail: { unknown, pesan: decision.pesan },
       })
+    }
+  }
+  // v3.6.79: tautan karangan (mis. link maps yang tidak ada di data toko) tidak dikirim.
+  {
+    const links = stripUnknownLinks(decision.pesan, [
+      store,
+      ...toolNotes,
+      input.text,
+      ...rows.map((row) => String(row.body || '')),
+      ...settings.paymentMethods.map((method) => method.destination),
+    ])
+    if (links.removed.length) {
+      decision.pesan = links.pesan
+      onTrace?.({ key: 'beta3-link', label: `Tautan tidak dikenal dibuang · ${links.removed.join(', ').slice(0, 120)}`, status: 'completed', detail: { dibuang: links.removed } })
     }
   }
   if (style) {
@@ -1951,12 +1965,36 @@ function parseJson<T>(raw: string): T | null {
 }
 
 async function findDestinations(q: string, mcp: LeanMcpConfig): Promise<DestinationRow[]> {
-  const found = await callLeanTool<{ destinations?: DestinationRow[] }>(
-    'check_destination',
-    { q },
-    mcp
-  )
-  return found?.destinations || []
+  return searchDestinations(q, async (query) => {
+    const found = await callLeanTool<{ destinations?: DestinationRow[] }>('check_destination', { q: query }, mcp)
+    return found?.destinations || []
+  })
+}
+
+/**
+ * v3.6.79 — Cari tujuan bertahap: kalimat utuh dulu; kosong → kata depan saja (kecamatan) lalu disaring
+ * dengan kata sisanya (kota). Uji: "tambun selatan bekasi" tidak ditemukan padahal "tambun selatan" ada
+ * (Kab. Bekasi) → AI lalu mengarang ongkir.
+ */
+export async function searchDestinations<T extends { city?: string; province?: string; district?: string; subdistrict?: string }>(
+  q: string,
+  search: (query: string) => Promise<T[]>
+): Promise<T[]> {
+  const first = await search(q)
+  if (first.length) return first
+  const words = q.trim().split(/\s+/)
+  for (let cut = words.length - 1; cut >= 1; cut--) {
+    const head = words.slice(0, cut).join(' ')
+    if (head.length < 3) break
+    const found = await search(head)
+    if (!found.length) continue
+    const tail = words.slice(cut).join(' ').toLowerCase()
+    const narrowed = found.filter((row) =>
+      [row.city, row.province, row.district, row.subdistrict].join(' ').toLowerCase().includes(tail)
+    )
+    return narrowed.length ? narrowed : found
+  }
+  return []
 }
 
 /**

@@ -2157,3 +2157,14 @@ html[data-theme] body.workspace-ui .message-footer .message-time + .message-stat
     flex: 1 1 100%;
   }
 }
+.wa-sim-room-draft {
+  align-self: flex-end;
+  max-width: 78%;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.wa-sim-room-draft pre {
+  white-space: pre-wrap;
+  margin: 4px 0 0;
+  font-size: 11.5px;
+}

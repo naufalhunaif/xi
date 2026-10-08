@@ -331,14 +331,15 @@ test.group('uji acak, foto selaras, grosir lolos pemeriksa harga (v3.6.79)', () 
     assert.isAbove(variants.size, 20)
   })
 
-  test('foto diselaraskan: warna yang disebut ikut; ≥3 foto satu produk → semua warnanya', async ({ assert }) => {
+  test('foto diselaraskan: warna yang disebut ikut, yang tidak disebut tidak ditambah', async ({ assert }) => {
     const reply = await import('#beta3/reply_check')
     const { alignPhotos } = reply
     const rows = [row('Tux', 'Army'), row('Tux', 'Black'), row('Tux', 'Brown'), row('Tux', 'Navy'), row('Tux', 'White'), row('Tux', 'Gray', { photoUrl: null })]
     const one = alignPhotos(['Ini fotonya bos, ada Navy dan Putih juga'], ['Tux - Black'], rows)
     assert.deepEqual(one.added, ['Tux - Navy', 'Tux - White'])
+    // Tanpa menyebut warna lain → tidak ditambah (daftar warna di teks menentukan, bukan jumlah foto).
     const many = alignPhotos(['Ini warnanya bos'], ['Tux - Army', 'Tux - Black', 'Tux - Brown'], rows)
-    assert.deepEqual(many.added, ['Tux - Navy', 'Tux - White'])
+    assert.deepEqual(many.added, [])
     assert.deepEqual(alignPhotos(['Ini fotonya'], ['Tux - Black'], rows).added, [])
   })
 
@@ -357,5 +358,45 @@ test.group('Hati: acara orang lain tanpa ucapan selamat (v3.6.79)', () => {
     assert.include(heartNote({ form: 'bertanya', feeling: 'netral', moment: 'nikah' } as any), 'selamat')
     const source = await readFile('app/beta3/jev_decisions.ts', 'utf8')
     assert.include(source, 'MILIKNYA SENDIRI')
+  })
+})
+
+test.group('ongkir: cari tujuan bertahap (v3.6.79)', () => {
+  test('"tambun selatan bekasi" kosong → "tambun selatan" disaring kota Bekasi', async ({ assert }) => {
+    const { searchDestinations } = await import('#beta3/reply_service')
+    const calls: string[] = []
+    const data: Record<string, Array<{ district: string; city: string }>> = {
+      'tambun selatan': [
+        { district: 'TAMBUN SELATAN', city: 'KAB. BEKASI' },
+        { district: 'TAMBUN SELATAN', city: 'BEKASI' },
+      ],
+    }
+    const found = await searchDestinations('tambun selatan bekasi', async (query) => {
+      calls.push(query)
+      return data[query] || []
+    })
+    assert.deepEqual(calls, ['tambun selatan bekasi', 'tambun selatan'])
+    assert.lengthOf(found, 2)
+    assert.deepEqual(await searchDestinations('zzz qqq', async () => []), [])
+  })
+})
+
+test.group('tautan karangan tidak dikirim (v3.6.79)', () => {
+  test('link maps yang tidak ada di data dibuang; link sah tetap', async ({ assert }) => {
+    const { stripUnknownLinks } = await import('#beta3/reply_check')
+    const made = stripUnknownLinks(['Lokasi di Cilacap bos, ini maps-nya https://maps.app.goo.gl/cilacap', 'Buka Senin-Jumat'], ['TOKO: Patimuan, Cilacap'])
+    assert.deepEqual(made.removed, ['https://maps.app.goo.gl/cilacap'])
+    assert.deepEqual(made.pesan, ['Lokasi di Cilacap bos', 'Buka Senin-Jumat'])
+    const ok = stripUnknownLinks(['Peta: https://maps.app.goo.gl/AbC123'], ['map_url https://maps.app.goo.gl/AbC123'])
+    assert.deepEqual(ok.removed, [])
+  })
+})
+
+test.group('foto selaras: daftar warna bukan janji foto (v3.6.79)', () => {
+  test('menyebut >3 warna (daftar) → foto tidak ditambah', async ({ assert }) => {
+    const { alignPhotos } = await import('#beta3/reply_check')
+    const rows = [row('Tux', 'Army'), row('Tux', 'Black'), row('Tux', 'Brown'), row('Tux', 'Navy'), row('Tux', 'White')]
+    const list = alignPhotos(['Warnanya ada Army, Black, Brown, Navy, Putih bos'], ['Tux - Black'], rows)
+    assert.deepEqual(list.added, [])
   })
 })

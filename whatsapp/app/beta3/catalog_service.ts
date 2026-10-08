@@ -260,8 +260,10 @@ export function renderCatalogDigest(rows: LeanCatalogRow[], now = new Date()) {
     if (!group.big && big) group.big = big
     group.rows.push(row)
   }
+  // v3.6.79: stok jadi tetap bisa dijual walau kainnya belum ada — tanda "bahan belum ada" hanya
+  // untuk yang harus dibuat (uji: dasi ready dijawab "belum ada, bahannya belum tersedia").
   const label = (row: LeanCatalogRow, product: string) =>
-    `${row.color || product}${row.materialAvailable ? '' : ' (bahan belum ada)'}`
+    `${row.color || product}${row.materialAvailable || row.sizesReady.trim() ? '' : ' (bahan belum ada)'}`
   const ciri = (row: LeanCatalogRow) => {
     const parts = [
       row.features || row.featuresAi,

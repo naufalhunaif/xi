@@ -119,7 +119,7 @@ export async function checkReply(input: {
           'Bandingkan balasan dengan foto_dikirim (caption "Produk - Warna") dan pesan_pelanggan. Apakah foto yang dikirim cocok dengan yang diucapkan balasan dan yang diminta pelanggan?',
         criteria: {
           sesuai: 'Cocok: foto sama dengan yang disebut/diminta, atau tidak ada foto dan balasan tidak menjanjikan foto',
-          kurang: 'Balasan menyebut/menjanjikan foto (mis. "ini fotonya", "ini warnanya", "ini semua warnanya") atau pelanggan minta lihat, tapi foto yang dimaksud tidak ada atau hanya sebagian padahal dijanjikan semua',
+          kurang: 'Balasan menjanjikan foto (mis. "ini fotonya", "ini semua warnanya") atau pelanggan minta LIHAT foto, tapi foto yang dimaksud tidak ada atau hanya sebagian. Sekadar menyebut daftar warna (tanpa menjanjikan foto tiap warna) BUKAN kurang',
           lebih: 'Ada foto yang tidak disebut balasan dan tidak diminta pelanggan',
           beda: 'Foto berbeda produk atau warna dengan yang dibahas balasan',
         },
@@ -217,7 +217,7 @@ async function aiReview(settings: LeanProviderSettings, state: Record<string, un
     {
       system: [
         'Kamu pemeriksa balasan CS toko jas SEBELUM dikirim ke pelanggan. Balas HANYA JSON sesuai skema.',
-        'Periksa: (1) maksud pesan_pelanggan terjawab — pahami bahasa tidak baku, daerah, salah ketik, singkatan, dan sebutan warna (item/hitem/ireng = hitam, dongker = navy, marun = maroon, krem = cream, abu = gray, pth = putih); (2) foto_dikirim PERSIS sama dengan produk & warna yang disebut atau dijanjikan balasan — warna yang disebut "ini fotonya/tersedia" tapi tidak ada fotonya = foto_kurang, foto yang tidak disebut/diminta = foto_lebih, produk/warna berbeda = foto_beda; pelanggan minta semua warna tapi hanya sebagian padahal fakta_katalog punya foto (✓) lainnya = foto_kurang; (3) harga, warna, size ready sesuai fakta_katalog/info_toko; (4) tidak menanyakan ulang yang sudah dijawab.',
+        'Periksa: (1) maksud pesan_pelanggan terjawab — pahami bahasa tidak baku, daerah, salah ketik, singkatan, dan sebutan warna (item/hitem/ireng = hitam, dongker = navy, marun = maroon, krem = cream, abu = gray, pth = putih); (2) foto_dikirim PERSIS sama dengan produk & warna yang disebut atau dijanjikan balasan — warna yang dijanjikan fotonya ("ini fotonya …") tapi tidak ada fotonya = foto_kurang (sekadar menyebut daftar warna tanpa menjanjikan foto tiap warna BUKAN foto_kurang), foto yang tidak disebut/diminta = foto_lebih, produk/warna berbeda = foto_beda; pelanggan minta semua warna tapi hanya sebagian padahal fakta_katalog punya foto (✓) lainnya = foto_kurang; (3) harga, warna, size ready, dan TOTAL gabungan (mis. jas + celana = harga setelan) sesuai fakta_katalog; angka ongkir harus dari data alat di fakta_katalog — tanpa data, menanyakan info yang kurang itu BENAR; (4) tidak menanyakan ulang yang sudah dijawab.',
         'Laporkan hanya masalah yang JELAS. Bila balasan benar atau kamu ragu → ok=true, masalah=[]. penjelasan: satu kalimat bahasa Indonesia yang menyebut apa yang harus diubah.',
       ].join('\n'),
       user: JSON.stringify(state),
@@ -256,8 +256,7 @@ const baseColor = (color: string) => fold(color).replace(/\s*\d+(?:\.\d+)?$/, ''
 
 /**
  * v3.6.79 — Foto diselaraskan dengan teks (pasti, berdasarkan katalog): warna produk yang sedang
- * difoto dan disebut di balasan ikut dikirim bila punya foto; ≥3 foto satu produk (menunjukkan
- * pilihan warna) → semua warna produk itu yang punya foto ikut (maks 10).
+ * difoto dan disebut di balasan ikut dikirim bila punya foto (maks 10).
  */
 export function alignPhotos(pesan: string[], foto: string[], rows: LeanCatalogRow[], max = 10) {
   const text = ` ${fold(pesan.join(' ')).replace(/[^a-z0-9.\s-]/g, ' ')} `
@@ -274,14 +273,14 @@ export function alignPhotos(pesan: string[], foto: string[], rows: LeanCatalogRo
   }
   for (const product of [...new Set(chosen.map((row) => row.product))]) {
     const variants = rows.filter((row) => row.product === product && row.active && row.photoUrl && !/tidak tampil di web/i.test(row.note || ''))
-    const shown = chosen.filter((row) => row.product === product).length
-    for (const row of variants) {
+    const mentioned = variants.filter((row) => {
       const base = baseColor(row.color)
-      if (!base) continue
+      if (!base) return false
       const words = COLOR_ALIASES[base] || [base]
-      if (words.some((word) => text.includes(` ${word} `) || text.includes(` ${word},`) || text.includes(` ${word}.`))) push(row)
-    }
-    if (shown >= 3) for (const row of variants) push(row)
+      return words.some((word) => text.includes(` ${word} `) || text.includes(` ${word},`) || text.includes(` ${word}.`))
+    })
+    // >3 warna disebut = daftar warna (bukan janji foto tiap warna) → tidak ditambah.
+    if (mentioned.length <= 3) for (const row of mentioned) push(row)
   }
   return { foto: labels, added }
 }
@@ -293,7 +292,7 @@ export function revisionNote(decision: Pick<LeanDecision, 'pesan' | 'foto'>, iss
     ...issues.map((issue) => `- ${issue.detail}`),
     `DRAF pesan: ${JSON.stringify(decision.pesan)}`,
     `DRAF foto: ${JSON.stringify(decision.foto)}`,
-    'Tulis ulang keputusan LENGKAP (format JSON yang sama) yang sudah memperbaiki masalah di atas. Isi foto harus persis produk/warna yang kamu sebut atau janjikan (nama varian dari KATALOG yang punya foto); kalau tidak ada fotonya, jangan janjikan foto. Jawab maksud pelanggan, angka harus dari KATALOG/POLA HARGA.',
+    'Tulis ulang keputusan LENGKAP (format JSON yang sama) yang sudah memperbaiki masalah di atas. Isi foto harus persis produk/warna yang kamu sebut atau janjikan (nama varian dari KATALOG yang punya foto); kalau tidak ada fotonya, jangan janjikan foto. Jawab maksud pelanggan, angka harus dari KATALOG/POLA HARGA/data alat. JANGAN mengarang angka: data belum ada (mis. tujuan ongkir tidak ditemukan) → tanyakan info yang kurang.',
   ].join('\n')
 }
 
@@ -302,4 +301,36 @@ export function mergeUsage(a: TokenUsage | null, b: TokenUsage | null): TokenUsa
   if (!a) return b
   if (!b) return a
   return { input: a.input + b.input, output: a.output + b.output, cached: a.cached + b.cached, cacheWrite: a.cacheWrite + b.cacheWrite }
+}
+
+const LINK = /\b(?:https?:\/\/|www\.)[^\s)]+|\b(?:maps\.app\.goo\.gl|goo\.gl|bit\.ly|wa\.me)\/[^\s)]*/gi
+
+/**
+ * v3.6.79 — Tautan yang tidak ada di data toko/chat tidak boleh dikirim (uji: AI mengarang
+ * "https://maps.app.goo.gl/cilacap"). Tautan dibuang dari kalimat; kalimat yang tinggal pengantar
+ * tautan ("ini maps-nya") ikut dibuang.
+ */
+export function stripUnknownLinks(pesan: string[], allowedTexts: string[]) {
+  const allowed = allowedTexts.join('\n').toLowerCase()
+  const removed: string[] = []
+  const out = pesan
+    .map((bubble) =>
+      bubble.replace(LINK, (link) => {
+        const clean = link.replace(/[.,!?]+$/, '')
+        if (allowed.includes(clean.toLowerCase())) return link
+        removed.push(clean)
+        return ''
+      })
+    )
+    .map((bubble, index) =>
+      bubble === pesan[index]
+        ? bubble
+        : bubble
+            .replace(/[,;:]?\s*(?:ini|berikut|cek)\s+(?:link\s*)?(?:maps|map|lokasi|link)(?:-?nya)?\s*(?:ya\s*)?(?:bos|kak)?\s*:?/gi, '')
+            .replace(/[ \t]{2,}/g, ' ')
+            .replace(/\s+([,.!?])/g, '$1')
+            .trim()
+    )
+    .filter(Boolean)
+  return { pesan: out.length ? out : pesan.map((bubble) => bubble.replace(LINK, '').trim()).filter(Boolean), removed }
 }
