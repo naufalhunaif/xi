@@ -1,7 +1,11 @@
 /* Halaman login/setup — gaya Wireframe (kartu putih minimal, latar off-white hangat, ikon kawat 3D).
    Inline style diblokir CSP. Satu-satunya warna: mark kecil di rail. */
+/* v3.6.74: font offline yang sama dengan aplikasi + latar gradasi hangat (keluarga Notch Card). */
+@font-face { font-family: "Instrument Sans"; src: url("fonts/instrument-sans.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/jetbrains-mono.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
 :root {
   color-scheme: light dark;
+  --bg-2: #d9d5ce;
   --bg: #edebe5;
   --card: #fff;
   --text: #151515;
@@ -13,9 +17,9 @@
   --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
-html[data-theme="dark"] { --bg: #0f0f0e; --card: #171716; --text: #ecebe6; --muted: #9b9a93; --line: #2a2a28; --ring: #ecebe6; --err-bg: #280e11; --err: #f3aca8; }
+html[data-theme="dark"] { --bg-2: #1a1a18; --bg: #0f0f0e; --card: #171716; --text: #ecebe6; --muted: #9b9a93; --line: #2a2a28; --ring: #ecebe6; --err-bg: #280e11; --err: #f3aca8; }
 @media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) { --bg: #0f0f0e; --card: #171716; --text: #ecebe6; --muted: #9b9a93; --line: #2a2a28; --ring: #ecebe6; --err-bg: #280e11; --err: #f3aca8; }
+  html:not([data-theme="light"]) { --bg-2: #1a1a18; --bg: #0f0f0e; --card: #171716; --text: #ecebe6; --muted: #9b9a93; --line: #2a2a28; --ring: #ecebe6; --err-bg: #280e11; --err: #f3aca8; }
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -25,15 +29,19 @@ body {
   display: grid;
   place-items: center;
   padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
-  background: var(--bg);
+  background:
+    radial-gradient(120% 70% at 75% 10%, color-mix(in srgb, var(--card) 70%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--bg), var(--bg-2));
+  background-attachment: fixed;
   color: var(--text);
   font: 14px/1.45 var(--sans);
+  -webkit-font-smoothing: antialiased;
 }
 .page {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
   gap: 18px;
-  width: min(560px, 100%);
+  width: min(480px, 100%);
   align-items: stretch;
 }
 /* Rail kiri: label vertikal monospace + satu mark berwarna. */

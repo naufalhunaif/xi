@@ -93,4 +93,13 @@ test.group('tampilan monokrom (v3.6.70)', () => {
     for (const file of ['resources/views/partials/settings/ai.edge', 'resources/views/partials/settings/payments.edge', 'resources/views/partials/settings/business.edge'])
       assert.include(await readFile(file, 'utf8'), 'class="button wa-add-button"', file)
   })
+
+  test('halaman masuk pakai font offline; ponsel: tabel order/kontak tanpa kolom panjang (v3.6.74)', async ({ assert }) => {
+    const auth = await readFile('public/assets/auth.css', 'utf8')
+    assert.include(auth, 'url("fonts/instrument-sans.woff2")')
+    assert.include(auth, 'url("fonts/jetbrains-mono.woff2")')
+    const css = await readFile('public/assets/mono.css', 'utf8')
+    assert.include(css, '.wa-orders-page .wa-order-table td:nth-child(6)')
+    assert.include(css, '.wa-directory-table td:nth-child(3)')
+  })
 })

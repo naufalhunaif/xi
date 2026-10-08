@@ -1797,3 +1797,44 @@ html[data-theme] body.workspace-ui .wa-segmented button { font-weight: 400; }
 html[data-theme] body.workspace-ui .wa-jev-bubble.judged { border: 1px solid var(--text); }
 html[data-theme] body.workspace-ui .wa-jev-bubble.judged > small { color: var(--muted); font-weight: 500; }
 html[data-theme] body.workspace-ui .wa-jev-answer { border-left: 0; border-radius: 6px; background: var(--wa-page); }
+
+/* v3.6.74 — layar ponsel: tabel daftar tanpa geser ke samping, pencarian selebar layar. */
+@media (max-width: 640px) {
+  html[data-theme] body.workspace-ui .wa-search-field {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table th:nth-child(3),
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table td:nth-child(3),
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table th:nth-child(6),
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table td:nth-child(6),
+  html[data-theme] body.workspace-ui .wa-directory-table th:nth-child(3),
+  html[data-theme] body.workspace-ui .wa-directory-table td:nth-child(3) {
+    display: none;
+  }
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table,
+  html[data-theme] body.workspace-ui .wa-directory-table {
+    min-width: 0 !important;
+    width: 100%;
+  }
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-photo {
+    display: none !important;
+  }
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table th,
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table td {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    font-size: 12px;
+    white-space: nowrap !important;
+  }
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table td:nth-child(5),
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table td:nth-child(5) * {
+    white-space: normal !important;
+    width: 100%;
+  }
+  html[data-theme] body.workspace-ui .wa-orders-page .wa-order-table td:nth-child(2) {
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
