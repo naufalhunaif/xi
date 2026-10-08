@@ -114,6 +114,42 @@ export function colorPriceIssues(pesan: string[], rows: LeanCatalogRow[]): Check
   return issues
 }
 
+const NOT_READY = /\b(kosong|habis|pre[\s-]?order|belum ready|tidak ready|gak ready|ga ready|belum ada stok|stoknya (?:lagi )?kosong)\b/i
+/**
+ * v3.6.89 — Stok ready (pasti, dari katalog): "jas Maroon size L pre order, stok kosong" padahal Basic Suit
+ * Maroon size L ready. Satu warna + satu size + klaim kosong → dicek ke sizes ready varian warna itu.
+ */
+export function readyClaimIssues(pesan: string[], rows: LeanCatalogRow[]): CheckIssue[] {
+  const base = (color: string) => fold(color).replace(/\s*\d+(?:\.\d+)?$/, '')
+  const colors = [...new Set(rows.map((row) => base(row.color)).filter((color) => color.length >= 3))]
+  const products = [...new Set(rows.map((row) => fold(row.product)))].sort((a, b) => b.length - a.length)
+  const issues: CheckIssue[] = []
+  for (const bubble of pesan) {
+    if (!NOT_READY.test(bubble)) continue
+    const text = ` ${fold(bubble).replace(/[^a-z0-9.\s-]/g, ' ')} `
+    const said = (color: string) =>
+      [color, ...(COLOR_ALIASES[color] || [])].some((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:nya)?\\b`).test(text))
+    const named = colors.filter(said)
+    const distinct = named.filter((color) => !named.some((other) => other !== color && other.includes(color)))
+    const sizes = [...new Set([...text.matchAll(/\bsize\s+(xs|s|m|l|xl|xxl|[2-5]xl)\b/g)].map((match) => match[1].toUpperCase()))]
+    if (distinct.length !== 1 || sizes.length !== 1) continue
+    const product = products.find((name) => text.includes(` ${name} `))
+    const set = /\bsetelan\b|\bset\b/.test(text)
+    const hit = rows.find(
+      (row) =>
+        base(row.color) === distinct[0] &&
+        (product ? fold(row.product) === product : set ? /^setelan\b/i.test(row.product) : !/^(setelan|vest|rompi|celana)\b/i.test(row.product)) &&
+        String(row.sizesReady || '').toUpperCase().split(/[\s,/]+/).includes(sizes[0])
+    )
+    if (hit)
+      issues.push({
+        code: 'fakta_salah',
+        detail: `${CHECK_LABEL.fakta_salah}: ${hit.product} ${hit.color} size ${sizes[0]} READY (stok ada), bukan kosong/pre-order.`,
+      })
+  }
+  return issues
+}
+
 export async function checkReply(input: {
   jid: string
   customerText: string
@@ -129,7 +165,7 @@ export async function checkReply(input: {
   if (missing.length)
     issues.push({ code: 'foto_tidak_ada', detail: `Tidak ada foto katalog untuk: ${missing.join(', ')}. Pakai nama varian persis dari KATALOG yang bertanda foto.` })
   if (input.decision.serah_cs || !input.decision.pesan.length) return { issues, jev: false }
-  issues.push(...colorPriceIssues(input.decision.pesan, input.rows))
+  issues.push(...colorPriceIssues(input.decision.pesan, input.rows), ...readyClaimIssues(input.decision.pesan, input.rows))
   const jevAllowed = await jevOn('cek_balasan')
   if (!jevAllowed && !input.settings) return { issues, jev: false }
   const recent = recentLines(input.history)

@@ -64,7 +64,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { cancelsOrder, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, keepCustomInChat } from '#beta3/reply_guards'
+import { cancelsOrder, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, inventsProgress, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -566,7 +566,11 @@ export async function createLeanReply(input: {
   // Balasan otomatis bot bisnis lain ("ketik 1 untuk …") tidak dibalas.
   const pitch = !input.imagePaths?.length && isBusinessPitch(input.text)
   const otherBot = !pitch && !input.imagePaths?.length && isOtherBot(input.text)
-  const quickText = pitch ? ['Halo, salam kenal. Terima kasih infonya, saya sampaikan ke owner dulu ya'] : otherBot ? [] : quickRaw
+  const quickText = pitch
+    ? ['Halo, salam kenal. Terima kasih infonya, saya sampaikan ke owner dulu ya']
+    : otherBot
+      ? ['Halo kak, ini Chameleon Cloth ya, sepertinya pesan otomatisnya ke kirim ke sini']
+      : quickRaw
   const quick = quickText && style && !pitch ? normalizeStyle(quickText, style) : quickText
   if (quick) {
     onTrace?.({
@@ -584,7 +588,7 @@ export async function createLeanReply(input: {
         serah_cs: pitch,
         alasan: pitch ? 'Tawaran jasa/kerja sama dari bisnis lain' : '',
         // Diam ("makasih" sesudah "sama-sama"): susulan yang sudah direncanakan tetap jalan.
-        susulan: quick.length || otherBot ? '' : await previousNudge(jid),
+        susulan: quick.length ? '' : await previousNudge(jid),
         spesifikasi: String(spec || ''),
       },
       autoTotal: null,
@@ -751,7 +755,10 @@ export async function createLeanReply(input: {
   const lastKey = `ongkir:last:${jid}`
   const last = form ? null : parseJson<LastShipping>(await readLeanState(lastKey))
   // Juga saat AI baru bertanya "pengiriman kemana": jawaban "ke pulogadung" langsung dicek.
-  const followUp = Boolean(last && Date.now() - last.at < 30 * 60_000) || stage === 'minta_alamat'
+  // v3.6.89: toko baru saja menanyakan tujuan ("ke kecamatan apa ya bos?") → jawaban nama tempat dicek ongkirnya
+  // (uji: "warudoyong sukabumi" tidak dicek karena pertanyaan awal tanpa kata "ongkir").
+  const askedPlace = asksDestination(rows)
+  const followUp = Boolean(last && Date.now() - last.at < 30 * 60_000) || stage === 'minta_alamat' || askedPlace
 
   // Alamat lengkap yang ditempel tanpa format form: ongkirnya langsung dicek,
   // supaya balasan menyebut tarif, bukan hanya "alamatnya sudah dicatat".
@@ -1232,7 +1239,7 @@ export async function createLeanReply(input: {
     history: rows,
     decision,
     rows: digest.rows,
-    extraFacts: [store, priceText, productionText, ...toolNotes].filter(Boolean),
+    extraFacts: [store, priceText, productionText, STORE_BASICS, ...toolNotes].filter(Boolean),
     settings,
   }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
   if (check.issues.length) {
@@ -1390,7 +1397,8 @@ export async function createLeanReply(input: {
   }
   // v3.6.83: pelanggan minta rekening (Jev) → rekening RESMI dari Pengaturan ditambahkan apa adanya
   // (uji chat nyata: AI menjawab "rekeningnya nanti" lalu menawarkan model lagi).
-  if (understanding.asksAccount && !decision.serah_cs) {
+  // v3.6.89: pola kata pasti ikut (Jev bisa mati / ragu): "kirim ke rek mana", "no rek nya", "transfer kemana".
+  if ((understanding.asksAccount || asksAccountText(input.text)) && !decision.serah_cs) {
     const methods = settings.paymentMethods.filter((method) => method.enabled)
     const payment = renderPaymentMessage(methods.map((method) => ({ bank: method.name, number: method.destination, holder: (method as { accountName?: string }).accountName || '' })))
     if (payment && !decision.pesan.some((bubble) => methods.some((method) => bubble.includes(method.destination)))) {
@@ -1777,6 +1785,20 @@ export async function createLeanReply(input: {
       decision.pesan = pants.pesan
       onTrace?.({ key: 'beta3-pants-guess', label: 'Nomor celana tebakan dibuang → ditanyakan', status: 'completed', detail: {} })
     }
+    const same = qualifySamePrice(decision.pesan, style?.address || 'bos')
+    if (same.changed) {
+      decision.pesan = same.pesan
+      onTrace?.({ key: 'beta3-same-price', label: '"Harga sama" dilengkapi: XXL ke atas beda', status: 'completed', detail: {} })
+    }
+    // Progres pesanan lama: tanpa data, jangan menyebut waktu/status karangan → dicek CS.
+    const orderData = [known, chatNote, activeOrder ? JSON.stringify(activeOrder) : ''].join('\n')
+    if (!toolNotes.some((note) => /resi|awb|paket|tracking|lacak/i.test(note)) && inventsProgress(input.text, decision.pesan, orderData)) {
+      decision.pesan = [`Saya cek dulu progres pesanannya ya ${style?.address || 'bos'}`]
+      decision.serah_cs = true
+      decision.alasan = 'Menanyakan progres pesanan; data progres tidak ada'
+      photos = []
+      onTrace?.({ key: 'beta3-progress-unknown', label: 'Progres pesanan tidak ada di data → dicek CS', status: 'completed', detail: {} })
+    }
   }
   // v3.6.85 — AI tidak melihat semua pesanan lama: jangan pernah bilang pesanan "belum tercatat / tidak ada"
   // (uji chat nyata: pesanan pelanggan sedang finishing, AI bilang belum tercatat). Cek oleh CS.
@@ -1818,6 +1840,25 @@ const WHOLESALE_TOPIC = new RegExp(
   ].join('|'),
   'i'
 )
+const ASKS_ACCOUNT =
+  /\b(no\.?\s*rek\w*|norek\w*|nomor\s+rek\w*|rek(?:ening)?(?:nya)?\s+(?:mana|apa|berapa)|(?:tf|trf|transf\w*|bayar\w*|kirim\w*)\s+(?:ke\s+)?(?:rek\w*\s+)?(?:mana|kemana)|ke\s+rek\w*\s+mana)\b/i
+/** Pelanggan menanyakan rekening / tujuan transfer (pasti, tanpa AI). */
+export function asksAccountText(text: string) {
+  return ASKS_ACCOUNT.test(String(text || ''))
+}
+
+/** Fakta dasar toko untuk pemeriksa & penilai (bukan prompt AI). */
+export const STORE_BASICS =
+  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer.'
+
+/** Pesan toko terakhir menanyakan tujuan kirim (kecamatan/kota/ke mana). */
+export function asksDestination(rows: LeanHistoryRow[]) {
+  const previous = rows.filter((row) => !row.current)
+  const lastOut = [...previous].reverse().find((row) => row.direction === 'out' && row.body)
+  if (!lastOut || previous[previous.length - 1] !== lastOut) return false
+  return /\b(kecamatan|kec\.?|kabupaten|kota)\s+(apa|mana)|\b(ke\s*mana|kemana)\b|dikirim\s+ke\s+(mana|daerah)|alamat\w*\s+(di\s*mana|dimana)/i.test(String(lastOut.body))
+}
+
 /** Link selain situs toko sendiri. */
 export function foreignLink(text: string) {
   return (String(text || '').match(/https?:\/\/[^\s]+/gi) || []).some((url) => !/chameleoncloth\.com|naufalhunaif\.com/i.test(url))

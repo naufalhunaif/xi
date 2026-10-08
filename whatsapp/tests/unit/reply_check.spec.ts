@@ -776,3 +776,56 @@ test.group('Beta3 · belajar semua chat CS & chat uji terpisah (v3.6.87)', () =>
     }
   })
 })
+
+test.group('Beta3 · temuan putaran 9 (v3.6.89)', () => {
+  test('tujuan ditanya toko → jawaban nama tempat dicek; terima kasih + emoji dibalas cepat', async ({ assert }) => {
+    const { asksDestination } = await import('#beta3/reply_service')
+    const { quickReply, ACK } = await import('#beta3/token_saver')
+    const at = new Date()
+    const rows = (out: string) => [
+      { direction: 'in' as const, body: 'ada pengiriman sehari ke sukabumi?', createdAt: at },
+      { direction: 'out' as const, senderType: 'ai', body: out, createdAt: at },
+      { direction: 'in' as const, body: 'warudoyong sukabumi', createdAt: at, current: true },
+    ]
+    assert.isTrue(asksDestination(rows('ke kecamatan apa ya bos, saya cekin dulu ongkirnya')))
+    assert.isTrue(asksDestination(rows('dikirim ke mana bos?')))
+    assert.isFalse(asksDestination(rows('mau model apa bos?')))
+    const before = [{ direction: 'out' as const, senderType: 'ai', body: 'Masih proses ya bos', createdAt: at }]
+    assert.deepEqual(quickReply({ text: 'Makasih\nBos\n🙏', imageCount: 0, stage: '', rows: before }), ['Siap sama sama bos'])
+    assert.isTrue(ACK.test('I seeeee'))
+    assert.isTrue(ACK.test('Okay'))
+    assert.isFalse(ACK.test('Okay\nSudah Co'))
+  })
+
+  test('custom + pertanyaan lain, "harga sama", progres karangan', async ({ assert }) => {
+    const { keepCustomInChat, qualifySamePrice, inventsProgress } = await import('#beta3/reply_guards')
+    const handoff = { serah_cs: true, alasan: 'cek status kirim', pesan: ['saya cek dulu ya bos'] }
+    assert.isNull(keepCustomInChat(handoff, 'size nya bsa di custom kan ya ? cuy\nKak orederan saya blm dkiirim ya ?'))
+    assert.isNotNull(keepCustomInChat(handoff, 'bisa custom ga kak?'))
+    const same = qualifySamePrice(['Kalau cuma ukurannya yang disesuaikan harganya sama bos, mulai dari 485.000'])
+    assert.isTrue(same.changed)
+    assert.include(same.pesan[0], 'kecuali size XXL ke atas')
+    assert.isFalse(qualifySamePrice(['harganya sama bos, XXL ke atas 585.000']).changed)
+    assert.isTrue(inventsProgress('Bos gimana progres jasnya ya', ['Masih proses bos, estimasi selesai minggu depan ya'], ''))
+    assert.isFalse(inventsProgress('Bos gimana progres jasnya ya', ['Saya cek dulu ya bos'], ''))
+    assert.isFalse(inventsProgress('harga jas berapa', ['besok bisa dikirim bos'], ''))
+  })
+})
+
+test.group('Beta3 · rekening, stok ready, bot lain (v3.6.89)', () => {
+  test('pola minta rekening; klaim kosong padahal ready', async ({ assert }) => {
+    const { asksAccountText } = await import('#beta3/reply_service')
+    const { readyClaimIssues } = await import('#beta3/reply_check')
+    for (const text of ['kirim Ke rek Mana yah?', 'No rek nya', 'pembayaran transfre kemana ya kak ?', 'tf kemana kak', 'norek dong'])
+      assert.isTrue(asksAccountText(text), text)
+    for (const text of ['sudah transfer ya kak', 'kirim ke jakarta berapa', 'rekomendasi size dong']) assert.isFalse(asksAccountText(text), text)
+    const rows = [
+      row('Basic Suit', 'Maroon', { sizesReady: 'S M L XL XXL' }),
+      row('Premium Basic Suit', 'Black', { sizesReady: 'M' }),
+      row('Basic Suit', 'Black 2.0', { sizesReady: 'L' }),
+    ]
+    assert.lengthOf(readyClaimIssues(['warna maroonnya, jas size L 485.000, nanti pre order ya karena stoknya lagi kosong'], rows), 1)
+    assert.lengthOf(readyClaimIssues(['Premium Basic Suit hitam size L belum ready bos'], rows), 0)
+    assert.lengthOf(readyClaimIssues(['Basic Suit Maroon size L ready bos'], rows), 0)
+  })
+})

@@ -23,7 +23,7 @@ import { allowedPrices, unknownPrices } from '#beta3/quality_service'
 import { reviewNudge } from '#beta3/reply_check'
 import { addLeanExample, listLeanExamples } from '#beta3/examples_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
-import { bubblesToSend, createLeanReply, type LeanSettings } from '#beta3/reply_service'
+import { STORE_BASICS, bubblesToSend, createLeanReply, type LeanSettings } from '#beta3/reply_service'
 import { renderProductionEstimate, type LeanHistoryRow } from '#beta3/prompt'
 import { generateScenarios, rng, roughen } from '#beta3/sim_generator'
 
@@ -266,6 +266,7 @@ export async function judgeFacts(settings?: LeanSettings) {
     production,
     // Kebijakan dasar yang juga diberikan ke AI (skill & pemeriksa COD).
     'CARA TOKO MENENTUKAN SIZE: dari tinggi & berat badan (alat Fit Advisor) atau ukuran badan dibanding size chart; CS biasa menanyakan tinggi dan berat badan.',
+    STORE_BASICS,
     'KEBIJAKAN: pembayaran transfer; COD/bayar di tempat, rekber, Shopee, Tokopedia tidak tersedia. Pengiriman JNE (REG/YES; kargo JTR min 8 kg).',
     renderExchangePolicy((await readExchangePolicy().catch(() => ({ text: '' }))).text),
     // v3.6.86: rekening resmi toko (dulu dinilai "tidak ada di FAKTA").
@@ -642,9 +643,21 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
     if (pool.length >= count * 2) break
   }
   const out: SimScenario[] = []
-  for (const [index, chat] of pool.entries()) {
+  // v3.6.89: chat uji terbatas (1 dari 5) → satu chat boleh dipakai beberapa kali dengan bagian yang berbeda.
+  const used = new Map<string, Set<number>>()
+  const turns: Array<[number, (typeof pool)[number], number]> = []
+  for (let round = 0; round < 4; round++)
+    for (const [index, chat] of pool.entries()) {
+      const taken = used.get(chat.jid) || new Set<number>()
+      const free = chat.segments.map((_, at) => at).filter((at) => !taken.has(at) && !taken.has(at - 1) && !taken.has(at + 1))
+      if (!free.length) continue
+      const start = free[Math.floor(rand() * free.length)]
+      taken.add(start)
+      used.set(chat.jid, taken)
+      turns.push([index, chat, start])
+    }
+  for (const [index, chat, start] of turns) {
     if (out.length >= count) break
-    const start = Math.floor(rand() * Math.max(1, chat.segments.length - 1))
     const picked = chat.segments.slice(start, start + 2)
     const other = pool[(index + 1 + Math.floor(rand() * (pool.length - 1 || 1))) % pool.length]?.segments[0]
     // Tawaran bisnis / bot lain tidak digabung dengan pertanyaan pelanggan (tidak terjadi di chat nyata).

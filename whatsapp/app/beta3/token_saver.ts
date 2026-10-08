@@ -8,9 +8,9 @@ import { seriesOf } from '#beta3/price_pattern'
 const OPENER_WORD =
   /^(?:halo+|hallo+|hai+|hay|hi|hei|p+|ping|permisi|punten|pagi|siang|sore|malam|met\s+(?:pagi|siang|sore|malam)|selamat\s+(?:pagi|siang|sore|malam)|ass?alamu'?\s*alaikum(?:\s+wr\.?\s*wb\.?)?|assalamualaikum|salam|kak|kakak|bos|boss|min|admin|gan|om|mas|mbak|sis)$/i
 const THANKS =
-  /^(?:(?:oke?|ok|siap|sip)\s+)?(?:makasih|makasi|terima\s*kasih|terimakasih|trims|thanks|thank\s+you|thx|tq|tengkyu)(?:\s+(?:ya+|kak|bos|min|banyak|gan|om|mas|mbak))*[\s!.]*$/i
+  /^(?:(?:oke?|ok|siap|sip)\s+)?(?:makasih|makasi|terima\s*kasih|terimakasih|trims|thanks|thank\s+you|thx|tq|tengkyu)(?:\s+(?:ya+|kak|bos|min|banyak|gan|om|mas|mbak))*[\s!.\p{Extended_Pictographic}\uFE0F\u200D]*$/iu
 /** Hanya tanda setuju/ragu tanpa isi ("ya", "oke 😁", "hmm 🤔"). */
-export const ACK = /^(?:(?:y+a*|i+y+a+|o+k+e*y*|sip+|siap|baik|noted|hm+|wkwk+|he+h?e*)[\s!.,~?]*|[\p{Extended_Pictographic}\uFE0F\u200D]\s*)+$/iu
+export const ACK = /^(?:(?:y+a*|i+y+a+|o+k+e*y*|o+k+a+y+|sip+|siap|baik|noted|hm+|wkwk+|he+h?e*|i\s*s+e+|makasi+h?|terima\s*kasih|terimakasih|thanks?|thx|tq|bos+|kak|ka|min|mas|mbak|gan|bang|pak|bu|om)[\s!.,~?]*|[\p{Extended_Pictographic}\uFE0F\u200D]\s*)+$/iu
 const PITCH = [
   /perkenalkan,?\s+(?:saya|kami)/i,
   /\bsaya\s+\w+\s+dari\s+(?:pt\b|cv\b|\w+\s+(?:agency|consult|digital|marketing|media|indonesia))/i,

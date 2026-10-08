@@ -509,7 +509,7 @@ export function renderProductionEstimate(
   const holiday = /^LIBUR:/m.test(store)
   const label: Record<string, string> = {
     preorder: 'pre-order (stok kosong, dibuatkan)',
-    custom: 'custom (ukuran/model/detail khusus)',
+    custom: 'custom (ukuran di luar S–4XL mis. XS, ukuran badan sendiri, model/detail khusus)',
   }
   const lines: string[] = []
   for (const [kind, rule] of Object.entries(policy.rules || {})) {

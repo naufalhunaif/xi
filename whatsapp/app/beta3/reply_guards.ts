@@ -23,9 +23,41 @@ export function keepCustomInChat(
   // v3.6.86: hanya bila PELANGGAN yang menanyakan custom (dulu alasan AI ikut dicek → balasan custom
   // muncul untuk tawaran bisnis "solusi AI custom" dan pertanyaan pelunasan).
   if (!CUSTOM.test(customerText) || String(customerText || '').length > 120) return null
+  // Ada pertanyaan lain di pesan yang sama (mis. "orderan saya blm dikirim?") → biar CS yang jawab semuanya.
+  const parts = String(customerText).split(/\n+|\?+/).map((part) => part.trim()).filter((part) => part.length > 3)
+  if (parts.some((part) => !CUSTOM.test(part) && !/^(?:(?:bisa|bs|boleh|ya|kak|ka|min|bos|gan|cuy|dong|kah)[\s!.,]*)+$/i.test(part))) return null
   if (OTHER_HANDOFF.test(decision.alasan) || OTHER_HANDOFF.test(customerText)) return null
   const usable = decision.pesan.length && !decision.pesan.some((bubble) => WAITING.test(bubble))
   return { pesan: usable ? decision.pesan : CUSTOM_REPLY }
+}
+
+const SAME_PRICE = /harga\w*\s+(?:tetap\s+)?sama/i
+/**
+ * v3.6.89 — "custom ukuran harganya sama" tanpa pengecualian: size XXL ke atas harganya beda (CS asli:
+ * "size lebih besar dari XL harga beda ya"). Kalimatnya dilengkapi pengecualian itu.
+ */
+export function qualifySamePrice(pesan: string[], address = 'bos') {
+  let changed = false
+  const out = pesan.map((bubble) => {
+    if (!SAME_PRICE.test(bubble) || !/custom|ukuran|size/i.test(bubble) || /xxl|2xl|3xl|4xl|besar dari xl|ukuran besar/i.test(bubble)) return bubble
+    changed = true
+    return bubble.replace(/(harga\w*\s+(?:tetap\s+)?sama)/i, `$1 (kecuali size XXL ke atas, harganya beda ya ${address})`)
+  })
+  return { pesan: out, changed }
+}
+
+const PROGRESS_ASK = /\b(progres\w*|udah jadi|sudah jadi|sdh jadi|kapan jadi|kapan (?:di)?kirim|bl[mu]?m?\s*d\w*kirim|belum dikirim|sudah dikirim|udah dikirim|sampai mana|gimana pesanan|pesanan saya|orderan saya)\b/i
+const TIME_CLAIM = /\b(minggu depan|besok|lusa|hari (?:senin|selasa|rabu|kamis|jumat|sabtu|minggu|ini)|tanggal \d{1,2}|tgl \d{1,2}|\d+\s*hari lagi|sudah (?:jadi|dikirim)|udah (?:jadi|dikirim)|sedang (?:dikirim|finishing)|masih proses)\b/i
+/**
+ * v3.6.89 — Progres pesanan lama tidak diketahui AI: klaim waktu/status ("minggu depan", "masih proses")
+ * yang tidak ada di data = mengarang. Dicek CS.
+ */
+export function inventsProgress(customerText: string, pesan: string[], known: string) {
+  if (!PROGRESS_ASK.test(customerText)) return false
+  return pesan.some((bubble) => {
+    const claim = bubble.match(TIME_CLAIM)?.[0]
+    return Boolean(claim && !known.toLowerCase().includes(claim.toLowerCase()))
+  })
 }
 
 const PANTS_NUMBER = /\b(?:no\.?|nomor|nomer|size|ukuran)\s*(2[6-9]|3\d|4[0-6])\b/i
