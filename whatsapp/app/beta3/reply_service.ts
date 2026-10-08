@@ -1042,7 +1042,15 @@ export async function createLeanReply(input: {
     systemNote += `\n\nCATATAN SISTEM: pesan ini kemungkinan perlu ditangani manusia (${understanding.csReason.replace(/_/g, ' ')}). Ikuti aturan serah_cs di skill.`
   if (understanding.agreed && pendingForJev?.status === 'pending')
     systemNote += '\n\nCATATAN SISTEM: pelanggan sudah menyetujui. Isi field order lengkap supaya total + rekening terkirim otomatis.'
-  const store = await readLeanState('store_profile')
+  const storeProfile = await readLeanState('store_profile')
+  // v3.6.56: diskon grosir ikut bagian TOKO hanya saat dibahas (hemat token).
+  const wholesale = String((await readLeanState('wholesale').catch(() => '')) || '')
+  const store = [
+    storeProfile,
+    wholesale && talksWholesale([input.text, chatNote || '', ...rows.slice(-6).map((row) => String(row.body || ''))].join('\n')) ? wholesale : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
   const policy = await readExchangePolicy()
   const activeOrder = await renderActiveOrder(jid).catch(() => '')
   // Pola harga per seri (dihitung dari katalog): selalu ikut, dan dipakai pemeriksa harga sesudah balasan.
@@ -1439,7 +1447,12 @@ export async function createLeanReply(input: {
       String(specNow || ''),
       understanding.service
     )
-    if (verdict.ok) autoTotal = verdict.total
+    // v3.6.56: pesanan grosir → total dengan diskon grosir dibuat toko lewat invoice, bukan total otomatis.
+    if (verdict.ok && wholesaleOrder(decision.catatan || chatNote || '')) {
+      decision.serah_cs = true
+      decision.alasan = `Pesanan grosir: total dengan diskon grosir dibuat lewat invoice. ${decision.alasan}`.slice(0, 500)
+      onTrace?.({ key: 'beta3-total', label: 'Pesanan grosir · total dibuat toko lewat invoice (diskon grosir)', status: 'completed', detail: {} })
+    } else if (verdict.ok) autoTotal = verdict.total
     await noteAutoTotalReason(totalOrderId, verdict.ok ? '' : verdict.reason)
     // Ongkir lebih dari satu dan pelanggan belum memilih: tanyakan, jangan dipilihkan.
     if (!verdict.ok && verdict.reason === 'layanan belum dipilih' && !decision.serah_cs) {
@@ -1603,6 +1616,16 @@ export async function createLeanReply(input: {
     orderId,
     skillName: skill.name,
   }
+}
+
+const WHOLESALE_TOPIC = /\b(diskon|grosir|grosiran|borong|seragam|lusin|kodi|partai|potongan|rombongan)\b|\bpesan(?:an)? banyak\b|\b\d{2,}\s*(?:pcs|stel|setel|potong|buah|orang)\b/i
+/** v3.6.56 — percakapan menyinggung pesanan banyak / diskon grosir. */
+export function talksWholesale(text: string) {
+  return WHOLESALE_TOPIC.test(text)
+}
+/** Catatan chat menandai pesanan grosir ("grosir: ya"). */
+export function wholesaleOrder(note: string) {
+  return /\bgrosir\s*[:=]\s*ya\b/i.test(note)
 }
 
 /** Balasan cadangan saat diserahkan ke CS dan AI tidak menulis apa pun. */

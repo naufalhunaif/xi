@@ -79,7 +79,7 @@ Kolom "6 Okt": ✓ sesuai · ✗ salah (apa yang terjadi) · – belum diuji.
 |---|---|---|
 | Misal beli kurang pas gimana / atau ga cocok | Syarat tukar size, ditulis ulang gaya CS (bukan salin teks bawaan) | ✗ teks bawaan "Hai bos! … 😊✨" |
 | Oke kalo ingin refund | Aturan refund [data pemilik]; sebelum ada: jujur + teruskan ke tim, tetap dibalas | ✗ diserahkan CS, diam 40 menit |
-| Pesan banyak dapet diskon? | Diskon grosir [data pemilik]; sebelum ada: "saya tanyakan ke tim ya bos" (dibalas) | ✗ diserahkan CS, diam |
+| Pesan banyak dapet diskon? | Sebut potongan per pcs dari DISKON GROSIR (website → Invoice → Diskon grosir) per kategori, tanya jumlah; total grosir dibuat toko lewat invoice. Tanpa data: "saya tanyakan ke tim ya bos" (dibalas) | ✗ diserahkan CS, diam |
 | Barang sudah sampai, mau tukar size | Sebut syarat + serahkan ke CS, tetap dibalas | – |
 
 ## I. Kirim & bayar

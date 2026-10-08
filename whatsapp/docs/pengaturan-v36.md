@@ -384,3 +384,9 @@ Perubahan v3.6.6:
 - Syarat tukar size ditulis dengan gaya CS (tidak disalin persis); pesanan custom & refund dijelaskan.
 - Alamat toko tidak lagi terpecah jadi poin-poin; pertanyaan order yang sama tidak ditagih ulang; balasan yang macet dipindah ke akun/model lain setelah 75 detik (dulu 120).
 
+## v3.6.56 — Diskon grosir dijawab dari website
+
+- "Pesan banyak dapat diskon?" kini dijawab AI dengan potongan per pcs per kategori dari website (Admin → Invoice → Diskon grosir), lalu AI menanyakan jumlahnya. Data ikut sinkron katalog; mengubah potongan di website langsung terbaca (perlu website versi terbaru).
+- Pesanan yang dicatat grosir tidak dikirimi total otomatis: totalnya dibuat toko lewat invoice dengan tombol Diskon grosir (pelanggan tetap dibalas).
+- Diskon di luar diskon grosir tetap diteruskan ke tim (dengan balasan singkat).
+

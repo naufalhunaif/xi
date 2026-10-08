@@ -163,6 +163,7 @@ export async function syncLeanCatalog(
     store?: { text?: string }
     fabrics?: { text?: string }
     size_charts?: { text?: string }
+    wholesale?: { text?: string; items?: Array<{ category?: string; discount?: number }> }
   }
   await writeLeanState(
     'store_profile',
@@ -172,6 +173,8 @@ export async function syncLeanCatalog(
     'fabrics',
     extra.fabrics?.text ? String(extra.fabrics.text).slice(0, 3000) : ''
   )
+  // v3.6.56: diskon grosir per kategori dari website (Admin → Invoice → Diskon grosir).
+  await writeLeanState('wholesale', renderWholesale(extra.wholesale).slice(0, 1000))
   await writeLeanState(
     'size_charts',
     extra.size_charts?.text ? String(extra.size_charts.text).slice(0, 4000) : ''
@@ -501,5 +504,21 @@ export async function syncProductWeights(config?: LeanMcpConfig) {
   }
   if (Object.keys(map).length) await writeLeanState('product_weights', JSON.stringify(map))
   return Object.keys(map).length
+}
+
+/** Nama kategori website → sebutan pelanggan. */
+const CATEGORY_WORDS: Record<string, string> = { suits: 'Jas', pants: 'Celana', vest: 'Rompi', shirt: 'Kemeja', setelan: 'Setelan', tie: 'Dasi' }
+
+/**
+ * v3.6.56 — diskon grosir per kategori (catalog_digest `wholesale`) → satu baris untuk bagian TOKO,
+ * dengan sebutan pelanggan (Suits → Jas). Tanpa items → teks dari website apa adanya.
+ */
+export function renderWholesale(wholesale?: { text?: string; items?: Array<{ category?: string; discount?: number }> }) {
+  const items = (wholesale?.items || []).filter((item) => item.category && Number(item.discount) > 0)
+  if (!items.length) return String(wholesale?.text || '')
+  const list = items
+    .map((item) => `${CATEGORY_WORDS[String(item.category).toLowerCase()] || item.category} ${Number(item.discount).toLocaleString('id-ID')}`)
+    .join(', ')
+  return `DISKON GROSIR (pesanan banyak/seragam; potongan per pcs dari harga KATALOG): ${list}. Kategori lain tanpa potongan. Total grosir dibuat lewat invoice toko.`
 }
 

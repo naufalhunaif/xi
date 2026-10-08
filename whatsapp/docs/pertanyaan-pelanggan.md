@@ -52,7 +52,7 @@ Kolom "Siap?": ✓ data sudah ada di AI · ½ sebagian · ✗ belum ada data/atu
 | Pembayaran lain (full/DP, paylater, kartu kredit, COD) | 39 / 36 | 2 / 2 | "DP atau full?", "bisa paylater?", "bayar di tempat?" | ✗ | Aturan DP/full, metode yang diterima |
 | Promo / event | 351 / 245 | 22 / 14 | "big sale anniv ketentuannya?", "yang dipromosikan ini?" | ✗ | Promo aktif + syarat (diperbarui pemilik) |
 | Link IG / website / katalog | 889 / 672 | 76 / 51 | link postingan IG, "share katalog", "pesan di web sama saja?" | ½ | AI membaca link produk web/IG; link katalog resmi |
-| Partai besar / seragam / reseller / kerja sama | 290 / 218 | 38 / 18 | "60–80 jas sekali pesan bisa?", "seragam kantor", tawaran sponsor | ✗ | Aturan pesanan banyak (min, harga, waktu) → CS, tetap dibalas |
+| Partai besar / seragam / reseller / kerja sama | 290 / 218 | 38 / 18 | "60–80 jas sekali pesan bisa?", "seragam kantor", tawaran sponsor | ½ | v3.6.56: potongan per pcs dari Diskon grosir website sudah dipakai AI; belum: jumlah minimum & waktu produksi pesanan banyak |
 | Ubah / vermak / revisi sesudah jadi | 310 / 226 | 51 / 19 | "lengan kurangi 1 cm bisa?", "kebesaran bisa dipermak?", "masih bisa revisi?" | ½ | Aturan revisi/perbaikan sesudah terima |
 | Kepercayaan (aman, penipu, benar ini toko, testimoni) | 111 / 99 | 8 / 7 | "bisa dipercaya?", "benar ini Chameleon Cloth?", "ada bukti pembelian?" | ✗ | Link highlight testimoni IG, alamat toko, website |
 | Perawatan (cuci, laundry, setrika) | 74 / 46 | 6 / 2 | "boleh di-laundry?", "setrika pakai apa?" | ✗ | Panduan perawatan singkat |
