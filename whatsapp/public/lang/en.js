@@ -2080,5 +2080,9 @@ window.waLocales.en = {
   "{0} jawaban CS asli ditambahkan ke Contoh jawaban CS": "{0} real CS answers added to CS reply examples",
   "Tambah ke Aturan toko": "Add to store rules",
   "Ditambahkan": "Added",
-  "Aturan dari CS asli: {0}": "Rule from the real CS: {0}"
+  "Aturan dari CS asli: {0}": "Rule from the real CS: {0}",
+  "Pelajari semua chat CS": "Learn from all CS chats",
+  "Semua jawaban CS manusia di chat nyata jadi contoh untuk AI. 1 dari 5 chat disimpan khusus untuk uji.": "Every human CS answer in real chats becomes an example for the AI. 1 in 5 chats is kept aside for testing only.",
+  "Mempelajari chat CS…": "Learning from CS chats…",
+  "Dipelajari: {added} contoh baru dari {chats} chat ({pairs} tanya-jawab).": "Learned: {added} new examples from {chats} chats ({pairs} Q&A pairs).",
 }

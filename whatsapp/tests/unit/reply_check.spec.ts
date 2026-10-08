@@ -708,3 +708,71 @@ test.group('Beta3 · tebakan & balasan custom (v3.6.86)', () => {
     assert.isNull(keepCustomInChat(handoff, 'Perkenalkan saya dari agency, kami membuat solusi AI custom untuk bisnis anda dan ingin berdiskusi lebih lanjut dengan tim anda minggu ini'))
   })
 })
+
+test.group('Beta3 · belajar semua chat CS & chat uji terpisah (v3.6.87)', () => {
+  test('holdout ±20%, pasangan layak, contoh riwayat butuh kemiripan', async ({ assert }) => {
+    const { isHoldout, learnablePair } = await import('#beta3/simulator')
+    const { pickExamples } = await import('#beta3/examples_service')
+    const { foreignLink } = await import('#beta3/reply_service')
+    const ids = Array.from({ length: 1000 }, (_, index) => `62812${String(index).padStart(6, '0')}@s.whatsapp.net`)
+    const share = ids.filter(isHoldout).length / ids.length
+    assert.isAbove(share, 0.14)
+    assert.isBelow(share, 0.26)
+    assert.equal(isHoldout(ids[3]), isHoldout(ids[3]))
+    assert.isTrue(learnablePair('bisa buat blazer cewek?', 'untuk cewek maaf gak bisa bos'))
+    assert.isFalse(learnablePair('ok', 'siap bos makasih'))
+    assert.isFalse(learnablePair('tf kemana kak', 'BRI 1234567890 an Contoh'))
+    assert.isFalse(learnablePair('Nama : Budi\nAlamat lengkap : Jl. Contoh', 'siap bos sudah dicatat'))
+    const examples = [
+      { id: 1, situation: '', customerText: 'Halo', csText: 'Halo bos', tags: 'lain', source: 'seed' },
+      { id: 2, situation: '', customerText: 'bisa buat blazer cewek', csText: 'untuk cewek maaf gak bisa bos', tags: 'riwayat', source: 'riwayat' },
+      { id: 3, situation: '', customerText: 'blazer hitam ready', csText: 'ready bos', tags: 'riwayat', source: 'riwayat' },
+    ]
+    const picked = pickExamples(examples, 'mas bisa bikin blazer buat cewek ga', '')
+    assert.include(picked.map((item) => item.id), 2)
+    assert.notInclude(picked.map((item) => item.id), 3)
+    assert.isTrue(foreignLink('ini kak https://www.instagram.com/reel/abc'))
+    assert.isFalse(foreignLink('order di https://chameleoncloth.com ya'))
+    assert.isFalse(foreignLink('tanpa link'))
+  })
+
+  test('learnAllRealChats: jawaban CS manusia jadi contoh; chat uji & jawaban AI tidak', async ({ assert }) => {
+    const { learnAllRealChats, isHoldout } = await import('#beta3/simulator')
+    let learn = ''
+    let hold = ''
+    for (let index = 0; (!learn || !hold) && index < 200; index++) {
+      const jid = `62899${String(index).padStart(6, '0')}@s.whatsapp.net`
+      if (isHoldout(jid)) hold ||= jid
+      else learn ||= jid
+    }
+    const now = Date.now()
+    const message = (jid: string, n: number, direction: string, sender: string, body: string) => ({
+      jid,
+      message_id: `t87-${jid}-${n}`,
+      direction,
+      sender_type: sender,
+      body,
+      status: 'sent',
+      created_at: new Date(now - (10 - n) * 60_000),
+    })
+    const rows = [
+      message(learn, 1, 'in', 'customer', 'bisa bikin blazer buat cewek ga kak uji87'),
+      message(learn, 2, 'out', 'cs', 'untuk cewek maaf gak bisa bos'),
+      message(learn, 3, 'in', 'customer', 'kalau jas anak bisa uji87'),
+      message(learn, 4, 'out', 'ai', 'bisa bos untuk anak'),
+      message(hold, 1, 'in', 'customer', 'rute ke toko lewat mana uji87'),
+      message(hold, 2, 'out', 'cs', 'lewat kalipucang aja bos dekat'),
+    ]
+    try {
+      await db.table('whatsapp_messages').multiInsert(rows)
+      const result = await learnAllRealChats(30)
+      assert.isAtLeast(result.added, 1)
+      const learned = await db.from('whatsapp_beta3_examples').where('customer_text', 'like', '%uji87%').select('customer_text', 'source')
+      assert.deepEqual(learned.map((row: any) => row.customer_text), ['bisa bikin blazer buat cewek ga kak uji87'])
+      assert.equal(learned[0].source, 'riwayat')
+    } finally {
+      await db.from('whatsapp_messages').whereIn('jid', [learn, hold]).delete()
+      await db.from('whatsapp_beta3_examples').where('customer_text', 'like', '%uji87%').delete()
+    }
+  })
+})

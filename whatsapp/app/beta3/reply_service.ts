@@ -1057,6 +1057,10 @@ export async function createLeanReply(input: {
   if (understanding.reaction === 'terima' && !systemNote && !toolNotes.length && !form && !loose)
     // Bukan "CATATAN SISTEM" supaya tidak memaksa model berat untuk sekadar "oke".
     systemNote += '\n\n(Pesan ini hanya tanda terima: balas satu kalimat singkat yang nyambung, tanpa pertanyaan baru; isi susulan langkah berikutnya.)'
+  // v3.6.87 — link luar (Instagram/TikTok/Shopee…) tidak bisa dibuka AI: jangan memastikan bisa dibuat.
+  if (foreignLink(input.text))
+    systemNote +=
+      '\n\nCATATAN SISTEM: pelanggan mengirim link yang tidak bisa kamu buka. Jangan memastikan model/produk di link itu bisa dibuat; minta screenshot/foto modelnya biar dicek.'
   if (understanding.paidClaim && pendingForJev?.status === 'awaiting_payment')
     systemNote +=
       '\n\nCATATAN SISTEM: pelanggan menyatakan SUDAH transfer. Balas "siap bos, kami cek dulu ya" (minta bukti transfernya bila belum dikirim); jangan bilang sudah diterima. tahap = bukti_dikirim.'
@@ -1814,6 +1818,10 @@ const WHOLESALE_TOPIC = new RegExp(
   ].join('|'),
   'i'
 )
+/** Link selain situs toko sendiri. */
+export function foreignLink(text: string) {
+  return (String(text || '').match(/https?:\/\/[^\s]+/gi) || []).some((url) => !/chameleoncloth\.com|naufalhunaif\.com/i.test(url))
+}
 const NO_ORDER =
   /\b(?:belum|tidak|gak|ga|nggak)\s+(?:ada\s+yang\s+)?(?:tercatat|ditemukan|terdata)\b|\b(?:tidak|belum|gak|ga|nggak)\s+ada\s+(?:pesanan|orderan|order)\b/i
 /** v3.6.85 — balasan menyangkal pesanan pelanggan ("belum tercatat", "tidak ada pesanan"). */

@@ -10,7 +10,7 @@ import { access, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import db from '#services/workspace_database'
-import { ownsWorkspaceMedia } from '#services/workspace_context'
+import { ownsWorkspaceMedia, workspaceScope } from '#services/workspace_context'
 import { maskPii } from '#beta3/jev'
 import { ensureLeanTables, readLeanState, writeBeta3ChatNote } from '#beta3/tables'
 import { catalogDigest, findCatalogVariant } from '#beta3/catalog_service'
@@ -265,6 +265,7 @@ export async function judgeFacts(settings?: LeanSettings) {
     renderPricePattern(pricePattern(digest.rows)),
     production,
     // Kebijakan dasar yang juga diberikan ke AI (skill & pemeriksa COD).
+    'CARA TOKO MENENTUKAN SIZE: dari tinggi & berat badan (alat Fit Advisor) atau ukuran badan dibanding size chart; CS biasa menanyakan tinggi dan berat badan.',
     'KEBIJAKAN: pembayaran transfer; COD/bayar di tempat, rekber, Shopee, Tokopedia tidak tersedia. Pengiriman JNE (REG/YES; kargo JTR min 8 kg).',
     renderExchangePolicy((await readExchangePolicy().catch(() => ({ text: '' }))).text),
     // v3.6.86: rekening resmi toko (dulu dinilai "tidak ada di FAKTA").
@@ -457,6 +458,95 @@ export async function runScenario(
 }
 
 /**
+ * v3.6.87 — Satu dari lima chat (hash jid) disimpan khusus untuk UJI dan tidak pernah dipelajari, supaya
+ * persentase lulus mengukur chat yang belum pernah dilihat AI (jujur, bukan hafalan).
+ */
+export function isHoldout(jid: string) {
+  let hash = 2166136261
+  for (const char of String(jid || '')) {
+    hash ^= char.charCodeAt(0)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0) % 5 === 0
+}
+
+const FORM_TEXT = /nama\s*:|alamat\s*(?:lengkap)?\s*:|kode\s*pos\s*:|no\.?\s*(?:hp|telp|wa)\s*:/i
+/** Pasangan (pertanyaan, jawaban CS manusia) layak jadi contoh: berisi, tanpa data pribadi. */
+export function learnablePair(customer: string, cs: string) {
+  const question = customer.trim()
+  const answer = cs.trim()
+  if (question.length < 6 || answer.split(/\s+/).length < 3) return false
+  if (FORM_TEXT.test(question) || FORM_TEXT.test(answer)) return false
+  if (/\d{8,}|\[(?:nomor hp|angka panjang|email)\]/i.test(`${question} ${answer}`)) return false
+  if (/\b(?:an|a\.n\.?|atas nama)\s+[A-Z]/.test(answer) && /\b(?:bri|bca|bni|mandiri|rek)/i.test(answer)) return false
+  return true
+}
+
+/**
+ * v3.6.87 — Pelajari semua jawaban CS manusia di chat nyata (kecuali chat uji): tiap pertanyaan pelanggan
+ * + jawaban CS jadi Contoh (sumber "riwayat"), dipilih otomatis bila pertanyaan baru mirip. Pengetahuan
+ * toko yang hanya ada di kepala CS (rute ke toko, model yang tidak dibuat, saran CS) ikut terbawa.
+ */
+export async function learnAllRealChats(days = 365) {
+  await ensureLeanTables()
+  const since = new Date(Date.now() - days * 86_400_000)
+  const jids = (await db
+    .from('whatsapp_messages')
+    .select('jid')
+    .where('created_at', '>', since)
+    .whereIn('sender_type', ['cs', 'owner'])
+    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid'))
+    .groupBy('jid')) as Array<{ jid: string }>
+  const fold = (text: string) => text.toLowerCase().replace(/\s+/g, ' ').trim()
+  const existing = new Set((await listLeanExamples()).map((example) => fold(example.customerText)))
+  let chats = 0
+  let pairs = 0
+  let added = 0
+  for (const { jid } of jids) {
+    if (isHoldout(jid)) continue
+    chats++
+    const rows = (await db
+      .from('whatsapp_messages')
+      .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
+      .where('jid', jid)
+      .where('created_at', '>', since)
+      .orderBy('created_at', 'asc')
+      .orderBy('id', 'asc')
+      .limit(600)) as RealRow[]
+    for (const segment of realSegments(rows)) {
+      pairs++
+      const customerText = maskPii(segment.teks).replace(/\n+/g, ' / ').slice(0, 300).trim()
+      const csText = maskPii(segment.jawaban.join('\n')).slice(0, 400).trim()
+      const key = fold(customerText)
+      if (!learnablePair(customerText, csText) || existing.has(key)) continue
+      await addLeanExample({ situation: segment.kutip ? `membalas: ${segment.kutip.slice(0, 80)}` : '', customerText, csText, tags: 'riwayat', source: 'riwayat' })
+      existing.add(key)
+      added++
+    }
+  }
+  return { chats, pairs, added }
+}
+
+type LearnState = { running: boolean; startedAt?: string; finishedAt?: string; result?: { chats: number; pairs: number; added: number }; error?: string }
+const learning = new Map<string, LearnState>()
+/** Status belajar dari semua chat nyata (per workspace). */
+export function realLearningStatus(): LearnState {
+  return learning.get(workspaceScope().prefix) || { running: false }
+}
+/** Mulai belajar di latar (sekali jalan per workspace). */
+export function startRealLearning(days = 365) {
+  const key = workspaceScope().prefix
+  const now = learning.get(key)
+  if (now?.running) return { ...now, started: false }
+  const state: LearnState = { running: true, startedAt: new Date().toISOString() }
+  learning.set(key, state)
+  learnAllRealChats(days)
+    .then((result) => learning.set(key, { running: false, startedAt: state.startedAt, finishedAt: new Date().toISOString(), result }))
+    .catch((error) => learning.set(key, { running: false, startedAt: state.startedAt, finishedAt: new Date().toISOString(), error: error instanceof Error ? error.message : String(error) }))
+  return { ...state, started: true }
+}
+
+/**
  * v3.6.83 — Jawaban CS manusia di chat nyata = kebenaran toko. AI bertentangan → pasangan
  * (pertanyaan asli, jawaban CS) masuk Contoh jawaban CS (sumber "chat-nyata"), dipakai AI di chat berikutnya.
  */
@@ -531,9 +621,13 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
     .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid'))
     .groupBy('jid')
     .orderByRaw('RAND(?)', [seed])
-    .limit(Math.min(400, count * 3))) as Array<{ jid: string }>
+    .limit(Math.min(2000, count * 15))) as Array<{ jid: string }>
   const pool: Array<{ jid: string; segments: RealSegment[]; rows: RealRow[] }> = []
+  const foldText = (text: string) => maskPii(text).replace(/\n+/g, ' / ').toLowerCase().replace(/\s+/g, ' ').trim()
+  const learned = new Set((await listLeanExamples()).flatMap((example) => [foldText(example.customerText), example.customerText.toLowerCase().replace(/\s+/g, ' ').trim()]))
   for (const { jid } of jids) {
+    // v3.6.87: uji hanya memakai chat yang tidak dipelajari.
+    if (!isHoldout(jid)) continue
     const rows = (await db
       .from('whatsapp_messages')
       .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
@@ -542,7 +636,8 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
       .orderBy('created_at', 'asc')
       .orderBy('id', 'asc')
       .limit(120)) as RealRow[]
-    const segments = realSegments(rows).filter((segment) => segment.teks.length >= 2 || segment.gambar)
+    // Pertanyaan yang sudah jadi contoh (dipelajari dari uji sebelumnya) tidak diuji lagi.
+    const segments = realSegments(rows).filter((segment) => (segment.teks.length >= 2 || segment.gambar) && !learned.has(foldText(segment.teks)))
     if (segments.length) pool.push({ jid, segments, rows })
     if (pool.length >= count * 2) break
   }

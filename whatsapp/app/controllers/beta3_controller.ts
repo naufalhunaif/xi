@@ -76,7 +76,7 @@ import { pricePattern, renderPricePattern } from '#beta3/price_pattern'
 import { attachOrderPhotos } from '#beta3/order_photos'
 import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '#beta3/weights'
 import env from '#start/env'
-import { listSimRuns, loadScenarios, readSimRun, resetSimRoom, sendSimRoom, simRoom, startSimRun, type SimScenario } from '#beta3/simulator'
+import { listSimRuns, loadScenarios, readSimRun, realLearningStatus, resetSimRoom, sendSimRoom, simRoom, startRealLearning, startSimRun, type SimScenario } from '#beta3/simulator'
 
 /** Beta 3: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
 /** Bukti transfer yang nominalnya sedang/baru dibaca AI (sekali per 10 menit per order). */
@@ -187,7 +187,9 @@ export default class Beta3Controller {
 
   async examples({ response }: HttpContext) {
     await seedLeanExamples().catch(() => 0)
-    return response.json({ examples: await listLeanExamples() })
+    // Contoh dari riwayat chat (ribuan) tidak ditampilkan satu per satu; cukup jumlahnya.
+    const all = await listLeanExamples()
+    return response.json({ examples: all.filter((example) => example.source !== 'riwayat'), riwayat: all.filter((example) => example.source === 'riwayat').length })
   }
 
   async addExample({ request, response }: HttpContext) {
@@ -679,7 +681,13 @@ export default class Beta3Controller {
       scenarios: scenarios.map((item) => ({ id: item.id, judul: item.judul, giliran: item.giliran })),
       runs,
       last,
+      learning: realLearningStatus(),
     })
+  }
+
+  /** v3.6.87 — pelajari semua jawaban CS manusia di chat nyata (latar). */
+  async simLearn({ response }: HttpContext) {
+    return response.json(startRealLearning())
   }
 
   async simRun({ params, response }: HttpContext) {

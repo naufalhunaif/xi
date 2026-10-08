@@ -368,6 +368,37 @@
     const count = Math.max(1, Math.min(300, Number(byId('beta3SimGenCount').value) || 50))
     startSim({ real: count, parallel: 3 })
   })
+  // v3.6.87: pelajari semua jawaban CS manusia (latar), status diperbarui sampai selesai.
+  let learnTimer = null
+  const showLearn = (state) => {
+    const node = byId('beta3SimLearnStatus')
+    if (!node || !state) return
+    const button = byId('beta3SimLearn')
+    if (button) button.disabled = Boolean(state.running)
+    if (state.running) {
+      node.hidden = false
+      node.textContent = t('Mempelajari chat CS…')
+      clearTimeout(learnTimer)
+      learnTimer = setTimeout(async () => showLearn((await api('/api/beta3/sim').catch(() => ({}))).learning), 5000)
+    } else if (state.result) {
+      node.hidden = false
+      node.textContent = t('Dipelajari: {added} contoh baru dari {chats} chat ({pairs} tanya-jawab).')
+        .replace('{added}', state.result.added)
+        .replace('{chats}', state.result.chats)
+        .replace('{pairs}', state.result.pairs)
+    } else if (state.error) {
+      node.hidden = false
+      node.textContent = state.error
+    }
+  }
+  byId('beta3SimLearn')?.addEventListener('click', async () => {
+    try {
+      showLearn(await api('/api/beta3/sim/learn', 'POST', {}))
+    } catch (error) {
+      notice(error.message, true)
+    }
+  })
+  api('/api/beta3/sim').then((result) => showLearn(result.learning)).catch(() => {})
   byId('beta3SimGenerate').addEventListener('click', () => {
     const count = Math.max(1, Math.min(500, Number(byId('beta3SimGenCount').value) || 50))
     startSim({ generate: count, parallel: 3 })

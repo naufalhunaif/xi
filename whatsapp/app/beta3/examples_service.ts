@@ -60,12 +60,14 @@ export function pickExamples(
       return { example, score: score > 0 && example.source === 'koreksi' ? score + 2 : score }
     })
     .sort((a, b) => b.score - a.score || (a.example.id || 0) - (b.example.id || 0))
-  const chosen = scored.filter((item) => item.score > 0).slice(0, limit)
+  // v3.6.87: contoh dari riwayat chat (ribuan) hanya dipakai bila cukup mirip (≥ 2 kata kunci sama).
+  const relevant = (item: { example: LeanExample; score: number }) => (item.example.source === 'riwayat' ? item.score >= 2 : item.score > 0)
+  const chosen = scored.filter(relevant).slice(0, limit)
   // Kalau pesan terlalu pendek untuk dicocokkan, tetap beri contoh tahap saat ini.
   if (chosen.length < 3)
     for (const item of scored) {
       if (chosen.length >= 3) break
-      if (!chosen.includes(item)) chosen.push(item)
+      if (!chosen.includes(item) && item.example.source !== 'riwayat') chosen.push(item)
     }
   return chosen.map((item) => item.example)
 }
