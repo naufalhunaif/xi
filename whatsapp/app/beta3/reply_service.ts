@@ -38,7 +38,7 @@ import {
 } from '#beta3/prompt'
 import { autoTier, runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
 import { chooseReplyTier, TIER_LABEL } from '#beta3/model_tier'
-import { normalizeStyle, storeStyle, styleGuide } from '#beta3/style_service'
+import { normalizeStyle, storeStyle, styleForChat, styleGuide } from '#beta3/style_service'
 import {
   callLeanTool,
   extractBodyMeasure,
@@ -592,7 +592,7 @@ export async function createLeanReply(input: {
   // Berat pesanan dari spesifikasi × berat produk (MCP toko): ongkir dicek sesuai berat asli.
   const orderGrams = await orderWeightGrams(String(spec || '')).catch(() => DEFAULT_ITEM_GRAMS)
   // Gaya balasan toko: sama untuk ChatGPT, Claude, dan Gemini.
-  const style = await storeStyle(examples).catch(() => null)
+  const style = styleForChat(await storeStyle(examples).catch(() => null), rows)
 
   // Tool dipanggil KODE pada event: TB/BB → fit advisor, form → ongkir. Model tidak memanggil tool.
   const mcp = await readLeanMcpConfig()
@@ -1940,7 +1940,7 @@ export async function finishLeanGoal(
  */
 export async function vetLeanNudge(jid: string, text: string, settings: LeanSettings) {
   const rows = await history(jid, new Set()).catch(() => [] as LeanHistoryRow[])
-  const style = await storeStyle(await listLeanExamples()).catch(() => null)
+  const style = styleForChat(await storeStyle(await listLeanExamples()).catch(() => null), rows)
   return reviewNudge({ jid, settings, susulan: text, history: rows, address: style?.address || 'bos' })
 }
 

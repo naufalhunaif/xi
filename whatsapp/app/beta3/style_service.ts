@@ -53,6 +53,38 @@ export async function storeStyle(examples: LeanExample[] = []): Promise<StylePro
   return profile
 }
 
+/**
+ * v3.6.84 — Sapaan per chat: jawaban CS manusia di chat ini adalah acuan. Bila CS di room ini
+ * memanggil pelanggan dengan sapaan lain (mis. "mbak", "kak") secara konsisten, AI ikut sapaan itu.
+ */
+export function chatAddress(
+  rows: Array<{ direction: string; senderType?: string | null; body?: string | null }>,
+  fallback: string | null
+) {
+  const counts = new Map<string, number>()
+  const human = rows.filter((row) => row.direction === 'out' && ['cs', 'owner'].includes(String(row.senderType || ''))).slice(-20)
+  for (const row of human)
+    for (const word of String(row.body || '').toLowerCase().match(/[a-z]+/g) || []) {
+      if (!ADDRESS_WORDS.includes(word) || word === 'min') continue
+      const key = word === 'kakak' ? 'kak' : word
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+  const total = [...counts.values()].reduce((a, b) => a + b, 0)
+  const [top, topCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [null, 0]
+  if (top && top !== fallback && topCount >= 2 && topCount / total >= 0.6) return top
+  return fallback
+}
+
+/** Profil gaya untuk satu chat: sapaan mengikuti CS manusia di chat itu. */
+export function styleForChat<T extends StyleProfile | null>(
+  profile: T,
+  rows: Array<{ direction: string; senderType?: string | null; body?: string | null }>
+): T {
+  if (!profile) return profile
+  const address = chatAddress(rows, profile.address)
+  return address === profile.address ? profile : ({ ...profile, address } as T)
+}
+
 /** Bagian prompt: aturan gaya yang sama persis untuk model apa pun. */
 export function styleGuide(profile: StyleProfile) {
   const lines = [
@@ -115,6 +147,16 @@ export function normalizeStyle(bubbles: string[], profile: StyleProfile, verbati
         .trim()
     })
     .filter(Boolean)
+  // Pembuka sama berturut-turut ("siap bos…" lalu "Siap sama sama bos") terasa robot: buang yang kedua.
+  const opener = (text: string) => text.match(/^(siap|oke|okey|ok|baik|sip)\b[\s,!.]*/i)
+  for (let i = clean.length - 1; i > 0; i--) {
+    const now = opener(clean[i])
+    const before = opener(clean[i - 1])
+    if (!now || !before) continue
+    const rest = clean[i].slice(now[0].length).trim()
+    if (!rest || /^(bos|kak|gan|sis|mas|mbak|min)[.!]?$/i.test(rest)) clean.splice(i, 1)
+    else clean[i] = rest[0].toUpperCase() + rest.slice(1)
+  }
   // Maksimal 3 bubble; sisanya digabung ke bubble terakhir.
   if (clean.length > 3) clean.splice(2, clean.length - 2, clean.slice(2).join('\n'))
   return clean

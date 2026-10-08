@@ -394,7 +394,7 @@ export function renderFitResult(
     .map((item) => `${item.label} ${item.percentage}%`)
     .join(', ')
   // v3.6.80: rekomendasi jas tidak memuat nomor celana (uji: AI menebak "celana no 33" dari TB/BB).
-  return `REKOMENDASI SIZE (Fit Advisor, TB ${measure.height} / BB ${measure.weight}, ${type === 'pants' ? 'celana' : 'jas'}): ${fit.recommended_size}${alternatives ? ` (${alternatives})` : ''}. Sampaikan sebagai rekomendasi, tetap konfirmasi ke pelanggan.${type === 'pants' ? '' : ' Nomor celana TIDAK termasuk: jangan ditebak, tanyakan nomor/lingkar pinggang biasanya bila celana ikut.'}`
+  return `REKOMENDASI SIZE (Fit Advisor, TB ${measure.height} / BB ${measure.weight}, ${type === 'pants' ? 'celana' : 'jas'}): ${fit.recommended_size}${alternatives ? ` (${alternatives})` : ''}. Sampaikan sebagai rekomendasi, tetap konfirmasi ke pelanggan. Size ini tidak ada di produk → sebut size terdekat yang ada (mis. XS → S).${type === 'pants' ? '' : ' Nomor celana TIDAK termasuk: jangan ditebak, tanyakan nomor/lingkar pinggang biasanya bila celana ikut.'}`
 }
 
 export type ShippingRates = {

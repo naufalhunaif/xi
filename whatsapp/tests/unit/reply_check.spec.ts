@@ -536,3 +536,46 @@ test.group('jawaban CS chat nyata = kebenaran (v3.6.83)', () => {
     assert.include(sim, 'tidak bisa = tidak bisa')
   })
 })
+
+test.group('Beta3 · sapaan per chat & pembuka ganda (v3.6.84)', () => {
+  test('sapaan mengikuti CS manusia di chat itu', async ({ assert }) => {
+    const { chatAddress, styleForChat, normalizeStyle } = await import('#beta3/style_service')
+    const cs = (body: string) => ({ direction: 'out', senderType: 'cs', body })
+    assert.equal(chatAddress([cs('siap mbak'), cs('ditunggu ya mbak')], 'bos'), 'mbak')
+    assert.equal(chatAddress([cs('siap mbak')], 'bos'), 'bos')
+    assert.equal(chatAddress([{ direction: 'out', senderType: 'ai', body: 'siap kak, oke kak' }], 'bos'), 'bos')
+    assert.equal(chatAddress([cs('siap bos'), cs('oke bos'), cs('ya kak')], 'bos'), 'bos')
+    const profile = { address: 'bos', emoji: false, length: 60, samples: 20 }
+    const mine = styleForChat(profile, [cs('siap mbak'), cs('makasih mbak')])
+    assert.equal(mine.address, 'mbak')
+    assert.equal(profile.address, 'bos')
+    assert.deepEqual(normalizeStyle(['Siap bos, kami cek dulu ya'], mine), ['Siap mbak, kami cek dulu ya'])
+  })
+
+  test('dua bubble berpembuka sama tidak diulang', async ({ assert }) => {
+    const { normalizeStyle } = await import('#beta3/style_service')
+    const profile = { address: 'bos', emoji: false, length: 60, samples: 20 }
+    assert.deepEqual(normalizeStyle(['siap bos, ditunggu ya pelunasannya', 'Siap sama sama bos'], profile), [
+      'siap bos, ditunggu ya pelunasannya',
+      'Sama sama bos',
+    ])
+    assert.deepEqual(normalizeStyle(['Siap bos, saya cek', 'Oke bos'], profile), ['Siap bos, saya cek'])
+    assert.deepEqual(normalizeStyle(['Harganya 250rb bos', 'Siap dikirim hari ini'], profile).length, 2)
+  })
+})
+
+test.group('Beta3 · ukuran baju vs badan (v3.6.84)', () => {
+  test('lebar dada/panjang badan → tanya dulu; fit advisor sebut size terdekat', async ({ assert }) => {
+    const { compareWithSizeChart } = await import('#beta3/context_service')
+    const { renderFitResult } = await import('#beta3/mcp')
+    const chart = 'Jas (cm): S dada 96; M dada 100; L dada 104; XL dada 110'
+    const inRow = (body: string) => ({ direction: 'in' as const, body, createdAt: new Date() })
+    const garment = compareWithSizeChart([inRow('Lebar Dada = 105 Panjang Badan = 86 TB 154 BB 45')], chart)
+    assert.include(garment, 'ukuran baju')
+    const body = compareWithSizeChart([inRow('lingkar dada 100')], chart)
+    assert.include(body, 'Paling dekat: M')
+    assert.notInclude(body, 'ukuran baju')
+    const note = renderFitResult({ recommended_size: 'XS' }, { height: 154, weight: 45 }, 'jacket')
+    assert.include(note, 'XS → S')
+  })
+})

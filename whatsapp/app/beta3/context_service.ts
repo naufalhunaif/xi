@@ -289,7 +289,15 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
       )
     }
   }
+  // v3.6.84 — "lebar dada / panjang badan" biasanya ukuran BAJU yang dibentangkan, bukan lingkar badan
+  // (uji chat nyata: lebar dada 105 dari TB 154/BB 45 dibaca lingkar dada → size XL, bertentangan).
+  const garment = rows
+    .slice(-20)
+    .some((row) => row.direction === 'in' && /\blebar\s+dada\b|\bpanjang\s+badan\b/i.test(String(row.body || '')))
+  const caution = garment
+    ? '\nPelanggan menulis "lebar dada/panjang badan" (biasanya ukuran baju dibentangkan, bukan lingkar badan): jangan langsung tentukan size dari angka ini; tanya singkat itu ukuran badan atau ukuran baju yang biasa dipakai.'
+    : ''
   return lines.length
-    ? `PERBANDINGAN SIZE CHART (dihitung sistem dari ukuran badan pelanggan; ukuran jadi ±1-2 cm):\n- ${lines.join('\n- ')}\nPakai hasil ini; bila berbeda dengan Fit Advisor, sebutkan keduanya singkat dan utamakan ukuran badan yang diukur.`
+    ? `PERBANDINGAN SIZE CHART (dihitung sistem dari ukuran badan pelanggan; ukuran jadi ±1-2 cm):\n- ${lines.join('\n- ')}\nPakai hasil ini; bila berbeda dengan Fit Advisor, sebutkan keduanya singkat dan utamakan ukuran badan yang diukur.${caution}`
     : ''
 }
