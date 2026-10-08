@@ -79,6 +79,29 @@ export function cancelsOrder(text: string, rows: Array<{ direction: string; body
 }
 
 /** v3.6.55 — pesan giliran yang batal ditaruh di depan antrean giliran berikutnya (tanpa dobel). */
+/**
+ * v3.6.69 — pesan pelanggan yang gilirannya batal / dilewati (pesan lebih baru sudah masuk) dan
+ * belum ada giliran berikutnya yang menunggu disimpan sebentar, lalu ikut giliran berikutnya
+ * (kasus Alkhoiri 8 Okt: foto model kedua + "Modelnya gini bs min?" tidak pernah dijawab AI).
+ */
+export const STASH_TTL_MS = 15 * 60_000
+export function stashTurn<T extends { id: string }>(
+  stash: Map<string, { at: number; items: T[] }>,
+  jid: string,
+  items: T[],
+  now = Date.now()
+) {
+  const previous = stash.get(jid)
+  const kept = previous && now - previous.at <= STASH_TTL_MS ? previous.items : []
+  const known = new Set(kept.map((item) => item.id))
+  stash.set(jid, { at: now, items: [...kept, ...items.filter((item) => !known.has(item.id))] })
+}
+export function takeStashed<T extends { id: string }>(stash: Map<string, { at: number; items: T[] }>, jid: string, now = Date.now()) {
+  const entry = stash.get(jid)
+  stash.delete(jid)
+  return entry && now - entry.at <= STASH_TTL_MS ? entry.items : []
+}
+
 export function prependMissing<T extends { id: string }>(queue: T[], items: T[]) {
   const known = new Set(queue.map((item) => item.id))
   queue.unshift(...items.filter((item) => !known.has(item.id)))

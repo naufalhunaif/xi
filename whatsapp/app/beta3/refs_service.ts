@@ -476,9 +476,69 @@ export async function saveAiRefs(
       .where('part', part)
       .first()
     if (!existing) await addRef({ jid, messageId, imageUrl: String(message.media_url), part })
+    // v3.6.69: foto model baru menggantikan foto model lama (yang terbaru yang dipakai penjahit).
+    if (isWholeModelPart(part)) await dropOtherModelRefs(jid, messageId, null)
     saved++
   }
   return saved
+}
+
+/** Bagian "model keseluruhan" (bukan detail kerah/saku/kancing). */
+export function isWholeModelPart(part: string) {
+  return /^(?:model)?\s*(?:keseluruhan|semua|full|jas|beskap|baju|utama)?\s*$/i.test(String(part || '').trim())
+}
+
+/** Hapus referensi model keseluruhan lain (belum menempel order / menempel order tertentu). */
+async function dropOtherModelRefs(jid: string, keepMessageId: string, orderId: number | null) {
+  const rows = await db
+    .from('whatsapp_beta3_refs')
+    .where('jid', jid)
+    .where((query) => (orderId ? query.whereNull('order_id').orWhere('order_id', orderId) : query.whereNull('order_id')))
+    .select('id', 'part', 'message_id')
+  const ids = rows
+    .filter((row) => isWholeModelPart(String(row.part || '')) && String(row.message_id || '') !== keepMessageId)
+    .map((row) => Number(row.id))
+  if (ids.length) await db.from('whatsapp_beta3_refs').whereIn('id', ids).delete()
+  return ids.length
+}
+
+/** "jadi modelnya seperti ini ya bos" / "model yang ini ya" — CS menetapkan model dari foto yang dibalas. */
+export const CS_MODEL_CONFIRM =
+  /\bmodel(?:nya)?\s+(?:seperti|kayak|kaya|kek|begini|gini)\b|\bmodel(?:nya)?\s+(?:yang\s+)?ini\b|\b(?:seperti|kayak|kaya)\s+(?:ini|gambar|foto)\b/i
+
+/**
+ * v3.6.69 — CS membalas (quote) foto pelanggan dengan konfirmasi model → foto itu jadi referensi model
+ * resmi untuk penjahit, menggantikan foto model sebelumnya (juga pada order aktif yang belum dikirim).
+ * Kasus Alkhoiri 8 Okt: referensi tetap foto pertama walau CS sudah mengonfirmasi foto kedua.
+ */
+export async function applyCsModelConfirm(jid: string, body: string, replyTo?: string | null) {
+  if (!replyTo || !CS_MODEL_CONFIRM.test(String(body || ''))) return null
+  await ensureLeanTables()
+  const quoted = await db.from('whatsapp_messages').where('message_id', replyTo).where('jid', jid).first()
+  if (!quoted || quoted.direction !== 'in' || quoted.media_type !== 'image' || !quoted.media_url) return null
+  const order = await db
+    .from('whatsapp_beta3_orders')
+    .where('jid', jid)
+    .whereIn('status', ['pending', 'awaiting_payment', 'paid'])
+    .where('created_at', '>=', new Date(Date.now() - 30 * 86_400_000))
+    .orderBy('id', 'desc')
+    .select('id', 'status')
+    .first()
+    .catch(() => null)
+  // Order sudah lunas → referensi sudah menempel ke order itu; ganti di sana. Selain itu referensi chat.
+  const orderId = order && order.status === 'paid' ? Number(order.id) : null
+  const removed = await dropOtherModelRefs(jid, String(replyTo), orderId)
+  const exists = await db
+    .from('whatsapp_beta3_refs')
+    .where('jid', jid)
+    .where('message_id', replyTo)
+    .where((query) => (orderId ? query.where('order_id', orderId) : query.whereNull('order_id')))
+    .first()
+  if (!exists) {
+    const id = await addRef({ jid, messageId: String(replyTo), imageUrl: String(quoted.media_url), part: 'model', note: 'Dikonfirmasi CS' })
+    if (orderId) await db.from('whatsapp_beta3_refs').where('id', id).update({ order_id: orderId })
+  }
+  return { messageId: String(replyTo), orderId, removed }
 }
 
 /** Gambar referensi apa adanya (resolusi asli) untuk dikirim ke grup produksi. */

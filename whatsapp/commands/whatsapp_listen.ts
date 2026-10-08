@@ -62,7 +62,7 @@ import { currentLine, setCurrentLine, lineColumns, lineOf } from '#services/line
 import { claimLine, lineHeld, listLines, readLine, releaseLine, removeLineNow, touchLine, updateLine } from '#services/line_service'
 import { spawn, type ChildProcess } from 'node:child_process'
 import * as beta3Reply from '#beta3/reply_service'
-import { prependMissing } from '#beta3/reply_guards'
+import { prependMissing, stashTurn, takeStashed } from '#beta3/reply_guards'
 import * as beta3Order from '#beta3/order_service'
 import * as beta3Tables from '#beta3/tables'
 import { measureCatalogColors } from '#beta3/image_color'
@@ -178,6 +178,8 @@ export default class WhatsappListen extends BaseCommand {
     return task
   }
   private pendingTurns = new Map<string, { items: PendingMessage[]; timer: NodeJS.Timeout }>()
+  /** v3.6.69: pesan giliran batal/dilewati tanpa giliran menunggu → ikut giliran berikutnya. */
+  private stashedTurns = new Map<string, { at: number; items: PendingMessage[] }>()
   private chatLocks = new Map<string, Promise<unknown>>()
   private sweeping = false
   private sweepTimer?: NodeJS.Timeout
@@ -1955,7 +1957,7 @@ export default class WhatsappListen extends BaseCommand {
       )
       // A mode-update error must not turn an already sent message into a failed send.
       if (message.sender_type === 'cs') {
-        await this.noteHumanOrderMessage(message.jid, String(message.body || ''))
+        await this.noteHumanOrderMessage(message.jid, String(message.body || ''), message.reply_to_message_id)
         await resumeAiAfterHumanReply(message.jid)
         // Jawaban CS menjadi kandidat contoh untuk AI, tanpa mengedit skill.
         try {
@@ -2064,8 +2066,13 @@ export default class WhatsappListen extends BaseCommand {
    * v3.6.51: juga untuk pesan yang dikirim dari HP (pemilik) — dulu hanya dari web, sehingga total
    * CS dari HP tidak tercatat dan AI mengira total belum pernah dikirim.
    */
-  private async noteHumanOrderMessage(jid: string, body: string) {
+  private async noteHumanOrderMessage(jid: string, body: string, replyTo?: string | null) {
+    // v3.6.69: pemilik/CS sudah menjawab → pesan tertinggal tidak dihidupkan lagi oleh AI.
+    this.stashedTurns.delete(jid)
     try {
+      // CS membalas foto pelanggan "jadi modelnya seperti ini" → foto itu referensi model resmi.
+      const model = await beta3Refs.applyCsModelConfirm(jid, body, replyTo).catch(() => null)
+      if (model) this.logger.info(`Referensi model ${jid} diganti foto yang dikonfirmasi CS (${model.messageId}).`)
       const applied = await beta3.applyCsTotalMessage(jid, body)
       if (applied) this.logger.info(`Order ${applied.orderId} diperbarui dari total CS: ${applied.total}`)
       else {
@@ -2104,7 +2111,7 @@ export default class WhatsappListen extends BaseCommand {
       status: 'sent',
       created_at: this.messageDate(message),
     })
-    if (text) await this.noteHumanOrderMessage(jid, text)
+    if (text) await this.noteHumanOrderMessage(jid, text, this.replyIdOf(message) || null)
     await resumeAiAfterHumanReply(jid)
   }
 
@@ -2168,6 +2175,8 @@ export default class WhatsappListen extends BaseCommand {
     const pending = this.pendingTurns.get(jid)
     this.pendingTurns.delete(jid)
     if (!pending?.items.length) return
+    // v3.6.69: pesan yang tertinggal dari giliran sebelumnya ikut dijawab di giliran ini.
+    prependMissing(pending.items, takeStashed(this.stashedTurns, jid))
     const items = pending.items
     const last = items[items.length - 1]
     const visualItems = items.filter((item) => item.media?.visual)
@@ -2190,7 +2199,12 @@ export default class WhatsappListen extends BaseCommand {
     }
 
     const goalRun = await beginGoalTurn(jid, last.id)
-    if (!goalRun) return
+    if (!goalRun) {
+      // v3.6.69: pesan lebih baru sudah masuk sebelum giliran ini mulai → pesan giliran ini ikut
+      // giliran berikutnya (dulu dibuang diam-diam: foto + pertanyaan tidak pernah dijawab).
+      this.carryOverTurn(jid, items)
+      return
+    }
     const turnSocket = this.socket
     const downloadedB3 = new Map<string, string | null>()
     for (const item of visualItems) downloadedB3.set(item.id, await item.mediaDownload)
@@ -2227,8 +2241,8 @@ export default class WhatsappListen extends BaseCommand {
 
   private carryOverTurn(jid: string, items: PendingMessage[]) {
     const pending = this.pendingTurns.get(jid)
-    if (!pending) return
-    prependMissing(pending.items, items)
+    if (pending) prependMissing(pending.items, items)
+    else stashTurn(this.stashedTurns, jid, items)
   }
 
   private async runBeta3Turn(

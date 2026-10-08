@@ -474,3 +474,9 @@ Perubahan v3.6.6:
 - **Penjaga total:** total otomatis ditahan (dicek toko) bila lembar penjahit belum menyebut produk katalog ("Model sesuai gambar") atau menyebut produk lain dari rincian total. Skill: baris pertama spesifikasi = nama persis KATALOG yang sama dengan `order`; ragu model mana → tanya.
 - **Berat/ongkir:** blok detail celana di spesifikasi ("Celana / Size 32 / panjang 92") sempat dihitung sebagai celana kedua → 1,4 kg → ongkir 150.000 (seharusnya 75.000). Blok lanjutan tanpa nama produk yang hanya mengulang bagian item sebelumnya kini tidak dihitung lagi.
 - **Saran untuk pemilik:** isi kolom ciri (kerah, bukaan, kancing) produk tanpa foto di website (mis. Beskap Clean Look vs Bescap Cross Placket) supaya AI bisa mencocokkan foto pelanggan dengan model yang benar.
+
+## v3.6.69 — Pesan tidak hilang, foto model terbaru & konfirmasi CS
+
+- **Pesan tidak hilang:** giliran yang dilewati karena pesan lebih baru sudah masuk sebelum giliran mulai (atau dibatalkan tanpa giliran berikutnya yang menunggu) kini ikut ke giliran berikutnya — termasuk fotonya (maks 15 menit; tidak dihidupkan lagi bila CS/pemilik sudah membalas). Kasus Alkhoiri 8 Okt: foto model kedua + "Modelnya gini bs min?" dulu tidak pernah sampai ke AI.
+- **Foto model terbaru:** referensi bagian `model` (model utuh) yang baru menggantikan foto model sebelumnya; referensi detail (kerah, saku, kancing) tetap.
+- **Konfirmasi CS:** CS/pemilik membalas (quote) foto pelanggan dengan "jadi modelnya seperti ini" / "model yang ini" → foto itu menjadi referensi model resmi (catatan "Dikonfirmasi CS"), menggantikan foto model lama — juga pada order yang sudah lunas (referensi sudah menempel ke order).
