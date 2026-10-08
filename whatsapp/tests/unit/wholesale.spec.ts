@@ -1,7 +1,9 @@
 import { test } from '@japa/runner'
 import { readFile } from 'node:fs/promises'
 import { talksWholesale, wholesaleOrder } from '#beta3/reply_service'
-import { renderWholesale } from '#beta3/mcp'
+import { CATALOG_SYNC_SCHEMA, renderWholesale, syncLeanCatalog } from '#beta3/mcp'
+import { writeLeanState } from '#beta3/tables'
+import db from '#services/workspace_database'
 import { lineQty, matchAutoTotal, renderTotalMessage } from '#beta3/order_service'
 import { renderWholesaleRule, wholesaleDiscounts, wholesaleGroup } from '#beta3/wholesale'
 
@@ -122,5 +124,45 @@ test.group('diskon grosir (v3.6.56 → v3.6.60)', () => {
     assert.deepEqual(wholesaleDiscounts(old), discounts)
     assert.equal(renderWholesaleRule(wholesaleDiscounts(old)), text)
     assert.deepEqual(wholesaleDiscounts(text), discounts)
+  })
+})
+
+// v3.6.66 — 8 Okt: diskon grosir tidak pernah tersimpan di server. Website sudah mengirim `wholesale`,
+// tapi katalog dianggap "belum berubah" (if_version sama) sehingga sinkron tidak pernah menyimpan
+// bagian baru itu; tombol Sync juga tidak memaksa tarik ulang.
+test.group('sinkron katalog menarik ulang saat bagian baru ditambahkan (v3.6.66)', (group) => {
+  const names = ['mcp_slug', 'mcp_url', 'mcp_token', 'catalog_version_sf2', 'catalog_sync_schema', 'product_weights']
+  let saved: Array<{ name: string; value: string }> = []
+  const realFetch = globalThis.fetch
+  group.each.setup(async () => {
+    saved = (await db.from('whatsapp_beta3_state').whereIn('name', names).select('name', 'value')) as any
+    return async () => {
+      globalThis.fetch = realFetch
+      await db.from('whatsapp_beta3_state').whereIn('name', names).delete()
+      for (const row of saved) await writeLeanState(row.name, row.value)
+    }
+  })
+
+  test('skema sinkron lama → tanpa if_version (tarik penuh); skema sama → if_version', async ({ assert }) => {
+    await writeLeanState('mcp_slug', '')
+    await writeLeanState('mcp_url', 'https://mcp.test/x')
+    await writeLeanState('mcp_token', '')
+    await writeLeanState('catalog_version_sf2', 'v1')
+    await writeLeanState('product_weights', '{}')
+    await writeLeanState('catalog_sync_schema', '1')
+    const sent: any[] = []
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(String(init.body)).params.arguments)
+      const text = JSON.stringify({ version: 'v1', unchanged: true })
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text }] } }), { status: 200 })
+    }) as unknown as typeof fetch
+    await syncLeanCatalog()
+    assert.notProperty(sent[0], 'if_version')
+    await writeLeanState('catalog_sync_schema', CATALOG_SYNC_SCHEMA)
+    await syncLeanCatalog()
+    assert.equal(sent[1].if_version, 'v1')
+    // Tombol Sync (force) selalu tarik penuh.
+    await syncLeanCatalog({ force: true })
+    assert.notProperty(sent[2], 'if_version')
   })
 })

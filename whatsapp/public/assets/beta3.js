@@ -72,7 +72,8 @@
     const label = button.textContent
     button.textContent = t('Menyinkronkan…')
     try {
-      const result = await api('/api/beta3/catalog/sync', 'POST', {})
+      // v3.6.66: tombol Sync selalu menarik penuh (toko, bahan, size chart, diskon grosir ikut).
+      const result = await api('/api/beta3/catalog/sync', 'POST', { force: true })
       notice(
         result.unchanged
           ? t('Katalog belum berubah (versi {0}); tidak ada yang diunduh.', result.version.slice(0, 8))

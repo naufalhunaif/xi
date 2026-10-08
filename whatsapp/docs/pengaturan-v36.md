@@ -453,3 +453,10 @@ Perubahan v3.6.6:
 - **ChatGPT:** katalog model akun dibaca lewat `codex debug models` (per akun, 24 jam, di latar). Model tier otomatis (luna/terra/sol) dipakai hanya bila ada di katalog akun; tidak ada → model bawaan penyedia untuk akun itu.
 - **Claude:** tetap alias resmi CLI (haiku / sonnet / opus) yang diterjemahkan Anthropic sendiri ke versi terbaru (tercatat mis. claude-sonnet-5).
 - Daftar belum terbaca (pertama kali / penyedia gangguan) → cara lama dipakai; balasan tidak menunggu.
+
+## v3.6.66 — Diskon grosir benar-benar tersimpan dari website
+
+- **Temuan 8 Okt:** website sudah mengirim diskon grosir (catalog_digest `wholesale`), tetapi di server tidak pernah tersimpan: sinkron 30 menit memakai `if_version`, dan karena versi katalog tidak berubah sejak aplikasi bisa membaca diskon grosir, jawaban penyedia selalu "belum berubah" sehingga bagian baru itu tidak pernah diambil. Akibatnya AI menjawab "saya tanyakan dulu" untuk diskon 6 pcs.
+- Sekarang sinkron mencatat **skema sinkron**; bila aplikasi mulai menyimpan bagian baru (seperti diskon grosir), katalog ditarik penuh sekali walau versinya sama. Setelah `wa update`, diskon grosir tersimpan pada sinkron berikutnya (paling lama 30 menit) atau langsung lewat tombol **Sync**.
+- Tombol **Sync** di halaman katalog Beta 3 kini selalu menarik penuh (toko, bahan, size chart, diskon grosir), bukan hanya bila versi berubah.
+- Peringatan "Skill terlalu panjang" hanya muncul bila skill asli yang dipakai (saat ringkasan dipakai tidak relevan).

@@ -506,13 +506,6 @@ export async function createLeanReply(input: {
   const { jid, settings, onTrace } = input
   const skill = selectLeanSkill(settings.skills)
   const skillTokens = estimateTokens(skill.content)
-  if (skillTokens > LEAN_SKILL_TOKEN_LIMIT)
-    onTrace?.({
-      key: 'beta3-skill',
-      label: `Skill ${skill.name} terlalu panjang (~${skillTokens} token, batas ${LEAN_SKILL_TOKEN_LIMIT})`,
-      status: 'completed',
-      detail: { tokens: skillTokens, limit: LEAN_SKILL_TOKEN_LIMIT },
-    })
 
   // v3.6.39: isi skill sama, format ringkas (digest). Skill asli tidak diubah; digest belum ada /
   // tidak lengkap → skill asli. Skill diubah tanpa DIGEST.md baru → digest dibuat AI sekali di latar.
@@ -527,6 +520,14 @@ export async function createLeanReply(input: {
     )
     return String(JSON.parse(made.text).digest || '')
   }).catch(() => ({ content: skill.content, digest: false, fallback: [] as string[] }))
+  // v3.6.66: peringatan hanya bila skill ASLI yang terkirim (ringkasan dipakai → tidak relevan).
+  if (!skillUsed.digest && skillTokens > LEAN_SKILL_TOKEN_LIMIT)
+    onTrace?.({
+      key: 'beta3-skill',
+      label: `Skill ${skill.name} terlalu panjang (~${skillTokens} token, batas ${LEAN_SKILL_TOKEN_LIMIT})`,
+      status: 'completed',
+      detail: { tokens: skillTokens, limit: LEAN_SKILL_TOKEN_LIMIT },
+    })
 
   await seedLeanExamples().catch(() => 0)
   const [digest, examples, customerNote, chatNote, rows, spec, rules] = await Promise.all([

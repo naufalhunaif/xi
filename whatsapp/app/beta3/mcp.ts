@@ -136,6 +136,13 @@ export type CatalogSyncResult = {
  * if_version, server hanya menjawab "unchanged" bila belum ada perubahan —
  * murah untuk dipanggil dari tombol Sync maupun dari perintah ace.
  */
+/**
+ * v3.6.66: naikkan bila sinkron mulai menyimpan bagian baru dari catalog_digest. Server yang
+ * menyimpan bagian lebih sedikit menarik ulang penuh sekali walau versi katalog belum berubah
+ * (kasus 8 Okt: diskon grosir tidak pernah tersimpan karena katalog dianggap "belum berubah").
+ */
+export const CATALOG_SYNC_SCHEMA = '2-wholesale'
+
 export async function syncLeanCatalog(
   options: { force?: boolean } = {}
 ): Promise<CatalogSyncResult> {
@@ -144,12 +151,13 @@ export async function syncLeanCatalog(
   // Hanya produk yang tampil di toko: produk tersembunyi (mis. pesanan khusus/invoice seperti
   // jas almamater) dan produk arsip tidak boleh ditawarkan AI ke pelanggan.
   const stored = await readLeanState('catalog_version_sf2')
+  const schemaOld = String((await readLeanState('catalog_sync_schema').catch(() => '')) || '') !== CATALOG_SYNC_SCHEMA
   const digest = await callLeanTool<{ items?: unknown[]; version?: string; unchanged?: boolean }>(
     'catalog_digest',
     {
       format: 'json',
       storefront_only: true,
-      ...(options.force || !stored ? {} : { if_version: stored }),
+      ...(options.force || !stored || schemaOld ? {} : { if_version: stored }),
     },
     config,
     30_000
@@ -183,6 +191,7 @@ export async function syncLeanCatalog(
   await syncProductWeights(config).catch(() => 0)
   const version = digest.version ? String(digest.version) : ''
   if (version) await writeLeanState('catalog_version_sf2', version)
+  await writeLeanState('catalog_sync_schema', CATALOG_SYNC_SCHEMA)
   return { configured: true, unchanged: false, count, version }
 }
 
