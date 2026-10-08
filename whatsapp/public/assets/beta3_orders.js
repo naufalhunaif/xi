@@ -134,59 +134,65 @@
     if (!orders.length) {
       const row = el('tr')
       const cell = el('td', t('Tidak ada order.'), 'wa-order-empty')
-      cell.colSpan = 5
+      cell.colSpan = 6
       row.append(cell)
       list.append(row)
       return
     }
-    // Tab Semua: order berjalan di atas, lalu Selesai dan Dibatalkan dalam kelompok sendiri.
+    // Tab Semua: order berjalan di atas, lalu Selesai dan Dibatalkan (tanpa baris judul kelompok; baris lama redup).
     const groupOf = (order) => (order.shipped ? 'done' : order.status === 'cancelled' ? 'cancelled' : 'active')
     const sorted = status === 'all' ? ['active', 'done', 'cancelled'].flatMap((key) => orders.filter((order) => groupOf(order) === key)) : orders
-    let lastGroup = 'active'
+    const day = (value) => {
+      if (!value) return ''
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short' }).formatToParts(new Date(value))
+      return `${parts.find((part) => part.type === 'day')?.value || ''} ${parts.find((part) => part.type === 'month')?.value || ''}`.trim()
+    }
     for (const order of sorted) {
-      if (status === 'all' && groupOf(order) !== lastGroup) {
-        lastGroup = groupOf(order)
-        const count = orders.filter((item) => groupOf(item) === lastGroup).length
-        const divider = el('tr', undefined, 'wa-order-group')
-        const cell = el('th', `${lastGroup === 'done' ? t('Selesai') : t('Dibatalkan')} · ${count}`)
-        cell.colSpan = 5
-        cell.scope = 'rowgroup'
-        divider.append(cell)
-        list.append(divider)
-      }
       const row = el('tr')
-      if (status === 'all' && lastGroup !== 'active') row.classList.add('wa-order-past')
+      if (status === 'all' && groupOf(order) !== 'active') row.classList.add('wa-order-past')
       row.dataset.orderId = order.id
       row.dataset.selected = String(order.id === selected)
       row.tabIndex = 0
-      const head = el('td')
-      head.append(el('span', when(order.created_at)), el('br'), el('small', order.order_number || `#${order.id}`, 'wa-muted'))
+      const head = el('td', order.order_number || `#${order.id}`, 'wa-order-no')
       const who = el('td')
-      who.append(el('span', order.customer_name || order.contact_name || '-'), el('br'), el('small', order.regency || order.district || '', 'wa-muted'))
+      const name = order.customer_name || order.contact_name || '-'
+      const person = el('span', undefined, 'wa-order-person')
+      const photo = order.profile_picture_url ? el('img', undefined, 'wa-order-photo') : el('span', String(name).slice(0, 1).toUpperCase(), 'wa-order-photo')
+      if (order.profile_picture_url) {
+        photo.src = order.profile_picture_url
+        photo.alt = ''
+        photo.loading = 'lazy'
+        photo.addEventListener('error', () => photo.replaceWith(el('span', String(name).slice(0, 1).toUpperCase(), 'wa-order-photo')), { once: true })
+      }
+      const names = el('span', undefined, 'wa-order-names')
+      names.append(el('span', name))
+      const place = order.regency || order.district || ''
+      if (place) names.append(el('small', place, 'wa-muted'))
+      person.append(photo, names)
+      who.append(person)
       const items = el('td')
-      // Satu baris ringkas dari teks pesanan: produk · jas/celana · size.
-      const summary = String(order.text || order.spec || order.items || '')
+      // Satu baris ringkas: baris pertama pesanan + jumlah baris lainnya.
+      const lines = String(order.items || order.text || order.spec || '')
         .split('\n')
         .map((line) => line.trim().replace(/^[-•]\s*/, ''))
         .filter(Boolean)
-        .slice(0, 3)
-        .join(' · ')
-      items.append(el('span', summary.slice(0, 140), 'wa-order-items'))
+      items.append(el('span', (lines[0] || '').slice(0, 120), 'wa-order-items'))
+      if (lines.length > 1) items.append(el('span', ` +${lines.length - 1}`, 'wa-muted'))
       const total = el('td', order.total ? money(order.total) : '—', 'wa-order-amount')
       const state = el('td')
       const dp = order.status === 'paid' && order.paid_amount && order.total && Number(order.paid_amount) < Number(order.total)
-      const badge = el('span', order.vendor ? t('Pembelian bahan') : order.shipped ? t('Selesai') : dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, 'wa-order-badge')
-      badge.dataset.tone = order.shipped ? 'success' : statusTone[order.status] || ''
+      const tone = order.vendor ? '' : order.shipped ? 'ok' : order.status === 'paid' ? 'ink' : order.status === 'cancelled' ? '' : order.status === 'awaiting_payment' ? 'warn' : ''
+      const badge = el('span', order.vendor ? t('Pembelian bahan') : order.shipped ? t('Selesai') : dp ? `${t('DP')} ${money(order.paid_amount)}` : statusLabel[order.status] || order.status, `wa-st ${tone}`)
       state.append(badge)
-      if (order.shipped_awb) state.append(el('br'), el('small', order.shipped_awb === 'ANTAR' ? t('Diantar tim') : `${t('Resi')} ${order.shipped_awb}`, 'wa-muted'))
-      if (order.status === 'pending' && order.auto_total_reason) state.append(el('br'), el('small', order.auto_total_reason, 'wa-muted'))
-      if (groupLabel[order.group_status])
-        state.append(
-          el('br'),
-          el('small', [groupLabel[order.group_status], groupName(order.group_jid)].filter(Boolean).join(' · '), 'wa-muted')
-        )
-      if (order.source === 'rekap') state.append(el('br'), el('small', t('Rekap dari chat'), 'wa-order-source'))
-      row.append(head, who, items, total, state)
+      const notes = []
+      if (order.shipped_awb) notes.push(order.shipped_awb === 'ANTAR' ? t('Diantar tim') : `${t('Resi')} ${order.shipped_awb}`)
+      if (order.status === 'pending' && order.auto_total_reason) notes.push(order.auto_total_reason)
+      if (groupLabel[order.group_status]) notes.push([groupLabel[order.group_status], groupName(order.group_jid)].filter(Boolean).join(' · '))
+      if (order.source === 'rekap') notes.push(t('Rekap dari chat'))
+      if (notes.length) state.append(el('small', notes.join(' · '), 'wa-order-note'))
+      const date = el('td', day(order.created_at), 'wa-order-date')
+      date.title = when(order.created_at)
+      row.append(head, who, items, total, state, date)
       const open = () => openOrder(order)
       row.addEventListener('click', open)
       row.addEventListener('keydown', (event) => {
@@ -223,9 +229,11 @@
     if (progress.running) {
       notice(t('Rekap berjalan: {0}/{1} chat dibaca, {2} order dicatat. Tidak ada pesan ke pelanggan.', progress.done, progress.total || '…', progress.created))
       byId('beta3RecapStart').disabled = true
+      byId('beta3RecapStart').classList.add('is-busy')
       recapTimer = setTimeout(checkRecap, 15000)
     } else {
       byId('beta3RecapStart').disabled = false
+      byId('beta3RecapStart').classList.remove('is-busy')
       if (progress.finishedAt && Date.now() - progress.finishedAt < 10 * 60_000)
         notice(t('Rekap selesai: {0} chat dibaca, {1} order dicatat.', progress.done, progress.created))
     }

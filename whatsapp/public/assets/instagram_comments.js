@@ -64,8 +64,18 @@
   }
 
   // Tautan kecil bergaya teks (hemat tempat).
-  const link = (label, action, primary = false) => {
-    const node = el('button', label, `wa-igc-link${primary ? ' primary' : ''}`)
+  // v3.6.72: aksi berupa ikon (Balas = panah balas, Balas pakai AI = ikon AI) dengan tooltip.
+  const ICON_PATH = {
+    reply: 'M10 6 4 12l6 6M4 12h11a5 5 0 0 1 5 5v1',
+    ai: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
+  }
+  const link = (label, action, primary = false, icon = '') => {
+    const node = el('button', icon ? undefined : label, `wa-igc-link${primary ? ' primary' : ''}${icon ? ' wa-igc-icon' : ''}`)
+    if (icon) {
+      node.innerHTML = `<svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="${ICON_PATH[icon]}"/></svg>`
+      node.title = label
+      node.setAttribute('aria-label', label)
+    }
     node.type = 'button'
     node.addEventListener('click', action)
     return node
@@ -139,7 +149,7 @@
       link(t('Balas'), () => {
         form.hidden = !form.hidden
         if (!form.hidden) input.focus()
-      })
+      }, false, 'reply')
     )
     if (entry.canDm && !['pending', 'processing'].includes(entry.status)) {
       const ai = link(t('Balas pakai AI'), async () => {
@@ -152,7 +162,7 @@
           notice(error.message, true)
           ai.disabled = false
         }
-      })
+      }, false, 'ai')
       actions.append(ai)
     }
     // HP: ketuk komentar untuk memunculkan tombol.

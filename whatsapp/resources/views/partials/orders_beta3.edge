@@ -1,5 +1,15 @@
-<section id="beta3OrdersPage" class="wa-orders-page">
-  <div class="wa-orders-title"><h1 data-i18n="Order">Order</h1><div class="wa-orders-title-actions"><span id="beta3OrdersCount" class="wa-muted"></span><select id="beta3RecapDays" aria-label="Rentang rekap" data-i18n-aria-label="Rentang rekap"><option value="7">7 hari</option><option value="30" selected>30 hari</option><option value="90">90 hari</option></select><button id="beta3RecapStart" class="button" type="button" title="AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan." data-i18n="Rekap dari chat" data-i18n-title="AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan.">Rekap dari chat</button><button id="beta3OrdersRefresh" class="button" type="button" data-i18n="Perbarui">Perbarui</button></div></div>
+<section id="beta3OrdersPage" class="wa-orders-page wa-mono-page">
+  <div class="wa-orders-title">
+    <div class="wa-page-heading">
+      <span id="beta3OrdersCount" class="wa-eyebrow"></span>
+      <h1 data-i18n="Daftar order">Daftar order</h1>
+    </div>
+    <div class="wa-orders-title-actions">
+      <select id="beta3RecapDays" class="wa-quiet-select" aria-label="Rentang rekap" title="Rentang rekap" data-i18n-aria-label="Rentang rekap" data-i18n-title="Rentang rekap"><option value="7" data-i18n="7 hari terakhir">7 hari terakhir</option><option value="30" selected data-i18n="30 hari terakhir">30 hari terakhir</option><option value="90" data-i18n="90 hari terakhir">90 hari terakhir</option></select>
+      <button id="beta3RecapStart" class="button wa-icon-only" type="button" aria-label="Rekap dari chat" title="AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan." data-i18n-aria-label="Rekap dari chat" data-i18n-title="AI membaca chat yang dilayani CS lalu mencatat ordernya. Tidak mengirim pesan ke pelanggan."><svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11m-4-4 4 4 4-4M5 20h14" /></svg></button>
+      <button id="beta3OrdersRefresh" class="button wa-icon-only" type="button" aria-label="Perbarui" title="Perbarui" data-i18n-aria-label="Perbarui" data-i18n-title="Perbarui"><svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg></button>
+    </div>
+  </div>
   <div class="wa-lean-toolbar">
     <div id="beta3OrdersTabs" class="wa-order-tabs" role="group" aria-label="Filter order" data-i18n-aria-label="Filter order">
       <button type="button" data-status="all" aria-pressed="true"><span data-i18n="Semua">Semua</span> <b class="wa-tab-count" data-count="all"></b></button>
@@ -10,14 +20,14 @@
       <button type="button" data-status="cancelled" aria-pressed="false"><span data-i18n="Dibatalkan">Dibatalkan</span> <b class="wa-tab-count" data-count="cancelled"></b></button>
       <button type="button" data-status="vendor" aria-pressed="false" title="Pembelian bahan ke vendor — bukan order pelanggan" data-i18n-title="Pembelian bahan ke vendor — bukan order pelanggan"><span data-i18n="Vendor">Vendor</span> <b class="wa-tab-count" data-count="vendor"></b></button>
     </div>
-    <div class="wa-order-filters"><input id="beta3OrdersSearch" type="search" placeholder="Cari nomor order / nama / telepon / produk" data-i18n-placeholder="Cari nomor order / nama / telepon / produk" aria-label="Cari order" data-i18n-aria-label="Cari order"></div>
+    <label class="wa-order-filters wa-search-field"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg><input id="beta3OrdersSearch" type="search" placeholder="Cari nomor order / nama / telepon / produk" data-i18n-placeholder="Cari nomor order / nama / telepon / produk" aria-label="Cari order" data-i18n-aria-label="Cari order"></label>
   </div>
   <p id="beta3OrdersNotice" role="status" aria-live="polite"></p>
   <div class="wa-order-workspace">
     <div class="wa-order-table-scroll" tabindex="0" role="region" aria-label="Order" data-i18n-aria-label="Order">
       <table class="wa-order-table">
-        <thead><tr><th scope="col" data-i18n="Order">Order</th><th scope="col" data-i18n="Pelanggan">Pelanggan</th><th scope="col" data-i18n="Pesanan">Pesanan</th><th scope="col" class="wa-order-amount" data-i18n="Total">Total</th><th scope="col" data-i18n="Status">Status</th></tr></thead>
-        <tbody id="beta3OrdersList"><tr><td colspan="5"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
+        <thead><tr><th scope="col" data-i18n="Order">Order</th><th scope="col" data-i18n="Pelanggan">Pelanggan</th><th scope="col" data-i18n="Pesanan">Pesanan</th><th scope="col" class="wa-order-amount" data-i18n="Total">Total</th><th scope="col" data-i18n="Status">Status</th><th scope="col" class="wa-order-date" data-i18n="Tanggal">Tanggal</th></tr></thead>
+        <tbody id="beta3OrdersList"><tr><td colspan="6"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
       </table>
     </div>
   </div>

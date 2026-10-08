@@ -124,11 +124,14 @@ html[data-theme] body.workspace-ui .button.small {
 }
 .wa-st::before {
   content: '';
+  flex: none;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--line);
+  background: var(--muted);
+  opacity: 0.55;
 }
+.wa-st.ok::before, .wa-st.warn::before, .wa-st.bad::before, .wa-st.ink::before { opacity: 1; }
 .wa-st.ok::before { background: var(--wa-ok); }
 .wa-st.warn::before { background: var(--wa-warn); }
 .wa-st.bad::before { background: var(--wa-err); }
@@ -1122,4 +1125,425 @@ html[data-theme] body.workspace-ui .wa-pill.err {
 .wa-b3-to .wa-muted {
   margin: 0;
   padding: 0;
+}
+
+/* ---------- Halaman daftar (Orders, Contacts, Instagram) — v3.6.72 ---------- */
+html[data-theme] body.workspace-ui .wa-orders-page {
+  max-width: 1280px;
+}
+html[data-theme] body.workspace-ui .wa-orders-title {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 16px;
+}
+.wa-page-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+html[data-theme] body.workspace-ui .wa-eyebrow,
+html[data-theme] body.workspace-ui .wa-page-heading > .wa-eyebrow {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  line-height: 16px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-orders-title h1,
+html[data-theme] body.workspace-ui .wa-directory-heading h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+html[data-theme] body.workspace-ui .wa-orders-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+html[data-theme] body.workspace-ui .button.wa-icon-only {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .button.wa-icon-only:hover {
+  color: var(--text);
+  background: var(--wa-surface, #fff);
+}
+html[data-theme] body.workspace-ui .button.wa-icon-only.is-busy {
+  color: var(--text);
+  animation: wa-pulse 1.2s ease-in-out infinite;
+}
+@keyframes wa-pulse { 50% { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] body.workspace-ui .button.wa-icon-only.is-busy { animation: none; }
+}
+html[data-theme] body.workspace-ui .wa-quiet-select {
+  height: 32px;
+  border: 0;
+  background-color: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+html[data-theme] body.workspace-ui .wa-quiet-select:hover {
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-lean-toolbar {
+  margin: 0 0 12px;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  align-items: flex-end;
+}
+html[data-theme] body.workspace-ui .wa-order-tabs {
+  gap: 20px;
+  margin: 0;
+}
+html[data-theme] body.workspace-ui .wa-order-tabs button {
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  box-shadow: inset 0 -1px transparent;
+}
+html[data-theme] body.workspace-ui .wa-order-tabs button:hover {
+  color: var(--text);
+  background: transparent;
+}
+html[data-theme] body.workspace-ui .wa-order-tabs button[aria-pressed='true'] {
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  box-shadow: inset 0 -1px var(--text);
+}
+html[data-theme] body.workspace-ui .wa-order-tabs .wa-tab-count {
+  margin-left: 2px;
+  padding: 0;
+  min-width: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--wa-mono);
+  font-size: 11px;
+  font-weight: 400;
+}
+html[data-theme] body.workspace-ui .wa-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin: 0 0 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--wa-surface, #fff);
+  color: var(--muted);
+  flex: 0 1 300px;
+}
+html[data-theme] body.workspace-ui .wa-search-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-order-table-scroll {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-order-table {
+  background: transparent;
+  font-size: 13px;
+}
+html[data-theme] body.workspace-ui .wa-order-table th {
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-order-table td {
+  padding: 8px 12px;
+  height: 48px;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  vertical-align: middle;
+}
+html[data-theme] body.workspace-ui .wa-order-table :is(th, td):first-child {
+  padding-left: 0;
+}
+html[data-theme] body.workspace-ui .wa-order-table :is(th, td):last-child {
+  padding-right: 0;
+}
+html[data-theme] body.workspace-ui .wa-order-table tbody tr:hover td,
+html[data-theme] body.workspace-ui .wa-order-table tbody tr[data-selected='true'] td {
+  background: rgba(255, 255, 255, 0.55);
+}
+html[data-theme='dark'] body.workspace-ui .wa-order-table tbody tr:hover td,
+html[data-theme='dark'] body.workspace-ui .wa-order-table tbody tr[data-selected='true'] td {
+  background: rgba(255, 255, 255, 0.04);
+}
+html[data-theme] body.workspace-ui .wa-order-table tr.wa-order-past td {
+  opacity: 0.7;
+}
+.wa-order-no {
+  font-family: var(--wa-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.wa-order-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.wa-order-photo {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  object-fit: cover;
+  background: var(--wa-bubble);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.wa-order-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 17px;
+}
+.wa-order-names small {
+  font-size: 12px;
+}
+html[data-theme] body.workspace-ui .wa-order-items {
+  white-space: normal;
+}
+html[data-theme] body.workspace-ui .wa-order-amount {
+  font-family: var(--wa-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+html[data-theme] body.workspace-ui .wa-order-table td .wa-st {
+  font-size: 13px;
+}
+.wa-order-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 15px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-order-date {
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-orders-title-actions select.wa-quiet-select {
+  border: 0 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  padding: 0 6px;
+}
+html[data-theme] body.workspace-ui .wa-search-field input[type='search'] {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  outline: 0;
+}
+html[data-theme] body.workspace-ui .wa-search-field:focus-within {
+  border-color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-order-table td > .wa-st {
+  display: flex;
+  width: fit-content;
+}
+
+/* Contacts */
+.wa-toolbar-spacer { flex: 1; }
+html[data-theme] body.workspace-ui .wa-directory-scroll {
+  border: 0;
+  border-radius: 0;
+}
+html[data-theme] body.workspace-ui .wa-directory-table td {
+  background: transparent;
+  vertical-align: middle;
+}
+html[data-theme] body.workspace-ui .wa-directory-contact {
+  gap: 10px;
+}
+html[data-theme] body.workspace-ui .wa-directory-contact strong {
+  font-weight: 500;
+}
+html[data-theme] body.workspace-ui .wa-directory-avatar {
+  width: 26px;
+  height: 26px;
+  flex-basis: 26px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--wa-bubble);
+}
+.wa-directory-phone {
+  font-family: var(--wa-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.wa-directory-addresses {
+  max-width: 420px;
+  color: var(--muted);
+}
+.wa-directory-address-line {
+  display: inline-block;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+html[data-theme] body.workspace-ui .wa-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: 10px 0 0;
+  font-family: var(--wa-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-pager .button.wa-icon-only {
+  width: 28px;
+  height: 28px;
+}
+
+/* Peringatan: kartu putih tipis, titik warna + teks biasa. */
+html[data-theme] body.workspace-ui .wa-alert.warn,
+html[data-theme] body.workspace-ui .wa-alert.err,
+html[data-theme] body.workspace-ui .wa-alert.ok {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--wa-surface, #fff);
+  color: var(--text);
+  font-size: 13px;
+}
+html[data-theme] body.workspace-ui .wa-alert.warn::before,
+html[data-theme] body.workspace-ui .wa-alert.err::before,
+html[data-theme] body.workspace-ui .wa-alert.ok::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wa-warn);
+}
+html[data-theme] body.workspace-ui .wa-alert.err::before { background: var(--wa-err); }
+html[data-theme] body.workspace-ui .wa-alert.ok::before { background: var(--wa-ok); }
+html[data-theme] body.workspace-ui .wa-alert a {
+  margin-left: auto;
+  color: var(--text);
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Instagram */
+html[data-theme] body.workspace-ui .wa-ig-tabs {
+  gap: 20px;
+  margin: 12px 0 14px;
+}
+html[data-theme] body.workspace-ui .wa-ig-tabs button {
+  padding: 0;
+  height: 34px;
+  border-bottom: 1px solid transparent;
+  font-weight: 400;
+}
+html[data-theme] body.workspace-ui .wa-ig-tabs button[aria-selected='true'] {
+  border-bottom-color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-ig-tab-badge {
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--wa-mono);
+  font-size: 11px;
+  font-weight: 400;
+}
+html[data-theme] body.workspace-ui .wa-igc-card {
+  border: 0;
+  border-radius: 6px;
+}
+html[data-theme] body.workspace-ui .wa-igc-icon {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-igc-icon:hover {
+  background: var(--wa-page);
+  color: var(--text);
+  text-decoration: none;
+}
+html[data-theme] body.workspace-ui .wa-lean-toolbar .wa-order-filters input {
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--wa-surface, #fff);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+html[data-theme] body.workspace-ui .button.primary .wa-ico {
+  margin-right: -2px;
+}
+html[data-theme] body.workspace-ui .nav-item.active > .icon,
+html[data-theme] body.workspace-ui .nav-item.active .icon {
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .nav-badge {
+  background: var(--text);
+  color: var(--wa-page);
+  font-family: var(--wa-mono);
+  font-weight: 500;
+}
+html[data-theme] body.workspace-ui .wa-igc-subname {
+  color: var(--text);
+  font-weight: 500;
 }

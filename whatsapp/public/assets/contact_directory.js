@@ -10,6 +10,13 @@
     el.className = cls
     return el
   }
+  // +62 812-0000-0101 dari 6281200000101 (nomor lain apa adanya).
+  const formatPhone = (value) => {
+    const digits = String(value || '').replace(/\D/g, '')
+    if (!digits.startsWith('62') || digits.length < 10) return value || ''
+    const rest = digits.slice(2)
+    return `+62 ${rest.slice(0, 3)}-${rest.slice(3, 7)}${rest.length > 7 ? `-${rest.slice(7)}` : ''}`
+  }
   let page = 1,
     revision = 0,
     timer,
@@ -61,22 +68,19 @@
       }
       link.append(node('strong', name))
       cell.append(link)
-      const addresses = node('td')
-      for (const address of contact.addresses) {
-        const block = node('div', '', 'wa-directory-address')
-        if (address.name || address.phone)
-          block.append(node('strong', [address.name, address.phone].filter(Boolean).join(' · ')))
-        block.append(node('div', address.address))
-        block.append(
-          node(
-            'small',
-            t({ cart: 'Cart', order: 'Order', conversation: 'Dari percakapan' }[address.source])
-          )
-        )
-        addresses.append(block)
-      }
-      if (!contact.addresses.length) addresses.textContent = '—'
-      row.append(cell, node('td', contact.phone || '—'), addresses)
+      // v3.6.72: alamat satu baris (sumber + jumlah alamat lain di tooltip); nomor HP diformat.
+      const addresses = node('td', '', 'wa-directory-addresses')
+      const first = contact.addresses[0]
+      if (first) {
+        const line = node('span', first.address, 'wa-directory-address-line')
+        const more = contact.addresses.length - 1
+        line.title = contact.addresses
+          .map((address) => [[address.name, address.phone].filter(Boolean).join(' · '), address.address].filter(Boolean).join('\n'))
+          .join('\n\n')
+        addresses.append(line)
+        if (more > 0) addresses.append(node('span', ` +${more}`, 'wa-muted'))
+      } else addresses.textContent = '—'
+      row.append(cell, node('td', formatPhone(contact.phone) || '—', 'wa-directory-phone'), addresses)
       rows.append(row)
     }
     if (!data.contacts.length) {
@@ -87,8 +91,8 @@
       rows.append(row)
     }
     byId('directoryCount').textContent = t('{0} kontak', data.total)
-    byId('directoryPage').textContent =
-      `${data.page} / ${Math.max(1, Math.ceil(data.total / data.limit))}`
+    const from = data.total ? (data.page - 1) * data.limit + 1 : 0
+    byId('directoryPage').textContent = `${from}–${Math.min(data.total, data.page * data.limit)} / ${data.total}`
     byId('directoryPrevious').disabled = page <= 1
     byId('directoryNext').disabled = page * data.limit >= data.total
   }

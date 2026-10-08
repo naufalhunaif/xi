@@ -198,12 +198,15 @@ export default class Beta3Controller {
     // Nama pelanggan dari kontak bila order belum punya nama (chat lama / rekap).
     const jids = [...new Set(orders.map((order: Record<string, any>) => String(order.jid || '')).filter(Boolean))]
     const contacts = jids.length
-      ? await db.from('whatsapp_contacts').whereIn('jid', jids).select('jid', 'name').catch(() => [])
+      ? await db.from('whatsapp_contacts').whereIn('jid', jids).select('jid', 'name', 'profile_picture_url').catch(() => [])
       : []
     const nameOf = new Map(contacts.map((row: any) => [String(row.jid), String(row.name || '')]))
+    // v3.6.72: foto profil pelanggan di daftar order.
+    const photoOf = new Map(contacts.map((row: any) => [String(row.jid), String(row.profile_picture_url || '')]))
     const withText = orders.map((order: Record<string, any>) => ({
       spec: order.spec as unknown,
       contact_name: nameOf.get(String(order.jid || '')) || '',
+      profile_picture_url: photoOf.get(String(order.jid || '')) || null,
       ...order,
       // Foto dicocokkan dari isi pesanan saja, bukan dari catatan chat.
       chat_note: '',

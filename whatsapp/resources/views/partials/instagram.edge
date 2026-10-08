@@ -1,13 +1,15 @@
 {{-- Satu halaman Instagram: tab Konten · Komentar · Ringkasan (tab aktif dari ?tab=). --}}
 <section id="igPage" class="wa-orders-page wa-ig-page wa-igp-page wa-igc-page" data-ig-tab="{{ igTab || 'content' }}">
   <div class="wa-orders-title">
-    <h1 data-i18n="Instagram">Instagram</h1>
+    <div class="wa-page-heading">
+      <span id="igpAccount" class="wa-eyebrow"></span>
+      <h1 data-i18n="Instagram">Instagram</h1>
+    </div>
     <div class="wa-orders-title-actions">
-      <span id="igpAccount" class="wa-muted"></span>
-      <button id="igpRefresh" class="button" type="button" data-ig-for="content" data-i18n="Perbarui">Perbarui</button>
-      <button id="igcRefresh" class="button" type="button" data-ig-for="comments" data-i18n="Perbarui">Perbarui</button>
-      <button id="igpSummaryRefresh" class="button" type="button" data-ig-for="summary" data-i18n="Perbarui data">Perbarui data</button>
-      <button id="igpNew" class="button primary" type="button" data-i18n="+ Buat postingan">+ Buat postingan</button>
+      <button id="igpRefresh" class="button wa-icon-only" type="button" data-ig-for="content" aria-label="Perbarui" title="Perbarui" data-i18n-aria-label="Perbarui" data-i18n-title="Perbarui"><svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg></button>
+      <button id="igcRefresh" class="button wa-icon-only" type="button" data-ig-for="comments" aria-label="Perbarui" title="Perbarui" data-i18n-aria-label="Perbarui" data-i18n-title="Perbarui"><svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg></button>
+      <button id="igpSummaryRefresh" class="button wa-icon-only" type="button" data-ig-for="summary" aria-label="Perbarui data" title="Perbarui data" data-i18n-aria-label="Perbarui data" data-i18n-title="Perbarui data"><svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg></button>
+      <button id="igpNew" class="button primary" type="button"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span data-i18n="Buat postingan">Buat postingan</span></button>
     </div>
   </div>
   <p id="igpReconnect" class="wa-alert warn" hidden>

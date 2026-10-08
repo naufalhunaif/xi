@@ -1124,7 +1124,7 @@ window.waLocales.en = {
   "Belum ada gambar di chat ini.": "No images in this chat yet.",
   "Diisi AI otomatis dan ikut terkirim ke grup produksi. Ubah hanya bila perlu.": "Filled by the AI and sent to the production group. Edit only if needed.",
   "Rentang rekap": "Recap range",
-  "Rekap dari chat": "Recap from chats",
+  "Rekap dari chat": "Import from chats",
   "7 hari": "7 days",
   "30 hari": "30 days",
   "90 hari": "90 days",
@@ -2007,5 +2007,10 @@ window.waLocales.en = {
   "Total & pengiriman": "Total & shipping",
   "Total dikirim": "Total sent",
   "Order pelanggan": "Order",
-  "Sudah bayar": "Paid"
+  "Sudah bayar": "Paid",
+  "7 hari terakhir": "Last 7 days",
+  "30 hari terakhir": "Last 30 days",
+  "90 hari terakhir": "Last 90 days",
+  "Tanggal": "Date",
+  "Daftar order": "Orders"
 }
