@@ -1,0 +1,687 @@
+/*
+ * v3.6.70 — Lapisan "monokrom" (dimuat paling akhir, setelah wire.css).
+ * Sesuai rancangan yang disetujui: Instrument Sans + JetBrains Mono (offline), monokrom hangat,
+ * judul ringan, label kecil monospace hanya untuk eyebrow/jam/angka, status = titik + kata,
+ * aksi kecil berupa ikon, foto profil pelanggan, penanda memuat bentuk kawat 3D.
+ * Semua aturan memakai awalan html[data-theme] body.workspace-ui agar menang atas lapisan sebelumnya.
+ */
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('fonts/instrument-sans.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('fonts/jetbrains-mono.woff2') format('woff2');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+html[data-theme] body.workspace-ui {
+  --wa-sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --wa-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --wa-bubble: #e0ddd5;
+  --wa-ok: #2f7a5b;
+  --wa-warn: #b26a00;
+  --wa-err: #b3261e;
+  font-family: var(--wa-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+html[data-theme='dark'] body.workspace-ui {
+  --wa-bubble: #2f2e2b;
+  --wa-ok: #5cc29a;
+  --wa-warn: #e3a64a;
+  --wa-err: #f08a84;
+}
+html[data-theme] body.workspace-ui :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+
+/* Teks tersembunyi untuk pembaca layar (label ikon). */
+.wa-sr {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Ikon garis. */
+.wa-ico {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -2px;
+}
+
+/* Penanda memuat: bentuk kawat 3D (wire_loader.js). */
+.wa-wf {
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--text, #151515);
+}
+.wa-wf path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.wa-wf.is-small path {
+  stroke-width: 2;
+}
+html[data-theme] body.workspace-ui .wa-loading {
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-loading.inline {
+  flex-direction: row;
+  gap: 6px;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+html[data-theme] body.workspace-ui .wa-loading:has(> .wa-wf)::before {
+  display: none;
+}
+
+/* Tombol: sans 13px, radius 6; primer hitam. */
+html[data-theme] body.workspace-ui .button {
+  font-family: var(--wa-sans);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+html[data-theme] body.workspace-ui .button.small {
+  font-size: 12px;
+}
+
+/* Status: titik kecil berwarna + kata (dipakai bertahap di halaman lain). */
+.wa-st {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.wa-st::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.wa-st.ok::before { background: var(--wa-ok); }
+.wa-st.warn::before { background: var(--wa-warn); }
+.wa-st.bad::before { background: var(--wa-err); }
+.wa-st.ink::before { background: var(--text); }
+
+/* ---------- Chat: daftar ---------- */
+html[data-theme] body.workspace-ui .wa-inbox-heading > strong {
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+html[data-theme] body.workspace-ui .wa-inbox-channels {
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-inbox-channels button {
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+}
+html[data-theme] body.workspace-ui .wa-inbox-channels button[aria-pressed='true'] {
+  background: var(--wa-page);
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-inbox-lines button {
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 8px;
+  min-width: 30px;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: transparent;
+}
+html[data-theme] body.workspace-ui .wa-inbox-lines button[aria-pressed='true'] {
+  background: var(--wa-page);
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-inbox-lines button[aria-pressed='true'] .wa-sim {
+  border-color: var(--text);
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-inbox-filters {
+  border-bottom: 1px solid var(--line);
+}
+html[data-theme] body.workspace-ui .wa-inbox-tabs {
+  gap: 16px;
+}
+html[data-theme] body.workspace-ui .wa-inbox-filters button[data-inbox-filter] {
+  height: 32px;
+  padding: 0 !important;
+  border: 0;
+  border-radius: 0 !important;
+  font-family: var(--wa-sans);
+  font-size: 13px !important;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: inset 0 -1px transparent;
+}
+html[data-theme] body.workspace-ui .wa-inbox-filters button[data-inbox-filter][aria-pressed='true'] {
+  color: var(--text);
+  font-weight: 400;
+  background: transparent;
+  box-shadow: inset 0 -1px var(--text);
+}
+html[data-theme] body.workspace-ui .wa-inbox-filters button [data-filter-count],
+html[data-theme] body.workspace-ui .wa-inbox-filters button[aria-pressed='true'] [data-filter-count] {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  font-family: var(--wa-mono);
+  font-size: 11px !important;
+  font-weight: 400;
+  color: var(--muted);
+  background: transparent;
+}
+html[data-theme] body.workspace-ui .wa-inbox-filters {
+  padding-bottom: 0;
+}
+html[data-theme] body.workspace-ui .wa-inbox-more {
+  border-radius: 6px !important;
+}
+html[data-theme] body.workspace-ui .wa-inbox-search input {
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+html[data-theme] body.workspace-ui .wa-contact {
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 0;
+}
+html[data-theme] body.workspace-ui .wa-contact.active {
+  background: var(--wa-page);
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-contact.ai-running {
+  box-shadow: none;
+}
+.wa-contact-photo {
+  position: relative;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+}
+html[data-theme] body.workspace-ui .wa-contact-photo .wa-contact-avatar {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  font-family: var(--wa-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--wa-bubble);
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-contact-channel {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--wa-surface, #fff);
+  color: var(--text);
+  box-shadow: 0 0 0 1.5px var(--wa-surface, #fff);
+}
+html[data-theme] body.workspace-ui .wa-contact-channel .wa-ico {
+  stroke-width: 1.9;
+}
+html[data-theme] body.workspace-ui .wa-contact-content {
+  flex: 1;
+  gap: 2px;
+}
+html[data-theme] body.workspace-ui .wa-contact-content strong {
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+html[data-theme] body.workspace-ui .wa-contact-content small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-contact-content small .wa-ico {
+  margin-right: 1px;
+}
+html[data-theme] body.workspace-ui .wa-contact-content small.active {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-style: normal;
+}
+html[data-theme] body.workspace-ui .wa-contact-content small .wa-wf {
+  width: 20px;
+  height: 20px;
+  margin: -2px 0;
+}
+html[data-theme] body.workspace-ui .wa-contact-meta {
+  align-self: stretch;
+  justify-content: center;
+  gap: 6px;
+}
+html[data-theme] body.workspace-ui .wa-unread-count {
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--text);
+  font-size: 0;
+  color: transparent;
+}
+html[data-theme] body.workspace-ui .wa-contact-pending {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--text);
+  font-size: 0;
+}
+html[data-theme] body.workspace-ui .wa-contact-meta .wa-unread-count ~ .wa-contact-pending,
+html[data-theme] body.workspace-ui .wa-contact-meta .wa-contact-pending:has(~ .wa-unread-count) {
+  display: none;
+}
+html[data-theme] body.workspace-ui .wa-contact-mode {
+  font-family: var(--wa-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+}
+html[data-theme] body.workspace-ui .wa-contact-mode.cs {
+  color: var(--muted);
+  background: transparent;
+  display: inline-grid;
+  place-items: center;
+}
+html[data-theme] body.workspace-ui .wa-contact-mode.urgent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--wa-err);
+  background: transparent;
+}
+html[data-theme] body.workspace-ui .wa-contact-mode.urgent::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wa-err);
+}
+
+/* ---------- Chat: header room ---------- */
+html[data-theme] body.workspace-ui .wa-room-title #roomName {
+  font-size: 14px;
+  font-weight: 500;
+}
+html[data-theme] body.workspace-ui :is(.wa-room-avatar) {
+  width: 36px;
+  height: 36px;
+  font-family: var(--wa-sans);
+  color: var(--muted);
+  background: var(--wa-bubble);
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui button.wa-room-mode {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  font-size: 0;
+}
+html[data-theme] body.workspace-ui button.wa-room-mode:hover {
+  background: var(--wa-page);
+}
+html[data-theme] body.workspace-ui button.wa-room-mode::after {
+  display: none;
+}
+html[data-theme] body.workspace-ui button.wa-room-mode.cs,
+html[data-theme] body.workspace-ui button.wa-room-mode.excluded {
+  color: var(--muted);
+  background: transparent;
+}
+.wa-room-mode-dot {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wa-ok, #2f7a5b);
+  box-shadow: 0 0 0 2px var(--wa-surface, #fff);
+}
+html[data-theme] body.workspace-ui .wa-room-status small,
+html[data-theme] body.workspace-ui #roomGoalStatus {
+  font-family: var(--wa-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+/* ---------- Chat: pesan ---------- */
+html[data-theme] body.workspace-ui .wa-messages .message {
+  border: 0;
+  border-radius: 6px;
+  background: var(--wa-surface, #fff);
+  padding: 9px 12px 7px;
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-messages .message.out,
+html[data-theme] body.workspace-ui .wa-messages .message.out.source-cs {
+  background: var(--wa-bubble);
+  border: 0;
+}
+html[data-theme] body.workspace-ui .wa-messages .message.has-media {
+  padding: 0;
+}
+html[data-theme] body.workspace-ui .wa-messages:not([data-jid$='@g.us']) .message.in .message-meta {
+  display: none;
+}
+html[data-theme] body.workspace-ui .message-meta[hidden] {
+  display: none;
+}
+html[data-theme] body.workspace-ui .message-body {
+  font-size: 13px;
+  line-height: 19px;
+}
+html[data-theme] body.workspace-ui .message-footer {
+  gap: 6px;
+  margin-top: 4px;
+  justify-content: flex-end;
+}
+html[data-theme] body.workspace-ui .message-footer .message-time {
+  font-family: var(--wa-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .message-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: auto;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .message.out .message-tools {
+  margin-right: 0;
+}
+html[data-theme] body.workspace-ui .message-footer .wa-trace-link {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0;
+}
+html[data-theme] body.workspace-ui .message-footer .wa-trace-link:hover {
+  background: var(--wa-surface, #fff);
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .message-footer .message-source-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0;
+}
+html[data-theme] body.workspace-ui .message-status {
+  display: inline-grid;
+  place-items: center;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .message-status.read {
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .message-status.failed {
+  color: var(--wa-err);
+  font-family: var(--wa-mono);
+}
+html[data-theme] body.workspace-ui .message-reactions {
+  order: -1;
+  margin-right: auto;
+}
+html[data-theme] body.workspace-ui .message-reactions:not(:empty) {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--wa-surface, #fff);
+  box-shadow: 0 0 0 1px var(--line);
+  font-size: 12px;
+}
+html[data-theme] body.workspace-ui .message.in .message-reactions:not(:empty) {
+  background: var(--wa-page);
+}
+html[data-theme] body.workspace-ui .message-reply-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 340px;
+  margin: -2px -5px 7px;
+  padding: 5px 8px;
+  border: 0;
+  border-left: 0;
+  border-radius: 4px;
+  background: rgba(21, 21, 21, 0.05);
+  color: var(--muted);
+  font-family: var(--wa-sans);
+  font-size: 12px;
+  text-align: left;
+}
+html[data-theme='dark'] body.workspace-ui .message-reply-preview {
+  background: rgba(255, 255, 255, 0.06);
+}
+html[data-theme] body.workspace-ui .message.has-media .message-reply-preview {
+  margin: 8px 8px 0;
+}
+html[data-theme] body.workspace-ui .message-reply-preview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Aksi pesan (React · Reply) saat kursor di atas pesan. */
+html[data-theme] body.workspace-ui .message-actions {
+  gap: 2px;
+  right: -64px;
+  width: 64px;
+  padding-top: 2px;
+  align-items: flex-start;
+}
+html[data-theme] body.workspace-ui .message.out .message-actions {
+  left: -64px;
+  right: auto;
+  justify-content: flex-end;
+}
+html[data-theme] body.workspace-ui .message:hover .message-actions {
+  opacity: 1;
+}
+html[data-theme] body.workspace-ui .message-actions > button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: var(--wa-surface, #fff);
+  color: var(--muted);
+  box-shadow: 0 0 0 1px var(--line);
+}
+html[data-theme] body.workspace-ui .message-actions > button:hover {
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .reaction-picker {
+  gap: 2px;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--wa-surface, #fff);
+  box-shadow: 0 0 0 1px var(--line), 0 6px 16px rgba(40, 36, 30, 0.08);
+}
+html[data-theme] body.workspace-ui .reaction-picker button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 14px;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+}
+html[data-theme] body.workspace-ui .reaction-picker button:hover {
+  background: var(--wa-page);
+}
+
+/* AI sedang membalas: baris tipis dengan spiral kawat + langkah yang sedang berjalan. */
+html[data-theme] body.workspace-ui .wa-ai-progress {
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--wa-page);
+  color: var(--text);
+  font-size: 13px;
+}
+html[data-theme] body.workspace-ui .wa-ai-progress > .wa-ai-progress-shape {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -4px 0;
+}
+html[data-theme] body.workspace-ui .wa-ai-progress > #aiProgressLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-theme] body.workspace-ui .wa-ai-progress > .wa-ai-progress-more {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- Chat: komposer ---------- */
+html[data-theme] body.workspace-ui .wa-composer input[type='text'] {
+  height: 38px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+html[data-theme] body.workspace-ui .wa-composer .wa-send {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+html[data-theme] body.workspace-ui .wa-send .wa-send-busy {
+  display: none;
+  color: currentColor;
+}
+html[data-theme] body.workspace-ui .wa-send.is-busy .wa-send-busy {
+  display: inline-block;
+}
+html[data-theme] body.workspace-ui .wa-send.is-busy .wa-send-icon {
+  display: none;
+}
+html[data-theme] body.workspace-ui .wa-reply-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-left: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--wa-surface, #fff);
+  font-family: var(--wa-sans);
+  font-size: 12px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-reply-composer[hidden] {
+  display: none;
+}
+
+/* Layar sentuh: aksi pesan tetap terlihat tapi tipis (tanpa kotak). */
+@media (hover: none), (max-width: 520px) {
+  html[data-theme] body.workspace-ui .message-actions {
+    opacity: 0.6;
+    width: 52px;
+    right: -54px;
+  }
+  html[data-theme] body.workspace-ui .message.out .message-actions {
+    left: -54px;
+  }
+  html[data-theme] body.workspace-ui .message-actions > button {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    box-shadow: none;
+  }
+}

@@ -1983,4 +1983,8 @@ window.waLocales.en = {
   "Paling kuat \u00b7 Claude": "Strongest \u00b7 Claude",
   "Paling kuat \u00b7 ChatGPT": "Strongest \u00b7 ChatGPT",
   "Tindakan lain": "More actions",
+  "Reaksi": "React",
+  "Dibalas AI": "Replied by AI",
+  "Dibalas CS": "Replied by CS",
+  "Semua saluran": "All channels"
 }

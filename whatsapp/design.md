@@ -2,6 +2,19 @@
 
 Wajib dibaca sebelum membuat atau mengubah halaman. Tujuannya: setiap layar rapi, mudah dibaca sekilas, dan mudah dipakai CS tanpa penjelasan.
 
+## 0. Gaya monokrom (v3.6.70, disetujui pemilik)
+
+Lapisan terakhir `public/assets/mono.css` (setelah `wire.css`). Semua halaman baru/ubahan mengikuti ini:
+
+- **Huruf:** Instrument Sans (teks) + JetBrains Mono (eyebrow, jam, angka, kode), dari `public/assets/fonts/` (offline, lisensi OFL).
+- **Warna:** monokrom hangat — latar `--wa-page` (#edebe5), kartu putih, teks `--text`, bubble keluar `--wa-bubble`. Tanpa biru/hijau dekoratif.
+- **Judul ringan** (weight 400, 20–22 px) dengan label kecil monospace huruf kapital di atasnya (eyebrow).
+- **Status = titik + kata** (`<span class="wa-st ok">Paid</span>`; `ok`, `warn`, `bad`, `ink`). Itu satu-satunya warna.
+- **Aksi kecil = ikon** dengan `title` + `aria-label` (Reply, React, Why this reply, Correct, Order, Send, Edit, Add…). Tombol utama yang penting tetap bertulisan.
+- **Foto profil pelanggan** di daftar (inisial bila tidak ada) + ikon kanal kecil di sudutnya.
+- **Tanpa border kartu & bayangan berat;** pemisah = garis tipis `--line` dan jarak. Radius maks 6 px.
+- **Penanda memuat = bentuk kawat 3D** (`wire_loader.js`): `sphere` (halaman/`.wa-loading`), `spiral` (AI sedang membalas), `core` (langkah proses berjalan), `rings` (tombol sibuk). Minimal 20 px; di bawah 32 px otomatis bentuk sederhana + garis tebal. `<svg class="wa-wf" data-shape="spiral" data-size="32"></svg>` atau `waLoader.make('spiral', 32)`.
+
 ## 1. Prinsip
 
 1. **Tindakan dulu, teks belakangan.** Tampilkan status, data, dan tombol yang dibutuhkan. Tidak ada paragraf pengantar; bantuan pakai satu baris `wa-note` atau popover ⓘ.

@@ -236,7 +236,7 @@ export async function latestInboxMessages(query: InboxQuery = {}) {
           AND n.contact_name IS NOT NULL AND n.contact_name <> '' ORDER BY n.id DESC LIMIT 1)) AS contact_name,
       COALESCE(NULLIF(c.phone_jid, ''), CASE WHEN m.jid LIKE '%@s.whatsapp.net' THEN m.jid END) AS phone_jid,
       m.body, m.media_type,
-      m.direction, m.created_at,
+      m.direction, m.sender_type, m.created_at,
       (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid AND ${lineSql('u')} = ${lineSql('m')}
         AND u.direction = 'in' AND u.id > COALESCE(rr.read_id, c.workspace_read_id, 0)) AS unread_count,
       (SELECT COUNT(*) FROM whatsapp_messages u WHERE u.jid = m.jid AND ${lineSql('u')} = ${lineSql('m')} AND u.direction = 'in'

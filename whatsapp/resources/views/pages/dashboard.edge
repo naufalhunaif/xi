@@ -165,9 +165,9 @@
             <div class="wa-inbox-heading">
               <strong>Chat</strong>
               <div id="inboxChannels" class="wa-inbox-channels" role="group" aria-label="Saluran" data-i18n-aria-label="Saluran" hidden>
-                <button type="button" data-channel="all" aria-pressed="true" data-i18n="Semua">Semua</button>
-                <button type="button" data-channel="wa" aria-pressed="false">WhatsApp</button>
-                <button type="button" data-channel="ig" aria-pressed="false">Instagram</button>
+                <button type="button" data-channel="all" aria-pressed="true" aria-label="Semua saluran" title="Semua saluran" data-i18n-aria-label="Semua saluran" data-i18n-title="Semua saluran"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 13l2-8h12l2 8v6H4zM4 13h5l1 2h4l1-2h5" /></svg></button>
+                <button type="button" data-channel="wa" aria-pressed="false" aria-label="WhatsApp" title="WhatsApp"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4.5 19.5l1.2-3.6A8 8 0 1 1 8.3 18.4z" /></svg></button>
+                <button type="button" data-channel="ig" aria-pressed="false" aria-label="Instagram" title="Instagram"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M8.5 4h7A4.5 4.5 0 0 1 20 8.5v7a4.5 4.5 0 0 1-4.5 4.5h-7A4.5 4.5 0 0 1 4 15.5v-7A4.5 4.5 0 0 1 8.5 4zM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" /></svg></button>
               </div>
               <a id="connectHint" class="wa-connect-hint" href="{{ appUrl }}/settings#numbers" hidden data-i18n="Hubungkan nomor">Hubungkan nomor</a>
               <button id="inboxSelect" type="button" class="wa-icon-button wa-inbox-select" aria-pressed="false" aria-label="Pilih chat" title="Pilih chat" data-i18n-aria-label="Pilih chat" data-i18n-title="Pilih chat">
@@ -337,14 +337,15 @@
                   }}
                 </strong>
                 <div id="roomStatus" class="wa-room-status" {{ selectedContact ? '' : 'hidden' }}>
-                  <button id="roomMode" type="button" class="wa-room-mode {{ selectedContact?.handling_mode }}" data-i18n-auto
+                  <button id="roomMode" type="button" class="wa-room-mode {{ selectedContact?.handling_mode }}"
                     aria-expanded="false" aria-controls="roomHandlingDetails"
                     data-reason="{{ selectedContact?.handoff_reason || '' }}"
                     data-schedule-paused="{{ selectedContact?.schedule_paused ? 'true' : 'false' }}"
                     data-note="{{ selectedContact?.handling_note || '' }}"
                     data-waiting="{{ selectedContact?.goal_waiting_for || '' }}"
                     data-next="{{ selectedContact?.goal_next_action || '' }}">
-                    {{ selectedContact?.ai_excluded ? 'Tanpa AI' : selectedContact?.handling_mode === 'cs' ? 'Ditangani CS' : 'Ditangani AI' }}
+                    <svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="{{ selectedContact?.handling_mode === 'cs' ? 'M12 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20c0-4 3-6 7-6s7 2 7 6' : 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z' }}" /></svg>
+                    <span class="wa-sr" data-i18n-auto>{{ selectedContact?.ai_excluded ? 'Tanpa AI' : selectedContact?.handling_mode === 'cs' ? 'Ditangani CS' : 'Ditangani AI' }}</span>
                   </button>
                   <small id="roomGoalStatus" class="wa-muted" aria-live="polite"></small>
                 </div>
@@ -594,8 +595,9 @@
               aria-haspopup="dialog"
               hidden
             >
+              <svg class="wa-wf wa-ai-progress-shape" data-shape="spiral" data-size="32"></svg>
               <span id="aiProgressLabel" role="status"></span>
-              <span data-i18n="Detail proses ›">Detail proses ›</span>
+              <span class="wa-ai-progress-more" data-i18n="Detail proses ›">Detail proses ›</span>
             </button>
             <form id="messageForm" class="wa-composer" enctype="multipart/form-data">
               <div id="replyComposer" class="wa-reply-composer" hidden>
@@ -650,8 +652,9 @@
                 placeholder="Pesan"
                 {{ selectedJid ? '' : 'disabled' }}
               / data-i18n-placeholder="Pesan">
-              <button class="button primary" type="submit" {{ selectedJid ? '' : 'disabled' }} data-i18n="Kirim">
-                Kirim
+              <button class="button primary wa-send" type="submit" {{ selectedJid ? '' : 'disabled' }} aria-label="Kirim" title="Kirim" data-i18n-aria-label="Kirim" data-i18n-title="Kirim">
+                <svg class="wa-ico wa-send-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+                <svg class="wa-wf wa-send-busy" data-shape="rings" data-size="20"></svg>
               </button>
             </form>
           </section>

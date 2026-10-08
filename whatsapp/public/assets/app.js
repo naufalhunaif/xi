@@ -3,6 +3,38 @@
   const appUrl = document.querySelector('meta[name="app-url"]')?.content?.replace(/\/$/, '') || ''
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || ''
   const byId = (id) => document.getElementById(id)
+  // v3.6.70: ikon garis kecil (gaya monokrom) untuk aksi & penanda di chat.
+  const ICONS = {
+    ai: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
+    person: 'M12 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20c0-4 3-6 7-6s7 2 7 6',
+    read: 'M2 12.5l4 4 8-9M11 15.5l1 1 8-9',
+    sent: 'm5 12.5 4 4 10-10',
+    why: 'M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM9.8 9.5a2.3 2.3 0 1 1 3.2 2.1c-.6.3-1 .8-1 1.4v.5M12 16.5h.01',
+    edit: 'M4 20h4L19 9l-4-4L4 16z',
+    reply: 'M10 6 4 12l6 6M4 12h11a5 5 0 0 1 5 5v1',
+    react: 'M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM8.5 14.5c1 1.3 2.1 2 3.5 2s2.5-.7 3.5-2M9 10h.01M15 10h.01',
+    wa: 'M4.5 19.5l1.2-3.6A8 8 0 1 1 8.3 18.4z',
+    ig: 'M8.5 4h7A4.5 4.5 0 0 1 20 8.5v7a4.5 4.5 0 0 1-4.5 4.5h-7A4.5 4.5 0 0 1 4 15.5v-7A4.5 4.5 0 0 1 8.5 4zM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z',
+    noai: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM4 4l16 16',
+  }
+  const icon = (name, size = 14) => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('width', String(size))
+    svg.setAttribute('height', String(size))
+    svg.setAttribute('aria-hidden', 'true')
+    svg.setAttribute('class', `wa-ico wa-ico-${name}`)
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path.setAttribute('d', ICONS[name] || '')
+    svg.append(path)
+    return svg
+  }
+  const srText = (text) => {
+    const span = document.createElement('span')
+    span.className = 'wa-sr'
+    span.textContent = text
+    return span
+  }
   const notice = byId('notice')
   async function api(path, options = {}) {
     const response = await fetch(`${appUrl}${path}`, {
@@ -223,13 +255,15 @@
     const replyButton = document.createElement('button')
     replyButton.type = 'button'
     replyButton.dataset.reply = ''
-    replyButton.ariaLabel = 'Reply'
-    replyButton.textContent = '↩'
+    replyButton.ariaLabel = t('Balas')
+    replyButton.title = t('Balas')
+    replyButton.append(icon('reply'))
     const reactionToggle = document.createElement('button')
     reactionToggle.type = 'button'
     reactionToggle.dataset.reactionToggle = ''
-    reactionToggle.ariaLabel = 'Reaction'
-    reactionToggle.textContent = '☺'
+    reactionToggle.ariaLabel = t('Reaksi')
+    reactionToggle.title = t('Reaksi')
+    reactionToggle.append(icon('react'))
     const picker = document.createElement('div')
     picker.className = 'reaction-picker'
     picker.hidden = true
@@ -240,7 +274,7 @@
       button.textContent = emoji
       picker.append(button)
     }
-    actions.append(replyButton, reactionToggle, picker)
+    actions.append(reactionToggle, replyButton, picker)
     article.append(actions)
 
     if (message.reply) {
@@ -357,10 +391,8 @@
     const meta = document.createElement('div')
     meta.className = 'message-meta'
     if (message.direction === 'out') {
-      const source = document.createElement('span')
-      source.className = 'message-source-badge'
-      source.textContent = senderType === 'ai' ? 'AI' : 'CS'
-      meta.append(source)
+      // v3.6.70: sumber balasan (AI/CS) jadi ikon kecil di kaki pesan; meta kosong disembunyikan.
+      meta.hidden = true
     } else {
       // Riwayat sering tanpa nama pengirim: pakai nama room, jangan tampilkan ID internal.
       const roomTitle = byId('roomName')?.textContent?.trim()
@@ -383,6 +415,38 @@
       reactions.append(emoji)
     }
     footer.append(reactions)
+    const tools = document.createElement('span')
+    tools.className = 'message-tools'
+    if (message.trace_id) {
+      const detail = document.createElement('button')
+      detail.type = 'button'
+      detail.className = 'wa-trace-link'
+      detail.dataset.traceId = message.trace_id
+      detail.title = t('Detail proses')
+      detail.setAttribute('aria-label', t('Detail proses'))
+      detail.append(icon('why', 13))
+      tools.append(detail)
+    }
+    if (message.direction === 'out' && senderType === 'ai' && message.body) {
+      // Koreksi pemilik: jadi contoh jawaban / aturan toko + kasus uji (quality.js).
+      const correct = document.createElement('button')
+      correct.type = 'button'
+      correct.className = 'wa-trace-link wa-correct-link'
+      correct.dataset.correctId = String(message.id)
+      correct.title = t('Koreksi')
+      correct.setAttribute('aria-label', t('Koreksi'))
+      correct.append(icon('edit', 13))
+      tools.append(correct)
+    }
+    if (message.direction === 'out') {
+      const source = document.createElement('span')
+      source.className = 'message-source-badge'
+      const label = senderType === 'ai' ? t('Dibalas AI') : t('Dibalas CS')
+      source.title = label
+      source.append(icon(senderType === 'ai' ? 'ai' : 'person', 12), srText(label))
+      tools.append(source)
+    }
+    if (tools.childNodes.length) footer.append(tools)
     // Jam kirim (WIB); pesan bukan hari ini ikut tanggalnya.
     const sentAt = message.created_at ? new Date(message.created_at) : null
     if (sentAt && !Number.isNaN(sentAt.getTime())) {
@@ -403,31 +467,11 @@
       const status = document.createElement('span')
       status.className = `message-status ${message.status}`
       status.title = message.status === 'failed' && message.send_error ? `${t('Gagal terkirim')}: ${message.send_error}` : message.status
-      status.textContent = ['read', 'delivered'].includes(message.status)
-        ? '✓✓'
-        : message.status === 'failed'
-          ? '!'
-          : '✓'
+      if (message.status === 'failed') status.textContent = '!'
+      else status.append(icon(['read', 'delivered'].includes(message.status) ? 'read' : 'sent', 13))
       footer.append(status)
     }
     article.append(footer)
-    if (message.trace_id) {
-      const detail = document.createElement('button')
-      detail.type = 'button'
-      detail.className = 'wa-trace-link'
-      detail.dataset.traceId = message.trace_id
-      detail.textContent = t('Detail proses')
-      article.append(detail)
-    }
-    if (message.direction === 'out' && senderType === 'ai' && message.body) {
-      // Koreksi pemilik: jadi contoh jawaban / aturan toko + kasus uji (quality.js).
-      const correct = document.createElement('button')
-      correct.type = 'button'
-      correct.className = 'wa-trace-link wa-correct-link'
-      correct.dataset.correctId = String(message.id)
-      correct.textContent = t('Koreksi')
-      article.append(correct)
-    }
     return article
   }
   function renderMessages(items) {
@@ -1042,17 +1086,19 @@
       } else {
         avatar.textContent = String(name).slice(0, 1).toUpperCase()
       }
+      // v3.6.70: foto profil + ikon kanal kecil di sudutnya (WhatsApp / Instagram).
+      const isIg = String(contact.jid).endsWith('@ig')
+      const photo = document.createElement('span')
+      photo.className = 'wa-contact-photo'
+      const channel = document.createElement('span')
+      channel.className = 'wa-contact-channel'
+      channel.title = isIg ? 'Instagram' : 'WhatsApp'
+      channel.append(icon(isIg ? 'ig' : 'wa', 10))
+      photo.append(avatar, channel)
       const content = document.createElement('span')
       content.className = 'wa-contact-content'
       const title = document.createElement('strong')
       title.textContent = name
-      if (String(contact.jid).endsWith('@ig')) {
-        const ig = document.createElement('span')
-        ig.className = 'wa-line-chip wa-ig-chip'
-        ig.title = 'Instagram'
-        ig.textContent = 'IG'
-        title.append(ig)
-      }
       if (contact.line_sim) {
         const chip = document.createElement('span')
         chip.className = 'wa-sim'
@@ -1062,13 +1108,25 @@
         title.append(chip)
       }
       const preview = document.createElement('small')
-      preview.textContent = contact.activity || cleanPreview(contact.body)
       preview.classList.toggle('active', Boolean(contact.activity))
+      if (contact.activity) {
+        // AI sedang bekerja di room ini: spiral kawat kecil + label aktivitas.
+        if (window.waLoader) preview.append(window.waLoader.make('spiral', 20))
+        preview.append(document.createTextNode(contact.activity))
+      } else {
+        // Pesan terakhir dari kita: ikon AI / centang (CS) menggantikan awalan teks.
+        if (contact.direction === 'out') {
+          const by = contact.sender_type === 'ai' ? 'ai' : 'read'
+          preview.append(icon(by, 12), document.createTextNode(' '))
+        }
+        preview.append(document.createTextNode(cleanPreview(contact.body)))
+      }
       content.append(title, preview)
-      // AI adalah bawaan: badge hanya untuk CS. Koin kuning = pembayaran perlu dikonfirmasi.
+      // AI adalah bawaan: penanda hanya untuk CS (ikon orang). Koin = pembayaran perlu dikonfirmasi.
       const mode = document.createElement('span')
       mode.className = 'wa-contact-mode cs'
-      mode.textContent = 'CS'
+      mode.title = t('Ditangani CS')
+      mode.append(icon('person', 13), srText(t('Ditangani CS')))
       const coin = document.createElement('span')
       coin.className = 'wa-contact-coin'
       coin.title = t('Pembayaran perlu dikonfirmasi')
@@ -1079,7 +1137,6 @@
       if (Number(contact.unanswered_count) > 0) {
         const pending = document.createElement('span')
         pending.className = 'wa-contact-pending'
-        pending.textContent = `${contact.unanswered_count} ↩`
         pending.title = t("{0} unanswered", contact.unanswered_count)
         pending.setAttribute('aria-label', pending.title)
         meta.append(pending)
@@ -1089,6 +1146,7 @@
         const badge = document.createElement('span')
         badge.className = 'wa-unread-count'
         badge.textContent = String(unread)
+        badge.title = t("{0} unread", unread)
         badge.setAttribute('aria-label', t("{0} unread", unread))
         meta.append(badge)
       }
@@ -1109,7 +1167,7 @@
         role.title = contact.role === 'vendor' ? t('Vendor / supplier bahan — bukan pelanggan') : t('Bukan pelanggan')
         meta.append(role)
       } else if (contact.handling_mode === 'cs') meta.append(mode)
-      link.append(avatar, content, meta)
+      link.append(photo, content, meta)
       const [at, id] = contactOrder(contact)
       link.dataset.at = String(at)
       link.dataset.mid = String(id)
@@ -1247,8 +1305,15 @@
     if (byId('roomGoalStatus')) byId('roomGoalStatus').textContent = ''
     handling.dataset.mode = selectedMode
     handling.dataset.schedulePaused = String(schedulePaused)
-    badge.className = `wa-room-mode ${selectedMode}`
-    badge.textContent = excluded ? t('Tanpa AI') : selectedMode === 'cs' ? t('Ditangani CS') : t('Ditangani AI')
+    // v3.6.70: status penanganan = ikon (AI + titik hijau / orang / AI dicoret); teksnya untuk pembaca layar & tooltip.
+    badge.className = `wa-room-mode ${selectedMode}${excluded ? ' excluded' : ''}`
+    const modeLabel = excluded ? t('Tanpa AI') : selectedMode === 'cs' ? t('Ditangani CS') : t('Ditangani AI')
+    badge.replaceChildren(icon(excluded ? 'noai' : selectedMode === 'cs' ? 'person' : 'ai', 16), srText(modeLabel))
+    if (!excluded && selectedMode === 'ai') {
+      const dot = document.createElement('span')
+      dot.className = 'wa-room-mode-dot'
+      badge.append(dot)
+    }
     button.textContent = selectedMode === 'cs' ? t('Aktifkan AI') : t('Ambil alih')
     button.disabled = excluded || schedulePaused
     button.title = excluded ? t('Hapus dari daftar Jangan dibalas AI terlebih dahulu') : schedulePaused ? t('Di luar jam kerja AI') : ''
@@ -1607,7 +1672,8 @@
     controls.forEach((control) => {
       control.disabled = true
     })
-    button.textContent = file ? t('Mengunggah…') : t('Mengirim…')
+    button.classList.add('is-busy')
+    button.setAttribute('aria-label', file ? t('Mengunggah…') : t('Mengirim…'))
     try {
       await api('/api/messages/send', { method: 'POST', body: requestBody })
       bodyInput.value = ''
@@ -1622,7 +1688,8 @@
       controls.forEach((control) => {
         control.disabled = false
       })
-      button.textContent = t('Kirim')
+      button.classList.remove('is-busy')
+      button.setAttribute('aria-label', t('Kirim'))
       bodyInput.focus()
     }
   })
