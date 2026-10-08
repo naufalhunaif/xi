@@ -76,6 +76,7 @@ import { pricePattern, renderPricePattern } from '#beta3/price_pattern'
 import { attachOrderPhotos } from '#beta3/order_photos'
 import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '#beta3/weights'
 import env from '#start/env'
+import { listSimRuns, loadScenarios, readSimRun, startSimRun, type SimScenario } from '#beta3/simulator'
 
 /** Beta 3: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
 /** Bukti transfer yang nominalnya sedang/baru dibaca AI (sekali per 10 menit per order). */
@@ -667,6 +668,48 @@ export default class Beta3Controller {
   async removeTest({ params, response }: HttpContext) {
     await removeTest(Number(params.id))
     return response.noContent()
+  }
+
+  /** v3.6.78 Uji percakapan: daftar skenario + putaran terakhir. */
+  async sim({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    const [scenarios, runs] = await Promise.all([loadScenarios(), listSimRuns(10)])
+    const last = runs[0] ? await readSimRun(runs[0].id) : null
+    return response.json({
+      scenarios: scenarios.map((item) => ({ id: item.id, judul: item.judul, giliran: item.giliran })),
+      runs,
+      last,
+    })
+  }
+
+  async simRun({ params, response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    const run = await readSimRun(Number(params.id))
+    return run ? response.json(run) : response.notFound({ error: 'Putaran uji tidak ditemukan.' })
+  }
+
+  /** Mulai uji: semua skenario, sebagian (ids), atau percakapan sendiri (custom: [{judul, maksud, giliran}]). */
+  async startSim({ request, response }: HttpContext) {
+    const settings = await readSettings(true)
+    const ids = (Array.isArray(request.input('ids')) ? request.input('ids') : []).map(String).filter(Boolean).slice(0, 100)
+    const custom = (Array.isArray(request.input('custom')) ? request.input('custom') : [])
+      .slice(0, 30)
+      .map((item: Record<string, unknown>, index: number) => ({
+        id: `coba-${index + 1}`,
+        judul: String(item?.judul || `Coba ${index + 1}`).slice(0, 120),
+        maksud: String(item?.maksud || 'Jawab maksud pelanggan dengan benar sesuai katalog.').slice(0, 1500),
+        giliran: (Array.isArray(item?.giliran) ? item.giliran : []).map(String).map((text: string) => text.trim()).filter(Boolean).slice(0, 8),
+        harap: item?.harap && typeof item.harap === 'object' ? (item.harap as SimScenario['harap']) : undefined,
+      }))
+      .filter((item: SimScenario) => item.giliran.length)
+    return response.json(
+      await startSimRun({ ...settings, aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt' } as any, {
+        ids,
+        custom,
+        judge: request.input('judge') !== false,
+        label: String(request.input('label') || ''),
+      })
+    )
   }
 
   /** Pengaturan → Jev: status, kunci API (terenkripsi), saklar per keputusan. */

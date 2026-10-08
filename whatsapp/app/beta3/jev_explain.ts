@@ -131,6 +131,22 @@ const INFO: Record<string, Info> = {
     },
     effect: () => 'The AI gets a short "HATI" note so it answers the feeling first (hint only, no data changes).',
   },
+  cek_balasan: {
+    question: (sub) =>
+      sub === 'foto'
+        ? 'Do the photos sent match what the AI reply says and what the customer asked?'
+        : sub === 'jawab'
+          ? "How well does the AI reply answer what the customer means? (1 missed · 2 partly · 3 fully)"
+          : sub === 'fakta'
+            ? 'Do the prices, colors and ready sizes in the AI reply match the catalog?'
+            : 'Does the AI reply repeat a question or something already said?',
+    labels: {
+      sesuai: 'Matches', kurang: 'Promised photos missing', lebih: 'Extra photos', beda: 'Different product/color',
+      bertentangan: 'Contradicts the catalog', tidak_bisa_dinilai: 'Cannot be checked', ya: 'Yes', tidak: 'No',
+    },
+    source: 'toko',
+    effect: () => 'Checked before sending. A confident problem makes the AI rewrite the reply once with the checker note.',
+  },
   janji_total: {
     question: () => 'Does the AI reply promise to send the total/bank account?',
     labels: yesNo,
@@ -267,7 +283,7 @@ export function answerLabel(decision: string, answer: string, sub = '') {
 /** Penjelasan satu baris log keputusan Jev untuk ditampilkan ke CS. */
 export function explainDecision(row: Row) {
   const info = INFO[row.decision]
-  const sub = ['topik', 'harga_konteks', 'varian', 'hati'].includes(row.decision) ? String(row.detail || '') : ''
+  const sub = ['topik', 'harga_konteks', 'varian', 'hati', 'cek_balasan'].includes(row.decision) ? String(row.detail || '') : ''
   const answer = String(row.answer || '')
   const used = Boolean(Number(row.used))
   return {

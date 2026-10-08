@@ -38,7 +38,7 @@ export const LEAN_OUTPUT_SCHEMA = {
       type: 'array',
       items: { type: 'string' },
       description:
-        'Nama varian katalog yang fotonya dikirim setelah pesan, persis seperti di KATALOG (misal "Tuxedo - Black"). Hanya bila pelanggan minta lihat atau baru memilih model. Kalau kamu menyebut/membandingkan beberapa model dan bilang "ini fotonya", SEMUA model yang disebut harus ada fotonya. Maksimal 5.',
+        'Nama varian katalog yang fotonya dikirim setelah pesan, persis seperti di KATALOG (misal "Tuxedo - Black"). Hanya bila pelanggan minta lihat atau baru memilih model. Kalau kamu menyebut/membandingkan beberapa model dan bilang "ini fotonya", SEMUA model yang disebut harus ada fotonya. Biasanya 1–3; pelanggan minta lihat semua → semua yang punya foto (maks 10) dan sebut nama sisanya.',
     },
     catatan: {
       type: 'string',

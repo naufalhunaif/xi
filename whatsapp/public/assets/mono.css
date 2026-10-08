@@ -1941,3 +1941,92 @@ html[data-theme] body.workspace-ui .message-footer .message-time + .message-stat
   font-size: 12px;
   text-align: right;
 }
+
+/* v3.6.78 — kartu Uji percakapan di halaman AI. */
+.wa-sim-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.wa-sim-summary {
+  margin: 0 0 6px;
+  font-family: var(--wa-mono);
+  font-size: 12px;
+}
+.wa-sim-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wa-sim-item {
+  border-top: 1px solid var(--line);
+}
+.wa-sim-item > details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+  font-size: 13px;
+  list-style: none;
+}
+.wa-sim-title {
+  flex: 1;
+  min-width: 0;
+}
+.wa-sim-score {
+  font-family: var(--wa-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.wa-sim-issues {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--wa-err, #b3261e);
+}
+.wa-sim-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 0 10px;
+}
+.wa-sim-chat p {
+  margin: 0;
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+.wa-sim-in {
+  align-self: flex-start;
+  background: var(--wa-surface, #fff);
+  border: 1px solid var(--line);
+}
+.wa-sim-out {
+  align-self: flex-end;
+  background: var(--wa-bubble, #e9e6df);
+}
+.wa-sim-photo {
+  font-family: var(--wa-mono);
+  font-size: 11.5px !important;
+}
+.wa-sim-handoff {
+  align-self: center;
+  color: var(--muted);
+  font-size: 11.5px !important;
+}
+.wa-sim-steps {
+  align-self: stretch;
+  font-size: 11px;
+  color: var(--muted);
+}
+.wa-sim-steps pre {
+  white-space: pre-wrap;
+  margin: 4px 0 0;
+}
+.wa-sim-card textarea {
+  width: 100%;
+  margin: 8px 0;
+}

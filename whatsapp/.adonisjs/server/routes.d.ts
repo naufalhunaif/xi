@@ -56,6 +56,9 @@ export type ScannedRoutes = {
     'beta_3.tests': { paramsTuple?: []; params?: {} }
     'beta_3.run_tests': { paramsTuple?: []; params?: {} }
     'beta_3.remove_test': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'beta_3.sim': { paramsTuple?: []; params?: {} }
+    'beta_3.sim_run': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'beta_3.start_sim': { paramsTuple?: []; params?: {} }
     'beta_3.customer': { paramsTuple?: []; params?: {} }
     'beta_3.save_customer': { paramsTuple?: []; params?: {} }
     'lines.index': { paramsTuple?: []; params?: {} }
@@ -189,6 +192,8 @@ export type ScannedRoutes = {
     'beta_3.jev_decisions': { paramsTuple?: []; params?: {} }
     'beta_3.rules': { paramsTuple?: []; params?: {} }
     'beta_3.tests': { paramsTuple?: []; params?: {} }
+    'beta_3.sim': { paramsTuple?: []; params?: {} }
+    'beta_3.sim_run': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.customer': { paramsTuple?: []; params?: {} }
     'lines.index': { paramsTuple?: []; params?: {} }
     'ai_accounts.index': { paramsTuple?: []; params?: {} }
@@ -266,6 +271,8 @@ export type ScannedRoutes = {
     'beta_3.jev_decisions': { paramsTuple?: []; params?: {} }
     'beta_3.rules': { paramsTuple?: []; params?: {} }
     'beta_3.tests': { paramsTuple?: []; params?: {} }
+    'beta_3.sim': { paramsTuple?: []; params?: {} }
+    'beta_3.sim_run': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'beta_3.customer': { paramsTuple?: []; params?: {} }
     'lines.index': { paramsTuple?: []; params?: {} }
     'ai_accounts.index': { paramsTuple?: []; params?: {} }
@@ -348,6 +355,7 @@ export type ScannedRoutes = {
     'beta_3.add_rule': { paramsTuple?: []; params?: {} }
     'beta_3.correction': { paramsTuple?: []; params?: {} }
     'beta_3.run_tests': { paramsTuple?: []; params?: {} }
+    'beta_3.start_sim': { paramsTuple?: []; params?: {} }
     'beta_3.save_customer': { paramsTuple?: []; params?: {} }
     'lines.store': { paramsTuple?: []; params?: {} }
     'lines.disconnect': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }

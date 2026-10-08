@@ -1,0 +1,275 @@
+import { test } from '@japa/runner'
+import { readFile } from 'node:fs/promises'
+import db from '#services/workspace_database'
+import { resetJevCache, saveJevConfig, setJevFetcher } from '#beta3/jev'
+import { checkReply, photoCaptions, relevantFacts, revisionNote } from '#beta3/reply_check'
+import { deterministicIssues, isSimJid, loadScenarios, transcript, type SimTurn } from '#beta3/simulator'
+import { allowedPrices } from '#beta3/quality_service'
+import { listLeanOrders, countLeanOrders } from '#beta3/order_service'
+import type { LeanCatalogRow } from '#beta3/catalog_service'
+
+const row = (product: string, color: string, extra: Partial<LeanCatalogRow> = {}): LeanCatalogRow => ({
+  id: 0,
+  product,
+  color,
+  category: 'Suits',
+  price: 485000,
+  sizesReady: '',
+  sizesAll: 'S M L XL',
+  photoUrl: `https://example.test/${product}-${color}.jpg`.replace(/\s+/g, '-'),
+  materialAvailable: true,
+  features: '',
+  featuresAi: '',
+  material: 'Maximotion',
+  sizeGroup: 'S-4XL',
+  fit: '',
+  note: 'XXL-3XL 585.000',
+  active: true,
+  updatedAt: new Date().toISOString(),
+  ...extra,
+})
+const catalog = [
+  row('Basic Suit', 'Navy', { sizesReady: 'S L XL' }),
+  row('Basic Suit', 'Maroon', { sizesReady: 'S M L XL XXL' }),
+  row('Basic Suit', 'Gray', { photoUrl: null }),
+  row('Tuxedo', 'Black'),
+  row('Beskap Premium', 'Sage Green', { price: 685000, photoUrl: null }),
+]
+
+const jevReply = (answers: Record<string, unknown>) =>
+  (async () =>
+    new Response(JSON.stringify({ model: 'jev-test', answers, usage: { input_tokens: 10, output_tokens: 1 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as unknown as typeof fetch
+const choice = (value: string, confidence = 0.92) => ({ type: 'choice', choice: value, probabilities: {}, confidence })
+
+test.group('pemeriksa balasan (Jev) sebelum kirim (v3.6.78)', (group) => {
+  group.each.setup(async () => {
+    const clean = () => db.from('whatsapp_beta3_state').whereIn('name', ['jev_key', 'jev_settings', 'jev_last_error']).delete().catch(() => {})
+    await clean()
+    return async () => {
+      setJevFetcher(null)
+      await clean()
+      resetJevCache()
+    }
+  })
+
+  test('foto yang tidak ada di katalog ditandai tanpa Jev; caption = "Produk - Warna"', async ({ assert }) => {
+    const { sent, missing } = photoCaptions(catalog, ['Basic Suit - Navy', 'Basic Suit - Gray', 'Kemeja Batik'])
+    assert.deepEqual(sent, ['Basic Suit - Navy'])
+    assert.deepEqual(missing, ['Basic Suit - Gray', 'Kemeja Batik'])
+    const result = await checkReply({
+      jid: 'cek@s.whatsapp.net',
+      customerText: 'liat yg abu dong',
+      history: [],
+      decision: { pesan: ['Ini fotonya bos'], foto: ['Basic Suit - Gray'], serah_cs: false },
+      rows: catalog,
+    })
+    assert.equal(result.jev, false)
+    assert.deepEqual(result.issues.map((issue) => issue.code), ['foto_tidak_ada'])
+  })
+
+  test('fakta yang relevan: produk yang disebut saja, warna bertanda foto & size ready', ({ assert }) => {
+    const facts = relevantFacts(catalog, ['ada beskap premium ijo?', 'Ada bos'])
+    assert.lengthOf(facts, 1)
+    assert.include(facts[0], 'Beskap Premium')
+    assert.include(facts[0], '685.000')
+    const basic = relevantFacts(catalog, ['basic suit navy'])[0]
+    assert.include(basic, 'Navy ✓ [S L XL]')
+    assert.include(basic, 'Gray')
+    assert.notInclude(basic, 'Gray ✓')
+    assert.include(basic, 'XXL+ 585.000')
+  })
+
+  test('Jev yakin foto kurang + maksud terlewat → dua masalah; ragu → tidak dipakai', async ({ assert }) => {
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    let sent: any = null
+    setJevFetcher((async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body))
+      return (
+        jevReply({
+          foto: choice('kurang'),
+          jawab: { type: 'score', score: 1, confidence: 0.9 },
+          fakta: choice('bertentangan', 0.5),
+          ulang: { type: 'noul', noul: 0.1 },
+        }) as any
+      )()
+    }) as unknown as typeof fetch)
+    const result = await checkReply({
+      jid: 'cek@s.whatsapp.net',
+      customerText: 'kirimin fotonya basic suit yg navy sm yg maroon, sama size L ada?',
+      history: [{ direction: 'out', body: 'Halo bos', createdAt: new Date() }],
+      decision: { pesan: ['Ini fotonya bos'], foto: ['Basic Suit - Navy'], serah_cs: false },
+      rows: catalog,
+    })
+    assert.isTrue(result.jev)
+    assert.deepEqual(result.issues.map((issue) => issue.code).sort(), ['foto_kurang', 'tidak_menjawab'])
+    // Jev menilai maksud dari pesan, balasan, foto yang benar-benar terkirim, dan fakta katalog.
+    assert.deepEqual(sent.state.foto_dikirim, ['Basic Suit - Navy'])
+    assert.include(sent.state.fakta_katalog[0], 'Basic Suit')
+    assert.includeMembers(Object.keys(sent.questions), ['foto', 'jawab', 'fakta', 'ulang'])
+    const note = revisionNote({ pesan: ['Ini fotonya bos'], foto: ['Basic Suit - Navy'] }, result.issues)
+    assert.include(note, 'PEMERIKSA BALASAN')
+    assert.include(note, 'Basic Suit - Navy')
+  })
+
+  test('pemeriksa dimatikan di pengaturan Jev → hanya pemeriksaan pasti', async ({ assert }) => {
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true, off: ['cek_balasan'] })
+    let called = false
+    setJevFetcher((async () => {
+      called = true
+      return (jevReply({}) as any)()
+    }) as unknown as typeof fetch)
+    const result = await checkReply({
+      jid: 'cek@s.whatsapp.net',
+      customerText: 'navy ada?',
+      history: [],
+      decision: { pesan: ['Ada bos'], foto: [], serah_cs: false },
+      rows: catalog,
+    })
+    assert.isFalse(called)
+    assert.deepEqual(result, { issues: [], jev: false })
+  })
+
+  test('reply_service: aturan grosir selalu ikut; draf diperiksa lalu ditulis ulang sekali', async ({ assert }) => {
+    const source = await readFile('app/beta3/reply_service.ts', 'utf8')
+    assert.include(source, 'const store = [storeProfile, wholesale]')
+    assert.include(source, "'beta3-revise'")
+    assert.include(source, 'revisionNote(decision, check.issues)')
+  })
+})
+
+test.group('uji percakapan (simulasi) (v3.6.78)', () => {
+  const turn = (balasan: string[], extra: Partial<SimTurn> = {}): SimTurn => ({
+    pelanggan: 'x',
+    balasan,
+    foto: [],
+    serah_cs: false,
+    alasan: '',
+    jejak: [],
+    ms: 1,
+    ...extra,
+  })
+
+  test('skenario: id unik, ada giliran, pola harap valid, bahasa beragam', async ({ assert }) => {
+    const scenarios = await loadScenarios()
+    assert.isAtLeast(scenarios.length, 35)
+    assert.equal(new Set(scenarios.map((item) => item.id)).size, scenarios.length)
+    for (const item of scenarios) {
+      assert.isAbove(item.maksud.length, 20, item.id)
+      for (const pattern of [...(item.harap?.sebut || []), ...(item.harap?.tidak_sebut || [])]) new RegExp(pattern, 'i')
+    }
+    const all = scenarios.flatMap((item) => item.giliran).join('\n')
+    for (const sample of ['isih ono ra', 'aya jas', 'awak mau', 'do u have', '👔', 'setengah lusin', 'kurng'])
+      assert.include(all, sample)
+  })
+
+  test('pemeriksaan pasti: harga asing, tidak membalas, serah CS tanpa perlu, kata wajib, foto', ({ assert }) => {
+    const allowed = allowedPrices([row('Basic Suit', 'Navy')], [])
+    const issues = deterministicIssues(
+      { harap: { serah_cs: false, sebut: ['15\\.000'], foto: true } },
+      [turn(['Basic Suit 485.000 bos, diskon jadi 455.000']), turn([]), turn(['Saya tanyakan ke tim ya'], { serah_cs: true, alasan: 'grosir' })],
+      allowed
+    )
+    assert.isTrue(issues.some((item) => item.includes('455.000')))
+    assert.isTrue(issues.some((item) => item.startsWith('Giliran 2: tidak membalas')))
+    assert.isTrue(issues.some((item) => item.startsWith('Diserahkan ke CS padahal bisa dijawab')))
+    assert.isTrue(issues.some((item) => item.includes('15\\.000')))
+    assert.isTrue(issues.some((item) => item === 'Seharusnya mengirim foto.'))
+    assert.isFalse(issues.some((item) => item.includes('485.000')))
+    const text = transcript([turn(['Ini fotonya bos'], { foto: ['Basic Suit - Navy'], pelanggan: 'navy?' })])
+    assert.equal(text, 'Pelanggan: navy?\nAI: Ini fotonya bos\nAI: [foto] Basic Suit - Navy')
+  })
+
+  test('jid uji tidak pernah tampil di daftar order & tidak bisa dikirimi pesan', async ({ assert }) => {
+    assert.isTrue(isSimJid('uji-a-1@sim'))
+    assert.isFalse(isSimJid('6281200000000@s.whatsapp.net'))
+    const jid = 'uji-test-0@sim'
+    await listLeanOrders()
+    await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
+    const before = (await countLeanOrders()) as Record<string, number>
+    await db.table('whatsapp_beta3_orders').insert({ jid, status: 'pending', items: 'Basic Suit - Navy', created_at: new Date(), updated_at: new Date() })
+    try {
+      const orders = await listLeanOrders()
+      assert.isFalse(orders.some((order: Record<string, any>) => order.jid === jid))
+      const after = (await countLeanOrders()) as Record<string, number>
+      assert.equal(after.all, before.all)
+    } finally {
+      await db.from('whatsapp_beta3_orders').where('jid', jid).delete()
+    }
+    const { queueOutgoingMessage } = await import('#services/message_service')
+    await assert.rejects(() => queueOutgoingMessage({ jid, body: 'tes' }))
+  })
+})
+
+test.group('uji percakapan · ujung ke ujung dengan AI tiruan (v3.6.78)', (group) => {
+  group.each.setup(async () => {
+    const clean = async () => {
+      await db.from('whatsapp_beta3_state').whereIn('name', ['jev_key', 'jev_settings', 'jev_last_error']).delete().catch(() => {})
+      await db.from('whatsapp_beta3_catalog').where('product', 'Jas Uji').delete().catch(() => {})
+    }
+    await clean()
+    return async () => {
+      setJevFetcher(null)
+      const { setLeanProviderOverride } = await import('#beta3/provider')
+      setLeanProviderOverride(null)
+      await clean()
+      resetJevCache()
+    }
+  })
+
+  test('draf foto kurang → Jev menandai → AI menulis ulang → foto sesuai; data uji terhapus', async ({ assert }) => {
+    const { importLeanCatalog, catalogDigest } = await import('#beta3/catalog_service')
+    const { setLeanProviderOverride } = await import('#beta3/provider')
+    const { readSettings } = await import('#services/settings_service')
+    const { runScenario } = await import('#beta3/simulator')
+    await importLeanCatalog([
+      { product: 'Jas Uji', color: 'Navy', price: 485000, category: 'Suits', photoUrl: 'https://example.test/navy.jpg', sizesReady: 'S M L' },
+      { product: 'Jas Uji', color: 'Maroon', price: 485000, category: 'Suits', photoUrl: 'https://example.test/maroon.jpg', sizesReady: 'M L' },
+    ])
+    await catalogDigest(true)
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    const checked: string[][] = []
+    setJevFetcher((async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body))
+      if (!body.questions.foto) return (jevReply({}) as any)()
+      checked.push(body.state.foto_dikirim)
+      return (jevReply({ foto: choice('kurang'), jawab: { type: 'score', score: 2, confidence: 0.9 }, fakta: choice('sesuai'), ulang: { type: 'noul', noul: 0.05 } }) as any)()
+    }) as unknown as typeof fetch)
+    const decision = (foto: string[]) =>
+      JSON.stringify({ pesan: ['Ini fotonya bos, 485.000'], foto, catatan: 'produk: Jas Uji', tahap: 'tanya_size', serah_cs: false, alasan: '', susulan: '', spesifikasi: '' })
+    const phases: string[] = []
+    setLeanProviderOverride(async ({ phase, prompt }) => {
+      phases.push(phase)
+      if (phase === 'beta3-sim-judge') return JSON.stringify({ nilai: 5, lulus: true, masalah: [] })
+      if (phase === 'beta3-revise') {
+        assert.include(prompt.user, 'PEMERIKSA BALASAN')
+        return decision(['Jas Uji - Navy', 'Jas Uji - Maroon'])
+      }
+      if (phase === 'beta3-reply') return decision(['Jas Uji - Navy'])
+      return '{}'
+    })
+    const settings = await readSettings(true)
+    const result = await runScenario(
+      {
+        id: 'e2e',
+        judul: 'Foto dua warna',
+        maksud: 'Kirim foto Jas Uji Navy dan Maroon.',
+        giliran: ['kirimin fotonya jas uji yg navy sm yg maroon dong'],
+        harap: { serah_cs: false, foto: true, sebut: ['485\\.000'] },
+      },
+      { ...settings, aiProvider: 'chatgpt' } as any,
+      { facts: 'Jas Uji 485.000' }
+    )
+    assert.deepEqual(result.masalah, [])
+    assert.isTrue(result.lulus)
+    assert.deepEqual(result.giliran[0].foto, ['Jas Uji - Navy', 'Jas Uji - Maroon'])
+    assert.deepEqual(checked, [['Jas Uji - Navy']])
+    assert.includeMembers(phases, ['beta3-reply', 'beta3-revise', 'beta3-sim-judge'])
+    assert.isTrue(result.giliran[0].jejak.some((step) => step.includes('Pemeriksa balasan')))
+    assert.isTrue(result.giliran[0].jejak.some((step) => step.includes('ditulis ulang')))
+    const leftovers = await db.from('whatsapp_beta3_chats').where('jid', 'like', 'uji-e2e-%@sim')
+    assert.lengthOf(leftovers, 0)
+  })
+})

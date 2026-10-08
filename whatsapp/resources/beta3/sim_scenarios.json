@@ -1,0 +1,282 @@
+[
+  {
+    "id": "harga-termurah-kondangan",
+    "judul": "Jas termurah, bahasa santai",
+    "maksud": "Pelanggan cari jas paling murah untuk kondangan. Jawaban benar: jas reguler mulai 485.000 (mis. Basic Suit/Tuxedo/Peak Suit), boleh tawarkan pilih model/warna.",
+    "giliran": ["min jas yg paling murah brp an ya, buat kondangan doang sih"],
+    "harap": { "serah_cs": false, "sebut": ["485\\.000"] }
+  },
+  {
+    "id": "selisih-double-breasted",
+    "judul": "Selisih harga kancing dobel (maksud tidak langsung)",
+    "maksud": "Pelanggan menanyakan model double breasted (kancing dua baris) dibanding jas biasa. Benar: Double Breasted 535.000, jas reguler 485.000 → selisih 50.000.",
+    "giliran": ["kalo yg kancingnya dobel 2 baris itu nambah brp dr yg biasa"],
+    "harap": { "serah_cs": false, "sebut": ["535\\.000"] }
+  },
+  {
+    "id": "budget-sejuta-setelan",
+    "judul": "Budget sejutaan untuk setelan",
+    "maksud": "Pelanggan punya budget sekitar 1 juta untuk setelan (jas + celana). Benar: setelan reguler 705.000, Signature 725.000, Premium 955.000 — semua masuk budget; sebut pilihan yang sesuai tanpa mengarang.",
+    "giliran": ["budget sejutaan dpt setelan yg lumayan bagus ga ya kak"],
+    "harap": { "serah_cs": false, "sebut": ["955\\.000|705\\.000"] }
+  },
+  {
+    "id": "485-sudah-celana",
+    "judul": "Apakah 485 sudah termasuk celana",
+    "maksud": "Pelanggan bertanya apakah 485.000 sudah termasuk celana. Benar: 485.000 jas saja; setelan jas + celana 705.000 (celana saja 220.000).",
+    "giliran": ["yg 485 itu udh sm celananya blm?"],
+    "harap": { "serah_cs": false, "sebut": ["705\\.000|220\\.000"] }
+  },
+  {
+    "id": "signature-beda",
+    "judul": "Bedanya Signature",
+    "maksud": "Pelanggan bingung harga beda-beda dan bertanya apa itu Signature. Benar: Signature = seri bahan Scuro, jas 500.000 (setelan 725.000), reguler 485.000.",
+    "giliran": ["harganya kok beda2 sih, yg signature itu apanya yg beda"],
+    "harap": { "serah_cs": false, "sebut": ["500\\.000|725\\.000"] }
+  },
+  {
+    "id": "warna-kopi-susu",
+    "judul": "Warna dideskripsikan (kopi susu)",
+    "maksud": "Pelanggan mencari warna seperti kopi susu (coklat muda/krem). Benar: tawarkan warna katalog yang mendekati (mis. Cream, Coast, Choco, Brown) untuk model yang ada; bila mengirim foto, foto harus persis warna yang disebut.",
+    "giliran": ["ada yg warnanya kaya kopi susu gitu ga min, buat basic suit"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "semua-warna-tuxedo",
+    "judul": "Minta lihat semua warna",
+    "maksud": "Pelanggan ingin melihat SEMUA warna Tuxedo. Benar: kirim foto semua warna Tuxedo yang punya foto (Army, Black, Brown, Cream, Maroon, Navy, White) atau bila tidak semua dikirim, jangan bilang 'ini semua' dan sebut nama sisanya. Teks dan foto harus cocok.",
+    "giliran": ["pengen liat smua warna tuxedo dong"],
+    "harap": { "serah_cs": false, "foto": true }
+  },
+  {
+    "id": "foto-navy-maroon",
+    "judul": "Minta dua foto spesifik",
+    "maksud": "Pelanggan minta foto Basic Suit warna Navy dan Maroon. Benar: kirim tepat dua foto itu (Basic Suit - Navy, Basic Suit - Maroon), tidak lebih tidak kurang.",
+    "giliran": ["kirimin fotonya basic suit yg navy sm yg maroon"],
+    "harap": { "serah_cs": false, "foto": true, "sebut": [] }
+  },
+  {
+    "id": "hitam-tanpa-list",
+    "judul": "Hitam polos tanpa list putih",
+    "maksud": "Pelanggan mencari jas hitam polos, bukan yang ada list putih. Benar: Basic Suit Black 2.0 (polos, ready S–3XL) 485.000; Basic Suit List White adalah yang berlist. Foto bila dikirim harus Basic Suit - Black 2.0, bukan yang List White.",
+    "giliran": ["yg item polos tanpa garis putih di kerah ada?"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "beskap-hijau",
+    "judul": "Beskap warna hijau (tanpa foto)",
+    "maksud": "Pelanggan mencari beskap warna hijau. Benar: Beskap Premium ada Green Emerald dan Sage Green (jas 685.000, setelan 955.000); belum ada foto di web untuk warna itu → jangan menjanjikan/mengirim foto yang tidak ada.",
+    "giliran": ["beskap ada ga kak?", "yg ijo2 gitu ada ga, ijo botol atau ijo sage"],
+    "harap": { "serah_cs": false, "sebut": ["685\\.000|955\\.000"] }
+  },
+  {
+    "id": "size-dari-tinggi-berat",
+    "judul": "Size dari tinggi & berat",
+    "maksud": "Pelanggan memberi tinggi 170 cm berat 68 kg dan tanya size. Benar: rekomendasi size dari fit advisor/size chart (sekitar M atau L) dengan penjelasan singkat.",
+    "giliran": ["tb 170 bb 68 biasanya pake size apa ya"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "stok-hitam-xl",
+    "judul": "Stok size tertentu (cara tanya tak baku)",
+    "maksud": "Pelanggan bertanya Basic Suit hitam size XL masih ada barangnya. Benar: Basic Suit Black 2.0 ready S, M, L, XL, XXL, 3XL → XL ready.",
+    "giliran": ["basic suit item yg XL msh ada barangnya kah"],
+    "harap": { "serah_cs": false, "sebut": ["xl"] }
+  },
+  {
+    "id": "celana-34-coklat",
+    "judul": "Celana pinggang 34 coklat",
+    "maksud": "Pelanggan cari celana ukuran 34 warna coklat. Benar: Pants Brown 2.0 dan Choco 2.0 ready 34, harga 220.000.",
+    "giliran": ["celana yg pinggang 34 warna coklat ready?"],
+    "harap": { "serah_cs": false, "sebut": ["220\\.000|34"] }
+  },
+  {
+    "id": "badan-besar-3xl",
+    "judul": "Badan besar, ukuran 3XL",
+    "maksud": "Pelanggan bertubuh besar (perut buncit) tanya aman pakai 3XL. Benar: 3XL tersedia untuk jas reguler dengan harga ukuran besar 585.000 (XXL+), lingkar dada 3XL 120 cm; minta ukuran badan bila perlu. Tidak menghina.",
+    "giliran": ["badan sy agak gemuk perut buncit, aman ga pake ukuran 3xl"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "seragam-kantor-12",
+    "judul": "Seragam kantor 12 orang",
+    "maksud": "Pelanggan mau seragam untuk 12 orang dan tanya harga khusus. Benar: ada diskon grosir mulai 6 jas — potongan per pcs jas 15.000, setelan 25.000 (celana 10.000, rompi 5.000). AI menjawab sendiri, tidak menyerahkan ke CS.",
+    "giliran": ["kantor mau bikin seragam jas buat 12 org, ada harga khusus ga"],
+    "harap": { "serah_cs": false, "sebut": ["15\\.000|25\\.000"] }
+  },
+  {
+    "id": "setengah-lusin",
+    "judul": "Setengah lusin (angka tidak langsung)",
+    "maksud": "Pelanggan ambil setengah lusin (= 6). Benar: 6 jas sudah masuk diskon grosir (jas 15.000/pcs, setelan 25.000/pcs).",
+    "giliran": ["kalo ambil setengah lusin dpt potongan ga min"],
+    "harap": { "serah_cs": false, "sebut": ["15\\.000|25\\.000"] }
+  },
+  {
+    "id": "tiga-minta-kurang",
+    "judul": "Ambil 3 minta kurang",
+    "maksud": "Pelanggan ambil 3 dan minta harga kurang. Benar: harga eceran sudah pas; potongan grosir baru mulai 6 jas. Sopan, tidak mengarang diskon.",
+    "giliran": ["ambil 3 aja bisa kurang dikit kan"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "beli-banyak-kurng",
+    "judul": "Kasus 8 Okt: beli banyak bisa kurng",
+    "maksud": "Pelanggan tanya beli banyak bisa kurang, lalu menyebut set S sampai 3XL (6 setelan, satu per size). Benar: AI menjelaskan diskon grosir (setelan 25.000/pcs mulai 6), ukuran XXL & 3XL berharga ukuran besar; tidak diserahkan ke CS.",
+    "giliran": ["Kalo beli banyak bisa kurng ga", "Set S sampai 3xl"],
+    "harap": { "serah_cs": false, "sebut": ["25\\.000"] }
+  },
+  {
+    "id": "groomsmen-enam-stel",
+    "judul": "Enam stel groomsmen (angka ditulis huruf)",
+    "maksud": "Pelanggan pesan enam stel untuk groomsmen. Benar: 6 setelan → diskon grosir setelan 25.000/pcs; tanya warna/model/size.",
+    "giliran": ["mau pesen enam stel buat groomsmen nikahan, warnanya sama semua"],
+    "harap": { "serah_cs": false, "sebut": ["25\\.000"] }
+  },
+  {
+    "id": "ongkir-makassar",
+    "judul": "Lama kirim ke Makassar",
+    "maksud": "Pelanggan tanya berapa hari sampai Makassar. Benar: cek ongkir/ETD dari tool (layanan & estimasi) atau minta kecamatan bila perlu; tidak mengarang tarif.",
+    "giliran": ["klo kirim ke makassar brp hari nyampe kak"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "cod-takut-ketipu",
+    "judul": "COD karena takut tertipu",
+    "maksud": "Pelanggan minta bayar di tempat karena takut ditipu. Benar: COD tidak tersedia, pembayaran transfer; tenangkan dengan info toko (alamat Cilacap) tanpa mengarang.",
+    "giliran": ["bisa bayar ditempat ga, takut ketipu jujur aja"],
+    "harap": { "serah_cs": false, "tidak_sebut": ["bisa cod"] }
+  },
+  {
+    "id": "shopee",
+    "judul": "Beli lewat marketplace",
+    "maksud": "Pelanggan ingin beli lewat Shopee. Benar: tidak tersedia di Shopee; order lewat chat/website.",
+    "giliran": ["di shopee ada ga tokonya, biar enak checkoutnya"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "alamat-fitting",
+    "judul": "Datang fitting langsung",
+    "maksud": "Pelanggan tanya lokasi toko dan bisa fitting langsung. Benar: toko di Patimuan, Cilacap; buka Sen–Jum 09.00–17.00, Sab 09.00–15.00, Minggu tutup.",
+    "giliran": ["tokonya dmn sih, bisa dateng fitting langsung ga"],
+    "harap": { "serah_cs": false, "sebut": ["cilacap"] }
+  },
+  {
+    "id": "minggu-buka",
+    "judul": "Hari Minggu buka?",
+    "maksud": "Pelanggan tanya apakah Minggu buka. Benar: toko fisik Minggu tutup; order lewat chat/website 24 jam.",
+    "giliran": ["minggu buka ga ya"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "jawa-ireng-l",
+    "judul": "Bahasa Jawa",
+    "maksud": "Pelanggan berbahasa Jawa menanyakan jas hitam ukuran L masih ada. Benar: pahami maksudnya; mis. Basic Suit Black 2.0 ready L (485.000) atau tanya model mana bila perlu.",
+    "giliran": ["mas, jas sing ireng ukuran L isih ono ra?"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "medan-pesta-kawan",
+    "judul": "Logat Medan, minta saran",
+    "maksud": "Pelanggan (logat Medan) mau jas buat pesta kawan, minta yang bagus. Benar: beri saran model/warna dari katalog dengan harga; foto bila dikirim harus sesuai yang disebut.",
+    "giliran": ["bang, awak mau jas buat pesta kawan, yg cakap yg mana ya bang"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "sunda-biru",
+    "judul": "Bahasa Sunda",
+    "maksud": "Pelanggan berbahasa Sunda menanyakan jas warna biru. Benar: ada Navy dan Blue Ice (mis. Basic Suit), sebut harga.",
+    "giliran": ["teh, aya jas warna biru teu?"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "english-mix",
+    "judul": "Campur bahasa Inggris",
+    "maksud": "Pelanggan campur bahasa Inggris: cari slim fit suit untuk wedding budget sekitar 700 ribu. Benar: setelan reguler 705.000 (jas + celana) atau jas 485.000; jawab dalam bahasa yang dimengerti.",
+    "giliran": ["hi min, do u have slim fit suit for wedding? budget around 700k"],
+    "harap": { "serah_cs": false, "sebut": ["705\\.000|485\\.000"] }
+  },
+  {
+    "id": "emoji-saja",
+    "judul": "Hanya emoji",
+    "maksud": "Pelanggan mengirim emoji jas + tanda tanya + uang (menanyakan harga jas). Benar: tangkap maksud harga jas, sebut mulai 485.000 atau tanya model.",
+    "giliran": ["👔❓💰"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "kesal-tuxedo",
+    "judul": "Pelanggan kesal",
+    "maksud": "Pelanggan kesal karena merasa pertanyaannya tidak dijawab, menanyakan harga tuxedo. Benar: minta maaf singkat lalu langsung jawab Tuxedo 485.000 (setelan 705.000).",
+    "giliran": ["dari tadi nanya ga dijawab2, jadi harga tuxedo brp sih"],
+    "harap": { "serah_cs": false, "sebut": ["485\\.000"] }
+  },
+  {
+    "id": "panjang-banyak-maksud",
+    "judul": "Pesan panjang banyak maksud",
+    "maksud": "Pelanggan mau nikah bulan depan, tema sage green, butuh jas pria: tanya ada warna itu, harganya, dan bisa sampai Kendari sebelum tanggal 20. Benar: Sage Green ada di seri Premium (Premium Basic Suit/Beskap/Peak/Tuxedo Premium; jas 685.000, setelan 955.000); jawab soal pengiriman Kendari (cek ongkir/estimasi atau minta kecamatan) — semua maksud ditanggapi.",
+    "giliran": ["jadi gini kak sy mau nikah bulan dpn, calon sy pengen tema sage green, cowoknya pake jas, ada ga warna itu, trs brp, sm bisa nyampe kendari ga sblm tgl 20"],
+    "harap": { "serah_cs": false, "sebut": ["685\\.000|955\\.000"] }
+  },
+  {
+    "id": "salah-ketik-berat",
+    "judul": "Salah ketik berat",
+    "maksud": "Pelanggan menulis dengan banyak salah ketik: harga jas tuxedo warna maroon. Benar: Tuxedo Maroon 485.000 (ready S–XL).",
+    "giliran": ["brpa hrg jz tuxdo yg mrun"],
+    "harap": { "serah_cs": false, "sebut": ["485\\.000"] }
+  },
+  {
+    "id": "rujuk-urutan-daftar",
+    "judul": "Merujuk urutan daftar sebelumnya",
+    "maksud": "Pelanggan minta daftar warna Basic Suit lalu minta foto 'yang kedua dari terakhir'. Benar: foto yang dikirim harus warna kedua dari terakhir di daftar yang diberikan AI sendiri (konsisten dengan daftarnya).",
+    "giliran": ["basic suit ada warna apa aja", "yg kedua dr terakhir itu fotonya dong"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "ganti-pikiran",
+    "judul": "Ganti pilihan warna",
+    "maksud": "Pelanggan memilih Basic Suit navy lalu berubah pikiran ke maroon. Benar: AI mengikuti pilihan terakhir (Maroon), tidak tetap Navy.",
+    "giliran": ["basic suit navy ya kak", "eh gajadi deh, maroon aja"],
+    "harap": { "serah_cs": false, "sebut": ["maroon"] }
+  },
+  {
+    "id": "beda-peak-basic",
+    "judul": "Bandingkan dua model",
+    "maksud": "Pelanggan tanya bedanya Peak Suit dan Basic Suit. Benar: perbedaan kerah (peak lapel lancip vs notch biasa) — tanpa mengarang ciri yang tidak ada; harga sama 485.000. Foto bila dikirim harus dua model itu.",
+    "giliran": ["bedanya peak suit sm basic suit apaan"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "keberatan-harga",
+    "judul": "Keberatan harga dibanding toko lain",
+    "maksud": "Pelanggan bilang mahal, di tempat lain 300 ribuan. Benar: tetap sopan, jelaskan nilai (bahan/jahitan) tanpa mengarang diskon; harga eceran pas.",
+    "giliran": ["mahal amat, di sebelah 300rban dapet jas"],
+    "harap": { "serah_cs": false, "tidak_sebut": ["300\\.000"] }
+  },
+  {
+    "id": "batik-tidak-ada",
+    "judul": "Produk yang tidak dijual",
+    "maksud": "Pelanggan tanya kemeja batik. Benar: tidak ada batik; yang ada Shirt (hitam/putih) 175.000.",
+    "giliran": ["jual kemeja batik ga kak"],
+    "harap": { "serah_cs": false }
+  },
+  {
+    "id": "dasi-murah",
+    "judul": "Pelengkap: dasi",
+    "maksud": "Pelanggan tanya dasi. Benar: Tie hitam 50.000.",
+    "giliran": ["dasinya ada ga, sekalian"],
+    "harap": { "serah_cs": false, "sebut": ["50\\.000"] }
+  },
+  {
+    "id": "rompi-tiga-potong",
+    "judul": "Three piece (jas + celana + rompi)",
+    "maksud": "Pelanggan mau three piece. Benar: jas 485.000 + celana 220.000 + rompi 175.000 = 880.000 (reguler); hitungan benar.",
+    "giliran": ["kalo three piece sm rompinya jadi brp totalnya"],
+    "harap": { "serah_cs": false, "sebut": ["880\\.000|175\\.000"] }
+  },
+  {
+    "id": "anak-sekolah-perpisahan",
+    "judul": "Konteks acara (perpisahan sekolah)",
+    "maksud": "Pelanggan butuh jas untuk acara perpisahan, minta yang tidak terlalu mahal dan cepat. Benar: saran jas reguler 485.000 dengan size ready; jangan menjanjikan waktu tanpa data.",
+    "giliran": ["buat perpisahan smk minggu depan, yg ga terlalu mahal ada yg ready ga"],
+    "harap": { "serah_cs": false }
+  }
+]

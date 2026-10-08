@@ -278,7 +278,76 @@
       notice(error.message, true)
     }
   })
-  const refresh = () => Promise.all([loadCatalog(), loadExamples(), loadMcp()]).catch((error) => notice(error.message, true))
+  // v3.6.78 Uji percakapan: hasil putaran terakhir; dipantau tiap 5 dtk selama berjalan.
+  let simTimer = null
+  function renderSimResult(result) {
+    const item = el('li', undefined, `wa-sim-item ${result.lulus ? 'ok' : 'err'}`)
+    const head = el('details')
+    const summary = el('summary')
+    summary.append(el('span', '', `wa-st ${result.lulus ? 'ok' : 'err'}`), el('span', result.judul, 'wa-sim-title'))
+    if (result.nilai) summary.append(el('span', `${result.nilai}/5`, 'wa-sim-score'))
+    head.append(summary)
+    if (result.masalah?.length) {
+      const issues = el('ul', undefined, 'wa-sim-issues')
+      for (const text of result.masalah) issues.append(el('li', text))
+      head.append(issues)
+    }
+    const chat = el('div', undefined, 'wa-sim-chat')
+    for (const turn of result.giliran || []) {
+      chat.append(el('p', turn.pelanggan, 'wa-sim-in'))
+      for (const bubble of turn.balasan || []) chat.append(el('p', bubble, 'wa-sim-out'))
+      for (const caption of turn.foto || []) chat.append(el('p', `🖼 ${caption}`, 'wa-sim-out wa-sim-photo'))
+      if (turn.total) chat.append(el('p', turn.total, 'wa-sim-out wa-sim-total'))
+      if (turn.serah_cs) chat.append(el('p', t('Diserahkan ke CS · {0}', turn.alasan || ''), 'wa-sim-handoff'))
+      if (turn.error) chat.append(el('p', turn.error, 'wa-sim-handoff'))
+      if (turn.jejak?.length) {
+        const steps = el('details', undefined, 'wa-sim-steps')
+        steps.append(el('summary', t('Langkah ({0})', turn.jejak.length)), el('pre', turn.jejak.join('\n')))
+        chat.append(steps)
+      }
+    }
+    head.append(chat)
+    item.append(head)
+    return item
+  }
+  async function loadSim() {
+    const data = await api('/api/beta3/sim')
+    byId('beta3SimCount').textContent = t('{0} skenario', data.scenarios.length)
+    const run = data.last
+    const list = byId('beta3SimList')
+    list.replaceChildren()
+    const busy = run?.status === 'running'
+    byId('beta3SimRun').disabled = busy
+    byId('beta3SimCustomRun').disabled = busy
+    if (!run) {
+      byId('beta3SimSummary').textContent = t('Belum pernah dijalankan.')
+    } else {
+      const when = run.finishedAt || run.startedAt
+      byId('beta3SimSummary').textContent = busy
+        ? t('Berjalan {0}/{1} · {2} lulus', run.done, run.total, run.passed)
+        : t('{0}/{1} lulus · {2} · {3}', run.passed, run.total, t(run.label), when ? window.waTime.ago(when) : '')
+      const sorted = [...run.results].sort((a, b) => Number(a.lulus) - Number(b.lulus))
+      for (const result of sorted) list.append(renderSimResult(result))
+    }
+    clearTimeout(simTimer)
+    if (busy) simTimer = setTimeout(() => loadSim().catch(() => {}), 5000)
+  }
+  async function startSim(body) {
+    try {
+      const result = await api('/api/beta3/sim/run', 'POST', body)
+      if (!result.started) notice(t(result.reason || 'Uji sedang berjalan.'), true)
+      await loadSim()
+    } catch (error) {
+      notice(error.message, true)
+    }
+  }
+  byId('beta3SimRun').addEventListener('click', () => startSim({}))
+  byId('beta3SimCustomRun').addEventListener('click', () => {
+    const giliran = byId('beta3SimCustom').value.split('\n').map((line) => line.trim()).filter(Boolean)
+    if (!giliran.length) return
+    startSim({ custom: [{ judul: t('Coba sendiri'), giliran }] })
+  })
+  const refresh = () => Promise.all([loadCatalog(), loadExamples(), loadMcp(), loadSim()]).catch((error) => notice(error.message, true))
   refresh()
   setInterval(() => {
     if (document.visibilityState === 'visible') loadCatalog().catch(() => {})

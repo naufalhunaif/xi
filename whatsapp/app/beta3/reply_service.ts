@@ -85,6 +85,7 @@ import {
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
+import { CHECK_LABEL, checkReply, mergeUsage, revisionNote, type CheckIssue } from '#beta3/reply_check'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
 /**
@@ -488,7 +489,8 @@ export function resolvePhotos(rows: LeanCatalogRow[], labels: string[]) {
     if (photos.some((photo) => photo.url === row.photoUrl)) continue
     photos.push({ caption, url: row.photoUrl })
   }
-  return photos.slice(0, 6)
+  // v3.6.78: maks 10 (pelanggan minta lihat semua warna); biasanya AI memilih 1–3.
+  return photos.slice(0, 10)
 }
 
 export async function createLeanReply(input: {
@@ -502,6 +504,10 @@ export async function createLeanReply(input: {
   onTrace?: TraceSink
   /** Catatan sistem untuk giliran ini (mis. CS sudah menjawab sebagian, chat sedang menunggu CS). */
   note?: string
+  /** v3.6.78 Uji percakapan: riwayat dari simulasi (bukan tabel pesan). */
+  history?: LeanHistoryRow[]
+  /** v3.6.78 Uji percakapan: tanpa efek ke data pelanggan (prioritas, referensi gambar, sinkron order). */
+  simulate?: boolean
 }): Promise<LeanReply> {
   const { jid, settings, onTrace } = input
   const skill = selectLeanSkill(settings.skills)
@@ -535,7 +541,9 @@ export async function createLeanReply(input: {
     listLeanExamples(),
     readCustomerNote(jid),
     readBeta3ChatNote(jid),
-    history(jid, new Set(input.messageIds), Boolean(parseOrderForm(input.text) || parseLooseAddress(input.text))),
+    input.history
+      ? Promise.resolve(input.history)
+      : history(jid, new Set(input.messageIds), Boolean(parseOrderForm(input.text) || parseLooseAddress(input.text))),
     readOrderSpec(jid),
     listRules(),
   ])
@@ -1028,7 +1036,7 @@ export async function createLeanReply(input: {
     awaitingPayment: pendingForJev?.status === 'awaiting_payment',
   }).catch(() => ({}) as TurnUnderstanding)
   // Prioritas chat untuk kotak masuk ("Penting").
-  if (understanding.urgency) await saveChatPriority(jid, understanding.urgency).catch(() => {})
+  if (understanding.urgency && !input.simulate) await saveChatPriority(jid, understanding.urgency).catch(() => {})
   // Maksud "status pesanan" yang tidak tertangkap pola kata → lacak resi juga.
   if (understanding.intent === 'status_pesanan') await trackParcel()
   // "oke/siap" tanda terima tetap dibalas singkat oleh AI (seperti v3.5.7); diam membuat chat terasa putus.
@@ -1053,14 +1061,12 @@ export async function createLeanReply(input: {
     onTrace?.({ key: 'beta3-hati', label: heartLabel(understanding.heart), status: 'completed', detail: { ...understanding.heart } })
   }
   const storeProfile = await readLeanState('store_profile')
-  // v3.6.56: diskon grosir ikut bagian TOKO hanya saat dibahas (hemat token).
   const storedWholesale = String((await readLeanState('wholesale').catch(() => '')) || '')
   // v3.6.60: teks lama ("dibuat lewat invoice") ditulis ulang dengan syarat mulai 6 jas.
   const wholesale = renderWholesaleRule(wholesaleDiscounts(storedWholesale)) || storedWholesale
-  const store = [
-    storeProfile,
-    wholesale && talksWholesale([input.text, chatNote || '', ...rows.slice(-6).map((row) => String(row.body || ''))].join('\n')) ? wholesale : '',
-  ]
+  // v3.6.78: aturan grosir SELALU ikut (±80 token) — AI memahami maksud "beli banyak/kurang ga"
+  // dalam bahasa apa pun; dulu ikut hanya bila pola kata cocok, sehingga kalimat tak biasa terlewat.
+  const store = [storeProfile, wholesale]
     .filter(Boolean)
     .join('\n')
   const policy = await readExchangePolicy()
@@ -1199,6 +1205,33 @@ export async function createLeanReply(input: {
     }
     onTrace?.({ key: 'beta3-tidy-text', label: 'Jawaban teks biasa dirapikan sistem', status: 'completed', detail: { bubbles } })
   }
+  // v3.6.78 Pemeriksa balasan (Jev): draf dinilai sebelum kirim — foto sesuai ucapan, maksud terjawab,
+  // fakta sesuai katalog, tidak mengulang. Ada masalah yakin → AI menulis ulang SEKALI dengan catatannya.
+  const check = await checkReply({ jid, customerText: input.text, history: rows, decision, rows: digest.rows }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
+  if (check.issues.length) {
+    onTrace?.({
+      key: 'beta3-check',
+      label: `Pemeriksa balasan · ${check.issues.map((issue) => CHECK_LABEL[issue.code]).join(' · ')}`,
+      status: 'failed',
+      detail: { masalah: check.issues, draf: { pesan: decision.pesan, foto: decision.foto } },
+    })
+    try {
+      const revised = await runLeanProvider(
+        settings,
+        { system: prompt.system, user: `${prompt.user}\n\n${revisionNote(decision, check.issues)}` },
+        input.imagePaths || [],
+        'beta3-revise',
+        undefined,
+        { jid, tier: tierChoice.tier }
+      )
+      const fixed = parseLeanDecision(revised.text)
+      decision = fixed
+      result.usage = mergeUsage(result.usage, revised.usage)
+      onTrace?.({ key: 'beta3-revise', label: 'Balasan ditulis ulang sesuai pemeriksa', status: 'completed', detail: { pesan: fixed.pesan, foto: fixed.foto } })
+    } catch (error) {
+      onTrace?.({ key: 'beta3-revise', label: 'Tulis ulang gagal · draf awal dipakai', status: 'failed', detail: { error: error instanceof Error ? error.message : String(error) } })
+    }
+  } else if (check.jev) onTrace?.({ key: 'beta3-check', label: 'Pemeriksa balasan · sesuai', status: 'completed', detail: {} })
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
   const jevColor = await jevVariantFix(jid, decision.spesifikasi, digest.rows, rows).catch(() => null)
   const colorFix = jevColor || fixCatalogColors(decision.spesifikasi, digest.rows, rows)
@@ -1621,7 +1654,7 @@ export async function createLeanReply(input: {
       onTrace?.({ key: 'beta3-paid-check', label: 'Dana masuk belum dinyatakan toko (Jev) · tidak ditandai lunas', status: 'completed', detail: {} })
     }
   }
-  if (!autoTotal && decision.pembayaran) {
+  if (!autoTotal && decision.pembayaran && !input.simulate) {
     const synced = await syncOrderFromChat(jid, decision.pembayaran).catch(() => null)
     if (synced)
       onTrace?.({ key: 'beta3-order-sync', label: `Order diperbarui dari chat · ${synced}`, status: 'completed', detail: decision.pembayaran })

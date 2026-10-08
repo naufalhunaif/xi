@@ -2034,5 +2034,21 @@ window.waLocales.en = {
   "Terakhir berubah": "Last changed",
   "Dicek {0}": "Checked {0}",
   "{0} produk · {1} warna": "{0} products · {1} colors",
-  "{0} warna": "{0} colors"
+  "{0} warna": "{0} colors",
+  "Uji percakapan": "Conversation tests",
+  "Jalankan semua uji": "Run all tests",
+  "Pelanggan tiruan bertanya dengan bahasa beragam; balasan diproses seperti chat sungguhan tanpa dikirim, lalu dinilai.": "A simulated customer asks in many different ways; replies run exactly like a real chat (nothing is sent) and are then graded.",
+  "Coba percakapan sendiri": "Try your own conversation",
+  "Satu pesan pelanggan per baris": "One customer message per line",
+  "Jalankan": "Run",
+  "Diserahkan ke CS · {0}": "Handed to CS · {0}",
+  "Langkah ({0})": "Steps ({0})",
+  "{0} skenario": "{0} scenarios",
+  "Belum pernah dijalankan.": "Not run yet.",
+  "Berjalan {0}/{1} · {2} lulus": "Running {0}/{1} · {2} passed",
+  "{0}/{1} lulus · {2} · {3}": "{0}/{1} passed · {2} · {3}",
+  "Uji sedang berjalan.": "A test run is already in progress.",
+  "Coba sendiri": "Your own test",
+  "Semua skenario": "All scenarios",
+  "Tidak ada percakapan uji.": "No test conversations."
 }

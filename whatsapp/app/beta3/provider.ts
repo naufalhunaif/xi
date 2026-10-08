@@ -124,6 +124,13 @@ const blockedList = (value: string) => value.split(',').map((item) => item.trim(
 /** Kegagalan yang akan terulang di akun mana pun (isi/skema) → tidak perlu pindah akun. */
 const STOP_CODES = new Set(['AI_CONTEXT_LIMIT', 'AI_SCHEMA_INVALID', 'DATABASE_UNAVAILABLE'])
 
+type ProviderOverride = (input: { prompt: { system: string; user: string }; phase: string }) => Promise<string>
+let override: ProviderOverride | null = null
+/** Untuk tes saja: jawaban AI tiruan (tanpa jaringan). null = penyedia sungguhan. */
+export function setLeanProviderOverride(next: ProviderOverride | null) {
+  override = next
+}
+
 /**
  * Banyak akun AI: dicoba sesuai urutan di Pengaturan → AI. Akun yang habis kuota
  * atau perlu login dijeda sementara, lalu otomatis dipakai lagi setelah pulih.
@@ -136,6 +143,8 @@ export async function runLeanProvider(
   schema: Record<string, unknown> = LEAN_OUTPUT_SCHEMA,
   meta: { jid?: string; providers?: AiProviderName[]; tier?: AutoTier } = {}
 ): Promise<LeanProviderResult> {
+  if (override)
+    return { text: await override({ prompt, phase }), usage: null, durationMs: 1, provider: 'chatgpt', model: 'tiruan' }
   const jid = meta.jid || ''
   const all = await usableAiAccounts(Date.now(), phase).catch(() => null)
   // Tugas tertentu (kasus uji) hanya memakai penyedia tertentu bila ada yang siap.

@@ -349,6 +349,8 @@ export async function listLeanOrders(status?: string, q?: string) {
     .select('o.*', db.raw(`${SHIPPED_SQL} AS shipped`), db.raw(`${SHIPPED_AWB_SQL} AS shipped_awb`), db.raw(`${VENDOR_SQL} AS vendor`))
     .orderBy('o.id', 'desc')
     .limit(300)
+  // v3.6.78: order dari Uji percakapan (jid …@sim) tidak pernah tampil.
+  query.whereNot('o.jid', 'like', '%@sim')
   // Tab Vendor: pembelian bahan; tab lain hanya order pelanggan.
   if (status === 'vendor') query.whereRaw(workspaceSql(VENDOR_SQL))
   else query.whereRaw(workspaceSql(`NOT ${VENDOR_SQL}`))
@@ -393,7 +395,7 @@ export async function countLeanOrders() {
       SUM(${customer} AND ${SHIPPED_SQL}) AS done,
       SUM(${customer} AND o.status = 'cancelled') AS cancelled,
       SUM(${VENDOR_SQL}) AS vendor
-    FROM whatsapp_beta3_orders o`)
+    FROM whatsapp_beta3_orders o WHERE o.jid NOT LIKE '%@sim'`)
   const row = (rows?.[0] || {}) as Record<string, unknown>
   const counts: Record<string, number> = {}
   for (const key of ['all', 'pending', 'awaiting_payment', 'process', 'done', 'cancelled', 'vendor'])
