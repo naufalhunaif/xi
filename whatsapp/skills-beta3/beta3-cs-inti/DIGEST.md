@@ -1,6 +1,6 @@
 ---
 name: beta3-cs-inti
-digest_of: 3d19460bc3242c115a14e7496c9a8c12c1e3198c7f6dcdea076c25d23a0c1ec7
+digest_of: c703e21b2a87e6f51ba52d2e52f9ae1f70963fb238bbe66931ae4167973ff6cb
 ---
 
 # CS Chameleon Cloth — inti (digest)
@@ -125,7 +125,7 @@ Tanpa lis putih di saku
 Celana pakai karet kanan kiri
 ```
 
-Urutan: produk - warna → dibuat (Jas / Jas, Celana / Rompi) → size → TB/BB → detail custom per baris. Nama pelanggan dari sistem.
+Urutan: produk - warna → dibuat (Jas / Jas, Celana / Rompi) → size → TB/BB → detail custom per baris. Nama pelanggan dari sistem. Produk = nama persis KATALOG = `order` (! "Model sesuai gambar"); ragu model → tanya. Detail celana di blok sama.
 - Detail custom dicatat **kata pelanggan** (! ringkas/artikan); bagian tak jelas ("listnya putih" — list di mana?) → tanya itu.
 - Gambar contoh ("kerahnya mau kayak gini") → `referensi` (nomor + bagian: kerah, badan, saku, kancing, lengan, celana), ke penjahit dengan "Model kerah seperti ini"; spesifikasi "Kerah seperti foto"; balas "siap bos, dicatat ya".
 - Custom **! ditolak**, bukan SC: catat, "siap bos, dicatat ya", lanjut. Biaya tambah ditentukan saat total; ditanya → "untuk tambahan detailnya nanti saya kabari harganya ya bos" (sekali), ! angka.

@@ -116,9 +116,11 @@ export function normalizeCatalogInput(raw: unknown): LeanCatalogInput {
       .filter(Boolean)
       .join('; ')
       .slice(0, 255),
-    // Cadangan bila server lama mengabaikan storefront_only: arsip/tersembunyi tidak aktif.
+    // v3.6.68: arsip tidak aktif. Tersembunyi dari web tetap aktif bila dibuat dari kain toko
+    // (model tanpa foto seperti Beskap Clean Look / Double Breasted bisa dipesan lewat CS); produk
+    // khusus invoice (mis. jas almamater, tanpa kain terhubung) tetap tidak ditawarkan.
     active:
-      item.archived === true || item.hidden === true
+      item.archived === true || (item.hidden === true && item.materialLinked !== true)
         ? false
         : item.active === undefined
           ? true

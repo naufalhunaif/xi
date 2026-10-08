@@ -141,22 +141,23 @@ export type CatalogSyncResult = {
  * menyimpan bagian lebih sedikit menarik ulang penuh sekali walau versi katalog belum berubah
  * (kasus 8 Okt: diskon grosir tidak pernah tersimpan karena katalog dianggap "belum berubah").
  */
-export const CATALOG_SYNC_SCHEMA = '2-wholesale'
+export const CATALOG_SYNC_SCHEMA = '3-hidden-models'
 
 export async function syncLeanCatalog(
   options: { force?: boolean } = {}
 ): Promise<CatalogSyncResult> {
   const config = await readLeanMcpConfig()
   if (!config.url) return { configured: false, unchanged: false, count: 0, version: '' }
-  // Hanya produk yang tampil di toko: produk tersembunyi (mis. pesanan khusus/invoice seperti
-  // jas almamater) dan produk arsip tidak boleh ditawarkan AI ke pelanggan.
+  // Produk arsip dan produk khusus invoice (mis. jas almamater) tidak ditawarkan AI; model yang
+  // hanya tidak tampil di web (tanpa foto) tetap masuk katalog AI (disaring di importLeanCatalog).
   const stored = await readLeanState('catalog_version_sf2')
   const schemaOld = String((await readLeanState('catalog_sync_schema').catch(() => '')) || '') !== CATALOG_SYNC_SCHEMA
   const digest = await callLeanTool<{ items?: unknown[]; version?: string; unchanged?: boolean }>(
     'catalog_digest',
     {
       format: 'json',
-      storefront_only: true,
+      // v3.6.68: termasuk model yang tidak tampil di web (tanpa foto) — disaring saat impor.
+      storefront_only: false,
       ...(options.force || !stored || schemaOld ? {} : { if_version: stored }),
     },
     config,

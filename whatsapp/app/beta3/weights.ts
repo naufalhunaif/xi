@@ -75,6 +75,10 @@ export function estimateOrderGrams(spec: string, catalog: Record<string, number>
   const products = [...byProduct.keys()].filter((name) => name.length >= 3).sort((a, b) => b.length - a.length)
   let total = 0
   let items = 0
+  // v3.6.68: blok lanjutan tanpa nama produk yang hanya mengulang bagian item sebelumnya
+  // ("Celana / Size 32 / panjang 92" sesudah "Jas, Celana") adalah detail, bukan barang baru
+  // (kasus Alkhoiri 8 Okt: celana terhitung dua kali → 1,4 kg → ongkir 150.000, seharusnya 75.000).
+  let previousParts = new Set<string>()
   for (const block of text.split(/\n\s*\n/)) {
     const lines = block
       .split('\n')
@@ -85,6 +89,11 @@ export function estimateOrderGrams(spec: string, catalog: Record<string, number>
     const [left, ...rest] = head.split(/\s+[-–—]\s+/)
     const name = key(left)
     const product = products.find((candidate) => ` ${name} `.includes(` ${candidate} `))
+    const parts = new Set(ITEM_TYPES.filter((type) => piecesLine && type.pattern.test(key(piecesLine))).map((type) => type.key))
+    const hasHead = lines.some((line) => /\s[-–—]\s/.test(line))
+    const qtyHere = /(\d{1,3})\s*(pcs|potong|set|stel|setel|buah|orang|pasang)\b|\b(?:qty|jumlah)\s*:?\s*\d/i.test(block)
+    if (!hasHead && !product && !qtyHere && parts.size && [...parts].every((part) => previousParts.has(part))) continue
+    if (parts.size) previousParts = parts
     let grams = piecesLine ? piecesGrams(piecesLine, weights) : 0
     if (!grams && product) {
       const color = key(rest.join(' ').split(/,|\bsize\b|\bukuran\b|\bno\b|\(/i)[0])

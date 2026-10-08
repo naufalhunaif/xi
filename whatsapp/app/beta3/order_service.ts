@@ -1418,6 +1418,10 @@ export async function verifyAutoTotal(
   // dulu total jas saja lolos (kasus uji 6 Okt: Tuxedo Double Breasted + celana → 485.000).
   const missing = partsMissingFromItems(String(spec ?? order.spec ?? ''), result.items, hints)
   if (missing.length) return { ok: false, reason: `item belum lengkap: ${missing.join(', ')}` }
+  // v3.6.68: model di lembar penjahit harus sama dengan model di total (kasus Alkhoiri 8 Okt:
+  // spesifikasi "Model sesuai gambar" kerah shanghai, total "Bescap Cross Placket").
+  const modelIssue = specModelMismatch(String(spec ?? order.spec ?? ''), result.items, catalog.map((row) => row.product))
+  if (modelIssue) return { ok: false, reason: modelIssue }
   return {
     ok: true,
     total: {
@@ -1661,4 +1665,39 @@ export async function noteAutoTotalReason(orderId: number, reason: string) {
     .where('id', orderId)
     .where('status', 'pending')
     .update({ auto_total_reason: reason ? reason.slice(0, 190) : null, updated_at: new Date() })
+}
+
+const PLACEHOLDER_MODEL = /\b(model\s+)?(sesuai|seperti|kayak|kaya|mirip)\s+(gambar|foto|contoh)\b|^\s*(model\s+)?custom\b/i
+const modelKey = (text: string) =>
+  String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/^\s*setelan\s+/, '')
+    .trim()
+
+/**
+ * v3.6.68 — Model di spesifikasi (lembar penjahit) vs model di rincian total. Kembalikan alasan bila
+ * spesifikasi belum menyebut produk KATALOG ("Model sesuai gambar") atau menyebut produk lain.
+ */
+export function specModelMismatch(spec: string, items: string, products: string[]) {
+  const names = [...new Set(products.map(modelKey))].filter((name) => name.length >= 3).sort((a, b) => b.length - a.length)
+  const find = (text: string) => {
+    const hay = ` ${modelKey(text)} `
+    return names.find((name) => hay.includes(` ${name} `)) || ''
+  }
+  const heads = String(spec || '')
+    .split(/\n\s*\n/)
+    .map((block) => block.split('\n').map((line) => line.trim()).filter(Boolean))
+    .filter((lines) => lines.length)
+    .map((lines) => lines.find((line) => /\s[-–—]\s/.test(line)) || lines[0])
+  if (!heads.length) return ''
+  const ordered = new Set(String(items || '').split('\n').map(find).filter(Boolean))
+  if (!ordered.size) return ''
+  for (const head of heads) {
+    const name = head.split(/\s+[-–—]\s+/)[0]
+    const product = find(name)
+    if (!product && PLACEHOLDER_MODEL.test(name)) return `model di spesifikasi belum produk katalog: ${name}`
+    if (product && !ordered.has(product)) return `model spesifikasi (${name}) ≠ model di total`
+  }
+  return ''
 }
