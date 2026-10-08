@@ -44,7 +44,7 @@ export async function recordUsage(input: {
   provider: string
   phase?: string
   model?: string
-  status: 'completed' | 'failed'
+  status: 'completed' | 'failed' | 'cancelled'
   usage: TokenUsage | null
   durationMs: number
 }) {

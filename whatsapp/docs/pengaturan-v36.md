@@ -445,3 +445,11 @@ Perubahan v3.6.6:
 - Sekarang Jev memakai **versi pasti yang dilaporkan penyedia** (mis. jev-1.13.0), bukan alias "jev-latest". Alias hanya dipakai bila versi belum diketahui atau sekali sehari untuk mengecek versi baru penyedia; selalu ada model cadangan.
 - Gangguan sementara (429, 500, 502, 503, 504, 529) dicoba ulang 2x dengan jeda singkat (150 ms, 400 ms); percobaan terakhir memakai model cadangan. Kunci salah (401), isi tidak sah (422), dan batas waktu habis tidak diulang (balasan pelanggan tidak tertahan).
 - Pengaturan Jev menampilkan model yang sedang dipakai ("Model: jev-1.13.0").
+
+## v3.6.65 — Model ChatGPT, Gemini, Claude sesuai penyedia; "dibatalkan" bukan gagal
+
+- **Temuan 8 Okt:** baris Claude/ChatGPT "gagal" di Recent runs sebagian besar adalah **cadangan paralel yang dihentikan** karena akun lain lebih dulu menjawab (mis. ChatGPT selesai 43 dtk, Claude yang mulai di detik 35 dihentikan di detik 43). Sekarang dicatat **Dibatalkan** (ikon abu-abu), tidak dihitung gagal.
+- **Gemini:** daftar model diambil dari Google per API key (ListModels, disimpan 24 jam, diperbarui di latar). Utama = Flash stabil terbaru dari daftar (bukan alias "gemini-flash-latest"), cadangan saat penuh = Flash-Lite / Flash lain yang ada di daftar (dulu nama tetap yang mungkin tidak tersedia). Model yang dicatat = versi asli dari Google.
+- **ChatGPT:** katalog model akun dibaca lewat `codex debug models` (per akun, 24 jam, di latar). Model tier otomatis (luna/terra/sol) dipakai hanya bila ada di katalog akun; tidak ada → model bawaan penyedia untuk akun itu.
+- **Claude:** tetap alias resmi CLI (haiku / sonnet / opus) yang diterjemahkan Anthropic sendiri ke versi terbaru (tercatat mis. claude-sonnet-5).
+- Daftar belum terbaca (pertama kali / penyedia gangguan) → cara lama dipakai; balasan tidak menunggu.

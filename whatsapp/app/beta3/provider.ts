@@ -12,6 +12,14 @@ import { codexPerformanceArgs, claudePerformanceArgs } from '#services/ai_runtim
 import { observeProviderProcess } from '#services/provider_process_diagnostics'
 import { recordUsage, usageFromEvent, type TokenUsage } from '#services/usage_service'
 import { LEAN_OUTPUT_SCHEMA } from '#beta3/prompt'
+import {
+  geminiCatalogKey,
+  knownModels,
+  loadCodexCatalog,
+  loadGeminiCatalog,
+  pickCodexModel,
+  pickGeminiModels,
+} from '#beta3/provider_models'
 import { withAiAccount } from '#services/ai_account_context'
 import { claudeQuotaWindows, type QuotaWindow } from '#services/ai_quota_contract'
 import {
@@ -390,13 +398,20 @@ async function runLeanOnce(
 ): Promise<LeanProviderResult> {
   const provider: AiProviderName =
     providerName === 'claude' ? 'claude' : providerName === 'gemini' ? 'gemini' : 'chatgpt'
-  const model =
+  let model =
     account.model ||
     (provider === 'claude'
       ? settings.claudeModel
       : provider === 'gemini'
         ? GEMINI_DEFAULT_MODEL
         : settings.chatgptModel)
+  // v3.6.65: model ChatGPT harus ada di katalog akun dari penyedia; tidak ada → bawaan penyedia.
+  if (provider === 'chatgpt' && model) {
+    const childEnv = codexOAuthEnv()
+    const command = codexCommand(settings.codexBin || env.get('CODEX_BIN'))
+    const args = codexOAuthArguments()
+    model = pickCodexModel(model, knownModels(`codex:${childEnv.CODEX_HOME || 'bawaan'}`, () => loadCodexCatalog(command, args, childEnv)))
+  }
   const tuned =
     provider === 'claude'
       ? { ...settings, claudeModel: model }
@@ -406,7 +421,7 @@ async function runLeanOnce(
   const workingDirectory = await mkdtemp(join(tmpdir(), 'wa-lean-'))
   const started = Date.now()
   let usage: TokenUsage | null = null
-  let status: 'completed' | 'failed' = 'failed'
+  let status: 'completed' | 'failed' | 'cancelled' = 'failed'
   // Nama model sebenarnya dari laporan CLI (mis. alias "opus" → claude-opus-…); tidak ada → yang diminta.
   let actual = ''
   try {
@@ -430,13 +445,15 @@ async function runLeanOnce(
       provider === 'claude'
         ? runClaudeLean(tuned, prompt, workingDirectory, schema, imagePaths, observe)
         : provider === 'gemini'
-          ? runGeminiLean(model, account.apiKey || '', prompt, schema, imagePaths, observe)
+          ? runGeminiLean(account.model || '', account.apiKey || '', prompt, schema, imagePaths, observe)
           : runCodexLean(tuned, prompt, workingDirectory, schemaPath, imagePaths, observe)
     )
     status = 'completed'
     return { text, usage, durationMs: Date.now() - started, provider, model: actual || model || 'bawaan' }
   } finally {
     const label = actual || model || 'bawaan akun'
+    // v3.6.65: dihentikan karena akun lain lebih dulu menjawab = "dibatalkan", bukan gagal.
+    if (status === 'failed' && cancelScope.getStore()?.aborted) status = 'cancelled'
     await recordUsage({
       provider,
       phase,
@@ -692,7 +709,7 @@ async function spawnClaude(
 
 /** Gemini lewat API key (Google AI Studio). Satu panggilan HTTP, keluaran JSON. */
 async function runGeminiLean(
-  model: string,
+  configured: string,
   apiKey: string,
   prompt: { system: string; user: string },
   schema: Record<string, unknown>,
@@ -713,7 +730,15 @@ async function runGeminiLean(
     const mime = /\.png$/i.test(path) ? 'image/png' : /\.webp$/i.test(path) ? 'image/webp' : 'image/jpeg'
     images.push({ inline_data: { mime_type: mime, data: data.toString('base64') } })
   }
+  // v3.6.65: model & cadangan dari daftar model penyedia untuk API key ini (bukan alias/tebakan).
+  const catalog = knownModels(geminiCatalogKey(apiKey), () => loadGeminiCatalog(apiKey))
+  const plan = catalog
+    ? pickGeminiModels(catalog, configured || process.env.GEMINI_MODEL || '')
+    : { main: configured || GEMINI_DEFAULT_MODEL, fallbacks: GEMINI_FALLBACK_MODELS }
+  const model = plan.main
+  let usedModel = model
   const call = async (withSchema: boolean, useModel = model) => {
+    usedModel = useModel
     const body = {
       system_instruction: {
         parts: [
@@ -765,7 +790,7 @@ async function runGeminiLean(
   const busy = () =>
     response.status === 503 ||
     /high demand|overloaded|UNAVAILABLE|try again later/i.test(JSON.stringify(data?.error || ''))
-  for (const fallback of GEMINI_FALLBACK_MODELS) {
+  for (const fallback of plan.fallbacks) {
     if (!busy() || fallback === model) continue
     ;({ response, data } = await call(withSchema, fallback))
   }
@@ -790,6 +815,8 @@ async function runGeminiLean(
   const meta = data?.usageMetadata || {}
   onEvent({
     type: 'gemini.usage',
+    // Nama model sebenarnya dari penyedia (alias → versi pasti).
+    model: String(data?.modelVersion || usedModel),
     usage: {
       input: Number(meta.promptTokenCount || 0),
       output: Number(meta.candidatesTokenCount || 0) + Number(meta.thoughtsTokenCount || 0),

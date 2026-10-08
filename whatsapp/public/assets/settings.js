@@ -293,21 +293,25 @@
     chip.title = t('Kembali ke rentang')
   }
   /* v3.6.41: status proses = ikon terisi (centang hijau / silang merah), bukan teks. */
-  function statusIcon(ok) {
+  function statusIcon(state) {
+    /* v3.6.65: dibatalkan (akun lain lebih dulu menjawab) = abu-abu, bukan gagal. */
+    const ok = state === 'completed'
+    const cancelled = state === 'cancelled'
+    const label = ok ? t('Selesai') : cancelled ? t('Dibatalkan — akun AI lain lebih dulu menjawab') : t('Gagal')
     const svgNs = 'http://www.w3.org/2000/svg'
     const svg = document.createElementNS(svgNs, 'svg')
     svg.setAttribute('viewBox', '0 0 16 16')
-    svg.setAttribute('class', `wa-run-status ${ok ? 'ok' : 'fail'}`)
+    svg.setAttribute('class', `wa-run-status ${ok ? 'ok' : cancelled ? 'cancelled' : 'fail'}`)
     svg.setAttribute('role', 'img')
-    svg.setAttribute('aria-label', ok ? t('Selesai') : t('Gagal'))
+    svg.setAttribute('aria-label', label)
     const title = document.createElementNS(svgNs, 'title')
-    title.textContent = ok ? t('Selesai') : t('Gagal')
+    title.textContent = label
     const circle = document.createElementNS(svgNs, 'circle')
     circle.setAttribute('cx', '8')
     circle.setAttribute('cy', '8')
     circle.setAttribute('r', '8')
     const mark = document.createElementNS(svgNs, 'path')
-    mark.setAttribute('d', ok ? 'M4.6 8.3l2.2 2.2 4.6-4.8' : 'M5.4 5.4l5.2 5.2M10.6 5.4l-5.2 5.2')
+    mark.setAttribute('d', ok ? 'M4.6 8.3l2.2 2.2 4.6-4.8' : cancelled ? 'M4.8 8h6.4' : 'M5.4 5.4l5.2 5.2M10.6 5.4l-5.2 5.2')
     svg.append(title, circle, mark)
     return svg
   }
@@ -321,7 +325,7 @@
       `${({ claude: 'Claude', gemini: 'Gemini', typesafe: 'Jev' })[run.provider] || 'ChatGPT'} / ${modelLabel(run.model)}`,
       run.tokens === null ? '—' : number(run.tokens),
       t("{0} dtk", number(Math.round(run.durationMs / 1000))),
-      statusIcon(run.status === 'completed'),
+      statusIcon(run.status),
     ])
       row.append(textElement('td', value))
     if (run.input !== null)

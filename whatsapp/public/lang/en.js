@@ -773,6 +773,7 @@ window.waLocales.en = {
   "Menunggu percobaan ulang": "Waiting to retry",
   "Percobaan ulang": "Retry",
   "Gagal": "Failed",
+  "Dibatalkan — akun AI lain lebih dulu menjawab": "Cancelled — another AI account answered first",
   "Berjalan": "Running",
   "Belum selesai": "Incomplete",
   "Dibatalkan": "Cancelled",
