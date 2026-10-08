@@ -199,7 +199,7 @@ export async function understandTurn(input: {
       instructions: 'Apakah pesan_terbaru menunda atau membatalkan rencana membeli?',
       criteria: {
         lanjut: 'Masih lanjut / tidak menyinggung penundaan',
-        tunda: 'Menunda: nanti dulu, pikir-pikir, kabari lagi, belum gajian',
+        tunda: 'Menunda: nanti dulu, pikir-pikir, kabari lagi, belum gajian, kemahalan/budget belum cukup, lihat-lihat dulu',
         batal: 'Membatalkan: tidak jadi, cancel, cari di tempat lain',
       },
     }

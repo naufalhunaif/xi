@@ -401,3 +401,10 @@ Perubahan v3.6.6:
 - Bila sistem melengkapi foto, jawaban AI yang berisi saran/alasan ("untuk gaya gen z biasanya pilih slimfit …") tidak lagi diganti "Ini fotonya bos". Ringkasan hanya untuk balasan yang sekadar menyebut nama model (nama sudah ada di caption).
 - Foto ikut dikirim → tawaran "Mau lihat modelnya bos?" dibuang (dulu pelanggan jawab "Boleh" dan foto yang sama terkirim lagi). Tawaran "model lainnya" tetap.
 - Foto yang sama sudah dikirim dalam 12 pesan keluar terakhir (≤ 6 jam) tidak dikirim lagi; pengantar menjadi "Fotonya sudah saya kirim di atas bos …". Pelanggan minta "kirim ulang" / "fotonya gak muncul" → dikirim lagi. Jejak: "Foto tidak diulang".
+
+## v3.6.59 — Bagian "Rasa" di skill: bahasa tidak kaku
+
+- Skill inti punya bagian baru **Rasa — baca maksud & perasaan pelanggan** (selalu dimuat, juga di ringkasan). Isinya: bertanya ≠ meminta ("Kancing 1 ..ya" dijawab, bukan "dicatat ya"), tidak mengulang kalimat yang sama dalam satu chat, saran gaya ("buat gen z") dengan alasan singkat, menenangkan yang ragu, pamit/kemahalan dibalas hangat tanpa susulan, "maaf ya bos" untuk yang kecewa.
+- "Siap sama sama bos" hanya untuk ucapan terima kasih, bukan penutup umum.
+- Jev menganggap "kemahalan / budget belum cukup / lihat-lihat dulu" sebagai menunda → susulan tidak dikirim.
+- Dibuat sebagai bagian skill inti (bukan skill terpisah) supaya tidak menambah panggilan/biaya; beberapa kalimat skill lain dipadatkan agar prompt tetap di bawah 10 ribu token.
