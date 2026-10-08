@@ -64,7 +64,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { cancelsOrder, dropRepeatedWait, fixCodClaim, keepCustomInChat } from '#beta3/reply_guards'
+import { cancelsOrder, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, keepCustomInChat } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -1765,6 +1765,15 @@ export async function createLeanReply(input: {
   }
   // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
   if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')
+  // v3.6.86 — nomor celana tidak ditebak dari TB/BB.
+  if (!decision.serah_cs) {
+    const known = [input.text, ...rows.filter((row) => row.direction === 'in' || row.senderType === 'cs' || row.senderType === 'owner').map((row) => String(row.body || '')), ...toolNotes].join('\n')
+    const pants = dropGuessedPantsNumber(decision.pesan, known, style?.address || 'bos')
+    if (pants.changed) {
+      decision.pesan = pants.pesan
+      onTrace?.({ key: 'beta3-pants-guess', label: 'Nomor celana tebakan dibuang → ditanyakan', status: 'completed', detail: {} })
+    }
+  }
   // v3.6.85 — AI tidak melihat semua pesanan lama: jangan pernah bilang pesanan "belum tercatat / tidak ada"
   // (uji chat nyata: pesanan pelanggan sedang finishing, AI bilang belum tercatat). Cek oleh CS.
   if (!decision.serah_cs && deniesOrder(decision.pesan)) {

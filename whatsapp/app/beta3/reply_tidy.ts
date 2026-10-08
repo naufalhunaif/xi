@@ -121,6 +121,34 @@ export function bulletLists(text: string) {
   return out.join('\n')
 }
 
+/**
+ * v3.6.86 — Pilihan pendek tanpa angka ("Mau model yang mana bos:\n- Basic Suit\n- Tuxedo") terasa seperti
+ * menu bot (uji chat nyata): ditulis satu kalimat "Mau model yang mana bos, Basic Suit atau Tuxedo?".
+ */
+export function inlineChoices(text: string) {
+  const lines = text.split('\n')
+  const out: string[] = []
+  let index = 0
+  while (index < lines.length) {
+    const intro = lines[index]
+    let end = index + 1
+    while (end < lines.length && BULLET.test(lines[end])) end++
+    const items = lines.slice(index + 1, end).map((line) => line.replace(BULLET, '').trim())
+    const short = items.every((item) => item && !/\d/.test(item) && item.split(/\s+/).length <= 4)
+    if (items.length >= 2 && items.length <= 5 && short && /\b(mau|pilih|yang mana|model apa|warna apa)\b/i.test(intro)) {
+      const head = intro.trim().replace(/[:?.!\s]+$/, '')
+      const list = items.length === 2 ? items.join(' atau ') : `${items.slice(0, -1).join(', ')}, atau ${items[items.length - 1]}`
+      out.push(`${head}, ${list}?`)
+      index = end
+      if (index < lines.length && !lines[index].trim()) index++
+      continue
+    }
+    out.push(intro)
+    index++
+  }
+  return out.join('\n').trim()
+}
+
 const ADDRESS = /\b(?:bapak\s*\/\s*ibu|bpk\s*\/\s*ibu|kakak|kak|anda|kamu|bapak|ibu|sis|gan|mas|mbak)\b/gi
 const FORMAL_OPENERS = [
   /^(?:terima\s*kasih|makasih)\s+(?:telah|sudah)\s+menghubungi[^.!?\n]*[.!?]?\s*/i,
@@ -174,7 +202,7 @@ export function tidyReply(pesan: string[], options: { address?: string; verbatim
         .trim()
       // "oke,siap" → "oke, siap" (bukan angka "1,5" dan bukan link).
       if (!/https?:\/\/|www\./i.test(text)) text = text.replace(/([A-Za-z]),(?=[A-Za-z])/g, '$1, ')
-      text = bulletLists(text)
+      text = inlineChoices(bulletLists(text))
         .replace(/[ \t]{2,}/g, ' ')
         .replace(/\n{3,}/g, '\n\n')
         .trim()

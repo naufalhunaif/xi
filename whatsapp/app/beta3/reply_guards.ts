@@ -20,10 +20,37 @@ export function keepCustomInChat(
   customerText: string
 ) {
   if (!decision.serah_cs) return null
-  if (!CUSTOM.test(`${decision.alasan} ${customerText}`)) return null
+  // v3.6.86: hanya bila PELANGGAN yang menanyakan custom (dulu alasan AI ikut dicek → balasan custom
+  // muncul untuk tawaran bisnis "solusi AI custom" dan pertanyaan pelunasan).
+  if (!CUSTOM.test(customerText) || String(customerText || '').length > 120) return null
   if (OTHER_HANDOFF.test(decision.alasan) || OTHER_HANDOFF.test(customerText)) return null
   const usable = decision.pesan.length && !decision.pesan.some((bubble) => WAITING.test(bubble))
   return { pesan: usable ? decision.pesan : CUSTOM_REPLY }
+}
+
+const PANTS_NUMBER = /\b(?:no\.?|nomor|nomer|size|ukuran)\s*(2[6-9]|3\d|4[0-6])\b/i
+/**
+ * v3.6.86 — Nomor celana yang ditebak (dari TB/BB) dibuang: fit advisor jas tidak memberi nomor celana
+ * (uji: "celananya rekomendasi no 35" tanpa lingkar pinggang). Angka yang ada di `known` (pesan pelanggan,
+ * data alat) tetap. Kalimat yang dibuang diganti satu pertanyaan nomor celana.
+ */
+export function dropGuessedPantsNumber(pesan: string[], known: string, address = 'bos') {
+  let changed = false
+  const out = pesan
+    .map((bubble) => {
+      const sentences = bubble.split(/(?<=[.!?])\s+|\n+/)
+      const kept = sentences.filter((sentence) => {
+        if (!/celana/i.test(sentence)) return true
+        const hit = sentence.match(PANTS_NUMBER)
+        if (!hit || new RegExp(`(^|\\D)${hit[1]}(\\D|$)`).test(known)) return true
+        changed = true
+        return false
+      })
+      return kept.join(' ').trim()
+    })
+    .filter(Boolean)
+  if (changed && !out.some((bubble) => /celana[^?]*\?/i.test(bubble))) out.push(`Celananya biasa pakai nomor berapa ${address}?`)
+  return { pesan: changed ? out : pesan, changed }
 }
 
 /**

@@ -79,6 +79,41 @@ const recentLines = (history: LeanHistoryRow[]) =>
  * Nilai draf balasan. Mengembalikan masalah yang yakin (ambang keputusan "cek_balasan"); kosong = aman.
  * Jev mati/gagal → hanya pemeriksaan pasti (foto tidak ada di katalog).
  */
+/**
+ * v3.6.86 — Harga per warna (pasti, dari katalog): "setelan Sage Green mulai 705.000" padahal setelan Sage
+ * Green termurah 955.000 (seri lain). Satu warna + satu harga di bubble yang sama → harga tidak boleh di
+ * bawah harga termurah warna itu (untuk jenis yang disebut: setelan / jas).
+ */
+export function colorPriceIssues(pesan: string[], rows: LeanCatalogRow[]): CheckIssue[] {
+  const colors = [...new Set(rows.map((row) => fold(row.color).replace(/\s*\d+(?:\.\d+)?$/, '')).filter((color) => color.length >= 3))]
+  const issues: CheckIssue[] = []
+  for (const bubble of pesan) {
+    const text = ` ${fold(bubble)} `
+    const named = colors.filter((color) => text.includes(` ${color} `) || text.includes(` ${color},`) || text.includes(` ${color}.`))
+    const distinct = named.filter((color) => !named.some((other) => other !== color && other.includes(color)))
+    // Ongkir, DP, diskon, potongan bukan harga barang.
+    const prices = [...bubble.matchAll(/\b(\d{2,3})(?:[.,]000\b|\s?(?:rb|ribu|k)\b)/gi)]
+      .filter((match) => !/(ongkir|ongkos|kirim|dp|diskon|potongan|hemat|kurang|tambah|selisih)\D{0,18}$/i.test(bubble.slice(0, match.index)))
+      .map((match) => Number(match[1]) * 1000)
+    if (distinct.length !== 1 || new Set(prices).size !== 1) continue
+    const set = /\bsetelan\b|\bjas\b.{0,25}\bcelana\b|\bsama celana\b/.test(text)
+    const candidates = rows.filter(
+      (row) =>
+        row.price &&
+        fold(row.color).replace(/\s*\d+(?:\.\d+)?$/, '') === distinct[0] &&
+        (set ? /^setelan\b/i.test(row.product) : true)
+    )
+    if (!candidates.length) continue
+    const lowest = Math.min(...candidates.map((row) => Number(row.price)))
+    if (prices[0] < lowest)
+      issues.push({
+        code: 'fakta_salah',
+        detail: `${CHECK_LABEL.fakta_salah}: harga ${set ? 'setelan ' : ''}${candidates[0].color} termurah ${lowest.toLocaleString('id-ID')} (${candidates.find((row) => row.price === lowest)?.product}), bukan ${prices[0].toLocaleString('id-ID')}.`,
+      })
+  }
+  return issues
+}
+
 export async function checkReply(input: {
   jid: string
   customerText: string
@@ -94,6 +129,7 @@ export async function checkReply(input: {
   if (missing.length)
     issues.push({ code: 'foto_tidak_ada', detail: `Tidak ada foto katalog untuk: ${missing.join(', ')}. Pakai nama varian persis dari KATALOG yang bertanda foto.` })
   if (input.decision.serah_cs || !input.decision.pesan.length) return { issues, jev: false }
+  issues.push(...colorPriceIssues(input.decision.pesan, input.rows))
   const jevAllowed = await jevOn('cek_balasan')
   if (!jevAllowed && !input.settings) return { issues, jev: false }
   const recent = recentLines(input.history)

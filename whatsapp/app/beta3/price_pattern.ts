@@ -106,7 +106,7 @@ export function renderPricePattern(pattern: PricePattern) {
   return [
     'POLA HARGA (dihitung sistem dari KATALOG; harga S–XL, ukuran besar di kurung):',
     ...lines,
-    'Setelan = jas + celana dari SERI YANG SAMA (pakai harga "setelan" seri itu, bukan harga jas). Celana untuk setelan/jas premium = celana seri premium. Jas & celana satu setelan bahannya sama. Model yang namanya beda tapi seri sama (Basic Suit, Peak Suit, Tuxedo, Beskap) harganya sama kecuali Double Breasted.',
+    'Setelan = jas + celana dari SERI YANG SAMA (pakai harga "setelan" seri itu, bukan harga jas). Celana untuk setelan/jas premium = celana seri premium. Jas & celana satu setelan bahannya sama. Model yang namanya beda tapi seri sama (Basic Suit, Peak Suit, Tuxedo, Beskap) harganya sama kecuali Double Breasted. Ukuran besar (XXL ke atas) = harga di kurung, juga saat custom.',
   ].join('\n')
 }
 

@@ -94,7 +94,7 @@ export function styleGuide(profile: StyleProfile) {
     // Sengaja tanpa batas jumlah huruf: batas panjang membuat jawaban terpotong dan
     // kurang informatif (harga/detail hilang). Panjang mengikuti skill & contoh CS.
     '- Bahasa santai sehari-hari seperti contoh CS; tanpa format markdown (**tebal**, #judul, tabel).',
-    '- Rapi seperti CS: daftar 3 item atau lebih (harga, pilihan model/warna, ongkir, rincian total, data pesanan) ditulis satu item per baris setelah kalimat pembuka, lalu pertanyaan di baris terpisah. Jangan dideretkan dengan koma dalam satu kalimat.',
+    '- Rapi seperti CS: rincian berangka (ongkir, rincian total, data pesanan, harga yang diminta per model) satu item per baris. Pilihan tanpa angka cukup satu kalimat ("mau A, B, atau C bos?"). Ditanya harga/price list umum → "mulai dari X" lalu tanya model.',
     '- Jangan membuka dengan salam panjang atau menutup dengan kalimat basa-basi yang sama tiap kali.',
   ]
   return lines.filter(Boolean).join('\n')

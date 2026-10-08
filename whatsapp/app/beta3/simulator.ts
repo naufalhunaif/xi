@@ -5,6 +5,7 @@
 // penilai AI yang membaca katalog lengkap. Data uji (jid "…@sim") dihapus sesudah tiap percakapan.
 import app from '@adonisjs/core/services/app'
 import { ACK, isBusinessPitch, isOtherBot } from '#beta3/token_saver'
+import { imageNotes } from '#beta3/refs_service'
 import { access, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,7 +15,7 @@ import { maskPii } from '#beta3/jev'
 import { ensureLeanTables, readLeanState, writeBeta3ChatNote } from '#beta3/tables'
 import { catalogDigest, findCatalogVariant } from '#beta3/catalog_service'
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
-import { renderTotalMessage } from '#beta3/order_service'
+import { renderPaymentMessage, renderTotalMessage } from '#beta3/order_service'
 import { pricePattern, renderPricePattern } from '#beta3/price_pattern'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { runLeanProvider } from '#beta3/provider'
@@ -36,7 +37,7 @@ export type SimScenario = {
   /** Chat nyata: pertanyaan asli + jawaban CS manusia per giliran (kebenaran toko). */
   asal?: Array<{ teks: string; jawaban: string[] }>
   /** Chat nyata: pesan sebelum giliran pertama (konteks yang dilihat CS waktu itu). */
-  riwayat?: Array<{ arah: 'in' | 'out'; teks: string; gambar?: boolean }>
+  riwayat?: Array<{ arah: 'in' | 'out'; teks: string; gambar?: boolean; catatan?: string }>
   harap?: {
     /** false = harus dijawab AI sendiri (tidak diserahkan ke CS). */
     serah_cs?: boolean
@@ -51,12 +52,14 @@ export type SimScenario = {
   }
 }
 
-export type SimMessage = { teks: string; gambar?: string }
+export type SimMessage = { teks: string; gambar?: string; kutip?: string }
 export const messageText = (item: string | SimMessage) => (typeof item === 'string' ? item : String(item?.teks || ''))
 export const messageImage = (item: string | SimMessage) => (typeof item === 'string' ? '' : String(item?.gambar || ''))
 
 export type SimTurn = {
   pelanggan: string
+  /** Pesan yang dikutip pelanggan. */
+  kutip?: string
   /** Gambar yang dikirim pelanggan (URL foto). */
   gambar?: string
   /** URL foto yang dikirim AI (urut sama dengan `foto`). */
@@ -164,10 +167,19 @@ export function deterministicIssues(
 }
 
 /** Transkrip untuk penilai (dan untuk dibaca pemilik). */
+/** v3.6.86 — konteks chat sebelum uji (juga dilihat AI) untuk penilai; dulu penilai tidak melihatnya. */
+export function priorContext(scenario: Pick<SimScenario, 'riwayat'>) {
+  const lines = (scenario.riwayat || []).map(
+    (item) =>
+      `${item.arah === 'in' ? 'Pelanggan' : 'Toko'}: ${item.gambar ? `[gambar${item.catatan ? `: ${item.catatan}` : ''}] ` : ''}${maskPii(item.teks || '').slice(0, 300)}`
+  )
+  return lines.length ? `PERCAKAPAN SEBELUMNYA (konteks yang juga dilihat AI; isi yang berasal dari sini BUKAN karangan):\n${lines.join('\n')}\n\n` : ''
+}
+
 export function transcript(turns: SimTurn[]) {
   return turns
     .flatMap((turn) => [
-      `Pelanggan: ${turn.gambar ? '[mengirim foto] ' : ''}${turn.pelanggan}`,
+      `Pelanggan: ${turn.kutip ? `(membalas pesan: "${turn.kutip}") ` : ''}${turn.gambar ? '[mengirim foto] ' : ''}${turn.pelanggan}`,
       ...(turn.alat || []).map((data) => `(data alat untuk AI — ${data})`),
       // Urutan kirim sama dengan listener: bubble pertama → foto → bubble berikutnya.
       ...turn.balasan.slice(0, 1).map((bubble) => `AI: ${bubble}`),
@@ -208,10 +220,11 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
         'Baris "(susulan bila pelanggan diam: …)" dikirim otomatis bila pelanggan tidak membalas: nilai juga perlu tidaknya dan rasa manusianya (tidak menagih, tidak mengulang, nyambung).',
         'Baris "(data alat untuk AI — …)" adalah hasil alat toko (ongkir, size, resi) yang dibaca AI: angka yang cocok dengan data itu BENAR, bukan karangan.',
         'Rasa manusia (nilai manusia): balasan harus terasa seperti CS manusia toko ini — santai, singkat, hangat, bahasa chat sehari-hari, menjawab dulu baru bertanya, tidak kaku, tidak bertele-tele, tidak memakai daftar/format bila cukup satu kalimat, tidak mengulang sapaan atau kalimat template. Bila ada "Jawaban CS manusia waktu itu", jadikan acuan gaya (isi harga/stok tetap ikut FAKTA saat ini). Rasa robotik ≤ 2 = masalah.',
+        `Waktu uji: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date())} WIB. Jawaban soal buka/tutup toko, hari ini/besok, dan tanggal dinilai terhadap waktu uji ini (chat asli bisa terjadi di jam lain).`,
         'lulus = true hanya bila tidak ada kesalahan fakta, foto cocok, maksud terjawab, dan rasa manusia ≥ 3. masalah: kalimat pendek bahasa Indonesia, sebut giliran & kutip bagian yang salah. Tanpa masalah → [].',
         `FAKTA TOKO:\n${facts}`,
       ].join('\n\n'),
-      user: `MAKSUD PELANGGAN & JAWABAN YANG DIHARAPKAN:\n${scenario.maksud}\n\nPERCAKAPAN:\n${transcript(turns)}`,
+      user: `MAKSUD PELANGGAN & JAWABAN YANG DIHARAPKAN:\n${scenario.maksud}\n\n${priorContext(scenario)}PERCAKAPAN:\n${transcript(turns)}`,
     },
     [],
     'beta3-sim-judge',
@@ -242,16 +255,26 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
 /** Fakta lengkap untuk penilai: profil toko, katalog, pola harga, grosir. */
 export async function judgeFacts(settings?: LeanSettings) {
   const digest = await catalogDigest()
-  const production = settings?.production ? renderProductionEstimate(settings.production) : ''
+  const profile = String((await readLeanState('store_profile').catch(() => '')) || '')
+  // v3.6.86: hari libur toko ikut (sama dengan AI) — dulu penilai menghitung Sabtu libur → tanggal beda.
+  const production = settings?.production ? renderProductionEstimate(settings.production, new Date(), profile) : ''
   const wholesaleText = String((await readLeanState('wholesale').catch(() => '')) || '')
   return [
-    String((await readLeanState('store_profile').catch(() => '')) || ''),
+    profile,
     renderWholesaleRule(wholesaleDiscounts(wholesaleText)) || wholesaleText,
     renderPricePattern(pricePattern(digest.rows)),
     production,
     // Kebijakan dasar yang juga diberikan ke AI (skill & pemeriksa COD).
     'KEBIJAKAN: pembayaran transfer; COD/bayar di tempat, rekber, Shopee, Tokopedia tidak tersedia. Pengiriman JNE (REG/YES; kargo JTR min 8 kg).',
     renderExchangePolicy((await readExchangePolicy().catch(() => ({ text: '' }))).text),
+    // v3.6.86: rekening resmi toko (dulu dinilai "tidak ada di FAKTA").
+    ((text) => (text ? `PEMBAYARAN RESMI (dikirim sistem bila diminta): ${text}` : ''))(
+      renderPaymentMessage(
+        (settings?.paymentMethods || [])
+          .filter((method) => method.enabled)
+          .map((method) => ({ bank: method.name, number: method.destination, holder: method.accountName || '' }))
+      )
+    ),
     // v3.6.85: size chart ikut fakta penilai (uji: saran size dari chart dianggap mengarang).
     ((chart) => (chart ? `SIZE CHART:\n${chart}` : ''))(String((await readLeanState('size_charts').catch(() => '')) || '')),
     digest.text,
@@ -304,7 +327,9 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
       turn.gambar = got.url
     }
     for (const row of state.rows) row.current = false
-    state.rows.push({ direction: 'in', senderType: 'customer', body: text, mediaType: image ? 'image' : null, createdAt: at, current: true })
+    const kutip = typeof message === 'string' ? '' : String(message?.kutip || '')
+    if (kutip) turn.kutip = kutip
+    state.rows.push({ direction: 'in', senderType: 'customer', body: text, mediaType: image ? 'image' : null, createdAt: at, current: true, ...(kutip ? { replyTo: kutip } : {}) })
     const reply = await createLeanReply({
       jid: state.jid,
       messageIds: [],
@@ -378,6 +403,7 @@ export async function runScenario(
       senderType: item.arah === 'in' ? 'customer' : 'cs',
       body: item.teks,
       mediaType: item.gambar ? 'image' : null,
+      mediaNote: item.catatan || '',
       createdAt: new Date(start - ((scenario.riwayat?.length || 0) - index) * 120_000),
     })
   try {
@@ -450,8 +476,8 @@ export async function learnFromRealChat(asal: Array<{ teks: string; jawaban: str
 
 /* ---------------- Skenario dari chat nyata (v3.6.80) ---------------- */
 
-type RealRow = { jid: string; direction: string; sender_type: string | null; body: string | null; media_type: string | null; media_url: string | null; created_at: Date | string }
-type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number }
+type RealRow = { jid: string; message_id?: string | null; reply_to_message_id?: string | null; direction: string; sender_type: string | null; body: string | null; media_type: string | null; media_url: string | null; created_at: Date | string }
+type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number; kutip?: string }
 
 /** Potong chat menjadi giliran: pesan pelanggan beruntun → balasan CS manusia (cs/owner) sesudahnya. */
 export function realSegments(rows: RealRow[]) {
@@ -462,7 +488,12 @@ export function realSegments(rows: RealRow[]) {
   const flush = () => {
     const texts = asked.map((row) => String(row.body || '').trim()).filter(Boolean)
     const image = asked.find((row) => row.media_type === 'image' && row.media_url)?.media_url || undefined
-    if ((texts.length || image) && answered.length) segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered, mulai: askedAt })
+    // v3.6.86: pesan yang dikutip pelanggan ("yang ini berapa" sambil membalas foto) ikut, seperti di chat asli.
+    const quotedId = asked.find((row) => row.reply_to_message_id)?.reply_to_message_id
+    const quoted = quotedId ? rows.find((row) => row.message_id && row.message_id === quotedId) : undefined
+    const kutip = quoted ? String(quoted.body || '').trim().slice(0, 160) || (quoted.media_type ? `[${quoted.media_type}]` : '') : ''
+    if ((texts.length || image) && answered.length)
+      segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered, mulai: askedAt, ...(kutip ? { kutip } : {}) })
     asked = []
     answered = []
   }
@@ -505,7 +536,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
   for (const { jid } of jids) {
     const rows = (await db
       .from('whatsapp_messages')
-      .select('jid', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
+      .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
       .where('jid', jid)
       .where('created_at', '>', since)
       .orderBy('created_at', 'asc')
@@ -531,18 +562,27 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
         // Giliran pertama digabung dengan pertanyaan pelanggan lain (dua maksud dalam satu pesan).
         if (turn === 0 && other && other.teks !== segment.teks) teks = `${teks}\n${roughen(rand, other.teks.replace(/\n+/g, ' '))}`
       }
-      return segment.gambar ? { teks, gambar: segment.gambar } : teks
+      return segment.gambar || segment.kutip
+        ? { teks, ...(segment.gambar ? { gambar: segment.gambar } : {}), ...(segment.kutip ? { kutip: segment.kutip } : {}) }
+        : teks
     })
     const reference = picked
       .map((segment, turn) => `Giliran ${turn + 1} — CS manusia waktu itu: ${segment.jawaban.join(' / ')}`)
       .concat(combined && other ? [`Pertanyaan tambahan (digabung) — CS manusia waktu itu: ${other.jawaban.join(' / ')}`] : [])
     const before = chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 12), picked[0].mulai ?? 0)
+    // Gambar di riwayat diberi keterangan seperti di sistem nyata (AI melihat isi gambar lama lewat catatan).
+    const notes = await imageNotes(chat.jid, before.filter((row) => row.message_id) as any[]).catch(() => new Map<string, string>())
     out.push({
       id: `real-${out.length + 1}-s${seed}`,
       asal: picked.map((segment) => ({ teks: segment.teks, jawaban: segment.jawaban })),
       riwayat: before
         .filter((row) => row.body || row.media_type === 'image')
-        .map((row) => ({ arah: row.direction === 'in' ? ('in' as const) : ('out' as const), teks: String(row.body || '').slice(0, 600), gambar: row.media_type === 'image' })),
+        .map((row) => ({
+          arah: row.direction === 'in' ? ('in' as const) : ('out' as const),
+          teks: String(row.body || '').slice(0, 600),
+          gambar: row.media_type === 'image',
+          ...(row.message_id && notes.get(String(row.message_id)) ? { catatan: notes.get(String(row.message_id)) } : {}),
+        })),
       judul: `${combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
       maksud: [
         'Pertanyaan dari chat nyata toko. Jawab semua maksudnya dengan benar menurut FAKTA saat ini, dengan rasa bahasa CS manusia.',

@@ -644,3 +644,67 @@ test.group('Beta3 · tawaran bisnis, bot lain, pesanan lama (v3.6.85)', () => {
     assert.deepEqual(lines.slice(1), ['AI: Ada bos, ini fotonya', 'AI: [foto] Jas - Black', 'AI: Pakai size apa bos?'])
   })
 })
+
+test.group('Beta3 · uji chat nyata memakai konteks lengkap (v3.6.86)', () => {
+  test('kutipan & catatan gambar ikut; penilai melihat konteks sebelumnya', async ({ assert }) => {
+    const { realSegments, priorContext } = await import('#beta3/simulator')
+    const at = new Date()
+    const segments = realSegments([
+      { jid: 'x', message_id: 'm1', direction: 'out', sender_type: 'cs', body: 'Tuxedo - Black', media_type: 'image', media_url: '/media/a.jpg', created_at: at },
+      { jid: 'x', message_id: 'm2', reply_to_message_id: 'm1', direction: 'in', sender_type: 'customer', body: 'yang ini berapa', media_type: null, media_url: null, created_at: at },
+      { jid: 'x', message_id: 'm3', direction: 'out', sender_type: 'cs', body: '485 bos', media_type: null, media_url: null, created_at: at },
+    ])
+    assert.equal(segments[0].kutip, 'Tuxedo - Black')
+    const context = priorContext({ riwayat: [{ arah: 'in', teks: 'ini ada?', gambar: true, catatan: 'jas abu-abu' }] })
+    assert.include(context, '[gambar: jas abu-abu] ini ada?')
+    assert.include(context, 'BUKAN karangan')
+    assert.equal(priorContext({}), '')
+    const text = transcript([{ pelanggan: 'yang ini berapa', kutip: 'Tuxedo - Black', balasan: ['485.000 bos'], foto: [], serah_cs: false, alasan: '', jejak: [], ms: 0 }])
+    assert.include(text, '(membalas pesan: "Tuxedo - Black")')
+  })
+})
+
+test.group('Beta3 · rasa manusia & harga per warna (v3.6.86)', () => {
+  test('pilihan pendek ditulis satu kalimat; rincian berangka tetap per baris', async ({ assert }) => {
+    const { inlineChoices, tidyReply } = await import('#beta3/reply_tidy')
+    assert.equal(
+      inlineChoices('Mau model yang mana bos:\n- Basic Suit\n- Peak Suit\n- Tuxedo\n- Bescap Cross Placket'),
+      'Mau model yang mana bos, Basic Suit, Peak Suit, Tuxedo, atau Bescap Cross Placket?'
+    )
+    assert.equal(inlineChoices('Mau warna apa bos?\n- Black\n- Navy'), 'Mau warna apa bos, Black atau Navy?')
+    const prices = 'Harganya:\n- Basic Suit 485.000\n- Premium 955.000'
+    assert.equal(inlineChoices(prices), prices)
+    const [tidy] = tidyReply(['Mau model yang mana bos:\n- Basic Suit\n- Tuxedo\n- Peak Suit'], { address: 'bos' })
+    assert.notInclude(tidy, '\n- ')
+  })
+
+  test('harga di bawah harga termurah warna itu → fakta salah', async ({ assert }) => {
+    const { colorPriceIssues } = await import('#beta3/reply_check')
+    const rows = [
+      row('Setelan Premium Basic Suit', 'Sage Green', { price: 955000 }),
+      row('Setelan Basic Suit', 'Black 2.0', { price: 705000 }),
+      row('Premium Basic Suit', 'Sage Green', { price: 685000 }),
+    ]
+    const wrong = colorPriceIssues(['Untuk setelan jas sama celana warna Sage Green harganya mulai 705.000 bos'], rows)
+    assert.lengthOf(wrong, 1)
+    assert.include(wrong[0].detail, '955.000')
+    assert.lengthOf(colorPriceIssues(['Setelan Sage Green 955.000 bos'], rows), 0)
+    assert.lengthOf(colorPriceIssues(['Jas Sage Green 685.000 bos'], rows), 0)
+    assert.lengthOf(colorPriceIssues(['Setelan Sage Green ongkirnya 25.000 bos'], rows), 0)
+    assert.lengthOf(colorPriceIssues(['Setelan Black 705.000, Sage Green juga ada'], rows), 0)
+  })
+})
+
+test.group('Beta3 · tebakan & balasan custom (v3.6.86)', () => {
+  test('nomor celana tebakan dibuang; yang disebut pelanggan tetap', async ({ assert }) => {
+    const { dropGuessedPantsNumber, keepCustomInChat } = await import('#beta3/reply_guards')
+    const guess = dropGuessedPantsNumber(['Rekomendasi size L bos. Untuk celananya rekomendasi no 35 bos, cocok pakai no 35 ya?'], 'tinggi 170 bb 73')
+    assert.isTrue(guess.changed)
+    assert.deepEqual(guess.pesan, ['Rekomendasi size L bos.', 'Celananya biasa pakai nomor berapa bos?'])
+    assert.isFalse(dropGuessedPantsNumber(['Celana no 32 ready bos'], 'celana saya 32').changed)
+    assert.isFalse(dropGuessedPantsNumber(['Jas size L ready bos'], '').changed)
+    const handoff = { serah_cs: true, alasan: 'Pelanggan minta ukuran custom untuk jas Step', pesan: ['saya cek dulu ya bos'] }
+    assert.isNull(keepCustomInChat(handoff, 'Besok siang saya tf pelunasan yah bos'))
+    assert.isNull(keepCustomInChat(handoff, 'Perkenalkan saya dari agency, kami membuat solusi AI custom untuk bisnis anda dan ingin berdiskusi lebih lanjut dengan tim anda minggu ini'))
+  })
+})
