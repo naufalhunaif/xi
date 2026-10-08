@@ -30,9 +30,26 @@ test.group('diskon grosir (v3.6.56 → v3.6.60)', () => {
       'ambil 20 stel ada potongan?',
       'harga grosir berapa min',
       'kalau ambil 6 jas gimana',
+      // v3.6.77 — kasus 8 Okt (AI menyerahkan ke CS karena aturan grosir tidak ikut):
+      'Kalo beli banyak bisa kurng ga',
+      'kalau ambil banyak bisa kurang?',
+      'pesen banyak dapet harga khusus?',
+      'bisa nego kalau beli banyak',
+      'Set S sampai 3xl',
+      'jas S-3XL masing2 satu',
+      'mau order 10 set',
     ])
       assert.isTrue(talksWholesale(text), text)
-    for (const text of ['Basic suit hitam ready size M?', 'ongkir ke Cilacap berapa', 'jas + celana berapa', 'ambil 2 jas'])
+    for (const text of [
+      'Basic suit hitam ready size M?',
+      'ongkir ke Cilacap berapa',
+      'jas + celana berapa',
+      'ambil 2 jas',
+      'bisa kurang ga harganya',
+      'ready semua size?',
+      'banyak warna ya',
+      'size S ada?',
+    ])
       assert.isFalse(talksWholesale(text), text)
   })
 

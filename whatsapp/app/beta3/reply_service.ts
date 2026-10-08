@@ -1671,7 +1671,20 @@ export async function createLeanReply(input: {
   }
 }
 
-const WHOLESALE_TOPIC = /\b(diskon|grosir|grosiran|borong|seragam|lusin|kodi|partai|potongan|rombongan)\b|\bpesan(?:an)? banyak\b|\b(?:[6-9]|\d{2,})\s*(?:pcs|stel|setel|potong|buah|orang|jas|setelan)\b/i
+// v3.6.77: juga "beli/ambil/pesen banyak", "banyak … kurang/murah/nego" (salah ketik "kurng"), dan
+// pesanan satu set per size ("set S sampai 3xl", "S-3XL"). Kasus 8 Okt: "Kalo beli banyak bisa kurng ga"
+// tidak dikenali → aturan DISKON GROSIR tidak ikut → AI menyerahkan ke CS dan pelanggan menunggu.
+const WHOLESALE_TOPIC = new RegExp(
+  [
+    '\\b(diskon|grosir|grosiran|borong|borongan|seragam|lusin|kodi|partai|potongan|rombongan)\\b',
+    '\\b(?:beli|pesan|pesen|pesanan|ambil|order|bikin|buat)\\s+(?:\\w+\\s+)?banyak\\b',
+    '\\bbanyak\\b.{0,30}\\b(?:kura?ng(?:in|i)?|murah(?:in)?|nego|harga khusus)\\b',
+    '\\b(?:kura?ng(?:in|i)?|murah(?:in)?|nego)\\b.{0,30}\\bbanyak\\b',
+    '\\b(?:[6-9]|\\d{2,})\\s*(?:pcs|stel|setel|set|potong|buah|orang|jas|setelan)\\b',
+    '\\b(?:set|stel|setel|jas)\\s+(?:size\\s+)?s\\s*(?:-|–|sampai|sampe|s/?d|hingga|ke)\\s*(?:[2-5]?x+l|[2-5]xl)\\b',
+  ].join('|'),
+  'i'
+)
 /** v3.6.56 — percakapan menyinggung pesanan banyak / diskon grosir. */
 export function talksWholesale(text: string) {
   return WHOLESALE_TOPIC.test(text)
