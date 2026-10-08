@@ -4,6 +4,7 @@
 // pemeriksaan pasti (harga di luar katalog, tidak membalas, serah CS tanpa perlu, kata wajib) dan
 // penilai AI yang membaca katalog lengkap. Data uji (jid "…@sim") dihapus sesudah tiap percakapan.
 import app from '@adonisjs/core/services/app'
+import { ACK, isBusinessPitch, isOtherBot } from '#beta3/token_saver'
 import { access, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -133,7 +134,9 @@ export function deterministicIssues(
   turns.forEach((turn, index) => {
     const n = index + 1
     if (turn.error) issues.push(`Giliran ${n}: gagal diproses (${turn.error}).`)
-    else if (!turn.balasan.length && !turn.foto.length && !turn.serah_cs) issues.push(`Giliran ${n}: tidak membalas.`)
+    // Diam atas "oke 😁" bisa tepat (seperti CS manusia); biar penilai yang menilai.
+    else if (!turn.balasan.length && !turn.foto.length && !turn.serah_cs && !ACK.test(String(turn.pelanggan || '').trim()))
+      issues.push(`Giliran ${n}: tidak membalas.`)
     const unknown = unknownPrices(turn.balasan, allowed)
     if (unknown.length) issues.push(`Giliran ${n}: harga ${unknown.map((value) => value.toLocaleString('id-ID')).join(', ')} tidak ada di katalog/ongkir.`)
   })
@@ -166,8 +169,10 @@ export function transcript(turns: SimTurn[]) {
     .flatMap((turn) => [
       `Pelanggan: ${turn.gambar ? '[mengirim foto] ' : ''}${turn.pelanggan}`,
       ...(turn.alat || []).map((data) => `(data alat untuk AI — ${data})`),
-      ...turn.balasan.map((bubble) => `AI: ${bubble}`),
+      // Urutan kirim sama dengan listener: bubble pertama → foto → bubble berikutnya.
+      ...turn.balasan.slice(0, 1).map((bubble) => `AI: ${bubble}`),
       ...turn.foto.map((caption) => `AI: [foto] ${caption}`),
+      ...turn.balasan.slice(1).map((bubble) => `AI: ${bubble}`),
       ...(turn.total ? [`Sistem: ${turn.total}`] : []),
       ...(turn.susulan
         ? [turn.susulan.kirim ? `(susulan bila pelanggan diam: ${turn.susulan.teks})` : `(susulan "${turn.susulan.asli}" DIBATALKAN pemeriksa: ${turn.susulan.alasan})`]
@@ -247,6 +252,8 @@ export async function judgeFacts(settings?: LeanSettings) {
     // Kebijakan dasar yang juga diberikan ke AI (skill & pemeriksa COD).
     'KEBIJAKAN: pembayaran transfer; COD/bayar di tempat, rekber, Shopee, Tokopedia tidak tersedia. Pengiriman JNE (REG/YES; kargo JTR min 8 kg).',
     renderExchangePolicy((await readExchangePolicy().catch(() => ({ text: '' }))).text),
+    // v3.6.85: size chart ikut fakta penilai (uji: saran size dari chart dianggap mengarang).
+    ((chart) => (chart ? `SIZE CHART:\n${chart}` : ''))(String((await readLeanState('size_charts').catch(() => '')) || '')),
     digest.text,
   ]
     .filter(Boolean)
@@ -514,7 +521,9 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
     const start = Math.floor(rand() * Math.max(1, chat.segments.length - 1))
     const picked = chat.segments.slice(start, start + 2)
     const other = pool[(index + 1 + Math.floor(rand() * (pool.length - 1 || 1))) % pool.length]?.segments[0]
-    const combined = rand() < mix
+    // Tawaran bisnis / bot lain tidak digabung dengan pertanyaan pelanggan (tidak terjadi di chat nyata).
+    const odd = (text = '') => isBusinessPitch(text) || isOtherBot(text) || text.length > 300
+    const combined = rand() < mix && !odd(picked[0]?.teks) && !odd(other?.teks)
     const giliran = picked.map((segment, turn) => {
       let teks = segment.teks
       if (combined) {

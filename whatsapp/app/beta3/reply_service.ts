@@ -65,7 +65,7 @@ import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } fr
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
 import { cancelsOrder, dropRepeatedWait, fixCodClaim, keepCustomInChat } from '#beta3/reply_guards'
-import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
+import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
@@ -552,18 +552,26 @@ export async function createLeanReply(input: {
     listRules(),
   ])
   const stage = stageFromNote(chatNote)
+  // Gaya balasan toko: sama untuk ChatGPT, Claude, dan Gemini; sapaan mengikuti CS di chat ini.
+  const style = styleForChat(await storeStyle(examples).catch(() => null), rows)
   // Sapaan / terima kasih: jawabannya selalu sama → tanpa memanggil AI (0 token).
-  const quick = quickReply({
+  const quickRaw = quickReply({
     text: input.text,
     imageCount: input.imagePaths?.length || 0,
     note: input.note,
     stage,
     rows,
   })
+  // v3.6.85 — Tawaran jasa/kerja sama dari bisnis lain: bukan pelanggan → sapa singkat & serahkan ke owner.
+  // Balasan otomatis bot bisnis lain ("ketik 1 untuk …") tidak dibalas.
+  const pitch = !input.imagePaths?.length && isBusinessPitch(input.text)
+  const otherBot = !pitch && !input.imagePaths?.length && isOtherBot(input.text)
+  const quickText = pitch ? ['Halo, salam kenal. Terima kasih infonya, saya sampaikan ke owner dulu ya'] : otherBot ? [] : quickRaw
+  const quick = quickText && style && !pitch ? normalizeStyle(quickText, style) : quickText
   if (quick) {
     onTrace?.({
       key: 'beta3-quick',
-      label: quick.length ? 'Balasan cepat tanpa AI (0 token)' : 'Tidak perlu dibalas (0 token)',
+      label: pitch ? 'Tawaran bisnis lain → owner (0 token)' : quick.length ? 'Balasan cepat tanpa AI (0 token)' : 'Tidak perlu dibalas (0 token)',
       status: 'completed',
       detail: { pesan: quick },
     })
@@ -573,10 +581,10 @@ export async function createLeanReply(input: {
         foto: [],
         catatan: chatNote,
         tahap: (stage || 'lain') as LeanDecision['tahap'],
-        serah_cs: false,
-        alasan: '',
+        serah_cs: pitch,
+        alasan: pitch ? 'Tawaran jasa/kerja sama dari bisnis lain' : '',
         // Diam ("makasih" sesudah "sama-sama"): susulan yang sudah direncanakan tetap jalan.
-        susulan: quick.length ? '' : await previousNudge(jid),
+        susulan: quick.length || otherBot ? '' : await previousNudge(jid),
         spesifikasi: String(spec || ''),
       },
       autoTotal: null,
@@ -591,8 +599,6 @@ export async function createLeanReply(input: {
   }
   // Berat pesanan dari spesifikasi × berat produk (MCP toko): ongkir dicek sesuai berat asli.
   const orderGrams = await orderWeightGrams(String(spec || '')).catch(() => DEFAULT_ITEM_GRAMS)
-  // Gaya balasan toko: sama untuk ChatGPT, Claude, dan Gemini.
-  const style = styleForChat(await storeStyle(examples).catch(() => null), rows)
 
   // Tool dipanggil KODE pada event: TB/BB → fit advisor, form → ongkir. Model tidak memanggil tool.
   const mcp = await readLeanMcpConfig()
@@ -675,7 +681,7 @@ export async function createLeanReply(input: {
   const chartNote = compareWithSizeChart(rows, String(sizeCharts || ''))
   if (chartNote) {
     toolNotes.push(chartNote)
-    onTrace?.({ key: 'beta3-sizechart', label: 'Size chart dibandingkan', status: 'completed', detail: {} })
+    onTrace?.({ key: 'beta3-sizechart', label: 'Size chart dibandingkan', status: 'completed', detail: { catatan: chartNote } })
   }
 
   // Jalur 2: form order dibaca kode, disimpan untuk CS. AI tetap menulis balasannya.
@@ -1136,6 +1142,7 @@ export async function createLeanReply(input: {
       status: 'completed',
       detail: { needs, skill: skillNeed, focus: focus ? { products: focus.products, colors: focus.colors } : null },
     })
+  const productionText = settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : ''
   const prompt = buildLeanPrompt({
     policy: renderExchangePolicy(policy.text),
     activeOrder,
@@ -1171,7 +1178,7 @@ export async function createLeanReply(input: {
     context: collectContext({ history: rows, catalog: digest.rows, text: input.text }),
     message: `${replyContext(rows)}${acceptedOffer(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}${priceNote}${input.note ? `\n\nCATATAN SISTEM: ${input.note}` : ''}`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
-    production: settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : '',
+    production: productionText,
     imageCount: input.imagePaths?.length || 0,
   })
   onTrace?.({
@@ -1221,7 +1228,7 @@ export async function createLeanReply(input: {
     history: rows,
     decision,
     rows: digest.rows,
-    extraFacts: [store, priceText, ...toolNotes].filter(Boolean),
+    extraFacts: [store, priceText, productionText, ...toolNotes].filter(Boolean),
     settings,
   }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
   if (check.issues.length) {
@@ -1758,6 +1765,15 @@ export async function createLeanReply(input: {
   }
   // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
   if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')
+  // v3.6.85 — AI tidak melihat semua pesanan lama: jangan pernah bilang pesanan "belum tercatat / tidak ada"
+  // (uji chat nyata: pesanan pelanggan sedang finishing, AI bilang belum tercatat). Cek oleh CS.
+  if (!decision.serah_cs && deniesOrder(decision.pesan)) {
+    decision.pesan = [`Saya cek dulu pesanannya ya ${style?.address || 'bos'}`]
+    decision.serah_cs = true
+    decision.alasan = 'Menanyakan pesanan yang tidak ada di data AI'
+    photos = []
+    onTrace?.({ key: 'beta3-order-unknown', label: 'Pesanan tidak ada di data AI → dicek CS (tidak bilang "belum tercatat")', status: 'completed', detail: {} })
+  }
   // v3.6.55: diserahkan ke CS tetap dibalas singkat — dulu pesan dibuang dan pelanggan didiamkan.
   if (ensureHandoffReply(decision)) {
     onTrace?.({ key: 'beta3-handoff-reply', label: 'Serah CS · balasan singkat dari sistem (AI tidak menulis balasan)', status: 'completed', detail: {} })
@@ -1789,6 +1805,12 @@ const WHOLESALE_TOPIC = new RegExp(
   ].join('|'),
   'i'
 )
+const NO_ORDER =
+  /\b(?:belum|tidak|gak|ga|nggak)\s+(?:ada\s+yang\s+)?(?:tercatat|ditemukan|terdata)\b|\b(?:tidak|belum|gak|ga|nggak)\s+ada\s+(?:pesanan|orderan|order)\b/i
+/** v3.6.85 — balasan menyangkal pesanan pelanggan ("belum tercatat", "tidak ada pesanan"). */
+export function deniesOrder(pesan: string[]) {
+  return pesan.some((bubble) => NO_ORDER.test(String(bubble || '')))
+}
 /** v3.6.56 — percakapan menyinggung pesanan banyak / diskon grosir. */
 export function talksWholesale(text: string) {
   return WHOLESALE_TOPIC.test(text)

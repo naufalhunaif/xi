@@ -238,7 +238,7 @@ export async function understandTurn(input: {
   if (on.minta_rekening)
     questions.minta_rekening = {
       type: 'noul',
-      instructions: 'Apakah pesan_terbaru pelanggan meminta nomor rekening atau menanyakan transfer ke mana?',
+      instructions: 'Apakah pesan_terbaru pelanggan meminta nomor rekening, menanyakan transfer ke mana, atau menyatakan mau transfer/bayar (DP/pelunasan) sekarang? Sudah transfer = tidak.',
     }
   if (on.sudah_tf)
     questions.sudah_tf = {

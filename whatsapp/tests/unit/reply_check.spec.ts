@@ -579,3 +579,68 @@ test.group('Beta3 · ukuran baju vs badan (v3.6.84)', () => {
     assert.include(note, 'XS → S')
   })
 })
+
+test.group('Beta3 · balasan singkat & pemeriksa (v3.6.85)', () => {
+  test('"Yaa 🤔" sesudah tawaran bantuan → dipersilakan; oke 😁 boleh diam di uji', async ({ assert }) => {
+    const { quickReply, ACK } = await import('#beta3/token_saver')
+    const rows = [
+      { direction: 'in' as const, body: 'Assalamualaikum kak', createdAt: new Date() },
+      { direction: 'out' as const, senderType: 'ai', body: 'Ada yang bisa kami bantu', createdAt: new Date() },
+    ]
+    assert.deepEqual(quickReply({ text: 'Yaa 🤔', imageCount: 0, stage: '', rows }), ['Silakan bos, mau tanya apa?'])
+    assert.isNull(quickReply({ text: 'ya yang hitam', imageCount: 0, stage: '', rows }))
+    assert.isTrue(ACK.test('oke 😁'))
+    assert.isTrue(ACK.test('Yaa 🤔'))
+    assert.isFalse(ACK.test('oke kirim ke medan'))
+    const turn = (pelanggan: string): SimTurn => ({ pelanggan, balasan: [], foto: [], serah_cs: false, alasan: '', jejak: [], ms: 0 })
+    const allowed = allowedPrices([], [])
+    assert.lengthOf(deterministicIssues({}, [turn('oke 😁')], allowed), 0)
+    assert.lengthOf(deterministicIssues({}, [turn('berapa harganya')], allowed), 1)
+  })
+
+  test('pemeriksa AI: karangan & topik bukan produk', async ({ assert }) => {
+    const source = await readFile('app/beta3/reply_check.ts', 'utf8')
+    assert.include(source, 'setelan hanya untuk produk berlabel Setelan')
+    assert.include(source, 'keluhan website')
+  })
+})
+
+test.group('Beta3 · tawaran bisnis, bot lain, pesanan lama (v3.6.85)', () => {
+  test('tawaran jasa dikenali; pertanyaan pelanggan biasa tidak', async ({ assert }) => {
+    const { isBusinessPitch, isOtherBot } = await import('#beta3/token_saver')
+    const pitch =
+      'Halo Selamat Siang, salam kenal Owner/Tim Toko Contoh. Perkenalkan saya Rina, Business Consultant dari Contoh AI. ' +
+      'Kami membantu perusahaan meningkatkan pelayanan pelanggan 24/7 dan meningkatkan penjualan. Sekiranya untuk menjelaskan ' +
+      'beberapa benefit dan credentials lainnya, apakah available untuk berdiskusi lebih lanjut dengan teamnya kak?'
+    assert.isTrue(isBusinessPitch(pitch))
+    const agency =
+      'Hi Kak, saya Budi dari Contoh Marketing Agency. Saya sempat check social media toko, kontennya sudah bagus. ' +
+      'Masih ada potential yang bisa di-push lagi dari content angle, engagement & reach. Kebetulan saya ada quick concept. ' +
+      'Boleh saya langsung kirim quick concept-nya, Kak? Siap untuk kerja sama juga.'
+    assert.isTrue(isBusinessPitch(agency))
+    assert.isFalse(
+      isBusinessPitch(
+        'Kak saya mau pesan 20 setelan untuk seragam kantor, kami perusahaan kecil di Bandung. Kira-kira ada potongan harga? ' +
+          'Ukurannya campur S sampai XXL, warnanya navy semua. Bisa dikirim sebelum akhir bulan? Terima kasih banyak kak.'
+      )
+    )
+    assert.isTrue(isOtherBot('TERIMA KASIH TELAH MENGHUBUNGI TOKO CONTOH. KETIK 1 UNTUK PRICELIST WEDDING'))
+    assert.isFalse(isOtherBot('terima kasih kak, saya pilih yang hitam'))
+  })
+
+  test('tidak menyangkal pesanan lama', async ({ assert }) => {
+    const { deniesOrder } = await import('#beta3/reply_service')
+    assert.isTrue(deniesOrder(['Maaf ya bos, pesanan jas dan celananya belum ada yang tercatat di chat ini']))
+    assert.isTrue(deniesOrder(['Di sini tidak ada pesanan atas nama itu bos']))
+    assert.isFalse(deniesOrder(['Pesanannya sedang finishing ya bos']))
+    assert.isFalse(deniesOrder(['Ukuran 109 cm saya catat ya bos']))
+  })
+
+  test('transkrip uji: foto sesudah bubble pertama', async ({ assert }) => {
+    const text = transcript([
+      { pelanggan: 'ada jas hitam?', balasan: ['Ada bos, ini fotonya', 'Pakai size apa bos?'], foto: ['Jas - Black'], serah_cs: false, alasan: '', jejak: [], ms: 0 },
+    ])
+    const lines = text.split('\n')
+    assert.deepEqual(lines.slice(1), ['AI: Ada bos, ini fotonya', 'AI: [foto] Jas - Black', 'AI: Pakai size apa bos?'])
+  })
+})

@@ -9,6 +9,26 @@ const OPENER_WORD =
   /^(?:halo+|hallo+|hai+|hay|hi|hei|p+|ping|permisi|punten|pagi|siang|sore|malam|met\s+(?:pagi|siang|sore|malam)|selamat\s+(?:pagi|siang|sore|malam)|ass?alamu'?\s*alaikum(?:\s+wr\.?\s*wb\.?)?|assalamualaikum|salam|kak|kakak|bos|boss|min|admin|gan|om|mas|mbak|sis)$/i
 const THANKS =
   /^(?:(?:oke?|ok|siap|sip)\s+)?(?:makasih|makasi|terima\s*kasih|terimakasih|trims|thanks|thank\s+you|thx|tq|tengkyu)(?:\s+(?:ya+|kak|bos|min|banyak|gan|om|mas|mbak))*[\s!.]*$/i
+/** Hanya tanda setuju/ragu tanpa isi ("ya", "oke 😁", "hmm 🤔"). */
+export const ACK = /^(?:(?:y+a*|i+y+a+|o+k+e*y*|sip+|siap|baik|noted|hm+|wkwk+|he+h?e*)[\s!.,~?]*|[\p{Extended_Pictographic}\uFE0F\u200D]\s*)+$/iu
+const PITCH = [
+  /perkenalkan,?\s+(?:saya|kami)/i,
+  /\bsaya\s+\w+\s+dari\s+(?:pt\b|cv\b|\w+\s+(?:agency|consult|digital|marketing|media|indonesia))/i,
+  /business\s+consultant|marketing\s+agency|digital\s+agency|\bagency\b/i,
+  /kerja\s*sama|kolaborasi|partnership|endorse|penawaran|proposal/i,
+  /kami\s+membantu|solusi\s+(?:untuk|bisnis|ai)|benefit|credentials|meningkatkan\s+(?:penjualan|pelayanan|efisiensi|engagement)/i,
+  /available\s+untuk\s+berdiskusi|boleh\s+saya\s+(?:langsung\s+)?kirim|jadwalkan\s+(?:meeting|diskusi|demo)/i,
+]
+/** Tawaran jasa/kerja sama dari bisnis lain (bukan pelanggan) — v3.6.85. */
+export function isBusinessPitch(text: string) {
+  const value = String(text || '')
+  if (value.length < 220) return false
+  return PITCH.filter((pattern) => pattern.test(value)).length >= 3
+}
+/** Balasan otomatis bot bisnis lain ("ketik 1 untuk pricelist …"). */
+export function isOtherBot(text: string) {
+  return /terima\s*kasih\s+telah\s+menghubungi[\s\S]{0,200}\bketik\s+\d/i.test(String(text || ''))
+}
 const FORM_LIKE = /nama\s*:|alamat|kecamatan|kabupaten|kode\s*pos|no\.?\s*(?:hp|telp|wa)/i
 /** Tahap tanpa urusan terbuka: sapaan boleh dijawab tanpa AI. */
 const OPEN_STAGES = ['', 'lain', 'selesai']
@@ -52,6 +72,8 @@ export function quickReply(input: {
     if (!last) return null
     return /sama[\s-]*sama/i.test(lastOut) ? [] : ['Siap sama sama bos']
   }
+  // v3.6.85 — "Yaa 🤔" sesudah "ada yang bisa kami bantu": pelanggan belum bilang maksudnya → persilakan.
+  if (ACK.test(text) && /ada yang bisa (?:kami|saya|aku) bantu/i.test(lastOut)) return ['Silakan bos, mau tanya apa?']
   if (!openerOnly(text) || !OPEN_STAGES.includes(input.stage)) return null
   if (/ada yang bisa kami bantu/i.test(lastOut)) return ['Iya bos, ada yang bisa kami bantu']
   const lower = text.toLowerCase()

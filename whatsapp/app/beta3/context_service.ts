@@ -284,7 +284,7 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
       lines.push(
         `${group.name}: ${part} badan ${value} cm → ${around.map((row) => `${row.size} = ${row.values.get(part)} cm`).join(', ')}. ` +
           (fit
-            ? `Paling dekat: ${fit.size} (${fit.values.get(part)} cm, selisih ${Math.abs(Math.round((fit.values.get(part)! - value) * 10) / 10)} cm). Sebut nomor ini; jangan menaikkan nomor tanpa alasan.`
+            ? `Paling dekat: ${fit.size} (${fit.values.get(part)} cm, selisih ${Math.abs(Math.round((fit.values.get(part)! - value) * 10) / 10)} cm). Sebut nomor ini (toko memakai angka chart langsung); jangan naikkan nomor dengan alasan longgar/ngepress.`
             : 'Lebih besar dari size terbesar: sarankan custom/tanya CS.')
       )
     }
