@@ -800,7 +800,7 @@ export async function startSimRun(
             .update({ done: results.length, passed: results.filter((item) => item.lulus).length, results: JSON.stringify(results) })
         }
       }
-      await Promise.all(Array.from({ length: Math.min(4, Math.max(1, input.parallel || 1)) }, one))
+      await Promise.all(Array.from({ length: Math.min(6, Math.max(1, input.parallel || 1)) }, one))
       await db.from('whatsapp_beta3_sim_runs').where('id', id).update({ status: 'done', finished_at: new Date(), current: null })
     } catch (error) {
       await db
