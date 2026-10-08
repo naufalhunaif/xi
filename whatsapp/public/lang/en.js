@@ -1429,7 +1429,7 @@ window.waLocales.en = {
   "Toko menyatakan dana masuk": "Store confirms payment received",
   "Pelanggan menunda / membatalkan": "Customer postpones / cancels",
   "Seri & barang yang ditanya harganya": "Series & item whose price is asked",
-  "Pola harga": "Price pattern",
+  "Pola harga": "Price rules",
   "Dihitung otomatis dari katalog per seri bahan. AI dan pemeriksa harga memakai tabel ini.": "Calculated automatically from the catalog per fabric series. The AI and the price checker use this table.",
   "Prioritas chat di kotak masuk": "Chat priority in inbox",
   "Penting": "Important",
@@ -2012,5 +2012,15 @@ window.waLocales.en = {
   "30 hari terakhir": "Last 30 days",
   "90 hari terakhir": "Last 90 days",
   "Tanggal": "Date",
-  "Daftar order": "Orders"
+  "Daftar order": "Orders",
+  "Dari website toko, otomatis tiap 30 menit": "From the store website, every 30 min",
+  "Teks yang dibaca AI": "Text the AI reads",
+  "Sumber": "Source",
+  "Jas": "Suit",
+  "Setelan": "Set",
+  "Seri": "Series",
+  "Disinkron {0}": "Synced {0}",
+  "{0} produk · {1} varian": "{0} products · {1} variants",
+  "Katalog sudah terbaru.": "The catalog is already up to date.",
+  "{0} varian disinkronkan.": "{0} variants synced."
 }

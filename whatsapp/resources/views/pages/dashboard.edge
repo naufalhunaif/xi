@@ -33,9 +33,9 @@
         <span class="nav-text">Beta 2</span>
       </a>
       @end
-      <a class="nav-item {{ page === 'beta3' ? 'active' : '' }}" href="{{ appUrl }}/beta3" aria-label="Beta 3" title="Beta 3" aria-current="{{ page === 'beta3' ? 'page' : 'false' }}">
-        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M4 6h16M4 18h10"/></svg></span>
-        <span class="nav-text">Beta 3</span>
+      <a class="nav-item {{ page === 'beta3' ? 'active' : '' }}" href="{{ appUrl }}/beta3" aria-label="AI" title="AI" aria-current="{{ page === 'beta3' ? 'page' : 'false' }}">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></span>
+        <span class="nav-text">AI</span>
       </a>
       <a class="nav-item {{ page === 'directory' ? 'active' : '' }}" href="{{ appUrl }}/contacts" aria-label="Kontak & Alamat" title="Kontak & Alamat" aria-current="{{ page === 'directory' ? 'page' : 'false' }}" data-i18n-aria-label="Kontak & Alamat" data-i18n-title="Kontak & Alamat">
         <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 17v-1a4 4 0 0 1 8 0v1M2 7h3M2 12h3M2 17h3"/></svg></span>
@@ -712,7 +712,7 @@
                       <div class="wa-card-title">
                         <strong><svg class="wa-i" aria-hidden="true"><use href="#i-whatsapp"/></svg>WhatsApp</strong>
                       </div>
-                      <div class="actions"><button type="button" class="button primary" id="lineAdd"><svg class="wa-i" aria-hidden="true"><use href="#i-plus"/></svg><span data-i18n="Tambah nomor">Tambah nomor</span></button></div>
+                      <div class="actions"><button type="button" class="button wa-add-button" id="lineAdd" title="Tambah nomor" aria-label="Tambah nomor" data-i18n-title="Tambah nomor" data-i18n-aria-label="Tambah nomor"><svg class="wa-i" aria-hidden="true"><use href="#i-plus"/></svg><span data-i18n="Tambah nomor">Tambah nomor</span></button></div>
                     </div>
                     <div class="wa-kv" id="linesList"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
                     <small id="linesStatus" role="status" aria-live="polite"></small>

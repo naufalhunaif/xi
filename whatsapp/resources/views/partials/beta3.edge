@@ -1,9 +1,12 @@
-<section id="beta3Page" class="wa-orders-page wa-lean-page">
+<section id="beta3Page" class="wa-orders-page wa-lean-page wa-ai-page">
   <div class="wa-orders-title">
-    <h1>Beta 3</h1>
+    <div class="wa-page-heading">
+      <span id="beta3SyncedAt" class="wa-eyebrow"></span>
+      <h1 data-i18n="AI">AI</h1>
+    </div>
     <div class="wa-orders-title-actions">
-      <button id="beta3Sync" class="button" type="button" title="Tarik katalog terbaru dari MCP" data-i18n="Sync katalog" data-i18n-title="Tarik katalog terbaru dari MCP">Sync katalog</button>
-      <button id="beta3McpOpen" type="button" class="shell-icon-button" aria-label="Sumber data" title="Sumber data" data-i18n-aria-label="Sumber data" data-i18n-title="Sumber data" aria-haspopup="dialog" aria-controls="beta3McpDialog" aria-expanded="false"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.4-2 .9L4 5.7 2 9l1.8 1.8v2.4L2 15l2 3.3 2.4-.6 2 .9L9 21h6l.6-2.4 2-.9 2.4.6 2-3.3-1.8-1.8v-2.4L22 9l-2-3.3-2.4.6-2-.9L15 3Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button id="beta3Sync" class="button wa-icon-only" type="button" aria-label="Sync katalog" title="Tarik katalog terbaru dari MCP" data-i18n-aria-label="Sync katalog" data-i18n-title="Tarik katalog terbaru dari MCP"><svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg></button>
+      <button id="beta3McpOpen" type="button" class="button wa-icon-only" aria-label="Sumber data" title="Sumber data" data-i18n-aria-label="Sumber data" data-i18n-title="Sumber data" aria-haspopup="dialog" aria-controls="beta3McpDialog" aria-expanded="false"><svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
     </div>
   </div>
   <p id="beta3Notice" role="status" aria-live="polite"></p>
@@ -18,19 +21,25 @@
     <small id="beta3McpStatus" class="wa-muted" role="status"></small>
   </dialog>
 
+  <div class="wa-ai-grid">
+  <div class="wa-ai-col">
   <section class="wa-lean-card">
     <div class="wa-lean-card-head">
-      <div><h2 data-i18n="Katalog">Katalog</h2><span id="beta3CatalogStatus" class="wa-muted" role="status" data-i18n="Memuat…">Memuat…</span></div>
+      <div><h2 class="wa-card-eyebrow" data-i18n="Katalog">Katalog</h2></div>
       <div class="actions">
-        <button id="beta3DigestOpen" class="button" type="button" data-i18n="Lihat digest">Lihat digest</button>
-        <button id="beta3ImportOpen" class="button" type="button" data-i18n="Impor JSON">Impor JSON</button>
+        <button id="beta3DigestOpen" class="wa-mini" type="button" aria-label="Lihat digest" title="Lihat digest" data-i18n-aria-label="Lihat digest" data-i18n-title="Lihat digest"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="2.5" /></svg></button>
+        <button id="beta3ImportOpen" class="wa-mini" type="button" aria-label="Impor JSON" title="Impor JSON" data-i18n-aria-label="Impor JSON" data-i18n-title="Impor JSON"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 15V4m-4 4 4-4 4 4M5 20h14" /></svg></button>
       </div>
     </div>
-    <p class="wa-muted" data-i18n="Ringkasan katalog yang dibaca AI saat membalas. Ditarik otomatis tiap 30 menit dari sumber data; Sync katalog memaksa sekarang.">Ringkasan katalog yang dibaca AI saat membalas. Ditarik otomatis tiap 30 menit dari sumber data; Sync katalog memaksa sekarang.</p>
-    <h3 data-i18n="Pola harga">Pola harga</h3>
-    <p class="wa-muted" data-i18n="Dihitung otomatis dari katalog per seri bahan. AI dan pemeriksa harga memakai tabel ini.">Dihitung otomatis dari katalog per seri bahan. AI dan pemeriksa harga memakai tabel ini.</p>
-    <pre id="beta3PricePattern" class="wa-lean-digest"><span class="wa-loading" data-i18n="Memuat…">Memuat…</span></pre>
+    <div class="wa-line-row"><div class="wa-line-label"><span data-i18n="Produk">Produk</span><small data-i18n="Dari website toko, otomatis tiap 30 menit">Dari website toko, otomatis tiap 30 menit</small></div><span id="beta3CatalogStatus" class="wa-line-value" role="status"></span></div>
+    <details class="wa-line-more"><summary data-i18n="Detail teknis">Detail teknis</summary><p id="beta3CatalogTech" class="wa-muted"></p></details>
   </section>
+  <section class="wa-lean-card">
+    <div class="wa-lean-card-head"><div><h2 class="wa-card-eyebrow" data-i18n="Pola harga">Pola harga</h2></div></div>
+    <div id="beta3PriceTable" class="wa-price-table"><span class="wa-loading" data-i18n="Memuat…">Memuat…</span></div>
+    <details class="wa-line-more"><summary data-i18n="Teks yang dibaca AI">Teks yang dibaca AI</summary><pre id="beta3PricePattern" class="wa-lean-digest"></pre></details>
+  </section>
+  </div>
 
   <dialog id="beta3DigestDialog" class="wa-order-drawer" data-motion="sheet" aria-labelledby="beta3DigestTitle">
     <header class="wa-order-drawer-header"><strong id="beta3DigestTitle" data-i18n="Digest katalog">Digest katalog</strong><button id="beta3DigestClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus>×</button></header>
@@ -48,20 +57,20 @@
     </form>
   </dialog>
 
-  <section class="wa-lean-card">
+  <section class="wa-lean-card wa-ai-examples">
     <div class="wa-lean-card-head">
-      <div><h2 data-i18n="Contoh jawaban CS">Contoh jawaban CS</h2><span id="beta3ExampleCount" class="wa-muted"></span></div>
-      <div class="actions"><button id="beta3ExampleOpen" class="button" type="button" data-i18n="Tambah contoh">Tambah contoh</button></div>
+      <div><h2 class="wa-card-eyebrow" data-i18n="Contoh jawaban CS">Contoh jawaban CS</h2><span id="beta3ExampleCount" class="wa-card-count"></span></div>
+      <div class="actions"><button id="beta3ExampleOpen" class="wa-mini" type="button" aria-label="Tambah contoh" title="Tambah contoh" data-i18n-aria-label="Tambah contoh" data-i18n-title="Tambah contoh"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button></div>
     </div>
-    <p class="wa-muted" data-i18n="Gaya yang ditiru AI. Jawaban CS saat mengambil alih chat otomatis masuk ke sini.">Gaya yang ditiru AI. Jawaban CS saat mengambil alih chat otomatis masuk ke sini.</p>
-    <div class="wa-order-filters"><input id="beta3ExampleSearch" type="search" placeholder="Cari contoh" data-i18n-placeholder="Cari contoh" aria-label="Cari contoh" data-i18n-aria-label="Cari contoh"></div>
+    <label class="wa-search-field"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg><input id="beta3ExampleSearch" type="search" placeholder="Cari contoh" data-i18n-placeholder="Cari contoh" aria-label="Cari contoh" data-i18n-aria-label="Cari contoh"></label>
     <div class="wa-order-table-scroll" tabindex="0" role="region" aria-label="Contoh jawaban CS" data-i18n-aria-label="Contoh jawaban CS">
       <table class="wa-order-table wa-lean-example-table">
-        <thead><tr><th scope="col" data-i18n="Situasi">Situasi</th><th scope="col" data-i18n="Pesan pelanggan">Pesan pelanggan</th><th scope="col" data-i18n="Jawaban CS">Jawaban CS</th><th scope="col" data-i18n="Tag">Tag</th><th scope="col"></th></tr></thead>
+        <thead><tr><th scope="col" data-i18n="Situasi">Situasi</th><th scope="col" data-i18n="Pesan pelanggan">Pesan pelanggan</th><th scope="col" data-i18n="Jawaban CS">Jawaban CS</th><th scope="col" data-i18n="Sumber">Sumber</th><th scope="col"><span class="wa-sr" data-i18n="Aksi">Aksi</span></th></tr></thead>
         <tbody id="beta3ExampleList"><tr><td colspan="5"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></td></tr></tbody>
       </table>
     </div>
   </section>
+  </div>
 
   <dialog id="beta3ExampleDialog" class="wa-order-routing" aria-labelledby="beta3ExampleTitle">
     <header class="wa-order-routing-header"><strong id="beta3ExampleTitle" data-i18n="Tambah contoh">Tambah contoh</strong><button id="beta3ExampleClose" class="shell-icon-button" type="button" aria-label="Tutup" data-i18n-aria-label="Tutup" autofocus>×</button></header>

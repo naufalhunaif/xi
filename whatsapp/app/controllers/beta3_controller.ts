@@ -95,10 +95,14 @@ export default class Beta3Controller {
 
   async catalog({ response }: HttpContext) {
     const digest = await catalogDigest(true)
+    const prices = pricePattern(digest.rows)
     return response.json({
       rows: digest.rows,
       digest: digest.text,
-      pricePattern: renderPricePattern(pricePattern(digest.rows)),
+      pricePattern: renderPricePattern(prices),
+      // v3.6.73: pola harga terstruktur untuk tabel di halaman AI.
+      priceTable: prices.series,
+      products: new Set(digest.rows.map((row) => row.product)).size,
       tokens: estimateTokens(digest.text),
       updatedAt: new Date(digest.at).toISOString(),
       version: await readLeanState('catalog_version_sf2'),

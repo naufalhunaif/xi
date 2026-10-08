@@ -1547,3 +1547,253 @@ html[data-theme] body.workspace-ui .wa-igc-subname {
   color: var(--text);
   font-weight: 500;
 }
+
+/* ---------- AI (Beta 3) — v3.6.73 ---------- */
+.wa-ai-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+.wa-ai-col {
+  flex: 1 1 380px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.wa-ai-examples {
+  flex: 1.5 1 520px;
+  min-width: 0;
+}
+html[data-theme] body.workspace-ui .wa-ai-page .wa-lean-card {
+  margin: 0;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--wa-surface, #fff);
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-ai-page .wa-lean-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+html[data-theme] body.workspace-ui .wa-card-eyebrow {
+  display: inline;
+  margin: 0;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wa-card-count {
+  margin-left: 8px;
+  font-family: var(--wa-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.wa-line-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.wa-lean-card-head + .wa-line-row {
+  border-top: 0;
+}
+.wa-line-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.wa-line-label small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.wa-line-value {
+  font-family: var(--wa-mono);
+  font-size: 12px;
+  text-align: right;
+}
+details.wa-line-more {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+details.wa-line-more > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+details.wa-line-more[open] > summary {
+  margin-bottom: 8px;
+}
+html[data-theme] body.workspace-ui .wa-ai-page .wa-lean-digest {
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--wa-page);
+  font-size: 11.5px;
+}
+.wa-price-grid small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.wa-price-materials {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-theme] body.workspace-ui .wa-tag {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-ai-examples .wa-search-field {
+  margin: 4px 0 8px;
+  max-width: 320px;
+}
+html[data-theme] body.workspace-ui .wa-lean-example-table td {
+  white-space: normal;
+  vertical-align: top;
+  padding-top: 10px;
+}
+html[data-theme] body.workspace-ui #beta3PriceTable {
+  overflow-x: auto;
+}
+html[data-theme] body.workspace-ui .wa-order-table.wa-price-grid {
+  min-width: 0;
+  width: 100%;
+}
+html[data-theme] body.workspace-ui .wa-price-grid td small {
+  display: block;
+  font-family: var(--wa-sans);
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-price-grid td small.wa-price-big {
+  font-family: var(--wa-mono);
+}
+.wa-ai-col { flex-basis: 460px; }
+html[data-theme] body.workspace-ui .wa-price-grid :is(th, td) {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+html[data-theme] body.workspace-ui .wa-price-grid :is(th, td):first-child { padding-left: 0; }
+html[data-theme] body.workspace-ui .wa-price-grid :is(th, td):last-child { padding-right: 0; }
+html[data-theme] body.workspace-ui .wa-order-table.wa-lean-example-table {
+  min-width: 0;
+}
+html[data-theme] body.workspace-ui .wa-lean-example-table td:nth-child(2),
+html[data-theme] body.workspace-ui .wa-lean-example-table td:nth-child(3) {
+  min-width: 140px;
+}
+
+/* ---------- Settings — v3.6.73 ---------- */
+html[data-theme] body.workspace-ui .wa-settings-heading,
+html[data-theme] body.workspace-ui .wa-settings-view-title {
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+html[data-theme] body.workspace-ui .wa-settings-view [data-settings-panel] {
+  border: 0;
+  border-radius: 6px;
+  padding: 14px 18px 16px;
+}
+html[data-theme] body.workspace-ui .wa-card-title strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+html[data-theme] body.workspace-ui .wa-card-title small,
+html[data-theme] body.workspace-ui .wa-settings-header small,
+html[data-theme] body.workspace-ui .wa-settings-header .wa-muted {
+  font-family: var(--wa-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-settings-panel label {
+  font-family: var(--wa-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+html[data-theme] body.workspace-ui details.wa-advanced > summary,
+html[data-theme] body.workspace-ui details.wa-advanced-inline > summary,
+html[data-theme] body.workspace-ui .wa-settings-panel details > summary {
+  font-family: var(--wa-sans);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-segmented {
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-segmented button {
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--wa-sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-segmented button:is([aria-pressed='true'], [aria-checked='true'], .active, [aria-selected='true']) {
+  color: var(--text);
+  background: transparent;
+  box-shadow: inset 0 -1px var(--text);
+}
+html[data-theme] body.workspace-ui .button.wa-add-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .button.wa-add-button:hover {
+  background: var(--wa-page);
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .button.wa-add-button > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+html[data-theme] body.workspace-ui .wa-settings-panel table th,
+html[data-theme] body.workspace-ui .wa-ai-table th {
+  font-size: 10.5px;
+}
+html[data-theme] body.workspace-ui .wa-segmented button { font-weight: 400; }
+/* Jev: monokrom (tanpa ungu, tanpa garis kiri berwarna). */
+html[data-theme] body.workspace-ui .wa-jev-bubble.judged { border: 1px solid var(--text); }
+html[data-theme] body.workspace-ui .wa-jev-bubble.judged > small { color: var(--muted); font-weight: 500; }
+html[data-theme] body.workspace-ui .wa-jev-answer { border-left: 0; border-radius: 6px; background: var(--wa-page); }

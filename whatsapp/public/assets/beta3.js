@@ -69,21 +69,18 @@
   byId('beta3Sync').addEventListener('click', async () => {
     const button = byId('beta3Sync')
     button.disabled = true
-    const label = button.textContent
-    button.textContent = t('Menyinkronkan…')
+    button.classList.add('is-busy')
+    button.setAttribute('aria-label', t('Menyinkronkan…'))
     try {
       // v3.6.66: tombol Sync selalu menarik penuh (toko, bahan, size chart, diskon grosir ikut).
       const result = await api('/api/beta3/catalog/sync', 'POST', { force: true })
-      notice(
-        result.unchanged
-          ? t('Katalog belum berubah (versi {0}); tidak ada yang diunduh.', result.version.slice(0, 8))
-          : t('{0} varian disinkronkan (versi {1}, ≈{2} token).', result.count, result.version.slice(0, 8), result.tokens)
-      )
+      notice(result.unchanged ? t('Katalog sudah terbaru.') : t('{0} varian disinkronkan.', result.count))
       await loadCatalog()
     } catch (error) {
       notice(error.message, true)
     } finally {
-      button.textContent = label
+      button.classList.remove('is-busy')
+      button.setAttribute('aria-label', t('Sync katalog'))
       button.disabled = false
     }
   })
@@ -124,15 +121,61 @@
   const importDialog = dialogPair(byId('beta3ImportDialog'), byId('beta3ImportOpen'), byId('beta3ImportClose'))
   const exampleDialog = dialogPair(byId('beta3ExampleDialog'), byId('beta3ExampleOpen'), byId('beta3ExampleClose'))
 
+  // v3.6.73: ringkasan katalog dalam bahasa biasa; token & versi di "Detail teknis"; pola harga sebagai tabel.
+  const ITEM_LABEL = () => ({ jas: t('Jas'), celana: t('Celana'), setelan: t('Setelan'), rompi: t('Rompi') })
+  const SERIES_LABEL = { reguler: 'Reguler', signature: 'Signature', premium: 'Premium', tradero: 'Tradero' }
+  const rupiah = (value) => new Intl.NumberFormat('id-ID').format(Number(value || 0))
+  function renderPriceTable(series) {
+    const box = byId('beta3PriceTable')
+    box.replaceChildren()
+    const keys = Object.keys(series || {})
+    if (!keys.length) {
+      box.append(el('p', t('Belum ada katalog — tekan Sync katalog.'), 'wa-muted'))
+      return
+    }
+    const items = ['jas', 'celana', 'setelan', 'rompi']
+    const table = el('table', undefined, 'wa-order-table wa-price-grid')
+    const head = el('tr')
+    head.append(el('th', t('Seri')))
+    for (const item of items) head.append(el('th', ITEM_LABEL()[item], 'wa-order-amount'))
+    const thead = el('thead')
+    thead.append(head)
+    const body = el('tbody')
+    for (const key of ['reguler', 'signature', 'premium', 'tradero']) {
+      const entry = series[key]
+      if (!entry) continue
+      for (const model of ['standar', 'db']) {
+        if (!items.some((item) => entry.cells?.[`${item}:${model}`])) continue
+        const row = el('tr')
+        const name = el('td')
+        name.append(el('span', `${SERIES_LABEL[key] || key}${model === 'db' ? ' · DB' : ''}`))
+        if (entry.materials?.length && model === 'standar') name.append(el('small', entry.materials.join(', '), 'wa-price-materials'))
+        row.append(name)
+        for (const item of items) {
+          const cell = entry.cells?.[`${item}:${model}`]
+          const td = el('td', cell ? rupiah(cell.price) : '—', 'wa-order-amount')
+          if (cell?.big && cell.big !== cell.price) td.append(el('small', `XXL+ ${rupiah(cell.big)}`, 'wa-price-big'))
+          row.append(td)
+        }
+        body.append(row)
+      }
+    }
+    table.append(thead, body)
+    box.append(table)
+  }
   async function loadCatalog() {
     const result = await api('/api/beta3/catalog')
-    const when = result.updatedAt ? t('diperbarui {0}', window.waTime.ago(result.updatedAt)) : ''
-    byId('beta3CatalogStatus').title = result.updatedAt ? window.waTime.full(result.updatedAt) : ''
+    const synced = result.updatedAt ? t('Disinkron {0}', window.waTime.ago(result.updatedAt)) : ''
+    byId('beta3SyncedAt').textContent = synced
+    byId('beta3SyncedAt').title = result.updatedAt ? window.waTime.full(result.updatedAt) : ''
     byId('beta3CatalogStatus').textContent = result.rows.length
-      ? [t('{0} varian', result.rows.length), t('≈{0} token', result.tokens), result.version ? t('versi {0}', String(result.version).slice(0, 8)) : '', when].filter(Boolean).join(' · ')
+      ? t('{0} produk · {1} varian', result.products || 0, result.rows.length)
       : t('Belum ada katalog — tekan Sync katalog.')
+    byId('beta3CatalogTech').textContent = [t('≈{0} token', result.tokens), result.version ? t('versi {0}', String(result.version).slice(0, 8)) : '']
+      .filter(Boolean).join(' · ')
     byId('beta3CatalogDigest').textContent = result.digest
     byId('beta3PricePattern').textContent = result.pricePattern || t('Belum ada katalog — tekan Sync katalog.')
+    renderPriceTable(result.priceTable)
   }
 
   let examples = []
@@ -154,9 +197,11 @@
     }
     for (const example of shown) {
       const row = el('tr')
-      const situation = el('td')
-      situation.append(el('span', example.situation || '—'), el('br'), el('small', example.source, 'wa-muted'))
-      const remove = el('button', t('Hapus'), 'button small')
+      const situation = el('td', example.situation || '—')
+      const remove = el('button', undefined, 'wa-mini')
+      remove.innerHTML = '<svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>'
+      remove.title = t('Hapus')
+      remove.setAttribute('aria-label', t('Hapus'))
       remove.type = 'button'
       remove.addEventListener('click', async () => {
         if (!confirm(t('Hapus contoh ini?'))) return
@@ -169,7 +214,9 @@
       })
       const actions = el('td')
       actions.append(remove)
-      row.append(situation, el('td', example.customerText), el('td', example.csText), el('td', example.tags || '—'), actions)
+      const source = el('td', example.source || '—', 'wa-tag')
+      if (example.tags) source.title = example.tags
+      row.append(situation, el('td', example.customerText, 'wa-muted'), el('td', example.csText), source, actions)
       list.append(row)
     }
   }
