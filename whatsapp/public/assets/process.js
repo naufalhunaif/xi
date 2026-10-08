@@ -654,7 +654,7 @@
       else dialog.showModal()
     }
     updateProgressVisibility()
-    byId('aiTraceClose').focus()
+    byId('aiTraceClose').focus({ preventScroll: true })
     try {
       const trace = await getTrace(id)
       if (dialog.open && version === requestVersion) {
@@ -687,7 +687,7 @@
     ++requestVersion
     selectedId = null
     updateProgressVisibility()
-    if (lastTrigger?.isConnected) lastTrigger.focus()
+    if (lastTrigger?.isConnected) lastTrigger.focus({ preventScroll: true })
   })
   async function refresh() {
     if (polling || document.hidden) return

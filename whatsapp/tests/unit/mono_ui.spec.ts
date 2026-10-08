@@ -102,4 +102,16 @@ test.group('tampilan monokrom (v3.6.70)', () => {
     assert.include(css, '.wa-orders-page .wa-order-table td:nth-child(6)')
     assert.include(css, '.wa-directory-table td:nth-child(3)')
   })
+
+  test('dialog terbuka: halaman belakang dikunci dan posisi gulir dikembalikan (v3.6.75)', async ({ assert }) => {
+    const motion = await readFile('public/assets/motion.js', 'utf8')
+    assert.include(motion, "root.classList.add('wa-modal-open')")
+    assert.include(motion, "attributeFilter: ['open']")
+    const css = await readFile('public/assets/mono.css', 'utf8')
+    assert.include(css, 'html.wa-modal-open body.workspace-ui #messages')
+    assert.include(css, 'overscroll-behavior: contain')
+    const process = await readFile('public/assets/process.js', 'utf8')
+    assert.include(process, 'lastTrigger.focus({ preventScroll: true })')
+    assert.notInclude(process, 'lastTrigger.focus()')
+  })
 })

@@ -228,6 +228,43 @@
       finishAll()
     }
   })
+  // v3.6.75 — selama dialog modal terbuka, halaman di belakang tidak ikut tergulir;
+  // posisi gulir chat/daftar dikembalikan persis saat dialog ditutup.
+  const lockedScroll = new Map()
+  function syncScrollLock() {
+    const modal = [...document.querySelectorAll('dialog[open]')].some((dialog) => {
+      try {
+        return dialog.matches(':modal')
+      } catch {
+        return true
+      }
+    })
+    const root = document.documentElement
+    if (modal && !root.classList.contains('wa-modal-open')) {
+      lockedScroll.clear()
+      for (const element of [
+        ...document.querySelectorAll('#messages, #contacts, .wa-order-table-scroll'),
+        document.scrollingElement,
+      ])
+        lockedScroll.set(element, {
+          top: element.scrollTop,
+          bottom: element.scrollHeight - element.clientHeight - element.scrollTop < 4,
+        })
+      root.classList.add('wa-modal-open')
+    } else if (!modal && root.classList.contains('wa-modal-open')) {
+      root.classList.remove('wa-modal-open')
+      for (const [element, saved] of lockedScroll)
+        if (element.isConnected)
+          element.scrollTop = saved.bottom && element.id === 'messages' ? element.scrollHeight : saved.top
+      lockedScroll.clear()
+    }
+  }
+  new MutationObserver(syncScrollLock).observe(document.documentElement, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['open'],
+  })
+  document.addEventListener('close', () => setTimeout(syncScrollLock), true)
   // Avoid animating a saved sidebar preference during the initial page load.
   requestAnimationFrame(() =>
     requestAnimationFrame(() => document.documentElement.classList.add('wa-motion-ready'))

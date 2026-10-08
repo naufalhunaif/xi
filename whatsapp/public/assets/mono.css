@@ -1838,3 +1838,20 @@ html[data-theme] body.workspace-ui .wa-jev-answer { border-left: 0; border-radiu
     text-overflow: ellipsis;
   }
 }
+
+/* v3.6.75 — dialog terbuka: halaman belakang dikunci, gulir di dalam dialog tidak merambat keluar. */
+html.wa-modal-open,
+html.wa-modal-open body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+html.wa-modal-open body.workspace-ui #messages,
+html.wa-modal-open body.workspace-ui #contacts,
+html.wa-modal-open body.workspace-ui .wa-order-table-scroll {
+  overflow: hidden !important;
+}
+html[data-theme] body.workspace-ui dialog,
+html[data-theme] body.workspace-ui dialog #aiTraceContent,
+html[data-theme] body.workspace-ui dialog .wa-cart-body {
+  overscroll-behavior: contain;
+}
