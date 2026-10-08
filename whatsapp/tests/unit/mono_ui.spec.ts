@@ -41,4 +41,25 @@ test.group('tampilan monokrom (v3.6.70)', () => {
     assert.include(view, 'data-shape="spiral"')
     assert.include(view, 'data-channel="wa" aria-pressed="false" aria-label="WhatsApp"')
   })
+
+  test('process details: ringkasan + langkah biasa; langkah teknis hanya di Detail teknis (v3.6.71)', async ({ assert }) => {
+    const js = await readFile('public/assets/process.js', 'utf8')
+    assert.include(js, "tech.dataset.key = 'technical'")
+    assert.include(js, 'const TECHNICAL_STEP = /^(?:prompt-size|beta3-trim|beta3-tier')
+    assert.include(js, "[/^beta3-rates$/, 'Menghitung ongkir']")
+    assert.notInclude(js, "t('Ringkasan dari AI; periksa kecocokannya dengan bukti MCP.')")
+    assert.notInclude(js, "t('Hasil relevan diringkas dan data sensitif disamarkan. Bukan penalaran internal mentah.')")
+    const view = await readFile('resources/views/partials/process_detail.edge', 'utf8')
+    assert.include(view, 'data-i18n="Kenapa AI membalas begini"')
+  })
+
+  test('order panel: nomor & status di header, langkah order, item rata kanan, edit lewat ikon (v3.6.71)', async ({ assert }) => {
+    const view = await readFile('resources/views/partials/cart.edge', 'utf8')
+    assert.include(view, 'id="beta3RoomProgress"')
+    assert.include(view, 'id="beta3RoomEdit"')
+    assert.notInclude(view, '<summary data-i18n="Ubah detail pesanan">')
+    const js = await readFile('public/assets/beta3_room.js', 'utf8')
+    assert.include(js, 'function renderProgress(order)')
+    assert.include(js, "el('ul', undefined, 'wa-b3-items')")
+  })
 })

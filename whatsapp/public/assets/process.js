@@ -286,6 +286,38 @@
     }
     return legend
   }
+  // v3.6.70: langkah teknis (ukuran prompt, hemat token, tingkat model, persiapan layanan) hanya di Detail teknis.
+  const TECHNICAL_STEP = /^(?:prompt-size|beta3-trim|beta3-tier|beta3-skill|beta3-image-color|beta3-tidy-text|beta3-quick|reply-timing|queue-timing|trace-finished|skills|media|business-check)$|:mcp-|:model-selection$|^compact-/
+  // Nama langkah dalam bahasa biasa; label asli tetap tampil kecil di bawahnya sebagai rinciannya.
+  const FRIENDLY_STEP = [
+    [/^beta3-ai$|^analysis$/, 'Menyusun balasan'],
+    [/^send-|^ig-send-/, 'Balasan terkirim'],
+    [/^beta3-rates$/, 'Menghitung ongkir'],
+    [/^beta3-(?:order|order-sync)$/, 'Memperbarui order'],
+    [/^beta3-(?:total|wholesale)$/, 'Memeriksa total'],
+    [/^beta3-(?:fit|sizechart)$/, 'Menyarankan ukuran'],
+    [/^beta3-awb$/, 'Melacak paket'],
+    [/^beta3-hati$/, 'Membaca maksud & perasaan pelanggan'],
+    [/^beta3-(?:refs|photo-complete|photo-repeat)$/, 'Menyiapkan foto'],
+    [/^beta3-(?:paid-claim|paid-check)$/, 'Memeriksa pembayaran'],
+    [/^beta3-cancel$/, 'Membatalkan order'],
+    [/^beta3-(?:guard|cod|color|custom|price-context|nudge-plan|handoff-reply|hati-[a-z]+)$/, 'Memeriksa balasan dengan aturan toko'],
+  ]
+  const STEP_ICONS = {
+    ai: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
+    live: 'M3 12h4l2-5 4 10 2-5h6',
+    cache: 'M4 7h16M4 12h16M4 17h16',
+    system: 'M12 3 4 7.5v9L12 21l8-4.5v-9zM4 7.5 12 12l8-4.5M12 12v9',
+  }
+  function stepIcon(name, label) {
+    const mark = document.createElement('span')
+    mark.className = 'wa-why-icon'
+    mark.title = label
+    mark.setAttribute('role', 'img')
+    mark.setAttribute('aria-label', label)
+    mark.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${STEP_ICONS[name] || STEP_ICONS.system}"/></svg>`
+    return mark
+  }
   function element(tag, text, className) {
     const node = document.createElement(tag)
     node.textContent = text
@@ -348,26 +380,40 @@
       content.append(element('p', t('Belum ada detail proses tercatat.')))
       return
     }
-    byId('aiTraceStatus').textContent =
-      `${states[trace.status] || trace.status} · ${trace.input.provider || 'AI'}${trace.input.model ? ` / ${trace.input.model}` : ''}`
-    function disclosure(key, title, value, parent = content) {
-      const block = document.createElement('details')
-      block.dataset.key = key
-      block.open = expanded.has(key)
-      block.append(element('summary', title))
-      const plainNote =
-        value && typeof value === 'object' && Object.keys(value).length === 1 && value.note
-      block.append(
-        element(
-          plainNote || typeof value === 'string' ? 'p' : 'pre',
-          plainNote || (typeof value === 'string' ? value : JSON.stringify(value, null, 2)),
-          'wa-trace-detail'
-        )
-      )
-      parent.append(block)
+    // v3.6.70: tampilan ringkas "Kenapa AI membalas begini" — ringkasan, pesan pelanggan, langkah
+    // dalam bahasa biasa, langkah berikutnya. Semua bukti teknis (token, model, prompt, pohon proses)
+    // tetap utuh di "Detail teknis" yang tertutup.
+    const statusLabel = byId('aiTraceStatus')
+    statusLabel.textContent = states[trace.status] || trace.status
+    statusLabel.className = `wa-st ${{ completed: 'ok', running: 'ink', failed: 'bad', interrupted: 'warn', cancelled: '' }[trace.status] ?? ''}`
+    const activityNow = currentActivity(trace)
+    if (trace.status === 'running') {
+      const live = element('p', '', 'wa-why-live')
+      if (window.waLoader) live.append(window.waLoader.make('core', 28))
+      live.append(element('span', activityNow.label))
+      content.append(live)
+    }
+    const summaryText = trace.decision?.summary || trace.decision?.reason || trace.decision?.error
+    if (summaryText) content.append(element('p', summaryText, 'wa-why-summary'))
+    const whenParts = []
+    const startedAt = trace.createdAt ? new Date(trace.createdAt) : null
+    if (startedAt && !Number.isNaN(startedAt.getTime()))
+      whenParts.push(startedAt.toLocaleTimeString('en-US', { timeZone: 'Asia/Jakarta', hour: 'numeric', minute: '2-digit' }))
+    const aiStep = (trace.steps || []).find((step) => step.key === 'beta3-ai' || step.detail?.usage)
+    if (Number.isFinite(aiStep?.durationMs)) whenParts.push(t('{0} dtk', Math.max(1, Math.round(aiStep.durationMs / 1000))))
+    if (trace.decision?.decision)
+      whenParts.push(trace.decision.decision === 'silent' ? t('Tidak membalas (sesuai skill)')
+        : trace.decision.decision === 'handoff' || trace.decision.decision === 'cs' ? t('Serahkan ke CS') : t('Balas pelanggan'))
+    if (whenParts.length) content.append(element('p', whenParts.join(' · '), 'wa-why-meta'))
+
+    const section = (title) => {
+      const block = element('section', '', 'wa-why-section')
+      block.append(element('h3', title, 'wa-why-eyebrow'))
+      content.append(block)
       return block
     }
-    disclosure('input', t('Input pelanggan'), trace.input.text || t('(tanpa teks)'))
+    const said = section(t('Pesan pelanggan'))
+    said.append(element('p', trace.input.text || t('(tanpa teks)'), 'wa-why-quote'))
     if (trace.media?.length) {
       const images = element('div', '', 'wa-trace-media')
       for (const media of trace.media) {
@@ -391,17 +437,81 @@
         image.loading = 'lazy'
         images.append(image)
       }
-      content.append(images)
+      said.append(images)
+    }
+
+    const stepsBlock = section(t('Langkah'))
+    const list = element('ol', '', 'wa-why-steps')
+    stepsBlock.append(list)
+    const allSteps = visibleSteps(trace)
+    const shown = allSteps.filter((step) => !TECHNICAL_STEP.test(step.key))
+    for (const step of shown) {
+      const running = trace.status === 'running' && step.status === 'running'
+      const item = element('li', '', `wa-why-step is-${running ? 'running' : step.status}`)
+      const text = element('span', '', 'wa-why-step-text')
+      const plain = FRIENDLY_STEP.find(([pattern]) => pattern.test(step.key))?.[1]
+      const original = t(step.label).replace(/\s*·\s*(?:cache|live|langsung)\s*$/i, '')
+      text.append(element('span', plain ? t(plain) : original, 'wa-why-step-label'))
+      if (plain && original && original !== t(plain)) text.append(element('small', original, 'wa-why-step-note'))
+      item.append(text)
+      const mark = element('span', '', 'wa-why-step-mark')
+      if (running && window.waLoader) mark.append(window.waLoader.make('core', 20))
+      else if (step.status === 'failed') mark.append(element('span', t('Gagal'), 'wa-st bad'))
+      else if (step.key === 'beta3-ai' || step.detail?.usage) mark.append(stepIcon('ai', t('AI')))
+      else {
+        const origin = stepOrigin(step)
+        mark.append(stepIcon(origin, t(ORIGINS[origin].label)))
+      }
+      item.append(mark)
+      list.append(item)
+    }
+    if (!shown.length) list.append(element('li', activityNow.label, 'wa-why-step'))
+    const goal = trace.decision?.goal
+    const next = goal?.next_action || goal?.waiting_for
+    if (next) section(t('Langkah berikutnya')).append(element('p', next))
+
+    const tech = document.createElement('details')
+    tech.dataset.key = 'technical'
+    tech.open = expanded.has('technical')
+    tech.className = 'wa-why-tech'
+    const techSummary = element('summary', t('Detail teknis'))
+    const usageTotal = allSteps.reduce((sum, step) => {
+      const usage = step.detail?.usage
+      return usage && Number.isFinite(usage.input) ? sum + (usage.input || 0) + (usage.output || 0) : sum
+    }, 0)
+    const techMeta = [trace.input.provider || '', trace.input.model || '', usageTotal ? t('{0} token', num(usageTotal)) : '']
+      .filter(Boolean).join(' · ')
+    if (techMeta) techSummary.append(element('span', techMeta, 'wa-why-tech-meta'))
+    tech.append(techSummary)
+    const area = element('div', '', 'wa-why-tech-body')
+    tech.append(area)
+    content.append(tech)
+    function disclosure(key, title, value, parent = area) {
+      const block = document.createElement('details')
+      block.dataset.key = key
+      block.open = expanded.has(key)
+      block.append(element('summary', title))
+      const plainNote =
+        value && typeof value === 'object' && Object.keys(value).length === 1 && value.note
+      block.append(
+        element(
+          plainNote || typeof value === 'string' ? 'p' : 'pre',
+          plainNote || (typeof value === 'string' ? value : JSON.stringify(value, null, 2)),
+          'wa-trace-detail'
+        )
+      )
+      parent.append(block)
+      return block
     }
     disclosure('skills', t('Skill yang dimuat'), trace.input.skills?.join('\n') || t('Tidak ada skill.'))
-    content.append(element('h3', t('Aktivitas')))
-    content.append(originLegend())
+    area.append(element('h3', t('Aktivitas')))
+    area.append(originLegend())
     const activity = currentActivity(trace)
     const steps = visibleSteps(trace)
     const tree = processTree(steps)
     const phaseCount = tree.filter(node => node.step && node.branch).length
     const toolLine = toolAccountingLine(steps)
-    if (toolLine) content.append(toolLine)
+    if (toolLine) area.append(toolLine)
     const group = element('section', '', 'wa-trace-activity')
     group.dataset.key = 'activity-timeline'
     const summary = element('div', '', `wa-trace-current is-${activity.state}`)
@@ -447,16 +557,16 @@
     group.append(summary)
     const timeline = element('ul', '', 'wa-trace-timeline')
     group.append(timeline)
-    content.append(group)
+    area.append(group)
     if (trace.status === 'failed') {
       const failure = trace.decision?.failure || steps.filter(step => step.status === 'failed').at(-1)?.detail
       if (failure?.code && failure?.action) {
-        content.append(element('p', `${failure.source || failure.provider || 'AI'} · ${failure.code}\n${t(failure.action)}`, 'wa-trace-detail'))
+        area.append(element('p', `${failure.source || failure.provider || 'AI'} · ${failure.code}\n${t(failure.action)}`, 'wa-trace-detail'))
       }
     }
     if (trace.status === 'interrupted') {
       const diagnostic = trace.interruption || {}
-      content.append(element('p',
+      area.append(element('p',
         `${diagnostic.code || 'TRACE_UPDATES_STALE'} · ${t(diagnostic.message || 'Tidak ada pembaruan aktivitas selama lebih dari 4 menit. Penyebab proses belum terkonfirmasi.')}\n${t(diagnostic.action || 'Periksa log dan status worker pada waktu tersebut, termasuk restart/deploy atau kehabisan memori. Jangan menjalankan ulang sebelum memastikan proses sebelumnya sudah berhenti.')}`,
         'wa-trace-diagnostic'))
     }
@@ -524,36 +634,7 @@
       }
     }
     drawList(tree, timeline)
-    if (trace.decision) {
-      if (trace.decision.goal) disclosure('goal', t('Tujuan & tindak lanjut'), trace.decision.goal)
-      content.append(element('h3', t('Dasar jawaban')))
-      content.append(
-        element('p', t('Ringkasan dari AI; periksa kecocokannya dengan bukti MCP.'), 'wa-trace-muted')
-      )
-      content.append(
-        element(
-          'p',
-          trace.decision.summary ||
-            trace.decision.reason ||
-            trace.decision.error ||
-            t('Tidak ada ringkasan tersedia.')
-        )
-      )
-      if (trace.decision.decision)
-        content.append(
-          element(
-            'p',
-            t("Keputusan: {0}", trace.decision.decision === 'silent' ? t('Tidak membalas (sesuai skill)') : trace.decision.decision === 'handoff' || trace.decision.decision === 'cs' ? t('Serahkan ke CS') : t('Balas pelanggan'))
-          )
-        )
-    }
-    content.append(
-      element(
-        'small',
-        t('Hasil relevan diringkas dan data sensitif disamarkan. Bukan penalaran internal mentah.'),
-        'wa-trace-muted'
-      )
-    )
+    if (trace.decision?.goal) disclosure('goal', t('Tujuan & tindak lanjut'), trace.decision.goal)
     if (focusedKey) {
       const target = [...content.querySelectorAll('details[data-key]')].find(node => node.dataset.key === focusedKey)
       target?.querySelector(':scope > summary')?.focus({ preventScroll: true })

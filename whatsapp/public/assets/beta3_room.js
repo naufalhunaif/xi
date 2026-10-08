@@ -90,7 +90,25 @@
     photos.hidden = !photos.childElementCount
 
     const text = String(result.groupPreview || result.spec || '').trim()
-    byId('beta3RoomText').textContent = text || t('Belum ada pesanan.')
+    const pre = byId('beta3RoomText')
+    // v3.6.70: baris item order → daftar (nama · harga rata kanan); tanpa order → teks pesanan biasa.
+    const lines = String(result.order && result.order.status !== 'cancelled' ? result.order.items || '' : '')
+      .split('\n').map((line) => line.trim()).filter(Boolean)
+    pre.parentElement.querySelector('.wa-b3-items')?.remove()
+    if (lines.length) {
+      const list = el('ul', undefined, 'wa-b3-items')
+      for (const line of lines) {
+        const price = line.match(/\s(-?\d{1,3}(?:\.\d{3})+)$/)
+        const row = el('li')
+        row.append(el('span', price ? line.slice(0, price.index) : line), el('span', price ? price[1] : '', 'wa-b3-price'))
+        list.append(row)
+      }
+      pre.hidden = true
+      pre.after(list)
+    } else {
+      pre.hidden = false
+      pre.textContent = text || t('Belum ada pesanan.')
+    }
     byId('beta3RoomSpec').value = result.spec || ''
     renderOrder(result.order, result.proofs || [])
   }
@@ -100,16 +118,25 @@
     box.replaceChildren()
     const status = byId('beta3RoomOrderStatus')
     status.textContent = ''
+    status.className = 'wa-st'
+    byId('beta3RoomOrderNo').textContent = ''
+    renderProgress(order)
     if (!order || order.status === 'cancelled') {
       box.append(el('p', t('Belum ada order. Order tercatat otomatis saat pelanggan mengirim alamat.'), 'wa-muted'))
       return
     }
     const dp = order.status === 'paid' && order.paid_amount && order.total && Number(order.paid_amount) < Number(order.total)
-    status.textContent = [order.order_number || `#${order.id}`, dp ? t('DP') : statusLabel[order.status], groupLabel[order.group_status]]
-      .filter(Boolean)
-      .join(' · ')
-    const to = [order.customer_name, order.phone, order.address].filter(Boolean).join(' · ')
-    if (to) box.append(el('p', `${t('Kirim ke')}: ${to}`, 'wa-muted wa-b3-to'))
+    byId('beta3RoomOrderNo').textContent = order.order_number || `#${order.id}`
+    status.textContent = [dp ? t('DP') : statusLabel[order.status], groupLabel[order.group_status]].filter(Boolean).join(' · ')
+    status.className = `wa-st ${{ pending: '', awaiting_payment: 'warn', paid: 'ok' }[order.status] || ''}`
+    if (order.customer_name || order.phone || order.address) {
+      const to = el('div', undefined, 'wa-b3-to')
+      to.append(el('span', t('Kirim ke'), 'wa-b3-label'))
+      const who = [order.customer_name, order.phone].filter(Boolean).join(' · ')
+      if (who) to.append(el('span', who))
+      if (order.address) to.append(el('span', order.address, 'wa-muted'))
+      box.append(to)
+    }
     if (order.ship_by)
       box.append(el('p', `${t('Dikirim sebelum')}: ${new Date(order.ship_by).toLocaleDateString(window.waI18n?.locale || 'id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`, 'wa-muted wa-b3-to'))
     const pay = window.waBeta3Pay?.create(order, { post: (path, body) => api(path, body), notice, reload: load })
@@ -187,6 +214,30 @@
     }
     if (actions.childElementCount) box.append(actions)
   }
+
+  // v3.6.70: langkah order — Detail → Total dikirim → Lunas → Produksi → Dikirim.
+  function renderProgress(order) {
+    const bar = byId('beta3RoomProgress')
+    if (!bar) return
+    const active = !order || order.status === 'cancelled' ? -1
+      : order.status === 'pending' ? 1
+        : order.status === 'awaiting_payment' ? 2
+          : order.status === 'paid' ? (order.group_status === 'sent' ? 4 : 3) : 0
+    bar.hidden = active < 0
+    bar.replaceChildren()
+    const labels = [t('Detail'), t('Total dikirim'), t('Sudah bayar'), t('Produksi'), t('Dikirim')]
+    labels.forEach((label, index) => {
+      const item = el('li', label, index < active ? 'is-done' : index === active ? 'is-now' : '')
+      if (index === active) item.setAttribute('aria-current', 'step')
+      bar.append(item)
+    })
+  }
+  byId('beta3RoomEdit')?.addEventListener('click', () => {
+    const editor = byId('beta3RoomEditor')
+    editor.hidden = !editor.hidden
+    byId('beta3RoomEdit').setAttribute('aria-expanded', String(!editor.hidden))
+    if (!editor.hidden) byId('beta3RoomSpec').focus()
+  })
 
   let proofsCache = []
   async function load() {

@@ -685,3 +685,441 @@ html[data-theme] body.workspace-ui .wa-reply-composer[hidden] {
     box-shadow: none;
   }
 }
+
+/* ---------- Process details: "Why the AI replied" (v3.6.70) ---------- */
+html[data-theme] body.workspace-ui .wa-trace-dialog {
+  width: min(420px, 100vw);
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--wa-surface, #fff);
+  box-shadow: none;
+}
+html[data-theme] body.workspace-ui .wa-trace-header {
+  min-height: 60px;
+  padding: 10px 16px 10px 24px;
+  border-bottom: 1px solid var(--line);
+}
+html[data-theme] body.workspace-ui .wa-trace-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+html[data-theme] body.workspace-ui .wa-trace-header h2 {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+html[data-theme] body.workspace-ui #aiTraceStatus {
+  font-size: 12px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-icon-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-icon-close:hover {
+  color: var(--text);
+  background: var(--wa-page);
+}
+html[data-theme] body.workspace-ui .wa-trace-content {
+  font-size: 13px;
+  line-height: 20px;
+  padding: 20px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.wa-why-live {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 14px;
+}
+.wa-why-summary {
+  margin: 0 0 -14px;
+  font-size: 15px;
+  line-height: 22px;
+}
+.wa-why-meta {
+  margin: 0;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wa-why-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wa-why-section > p {
+  margin: 0;
+}
+html[data-theme] body.workspace-ui .wa-why-eyebrow {
+  margin: 0;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wa-why-quote {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: var(--wa-page);
+  white-space: pre-line;
+  line-height: 19px;
+}
+.wa-why-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  counter-reset: why;
+}
+.wa-why-step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: start;
+  counter-increment: why;
+}
+.wa-why-step::before {
+  content: counter(why, decimal-leading-zero);
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.wa-why-step-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.wa-why-step-label {
+  line-height: 20px;
+}
+.wa-why-step.is-running .wa-why-step-label {
+  font-weight: 500;
+}
+.wa-why-step-note {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.wa-why-step-mark {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  color: var(--muted);
+}
+.wa-why-step.is-running .wa-why-step-mark {
+  color: var(--text);
+}
+.wa-why-icon {
+  display: inline-grid;
+  place-items: center;
+}
+.wa-why-step-mark .wa-st {
+  font-size: 12px;
+  color: var(--wa-err);
+}
+details.wa-why-tech {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+details.wa-why-tech > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+details.wa-why-tech > summary::-webkit-details-marker {
+  display: none;
+}
+details.wa-why-tech > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+details.wa-why-tech[open] > summary::before {
+  transform: rotate(45deg);
+}
+.wa-why-tech-meta {
+  margin-left: auto;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.wa-why-tech-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+.wa-why-tech-body {
+  font-size: 12px;
+}
+html[data-theme] body.workspace-ui .wa-why-tech-body .wa-trace-timeline {
+  --trace-line: var(--line);
+}
+html[data-theme] body.workspace-ui .wa-why-tech-body .wa-trace-step::after {
+  background: var(--muted);
+}
+
+/* ---------- Order panel (keranjang di room) ---------- */
+html[data-theme] body.workspace-ui .wa-cart-dialog {
+  width: min(420px, 100vw);
+  border-left: 1px solid var(--line);
+  background: var(--wa-surface, #fff);
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-cart-header {
+  gap: 10px;
+  min-height: 60px;
+  padding: 10px 16px 10px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.wa-cart-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+html[data-theme] body.workspace-ui .wa-cart-title strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.wa-cart-no {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui #beta3RoomOrderStatus {
+  font-size: 12px;
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui #beta3RoomOrderStatus:empty {
+  display: none;
+}
+html[data-theme] body.workspace-ui .wa-cart-body {
+  flex: 1 1 auto;
+  width: auto;
+  padding: 20px 24px 28px;
+  background: var(--wa-surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-heading {
+  margin: 0 0 10px;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-heading h3 {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-b3-status {
+  margin: -8px 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-b3-status:empty {
+  display: none;
+}
+.wa-cart-progress {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+.wa-cart-progress[hidden] {
+  display: none;
+}
+.wa-cart-progress li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
+}
+.wa-cart-progress li::before {
+  content: '';
+  height: 2px;
+  background: var(--line);
+}
+.wa-cart-progress li.is-done::before,
+.wa-cart-progress li.is-now::before {
+  background: var(--text);
+}
+.wa-cart-progress li.is-now {
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-b3-spec {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--wa-page);
+  font-family: var(--wa-sans);
+  font-size: 13px;
+  line-height: 19px;
+}
+.wa-b3-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wa-b3-items li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.wa-b3-items li:last-child {
+  border-bottom: 0;
+}
+.wa-b3-price {
+  flex: none;
+  font-family: var(--wa-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.wa-mini {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.wa-mini:hover,
+.wa-mini[aria-expanded='true'] {
+  background: var(--wa-page);
+  color: var(--text);
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-b3-edit {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-b3-edit[hidden] {
+  display: none;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-summary {
+  margin: 0;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-summary > div {
+  padding: 3px 0;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-summary dt {
+  color: var(--muted);
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-summary dd {
+  font-family: var(--wa-mono);
+  font-size: 12.5px;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-summary .wa-cart-total {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--text);
+  font-weight: 500;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .wa-cart-summary .wa-cart-total dt {
+  color: var(--text);
+}
+.wa-b3-to {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 14px;
+}
+.wa-b3-label {
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+html[data-theme] body.workspace-ui .wa-cart-dialog .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* Pill status → titik + kata (tanpa latar berwarna, tanpa huruf kapital). */
+html[data-theme] body.workspace-ui .wa-pill {
+  height: auto;
+  padding: 0;
+  gap: 6px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--wa-sans);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+html[data-theme] body.workspace-ui .wa-pill::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+  opacity: 1;
+}
+html[data-theme] body.workspace-ui .wa-pill.ok::before { background: var(--wa-ok); }
+html[data-theme] body.workspace-ui .wa-pill.warn::before { background: var(--wa-warn); }
+html[data-theme] body.workspace-ui .wa-pill.err::before { background: var(--wa-err); }
+html[data-theme] body.workspace-ui .wa-pill.ok,
+html[data-theme] body.workspace-ui .wa-pill.warn,
+html[data-theme] body.workspace-ui .wa-pill.err {
+  background: transparent;
+  color: var(--text);
+}
+.wa-b3-to .wa-muted {
+  margin: 0;
+  padding: 0;
+}

@@ -1,26 +1,37 @@
 <dialog id="cartDialog" class="wa-cart-dialog" aria-labelledby="cartTitle" data-beta3-mode="true">
   <header class="wa-cart-header">
-    <strong id="cartTitle" data-i18n="Pesanan">Pesanan</strong>
-    <button type="button" id="cartClose" class="button" aria-label="Tutup cart" data-i18n-aria-label="Tutup cart">×</button>
+    <div class="wa-cart-title">
+      <strong id="cartTitle" data-i18n="Order pelanggan">Order pelanggan</strong>
+      <small id="beta3RoomOrderNo" class="wa-cart-no"></small>
+    </div>
+    <small id="beta3RoomOrderStatus" class="wa-st"></small>
+    <button type="button" id="cartClose" class="button wa-icon-close" aria-label="Tutup cart" title="Tutup cart" data-i18n-aria-label="Tutup cart" data-i18n-title="Tutup cart">
+      <svg class="wa-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+    </button>
   </header>
   <div class="wa-cart-layout">
   <div class="wa-cart-body" id="beta3RoomPanel">
     <div id="beta3RoomNotice" role="status" hidden></div>
+    <ol id="beta3RoomProgress" class="wa-cart-progress" aria-label="Progres order" data-i18n-aria-label="Progres order" hidden></ol>
     <p id="beta3RoomStatus" class="wa-b3-status"></p>
     <section class="wa-cart-section">
-      <h3 data-i18n="Pesanan">Pesanan</h3>
+      <div class="wa-cart-heading">
+        <h3 data-i18n="Pesanan">Pesanan</h3>
+        <button type="button" id="beta3RoomEdit" class="wa-mini" aria-label="Ubah detail pesanan" title="Ubah detail pesanan" data-i18n-aria-label="Ubah detail pesanan" data-i18n-title="Ubah detail pesanan" aria-controls="beta3RoomEditor" aria-expanded="false">
+          <svg class="wa-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
+        </button>
+      </div>
       <div id="beta3RoomPhotos" class="wa-b3-photos" hidden></div>
       <pre id="beta3RoomText" class="wa-b3-spec"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></pre>
+      <div id="beta3RoomEditor" class="wa-b3-edit" hidden>
+        <textarea id="beta3RoomSpec" rows="6"></textarea>
+        <div class="actions"><button id="beta3RoomSpecSave" type="button" class="button" data-i18n="Simpan">Simpan</button></div>
+      </div>
     </section>
     <section class="wa-cart-section">
-      <div class="wa-cart-heading"><h3 data-i18n="Order">Order</h3><small id="beta3RoomOrderStatus" class="wa-muted"></small></div>
+      <div class="wa-cart-heading"><h3 data-i18n="Total & pengiriman">Total & pengiriman</h3></div>
       <div id="beta3RoomOrder"><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></div>
     </section>
-    <details class="wa-cart-section wa-b3-edit">
-      <summary data-i18n="Ubah detail pesanan">Ubah detail pesanan</summary>
-      <textarea id="beta3RoomSpec" rows="6"></textarea>
-      <div class="actions"><button id="beta3RoomSpecSave" type="button" class="button" data-i18n="Simpan">Simpan</button></div>
-    </details>
   </div>
   </div>
 </dialog>
