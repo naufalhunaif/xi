@@ -950,3 +950,75 @@ test.group('Beta3 · uji tidak menghabiskan kuota (v3.6.94)', () => {
     assert.deepEqual(stopSimRun(), { stopped: false })
   })
 })
+
+test.group('Beta3 · jalur kilat (v3.6.95)', () => {
+  test('pertanyaan umum satu maksud dikenali; yang spesifik/berkonteks ke AI', async ({ assert }) => {
+    const { fastIntent } = await import('#beta3/fast_reply')
+    const yes: Array<[string, string]> = [
+      ['Cek harga jas formal kk', 'harga_umum'],
+      ['kak harga jas berapa ya', 'harga_umum'],
+      ['pricelist dong min', 'harga_umum'],
+      ['Lokasi dmn ya ka ??', 'lokasi'],
+      ['Wahh bisa minta tolong shareloc?', 'lokasi'],
+      ['Mas toko buka?', 'jam_buka'],
+      ['tutup jam berapa kak', 'jam_buka'],
+      ['Ada link shoppe kak?', 'marketplace'],
+      ['tokonya ada di tokped gak?', 'marketplace'],
+      ['Brp lama ya ka', 'lama_pengerjaan'],
+      ['cara ordernya bagaimana kak?', 'cara_order'],
+      ['kirim Ke rek Mana yah?', 'rekening'],
+      ['Assalamualaikum kak, no rek nya?', 'rekening'],
+    ]
+    for (const [text, intent] of yes) assert.equal(fastIntent(text), intent, text)
+    const no = [
+      'Ini brapa ?',
+      'harga jas hitam size L berapa',
+      'Beskap ini di shopee ready atau PO?',
+      'cara pesan custom gimana min ?',
+      'berapa lama sampai ke makassar',
+      'Kak orederan saya blm dikirim ya ?',
+      'harga brp',
+      'Lokasi dmn? sama harga jas berapa?',
+      'Kalau dari Kota Banjar baiknya ambil arah mana ... Kalau dikirim kapan sampai ka perlu buat tgl 18',
+      'alamat saya di jl. merdeka no 5 bekasi',
+      'Hallo kak, mau tanya jasnya',
+    ]
+    for (const text of no) assert.isNull(fastIntent(text), text)
+  })
+
+  test('jawaban dari data toko', async ({ assert }) => {
+    const { fastAnswer, storeParts } = await import('#beta3/fast_reply')
+    const store =
+      'TOKO: CHAMELEON CLOTH — CHAMELEON CLOTH Jl. Contoh No 1, Cinyawang, Patimuan, Cilacap, Central Java, 53264.\nOrder lewat chat/website bisa 24 jam. Toko fisik buka Sen-Jum 09:00-17:00, Sab 09:00-15:00, Min tutup WIB (untuk yang mau datang).'
+    assert.deepEqual(storeParts(store), {
+      address: 'Jl. Contoh No 1, Cinyawang, Patimuan, Cilacap, Jawa Tengah, 53264',
+      hours: 'Sen-Jum 09.00-17.00, Sab 09.00-15.00, Min tutup',
+    })
+    const facts = {
+      store,
+      rows: [
+        row('Basic Suit', 'Black', { category: 'Suits', price: 485000 }),
+        row('Bescap Cross Placket', 'Black', { category: 'Suits', price: 485000 }),
+        row('Setelan Basic Suit', 'Black', { category: 'Setelan', price: 705000 }),
+        row('Pants', 'Black', { category: 'Pants', price: 220000 }),
+      ],
+      ranges: { preorder: '5-10 hari kerja', custom: '7-14 hari kerja' },
+      payment: 'Untuk pembayaran tf ke rek BANK 000 an TOKO agar pesanan langsung kami proses',
+      address: 'bos',
+    }
+    const harga = fastAnswer('harga_umum', 'Cek harga jas formal kk', facts)!
+    assert.include(harga[0], '485.000')
+    assert.include(harga[0], '705.000')
+    assert.include(fastAnswer('harga_umum', 'harga celana berapa', facts)![0], '220.000')
+    const lokasi = fastAnswer('lokasi', 'Assalamualaikum, lokasi dimana', facts)!
+    assert.match(lokasi[0], /^Waalaikumsalam bos, .*Jl\. Contoh No 1/)
+    // Bukan template: kalimat berbeda antar pesan, dan kalimat toko terakhir tidak diulang persis.
+    const variants = new Set(['harga jas berapa', 'harga jas brp kak', 'pricelist dong', 'kak harga jas', 'harga jas mulai berapa'].map((text) => fastAnswer('harga_umum', text, facts)![0].replace(/^\w+ \w+, /, '')))
+    assert.isAbove(variants.size, 1)
+    const once = fastAnswer('marketplace', 'ada di shopee?', facts)!
+    const again = fastAnswer('marketplace', 'ada di shopee?', { ...facts, avoid: once })!
+    assert.notEqual(again[0], once[0])
+    assert.include(fastAnswer('lama_pengerjaan', 'brp lama', facts)![0], '5-10 hari kerja')
+    assert.isNull(fastAnswer('rekening', 'norek', { ...facts, payment: '' }))
+  })
+})

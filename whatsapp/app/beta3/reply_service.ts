@@ -69,6 +69,9 @@ import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, ski
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
 import { lookupPlace, mapLink, parseAddress, type PlaceLookup } from '#beta3/place_lookup'
+import { fastAnswer, fastIntent, needsContext } from '#beta3/fast_reply'
+/** Tahap awal: jalur kilat untuk harga umum, lama pengerjaan, cara order. */
+const FAST_EARLY = ['', 'lain', 'selesai', 'tanya_model', 'tanya_size']
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
 import { completePhotos, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
@@ -600,6 +603,46 @@ export async function createLeanReply(input: {
       durationMs: 0,
       orderId: null,
       skillName: skill.name,
+    }
+  }
+  // v3.6.95 — Jalur kilat: pertanyaan umum satu maksud dijawab dari data toko tanpa AI (seperti CS yang hafal).
+  const fastKind =
+    !input.imagePaths?.length && !input.note && !needsContext(rows) ? fastIntent(input.text) : null
+  const fastStageOk = fastKind && (['rekening', 'lokasi', 'jam_buka', 'marketplace'].includes(fastKind) || FAST_EARLY.includes(stage))
+  if (fastKind && fastStageOk) {
+    const methods = settings.paymentMethods.filter((method) => method.enabled)
+    const fast = fastAnswer(fastKind, input.text, {
+      store: String((await readLeanState('store_profile').catch(() => '')) || ''),
+      rows: digest.rows,
+      ranges: productionRanges(settings.production),
+      payment: renderPaymentMessage(methods.map((method) => ({ bank: method.name, number: method.destination, holder: (method as { accountName?: string }).accountName || '' }))),
+      address: style?.address || 'bos',
+      seed: `${jid}|${rows.length}`,
+      avoid: rows.filter((row) => row.direction === 'out').slice(-6).map((row) => String(row.body || '')),
+    })
+    if (fast?.length) {
+      const pesan = style ? normalizeStyle(fast, style) : fast
+      onTrace?.({ key: 'beta3-fast', label: `Jalur kilat · ${fastKind.replace(/_/g, ' ')} (0 token)`, status: 'completed', detail: { pesan } })
+      return {
+        decision: {
+          pesan,
+          foto: [],
+          catatan: chatNote,
+          tahap: (stage || 'lain') as LeanDecision['tahap'],
+          serah_cs: false,
+          alasan: `Jalur kilat: ${fastKind}`,
+          susulan: '',
+          spesifikasi: String(spec || ''),
+        },
+        autoTotal: null,
+        photos: [],
+        promptTokens: 0,
+        promptSections: [],
+        usage: null,
+        durationMs: 0,
+        orderId: null,
+        skillName: skill.name,
+      }
     }
   }
   // Berat pesanan dari spesifikasi × berat produk (MCP toko): ongkir dicek sesuai berat asli.
