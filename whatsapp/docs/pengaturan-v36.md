@@ -460,3 +460,9 @@ Perubahan v3.6.6:
 - Sekarang sinkron mencatat **skema sinkron**; bila aplikasi mulai menyimpan bagian baru (seperti diskon grosir), katalog ditarik penuh sekali walau versinya sama. Setelah `wa update`, diskon grosir tersimpan pada sinkron berikutnya (paling lama 30 menit) atau langsung lewat tombol **Sync**.
 - Tombol **Sync** di halaman katalog Beta 3 kini selalu menarik penuh (toko, bahan, size chart, diskon grosir), bukan hanya bila versi berubah.
 - Peringatan "Skill terlalu panjang" hanya muncul bila skill asli yang dipakai (saat ringkasan dipakai tidak relevan).
+
+## v3.6.67 — Ulasan room uji 8 Okt: total grosir, foto kosong, COD
+
+- **"Totalnya saya hitung dulu" padahal data lengkap:** penyebabnya bukan riwayat chat yang terpotong. Pemeriksa total menolak rincian AI karena harga size besar tertulis "XXL-4XL 585.000" (size terbesar 4XL), sedangkan pemeriksa hanya mengenali "XXL-3XL" → XXL & 3XL dihitung 485.000 → "subtotal AI 3.110.000 ≠ katalog 2.820.000" → total menunggu CS. Sekarang semua bentuk (XXL, XXL-3XL, XXL-4XL) dan size 4XL dihitung harga besar; total grosir 6 jas (3.110.000 − 90.000) terkirim otomatis.
+- **"Ini fotonya bos" tanpa foto:** saat AI sengaja diam (pelanggan hanya "Oke"), perapian foto v3.6.58 keliru mengisi "Ini fotonya bos". Sekarang hanya bila foto benar-benar dikirim.
+- **COD:** AI menjawab "Bisa COD bos" tanpa data. Menurut data CS lama, COD / bayar di tempat / paylater tidak tersedia → skill memuat faktanya dan sistem mengganti klaim "bisa COD" dengan "Maaf bos, belum bisa COD ya, pembayarannya lewat transfer".

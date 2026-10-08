@@ -195,6 +195,8 @@ export function polishWithPhotos(
   address = 'bos'
 ) {
   let ordered = dropPhotoOffers(questionAfterPhotos(pesan, photos.length), photos.length)
-  if (!ordered.length) ordered = [`Ini fotonya ${address}`]
+  // Hanya bila foto benar-benar dikirim dan isinya habis karena tawaran dibuang (v3.6.67: dulu AI
+  // yang sengaja diam — "Oke" — malah mengirim "Ini fotonya bos" tanpa foto).
+  if (!ordered.length && photos.length && pesan.length) ordered = [`Ini fotonya ${address}`]
   return compactPhotoIntro(ordered, photos, customerText, address)
 }

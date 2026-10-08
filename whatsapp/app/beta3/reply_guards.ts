@@ -84,3 +84,20 @@ export function prependMissing<T extends { id: string }>(queue: T[], items: T[])
   queue.unshift(...items.filter((item) => !known.has(item.id)))
   return queue
 }
+
+/** v3.6.67 — COD / bayar di tempat / paylater tidak tersedia (data CS lama); AI sempat menjawab "Bisa COD bos". */
+export const NO_COD_REPLY = 'Maaf bos, belum bisa COD ya, pembayarannya lewat transfer'
+const ASKS_COD = /\b(cod|bayar di tempat|bayar ditempat|paylater|pay later)\b/i
+const CLAIMS_COD = /[^.!?\n]*\b(?:bisa|boleh|tersedia|ada)\s+(?:pakai\s+|via\s+)?(?:cod|bayar di ?tempat|paylater)\b[^.!?\n]*[.!?]?/gi
+export function fixCodClaim(pesan: string[], customerText: string) {
+  if (!ASKS_COD.test(customerText || '')) return { pesan, changed: false }
+  let changed = false
+  const out = pesan.map((bubble) =>
+    bubble.replace(CLAIMS_COD, (sentence) => {
+      if (/\b(belum|tidak|gak|ga|nggak|engga)\b/i.test(sentence)) return sentence
+      changed = true
+      return `${NO_COD_REPLY}. `
+    }).replace(/\s{2,}/g, ' ').trim()
+  )
+  return { pesan: changed ? out.filter(Boolean) : pesan, changed }
+}

@@ -64,7 +64,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { cancelsOrder, dropRepeatedWait, keepCustomInChat } from '#beta3/reply_guards'
+import { cancelsOrder, dropRepeatedWait, fixCodClaim, keepCustomInChat } from '#beta3/reply_guards'
 import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -1213,6 +1213,11 @@ export async function createLeanReply(input: {
     })
   }
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
+  const cod = fixCodClaim(decision.pesan, input.text)
+  if (cod.changed) {
+    decision.pesan = cod.pesan
+    onTrace?.({ key: 'beta3-cod', label: 'Klaim COD diganti · COD tidak tersedia', status: 'completed', detail: {} })
+  }
   // v3.6.63 Hati CS: kalimat yang sama tidak diulang, ucapan momen sekali, pelanggan kesal/pamit tidak didesak.
   if (!decision.serah_cs) {
     const repeated = dropRepeatedSentences(decision.pesan, rows)

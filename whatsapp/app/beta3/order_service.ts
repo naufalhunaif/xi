@@ -1302,7 +1302,9 @@ export function matchAutoTotal(
       if (!linePrices.length && detail) continue
       return { ok: false, reason: `baris tidak cocok katalog: ${line}` }
     }
-    const big = /\b(xxl|3xl|xxxl)\b/i.test(line) ? row.note.match(/XXL-3XL ([\d.]+)/)?.[1] : null
+    // v3.6.67: harga besar tertulis "XXL-4XL 585.000" bila size terbesar 4XL (dulu hanya "XXL-3XL"
+    // yang dikenali → XXL/3XL dihitung harga biasa, total grosir 8 Okt tertahan).
+    const big = /\b(xxl|xxxl|[3-9]xl)\b/i.test(line) ? row.note.match(/XXL(?:-\d?X*L)?\s+([\d.]{5,})/i)?.[1] : null
     const unit = big ? Number(big.replace(/\./g, '')) : Number(row.price)
     sum += unit * qty
     items.push(line)
