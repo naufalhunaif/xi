@@ -165,12 +165,25 @@
   }
   async function loadCatalog() {
     const result = await api('/api/beta3/catalog')
-    const synced = result.updatedAt ? t('Disinkron {0}', window.waTime.ago(result.updatedAt)) : ''
-    byId('beta3SyncedAt').textContent = synced
-    byId('beta3SyncedAt').title = result.updatedAt ? window.waTime.full(result.updatedAt) : ''
-    byId('beta3CatalogStatus').textContent = result.rows.length
-      ? t('{0} produk · {1} varian', result.products || 0, result.rows.length)
+    // v3.6.76: "Dicek" = terakhir dicocokkan ke website (bukan waktu halaman dibuka).
+    const checked = result.checkedAt || result.changedAt
+    byId('beta3SyncedAt').textContent = checked ? t('Dicek {0}', window.waTime.ago(checked)) : ''
+    byId('beta3SyncedAt').title = checked ? window.waTime.full(checked) : ''
+    const stats = result.stats || {}
+    byId('beta3CatalogStatus').textContent = stats.colors
+      ? t('{0} produk · {1} warna', stats.products, stats.colors)
       : t('Belum ada katalog — tekan Sync katalog.')
+    const list = byId('beta3CatalogStats')
+    list.hidden = !stats.colors
+    const value = {
+      onWeb: t('{0} warna', stats.onWeb || 0),
+      ready: t('{0} warna', stats.ready || 0),
+      inactive: String(stats.inactive || 0),
+      changedAt: result.changedAt ? window.waTime.ago(result.changedAt) : '—',
+    }
+    for (const cell of list.querySelectorAll('[data-stat]')) cell.textContent = value[cell.dataset.stat]
+    list.querySelector('[data-stat-row="inactive"]').hidden = !stats.inactive
+    if (result.changedAt) list.querySelector('[data-stat="changedAt"]').title = window.waTime.full(result.changedAt)
     byId('beta3CatalogTech').textContent = [t('≈{0} token', result.tokens), result.version ? t('versi {0}', String(result.version).slice(0, 8)) : '']
       .filter(Boolean).join(' · ')
     byId('beta3CatalogDigest').textContent = result.digest

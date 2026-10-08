@@ -673,10 +673,17 @@ html[data-theme] body.workspace-ui .wa-reply-composer[hidden] {
 
 /* Layar sentuh: aksi pesan tetap terlihat tapi tipis (tanpa kotak). */
 @media (hover: none), (max-width: 520px) {
+  /* v3.6.76: ikon aksi tidak lagi berjajar di setiap bubble — muncul saat bubble diketuk/disorot. */
   html[data-theme] body.workspace-ui .message-actions {
-    opacity: 0.6;
+    opacity: 0;
+    pointer-events: none;
     width: 52px;
     right: -54px;
+  }
+  html[data-theme] body.workspace-ui .message.is-picked .message-actions,
+  html[data-theme] body.workspace-ui .message:focus-within .message-actions {
+    opacity: 1;
+    pointer-events: auto;
   }
   html[data-theme] body.workspace-ui .message.out .message-actions {
     left: -54px;
@@ -1854,4 +1861,83 @@ html[data-theme] body.workspace-ui dialog,
 html[data-theme] body.workspace-ui dialog #aiTraceContent,
 html[data-theme] body.workspace-ui dialog .wa-cart-body {
   overscroll-behavior: contain;
+}
+
+/* v3.6.76 — bubble lebih rapi: pesan beruntun dari pihak yang sama dirapatkan, jeda saat pengirim berganti;
+   footer = reaksi di kiri, ikon + jam + status rapat di kanan. */
+html[data-theme] body.workspace-ui .wa-message-list {
+  gap: 3px;
+}
+html[data-theme] body.workspace-ui .wa-message-list > .message.in + .message.out,
+html[data-theme] body.workspace-ui .wa-message-list > .message.out + .message.in,
+html[data-theme] body.workspace-ui .wa-message-list > .message.source-ai + .message.source-cs,
+html[data-theme] body.workspace-ui .wa-message-list > .message.source-cs + .message.source-ai,
+html[data-theme] body.workspace-ui .wa-message-list > :not(.message) + .message {
+  margin-top: 10px;
+}
+html[data-theme] body.workspace-ui .message-footer {
+  align-items: center;
+  gap: 4px;
+}
+html[data-theme] body.workspace-ui .message-footer .message-reactions {
+  margin-right: auto;
+}
+html[data-theme] body.workspace-ui .message-footer .message-reactions:empty {
+  display: none;
+}
+html[data-theme] body.workspace-ui .message-footer .message-tools,
+html[data-theme] body.workspace-ui .message.out .message-footer .message-tools {
+  margin: 0 2px 0 0;
+}
+html[data-theme] body.workspace-ui .message-footer .message-time {
+  margin-left: 0;
+}
+html[data-theme] body.workspace-ui .message-footer .message-time + .message-status {
+  margin-left: 0;
+}
+@media (hover: hover) {
+  html[data-theme] body.workspace-ui .message:hover .message-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* v3.6.76 — kartu Katalog: total yang ditawarkan AI + rincian singkat. */
+.wa-catalog-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 10px;
+}
+.wa-catalog-total {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.wa-catalog-summary small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.wa-catalog-stats {
+  margin: 0 0 4px;
+}
+.wa-catalog-stats > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.wa-catalog-stats > div[hidden] {
+  display: none;
+}
+.wa-catalog-stats dt {
+  color: var(--muted);
+}
+.wa-catalog-stats dd {
+  margin: 0;
+  font-family: var(--wa-mono);
+  font-size: 12px;
+  text-align: right;
 }

@@ -177,6 +177,44 @@
   })
   const messages = byId('messages')
   const messageList = byId('messageList')
+  // v3.6.76 — salin beberapa pesan sekaligus: tiap baris diberi waktu + pengirim (Pelanggan/AI/CS),
+  // supaya jelas siapa yang membalas saat chat ditempel untuk dilaporkan.
+  const COPY_SENDER = { customer: 'Pelanggan', ai: 'AI', cs: 'CS', owner: 'CS (HP)' }
+  const copyStamp = (value) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    const pad = (number) => String(number).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
+  function copyLine(article) {
+    const sender = t(COPY_SENDER[article.dataset.sender] || (article.classList.contains('out') ? 'CS' : 'Pelanggan'))
+    const body = article.querySelector('.message-body')?.innerText.trim() || ''
+    const kind = { image: 'Foto', video: 'Video', audio: 'Audio', document: 'Dokumen', sticker: 'Stiker' }[article.dataset.media] || 'Media'
+    const media = article.classList.contains('has-media') ? `[${t(kind)}]` : ''
+    const quote = article.querySelector('.message-reply-preview')?.innerText.trim()
+    const text = [media, body].filter(Boolean).join(' ').replace(/\n/g, '\n    ')
+    return `[${copyStamp(article.dataset.at)}] ${sender}: ${quote ? `(${t('membalas')} "${quote}") ` : ''}${text}`
+  }
+  // Layar sentuh: ketuk bubble → tampilkan ikon Reaksi/Balas untuk bubble itu saja.
+  messages?.addEventListener('click', (event) => {
+    if (!window.matchMedia('(hover: none), (max-width: 520px)').matches) return
+    if (event.target.closest('button, a, img, video, audio, .message-actions')) return
+    const article = event.target.closest('article.message')
+    if (window.getSelection()?.toString()) return
+    for (const picked of messages.querySelectorAll('article.message.is-picked'))
+      if (picked !== article) picked.classList.remove('is-picked')
+    article?.classList.toggle('is-picked')
+  })
+  messages?.addEventListener('copy', (event) => {
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed || !event.clipboardData) return
+    const range = selection.getRangeAt(0)
+    const touched = [...messages.querySelectorAll('article.message')].filter((article) => range.intersectsNode(article))
+    const whole = touched.length > 1 ? touched : touched.filter((article) => selection.containsNode(article, false))
+    if (!whole.length) return
+    event.preventDefault()
+    event.clipboardData.setData('text/plain', whole.map(copyLine).join('\n'))
+  })
   const compareMessages = (left, right) =>
     ((Date.parse(left.created_at) || 0) - (Date.parse(right.created_at) || 0)) ||
     Number(left.id) - Number(right.id)
@@ -249,6 +287,9 @@
     article.dataset.id = String(message.id)
     article.dataset.messageId = message.message_id
     article.dataset.body = message.body || message.media_type || 'Media'
+    article.dataset.sender = senderType
+    if (hasMedia) article.dataset.media = message.media_type
+    article.dataset.at = message.created_at || ''
 
     const actions = document.createElement('div')
     actions.className = 'message-actions'

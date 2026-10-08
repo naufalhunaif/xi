@@ -2022,5 +2022,17 @@ window.waLocales.en = {
   "Disinkron {0}": "Synced {0}",
   "{0} produk · {1} varian": "{0} products · {1} variants",
   "Katalog sudah terbaru.": "The catalog is already up to date.",
-  "{0} varian disinkronkan.": "{0} variants synced."
+  "{0} varian disinkronkan.": "{0} variants synced.",
+  "CS": "CS",
+  "CS (HP)": "CS (phone)",
+  "membalas": "replying to",
+  "Audio": "Audio",
+  "Ditawarkan AI · diambil dari website toko tiap 30 menit": "Offered by AI · pulled from the store website every 30 min",
+  "Tampil di website": "On the website",
+  "Ada stok ready": "In stock (ready)",
+  "Nonaktif, tidak ditawarkan": "Inactive, not offered",
+  "Terakhir berubah": "Last changed",
+  "Dicek {0}": "Checked {0}",
+  "{0} produk · {1} warna": "{0} products · {1} colors",
+  "{0} warna": "{0} colors"
 }

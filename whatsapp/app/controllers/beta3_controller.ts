@@ -81,6 +81,27 @@ import env from '#start/env'
 /** Bukti transfer yang nominalnya sedang/baru dibaca AI (sekali per 10 menit per order). */
 const proofReads = new Map<string, number>()
 
+/** v3.6.76: ringkasan katalog untuk halaman AI — hanya warna aktif yang ditawarkan AI. */
+export function catalogStats(
+  rows: Array<{ product: string; active: boolean; photoUrl: string | null; sizesReady: string; note: string }>
+) {
+  const offered = rows.filter((row) => row.active)
+  // Tampil di website = punya foto dan tidak ditandai "tidak tampil di web" oleh sinkron toko.
+  const onWeb = (row: (typeof rows)[number]) => Boolean(row.photoUrl) && !/tidak tampil di web/i.test(row.note || '')
+  return {
+    products: new Set(offered.map((row) => row.product)).size,
+    colors: offered.length,
+    onWeb: offered.filter(onWeb).length,
+    ready: offered.filter((row) => row.sizesReady.trim()).length,
+    inactive: rows.length - offered.length,
+  }
+}
+
+function latestRowUpdate(rows: Array<{ updatedAt?: string | Date | null }>) {
+  const times = rows.map((row) => Date.parse(String(row.updatedAt || ''))).filter(Number.isFinite)
+  return times.length ? new Date(Math.max(...times)).toISOString() : null
+}
+
 export default class Beta3Controller {
   async page({ view, session }: HttpContext) {
     await ensureDefaults()
@@ -103,7 +124,11 @@ export default class Beta3Controller {
       // v3.6.73: pola harga terstruktur untuk tabel di halaman AI.
       priceTable: prices.series,
       products: new Set(digest.rows.map((row) => row.product)).size,
+      // v3.6.76: angka yang dipakai AI. Satu baris katalog = satu warna dari satu produk.
+      stats: catalogStats(digest.rows),
       tokens: estimateTokens(digest.text),
+      checkedAt: (await readLeanState('catalog_checked_at')) || null,
+      changedAt: (await readLeanState('catalog_changed_at')) || latestRowUpdate(digest.rows),
       updatedAt: new Date(digest.at).toISOString(),
       version: await readLeanState('catalog_version_sf2'),
     })

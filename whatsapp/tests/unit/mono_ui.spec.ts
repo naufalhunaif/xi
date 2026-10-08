@@ -114,4 +114,37 @@ test.group('tampilan monokrom (v3.6.70)', () => {
     assert.include(process, 'lastTrigger.focus({ preventScroll: true })')
     assert.notInclude(process, 'lastTrigger.focus()')
   })
+
+  test('salin chat: tiap baris berlabel waktu + pengirim; bubble beruntun dirapatkan (v3.6.76)', async ({ assert }) => {
+    const app = await readFile('public/assets/app.js', 'utf8')
+    assert.include(app, "const COPY_SENDER = { customer: 'Pelanggan', ai: 'AI', cs: 'CS', owner: 'CS (HP)' }")
+    assert.include(app, "event.clipboardData.setData('text/plain', whole.map(copyLine).join('\\n'))")
+    assert.include(app, 'article.dataset.sender = senderType')
+    const css = await readFile('public/assets/mono.css', 'utf8')
+    assert.include(css, '.wa-message-list > .message.in + .message.out')
+    assert.include(css, '.message.is-picked .message-actions')
+  })
+
+  test('kartu Katalog: hitungan warna yang ditawarkan AI, tampil di web, stok ready, nonaktif (v3.6.76)', async ({ assert }) => {
+    const { catalogStats } = await import('#controllers/beta3_controller')
+    const row = (product: string, extra: Record<string, unknown> = {}) => ({
+      product,
+      active: true,
+      photoUrl: 'https://example.test/a.jpg',
+      sizesReady: '',
+      note: '',
+      ...extra,
+    })
+    const stats = catalogStats([
+      row('Suit', { sizesReady: 'M L' }),
+      row('Suit'),
+      row('Suit', { note: 'tidak tampil di web' }),
+      row('Pants', { photoUrl: null }),
+      row('Vest', { active: false }),
+    ] as never)
+    assert.deepEqual(stats, { products: 2, colors: 4, onWeb: 2, ready: 1, inactive: 1 })
+    const page = await readFile('resources/views/partials/beta3.edge', 'utf8')
+    assert.include(page, 'id="beta3CatalogStats"')
+    assert.notInclude(await readFile('public/assets/beta3.js', 'utf8'), "'{0} produk · {1} varian'")
+  })
 })

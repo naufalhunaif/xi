@@ -31,7 +31,16 @@
         <button id="beta3ImportOpen" class="wa-mini" type="button" aria-label="Impor JSON" title="Impor JSON" data-i18n-aria-label="Impor JSON" data-i18n-title="Impor JSON"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 15V4m-4 4 4-4 4 4M5 20h14" /></svg></button>
       </div>
     </div>
-    <div class="wa-line-row"><div class="wa-line-label"><span data-i18n="Produk">Produk</span><small data-i18n="Dari website toko, otomatis tiap 30 menit">Dari website toko, otomatis tiap 30 menit</small></div><span id="beta3CatalogStatus" class="wa-line-value" role="status"></span></div>
+    <div class="wa-catalog-summary">
+      <strong id="beta3CatalogStatus" class="wa-catalog-total" role="status"></strong>
+      <small data-i18n="Ditawarkan AI · diambil dari website toko tiap 30 menit">Ditawarkan AI · diambil dari website toko tiap 30 menit</small>
+    </div>
+    <dl id="beta3CatalogStats" class="wa-catalog-stats" hidden>
+      <div><dt data-i18n="Tampil di website">Tampil di website</dt><dd data-stat="onWeb"></dd></div>
+      <div><dt data-i18n="Ada stok ready">Ada stok ready</dt><dd data-stat="ready"></dd></div>
+      <div data-stat-row="inactive"><dt data-i18n="Nonaktif, tidak ditawarkan">Nonaktif, tidak ditawarkan</dt><dd data-stat="inactive"></dd></div>
+      <div><dt data-i18n="Terakhir berubah">Terakhir berubah</dt><dd data-stat="changedAt"></dd></div>
+    </dl>
     <details class="wa-line-more"><summary data-i18n="Detail teknis">Detail teknis</summary><p id="beta3CatalogTech" class="wa-muted"></p></details>
   </section>
   <section class="wa-lean-card">

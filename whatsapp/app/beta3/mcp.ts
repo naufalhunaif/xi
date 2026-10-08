@@ -164,6 +164,9 @@ export async function syncLeanCatalog(
     30_000
   )
   if (!digest) return { configured: false, unchanged: false, count: 0, version: '' }
+  // v3.6.76: catat kapan katalog terakhir dicek ke website (halaman AI menampilkan ini, bukan
+  // waktu ringkasan dibuat ulang yang selalu "baru saja").
+  await writeLeanState('catalog_checked_at', new Date().toISOString())
   if (digest.unchanged) {
     if (!(await readLeanState('product_weights'))) await syncProductWeights(config).catch(() => 0)
     return { configured: true, unchanged: true, count: 0, version: stored }
@@ -193,6 +196,7 @@ export async function syncLeanCatalog(
   const version = digest.version ? String(digest.version) : ''
   if (version) await writeLeanState('catalog_version_sf2', version)
   await writeLeanState('catalog_sync_schema', CATALOG_SYNC_SCHEMA)
+  await writeLeanState('catalog_changed_at', new Date().toISOString())
   return { configured: true, unchanged: false, count, version }
 }
 
