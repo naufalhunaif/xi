@@ -49,7 +49,12 @@ export type LeanProviderSettings = {
   claudeSpeed: string
   claudeReasoning: string
   claudeBin: string
+  /** v3.6.97: izinkan WebSearch/WebFetch (hanya fase pencarian alamat). */
+  webSearch?: boolean
 }
+
+/** Fase yang boleh mencari di internet (seperti CS membuka Google). */
+export const WEB_PHASES = new Set(['beta3-web-place'])
 
 export type LeanProviderResult = {
   text: string
@@ -457,7 +462,7 @@ async function runLeanOnce(
     }
     const text = await timeoutScope.run(providerTimeout(phase, imagePaths.length), () =>
       provider === 'claude'
-        ? runClaudeLean(tuned, prompt, workingDirectory, schema, imagePaths, observe)
+        ? runClaudeLean({ ...tuned, webSearch: WEB_PHASES.has(phase) }, prompt, workingDirectory, schema, imagePaths, observe)
         : provider === 'gemini'
           ? runGeminiLean(account.model || '', account.apiKey || '', prompt, schema, imagePaths, observe)
           : runCodexLean(tuned, prompt, workingDirectory, schemaPath, imagePaths, observe)
@@ -694,8 +699,8 @@ async function spawnClaude(
       '--system-prompt',
       prompt.system,
       '--tools',
-      imagePaths.length ? 'Read' : '',
-      ...(imagePaths.length ? ['--allowedTools', 'Read'] : []),
+      settings.webSearch ? 'WebSearch,WebFetch' : imagePaths.length ? 'Read' : '',
+      ...(settings.webSearch ? ['--allowedTools', 'WebSearch,WebFetch'] : imagePaths.length ? ['--allowedTools', 'Read'] : []),
       '--disable-slash-commands',
       '--setting-sources',
       '',

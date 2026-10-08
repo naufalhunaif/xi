@@ -229,10 +229,14 @@ export type LookupTrail = string[]
  * Cari tujuan dari link peta di pesan, atau dari nama tempat yang tidak dikenal ekspedisi.
  * null bila tidak ketemu (AI lalu menanyakan kecamatan seperti biasa).
  */
+/** Pencarian internet oleh AI (WebSearch) untuk nama usaha/tempat yang tidak ada di peta terbuka. */
+export type WebPlaceSearch = (query: string) => Promise<{ alamat?: string; kecamatan?: string; kabupaten?: string; kode_pos?: string } | null>
+
 export async function lookupPlace(
   input: { text: string; place?: string | null },
   find: (q: string) => Promise<DestinationRow[]>,
-  trail: LookupTrail = []
+  trail: LookupTrail = [],
+  web?: WebPlaceSearch
 ): Promise<PlaceLookup | null> {
   const link = mapLink(input.text)
   let place: GeoPlace | null = null
@@ -257,6 +261,28 @@ export async function lookupPlace(
     for (const query of placeQueries(input.place)) {
       place = await geocode(query)
       if (place) break
+    }
+  }
+  // v3.6.97: tidak ada di peta terbuka → cari di internet (Google Maps/website) seperti CS, hasil disimpan 30 hari.
+  if (!place && web) {
+    const target = link ? (await resolveMapLink(link)).name || '' : ''
+    const query = [target, link || input.place || ''].filter(Boolean).join(' ').trim()
+    if (query) {
+      const found = await cached(`geo:w:${query.toLowerCase().slice(0, 180)}`, async () => {
+        const hit = await web(query).catch(() => null)
+        if (!hit || (!hit.kecamatan && !hit.kode_pos)) return null
+        return {
+          display: String(hit.alamat || [hit.kecamatan, hit.kabupaten].filter(Boolean).join(', ')).slice(0, 300),
+          names: hit.kecamatan ? [clean(hit.kecamatan)] : [],
+          city: clean(hit.kabupaten || ''),
+          postcode: String(hit.kode_pos || '').replace(/\D/g, '').slice(0, 5),
+        } satisfies GeoPlace
+      })
+      trail.push(`internet → ${found ? `${found.display.slice(0, 120)} | ${found.names.join('/')} | ${found.city} | ${found.postcode}` : 'tidak ketemu'}`)
+      if (found) {
+        place = found
+        if (link) source = 'link'
+      }
     }
   }
   if (!place) {

@@ -871,7 +871,9 @@ export async function createLeanReply(input: {
         // cocokkan ke tujuan ekspedisi lewat kecamatan + kota + kode pos. Seperti CS membuka Google Maps.
         if (!kept && (areas.length !== 1 || place === linkPlace) && fresh !== false && mcp.url) {
           const trail: string[] = []
-          geoFound = await lookupPlace({ text: input.text, place: place === linkPlace ? null : place }, (query) => findDestinations(query, mcp), trail).catch(() => null)
+          // Internet hanya untuk link peta / nama usaha (jarang); nama tempat biasa cukup peta terbuka.
+          const web = place === linkPlace ? (query: string) => webPlaceSearch(settings, jid, query) : undefined
+          geoFound = await lookupPlace({ text: input.text, place: place === linkPlace ? null : place }, (query) => findDestinations(query, mcp), trail, web).catch(() => null)
           if (!geoFound) onTrace?.({ key: 'beta3-geo', label: 'Lokasi tidak ketemu di peta', status: 'completed', detail: { place, trail } })
           const better = geoFound ? groupDestinations(geoFound.rows) : []
           if (better.length && (better.length < areas.length || !areas.length || place === linkPlace)) {
@@ -1988,6 +1990,37 @@ export function productionRanges(production?: LeanSettings['production']) {
 /** Fakta dasar toko untuk pemeriksa & penilai (bukan prompt AI). */
 export const STORE_BASICS =
   'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer.'
+
+const WEB_PLACE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    alamat: { type: 'string' },
+    kecamatan: { type: 'string' },
+    kabupaten: { type: 'string' },
+    kode_pos: { type: 'string' },
+  },
+  required: ['alamat', 'kecamatan', 'kabupaten', 'kode_pos'],
+}
+/** v3.6.97 — AI mencari alamat di internet (WebSearch), seperti CS membuka Google Maps. */
+export async function webPlaceSearch(settings: LeanSettings, jid: string, query: string) {
+  const reply = await runLeanProvider(
+    settings,
+    {
+      system:
+        'Kamu membantu CS toko mencari alamat pengiriman di Indonesia. Cari di internet (WebSearch/WebFetch, mis. Google Maps, situs usaha). Balas HANYA JSON sesuai skema. Isi kecamatan, kabupaten/kota, kode pos dari sumber; kosongkan yang tidak yakin. Jangan mengarang.',
+      user: `Cari alamat lengkap untuk: ${query.slice(0, 300)}`,
+    },
+    [],
+    'beta3-web-place',
+    WEB_PLACE_SCHEMA,
+    { jid, providers: ['claude'], tier: 'standard' }
+  )
+  // Hanya Claude yang benar-benar mencari di internet; penyedia lain (tanpa web) bisa mengarang alamat.
+  if (reply.provider !== 'claude' && reply.model !== 'tiruan') return null
+  const text = reply.text
+  return JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { alamat?: string; kecamatan?: string; kabupaten?: string; kode_pos?: string }
+}
 
 /** Pesan toko terakhir menanyakan tujuan kirim (kecamatan/kota/ke mana). */
 export function asksDestination(rows: LeanHistoryRow[]) {

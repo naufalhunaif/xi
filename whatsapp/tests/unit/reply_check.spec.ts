@@ -1062,3 +1062,32 @@ test.group('Beta3 · ingatan pelanggan dari chat lama (v3.6.96)', () => {
     assert.include(merged, 'Size jas: M')
   })
 })
+
+test.group('Beta3 · cari alamat di internet (v3.6.97)', () => {
+  test('link nama usaha tidak ada di peta → pencarian internet → tujuan ekspedisi', async ({ assert }) => {
+    const { lookupPlace, setGeoFetcher } = await import('#beta3/place_lookup')
+    setGeoFetcher(async (url) =>
+      ({ ok: true, url: String(url).includes('share.google') ? 'https://www.google.com/search?q=CV.+USAHA+UJI97' : String(url), json: async () => [], text: async () => '' }) as any
+    )
+    const asked: string[] = []
+    try {
+      const found = await lookupPlace(
+        { text: 'kirim ke sini kak CV. USAHA UJI97 https://share.google/uji97' },
+        async (q) => (q.toLowerCase() === 'pangkajene' ? [{ code: 'PKJ1', district: 'PANGKAJENE', city: 'PANGKAJENE KEPULAUAN', zip_code: '90612' }] : []),
+        [],
+        async (query) => {
+          asked.push(query)
+          return { alamat: 'Jagong, Kec. Pangkajene, Kab. Pangkajene dan Kepulauan 90612', kecamatan: 'Pangkajene', kabupaten: 'Pangkajene dan Kepulauan', kode_pos: '90612' }
+        }
+      )
+      assert.deepEqual(found?.rows.map((row) => row.code), ['PKJ1'])
+      assert.equal(found?.source, 'link')
+      assert.include(asked[0], 'CV. USAHA UJI97')
+    } finally {
+      setGeoFetcher(null)
+    }
+    const { WEB_PHASES } = await import('#beta3/provider')
+    assert.isTrue(WEB_PHASES.has('beta3-web-place'))
+    assert.isFalse(WEB_PHASES.has('beta3-reply'))
+  })
+})
