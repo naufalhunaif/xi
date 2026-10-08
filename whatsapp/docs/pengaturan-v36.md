@@ -416,3 +416,10 @@ Perubahan v3.6.6:
 - Celana/rompi tanpa 6 jas, atau kurang dari 6 jas: tanpa potongan. Kemeja tidak ikut potongan otomatis.
 - Dicatat `grosir: ya` tapi jumlah jas belum 6 / jumlah pcs tidak terbaca → total tidak dikirim otomatis, dicek toko (tetap dibalas).
 - Teks DISKON GROSIR lama yang tersimpan langsung dibaca ulang dengan aturan baru (tidak menunggu sinkron katalog).
+
+## v3.6.61 — Skill inti: bagian "Hati CS" (pikiran, rasa, jiwa, tindakan)
+
+- Bagian "Rasa" diganti **Hati CS**: tiap balasan dipikirkan lewat 4 lapis berurutan — **pikiran** (pahami maksud apa adanya, bertanya ≠ meminta, tidak menafsir terlalu jauh), **rasa** (keberatan harga, cemas, buru-buru, kesal, senang, pamit, momen penting → ditanggapi dulu), **jiwa** (sarankan yang cocok bukan yang termahal, jujur, tidak mendesak, tidak mengulang kalimat), **tindakan** (satu langkah yang menolong, tawaran = janji, tutup dengan pintu terbuka).
+- Contoh sebelum → sesudah dari chat Agus & Nofita ikut di skill. "Takut kebesaran" = ingin pas di badan (bukan soal uang).
+- Aturan yang sama di "Cara bicara" (satu pertanyaan, tawaran = janji, nego/takut ditipu/pujian) dipindah ke Hati CS — tidak dobel. Beberapa kalimat bagian lain dipadatkan; prompt penuh tetap < 10 ribu token.
+- Tetap satu skill inti; bagian ini selalu dimuat (juga di ringkasan) dan bisa diedit di halaman Skill.

@@ -28,7 +28,8 @@ test.group('skill digest', () => {
     const digest = await readFile(new URL('DIGEST.md', root), 'utf8')
     const broken = digest.replace('"Sudah harga pas bos"', '"harga pas"')
     const merged = mergeDigest(skill, broken)
-    assert.include(merged!.fallback, 'Cara bicara')
+    // v3.6.61: aturan nego pindah dari "Cara bicara" ke "Hati CS".
+    assert.include(merged!.fallback, 'Hati CS — pikiran, rasa, jiwa, tindakan')
     assert.include(merged!.text, 'Nego harga: "Sudah harga pas bos"')
     const trimmed = trimSkill(merged!.text, {
       size: false, spec: false, catalog: false, shipping: false, paid: false, photo: false, instagram: false,
