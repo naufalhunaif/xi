@@ -84,6 +84,7 @@ import {
 } from '#beta3/jev_decisions'
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
+import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 
 /**
  * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
@@ -1044,7 +1045,9 @@ export async function createLeanReply(input: {
     systemNote += '\n\nCATATAN SISTEM: pelanggan sudah menyetujui. Isi field order lengkap supaya total + rekening terkirim otomatis.'
   const storeProfile = await readLeanState('store_profile')
   // v3.6.56: diskon grosir ikut bagian TOKO hanya saat dibahas (hemat token).
-  const wholesale = String((await readLeanState('wholesale').catch(() => '')) || '')
+  const storedWholesale = String((await readLeanState('wholesale').catch(() => '')) || '')
+  // v3.6.60: teks lama ("dibuat lewat invoice") ditulis ulang dengan syarat mulai 6 jas.
+  const wholesale = renderWholesaleRule(wholesaleDiscounts(storedWholesale)) || storedWholesale
   const store = [
     storeProfile,
     wholesale && talksWholesale([input.text, chatNote || '', ...rows.slice(-6).map((row) => String(row.body || ''))].join('\n')) ? wholesale : '',
@@ -1445,14 +1448,21 @@ export async function createLeanReply(input: {
       customerText,
       statedPrices,
       String(specNow || ''),
-      understanding.service
+      understanding.service,
+      // v3.6.60: mulai 6 jas → potongan grosir dihitung di total otomatis (dulu ditahan untuk invoice).
+      wholesaleDiscounts(String((await readLeanState('wholesale').catch(() => '')) || ''))
     )
-    // v3.6.56: pesanan grosir → total dengan diskon grosir dibuat toko lewat invoice, bukan total otomatis.
-    if (verdict.ok && wholesaleOrder(decision.catatan || chatNote || '')) {
+    const bulk = verdict.ok ? verdict.total.items.match(/^Diskon grosir .+$/m)?.[0] : undefined
+    if (verdict.ok && !bulk && wholesaleOrder(decision.catatan || chatNote || '')) {
+      // Dicatat grosir tapi jumlah jas < 6 / jumlah pcs tidak terbaca di rincian: jangan kirim total
+      // yang mungkin salah hitung — toko yang mengecek (seperti v3.6.56).
       decision.serah_cs = true
-      decision.alasan = `Pesanan grosir: total dengan diskon grosir dibuat lewat invoice. ${decision.alasan}`.slice(0, 500)
-      onTrace?.({ key: 'beta3-total', label: 'Pesanan grosir · total dibuat toko lewat invoice (diskon grosir)', status: 'completed', detail: {} })
-    } else if (verdict.ok) autoTotal = verdict.total
+      decision.alasan = `Pesanan grosir: jumlah jas belum 6 atau jumlah pcs tidak terbaca, total dicek toko. ${decision.alasan}`.slice(0, 500)
+      onTrace?.({ key: 'beta3-total', label: 'Pesanan grosir · jumlah jas belum 6 / tidak terbaca · total dicek toko', status: 'completed', detail: {} })
+    } else if (verdict.ok) {
+      autoTotal = verdict.total
+      if (bulk) onTrace?.({ key: 'beta3-wholesale', label: `Total grosir · ${bulk}`, status: 'completed', detail: {} })
+    }
     await noteAutoTotalReason(totalOrderId, verdict.ok ? '' : verdict.reason)
     // Ongkir lebih dari satu dan pelanggan belum memilih: tanyakan, jangan dipilihkan.
     if (!verdict.ok && verdict.reason === 'layanan belum dipilih' && !decision.serah_cs) {
@@ -1625,11 +1635,12 @@ export async function createLeanReply(input: {
   }
 }
 
-const WHOLESALE_TOPIC = /\b(diskon|grosir|grosiran|borong|seragam|lusin|kodi|partai|potongan|rombongan)\b|\bpesan(?:an)? banyak\b|\b\d{2,}\s*(?:pcs|stel|setel|potong|buah|orang)\b/i
+const WHOLESALE_TOPIC = /\b(diskon|grosir|grosiran|borong|seragam|lusin|kodi|partai|potongan|rombongan)\b|\bpesan(?:an)? banyak\b|\b(?:[6-9]|\d{2,})\s*(?:pcs|stel|setel|potong|buah|orang|jas|setelan)\b/i
 /** v3.6.56 — percakapan menyinggung pesanan banyak / diskon grosir. */
 export function talksWholesale(text: string) {
   return WHOLESALE_TOPIC.test(text)
 }
+
 /** Catatan chat menandai pesanan grosir ("grosir: ya"). */
 export function wholesaleOrder(note: string) {
   return /\bgrosir\s*[:=]\s*ya\b/i.test(note)

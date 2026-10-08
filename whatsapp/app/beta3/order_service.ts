@@ -11,6 +11,7 @@ import {
   writeOrderSpec,
 } from '#beta3/customer_service'
 import { rupiah } from '#beta3/catalog_service'
+import { wholesaleDiscount, wholesaleGroup } from '#beta3/wholesale'
 import { attachRefsToOrder, proofTotalSince } from '#beta3/refs_service'
 import { addProductionDays, closedDaysFromStore } from '#beta3/prompt'
 import { readProductionPolicy } from '#services/production_service'
@@ -1203,6 +1204,7 @@ export function matchAutoTotal(
     active: boolean
     material?: string
     materialAvailable?: boolean
+    category?: string
   }>,
   prices: Array<{ service: string; price: number }>,
   /** Teks lain tempat mencari nama layanan bila draft.layanan kosong (catatan, spesifikasi, pesan). */
@@ -1210,9 +1212,11 @@ export function matchAutoTotal(
   /** Harga yang sudah disebut pihak toko (CS/AI) di chat, mis. "jas saja 500.000". */
   statedPrices: number[] = [],
   /** Pilihan layanan dari Jev: alias ("reg"/"yes"), null = belum memilih, undefined = pakai pola kata. */
-  chosenService?: string | null
+  chosenService?: string | null,
+  /** v3.6.60: potongan grosir per pcs (`wholesaleDiscounts`); berlaku mulai 6 jas. */
+  wholesale?: Record<string, number>
 ):
-  | { ok: true; items: string; subtotal: number; shippingService: string; shippingCost: number }
+  | { ok: true; items: string; subtotal: number; shippingService: string; shippingCost: number; discount: number }
   | { ok: false; reason: string } {
   const lines = draft.rincian
     .split('\n')
@@ -1233,6 +1237,7 @@ export function matchAutoTotal(
       .filter((word) => word.length >= 2)
   let sum = 0
   const items: string[] = []
+  const grouped: Array<{ group: string; qty: number }> = []
   const productNames = [...new Set(rows.map((row) => row.product))]
   for (const line of lines) {
     const text = norm(line)
@@ -1270,7 +1275,7 @@ export function matchAutoTotal(
       )
       if (fabric) row = pool.find((candidate) => candidate.material === fabric.material)
     }
-    const qty = Math.max(1, Number(line.match(/(\d+)\s*(?:x|pcs|pc|buah)\b/i)?.[1] || 1))
+    const qty = lineQty(line)
     const linePrices = parsePrices(line)
     if (!row) {
       // Harga yang sudah disebut toko di chat (mis. pre-order / produk di luar katalog).
@@ -1301,12 +1306,18 @@ export function matchAutoTotal(
     const unit = big ? Number(big.replace(/\./g, '')) : Number(row.price)
     sum += unit * qty
     items.push(line)
+    grouped.push({ group: wholesaleGroup(String(row.category || ''), row.product), qty })
   }
   if (!items.length) return { ok: false, reason: 'tidak ada produk katalog di rincian' }
-  // subtotal 0 = draft dari kode (spesifikasi), pakai jumlah katalog apa adanya.
-  if (draft.subtotal > 0 && sum !== draft.subtotal)
-    return { ok: false, reason: `subtotal AI ${draft.subtotal} ≠ katalog ${sum}` }
-  if (sum <= 0) return { ok: false, reason: 'harga katalog kosong' }
+  // v3.6.60: grosir mulai 6 jas (setelan dihitung jas) → potongan per pcs untuk jas/setelan/celana/rompi.
+  const bulk = wholesaleDiscount(grouped, wholesale || {})
+  const net = sum - bulk.discount
+  // subtotal 0 = draft dari kode (spesifikasi), pakai jumlah katalog apa adanya. AI boleh menulis
+  // subtotal sebelum atau sesudah potongan grosir.
+  if (draft.subtotal > 0 && sum !== draft.subtotal && net !== draft.subtotal)
+    return { ok: false, reason: `subtotal AI ${draft.subtotal} ≠ katalog ${bulk.discount ? net : sum}` }
+  if (sum <= 0 || net <= 0) return { ok: false, reason: 'harga katalog kosong' }
+  if (bulk.discount) items.push(`Diskon grosir ${bulk.jas} jas -${rupiah(bulk.discount)}`)
   const key = (text: string) => text.toLowerCase().replace(/[^a-z]/g, '')
   // Pelanggan melihat nama REG/YES/JTR; kode ekspedisi CTC/CTCYES/CTCJTR setara.
   const alias = (text: string) => key(text).replace(/^ctc/, '') || 'reg'
@@ -1363,10 +1374,17 @@ export function matchAutoTotal(
   return {
     ok: true,
     items: items.join('\n'),
-    subtotal: sum,
+    subtotal: net,
     shippingService: chosen.service.replace(/\d+$/, ''),
     shippingCost: Math.round(chosen.price),
+    discount: bulk.discount,
   }
+}
+
+/** Jumlah pcs di baris rincian: "6 pcs", "6x", "x 6", "6 stel". Tanpa angka = 1. */
+export function lineQty(line: string) {
+  const match = line.match(/(\d+)\s*(?:x|pcs|pc|buah|stel|setel|potong)\b/i) || line.match(/(?:^|\s)x\s*(\d+)\b/i)
+  return Math.max(1, Number(match?.[1] || 1))
 }
 
 export async function verifyAutoTotal(
@@ -1378,18 +1396,20 @@ export async function verifyAutoTotal(
     price: number | null
     note: string
     active: boolean
+    category?: string
   }>,
   hints: string[] = [],
   statedPrices: number[] = [],
   spec?: string,
-  chosenService?: string | null
+  chosenService?: string | null,
+  wholesale?: Record<string, number>
 ): Promise<{ ok: true; total: VerifiedAutoTotal } | { ok: false; reason: string }> {
   const order = await readLeanOrder(orderId)
   if (!order || order.status !== 'pending') return { ok: false, reason: 'order bukan pending' }
   const options = order.shipping_options ? JSON.parse(String(order.shipping_options)) : null
   if (!options?.prices?.length) return { ok: false, reason: 'tarif ongkir belum ada di order' }
   if (pantsNumberMissing(String(spec ?? order.spec ?? ''), draft.rincian)) return { ok: false, reason: 'nomor celana belum diketahui' }
-  const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices, chosenService)
+  const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices, chosenService, wholesale)
   if (!result.ok) return result
   // v3.6.41: bagian (celana/rompi) dicek pada baris yang BERHARGA, bukan seluruh rincian —
   // rincian dari spesifikasi memuat "Jas, Celana" sebagai baris detail tanpa harga, sehingga

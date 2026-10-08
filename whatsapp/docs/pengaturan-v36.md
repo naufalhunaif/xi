@@ -408,3 +408,11 @@ Perubahan v3.6.6:
 - "Siap sama sama bos" hanya untuk ucapan terima kasih, bukan penutup umum.
 - Jev menganggap "kemahalan / budget belum cukup / lihat-lihat dulu" sebagai menunda → susulan tidak dikirim.
 - Dibuat sebagai bagian skill inti (bukan skill terpisah) supaya tidak menambah panggilan/biaya; beberapa kalimat skill lain dipadatkan agar prompt tetap di bawah 10 ribu token.
+
+## v3.6.60 — Diskon grosir mulai 6 jas, total otomatis dengan potongan
+
+- Syarat grosir: **mulai 6 jas**; setelan (jas + celana) dihitung jas. Bila terpenuhi, jas, setelan, celana, dan rompi di pesanan dipotong per pcs sesuai website (Admin → Invoice → Diskon grosir: Jas 15.000, Setelan 25.000, Celana 10.000, Rompi 5.000).
+- Total otomatis dikirim dengan baris "Diskon grosir 6 jas -…" (dulu pesanan grosir ditahan untuk invoice toko). AI menyebut syarat mulai 6 jas dan menulis jumlah di baris order ("6 pcs").
+- Celana/rompi tanpa 6 jas, atau kurang dari 6 jas: tanpa potongan. Kemeja tidak ikut potongan otomatis.
+- Dicatat `grosir: ya` tapi jumlah jas belum 6 / jumlah pcs tidak terbaca → total tidak dikirim otomatis, dicek toko (tetap dibalas).
+- Teks DISKON GROSIR lama yang tersimpan langsung dibaca ulang dengan aturan baru (tidak menunggu sinkron katalog).

@@ -4,6 +4,7 @@ import { readLeanState, writeLeanState } from '#beta3/tables'
 import { sharedMcpToken } from '#services/shared_mcp_oauth_service'
 import { importLeanCatalog } from '#beta3/catalog_service'
 import { DEFAULT_ITEM_GRAMS, gramsToKgText } from '#beta3/weights'
+import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 
 /**
  * Klien MCP satu pintu untuk jalur ramping: dipanggil KODE pada event tertentu
@@ -506,19 +507,14 @@ export async function syncProductWeights(config?: LeanMcpConfig) {
   return Object.keys(map).length
 }
 
-/** Nama kategori website → sebutan pelanggan. */
-const CATEGORY_WORDS: Record<string, string> = { suits: 'Jas', pants: 'Celana', vest: 'Rompi', shirt: 'Kemeja', setelan: 'Setelan', tie: 'Dasi' }
-
 /**
- * v3.6.56 — diskon grosir per kategori (catalog_digest `wholesale`) → satu baris untuk bagian TOKO,
- * dengan sebutan pelanggan (Suits → Jas). Tanpa items → teks dari website apa adanya.
+ * v3.6.56 — diskon grosir per kategori (catalog_digest `wholesale`) → kalimat DISKON GROSIR untuk bagian
+ * TOKO dengan sebutan pelanggan (Suits → Jas). v3.6.60: syarat mulai 6 jas, total dikirim sistem.
+ * Tanpa potongan jas/setelan/celana/rompi → teks dari website apa adanya.
  */
 export function renderWholesale(wholesale?: { text?: string; items?: Array<{ category?: string; discount?: number }> }) {
   const items = (wholesale?.items || []).filter((item) => item.category && Number(item.discount) > 0)
-  if (!items.length) return String(wholesale?.text || '')
-  const list = items
-    .map((item) => `${CATEGORY_WORDS[String(item.category).toLowerCase()] || item.category} ${Number(item.discount).toLocaleString('id-ID')}`)
-    .join(', ')
-  return `DISKON GROSIR (pesanan banyak/seragam; potongan per pcs dari harga KATALOG): ${list}. Kategori lain tanpa potongan. Total grosir dibuat lewat invoice toko.`
+  const discounts = wholesaleDiscounts(items.map((item) => `${item.category} ${Number(item.discount)}`).join(', '))
+  return renderWholesaleRule(discounts) || String(wholesale?.text || '')
 }
 
