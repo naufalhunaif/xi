@@ -76,7 +76,7 @@ import { pricePattern, renderPricePattern } from '#beta3/price_pattern'
 import { attachOrderPhotos } from '#beta3/order_photos'
 import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '#beta3/weights'
 import env from '#start/env'
-import { listSimRuns, loadScenarios, readSimRun, startSimRun, type SimScenario } from '#beta3/simulator'
+import { listSimRuns, loadScenarios, readSimRun, resetSimRoom, sendSimRoom, simRoom, startSimRun, type SimScenario } from '#beta3/simulator'
 
 /** Beta 3: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
 /** Bukti transfer yang nominalnya sedang/baru dibaca AI (sekali per 10 menit per order). */
@@ -698,7 +698,14 @@ export default class Beta3Controller {
         id: `coba-${index + 1}`,
         judul: String(item?.judul || `Coba ${index + 1}`).slice(0, 120),
         maksud: String(item?.maksud || 'Jawab maksud pelanggan dengan benar sesuai katalog.').slice(0, 1500),
-        giliran: (Array.isArray(item?.giliran) ? item.giliran : []).map(String).map((text: string) => text.trim()).filter(Boolean).slice(0, 8),
+        giliran: (Array.isArray(item?.giliran) ? item.giliran : [])
+          .map((entry: unknown) =>
+            entry && typeof entry === 'object'
+              ? { teks: String((entry as any).teks || '').trim().slice(0, 2000), gambar: String((entry as any).gambar || '').slice(0, 500) || undefined }
+              : String(entry ?? '').trim().slice(0, 2000)
+          )
+          .filter((entry: string | { teks: string; gambar?: string }) => (typeof entry === 'string' ? entry : entry.teks || entry.gambar))
+          .slice(0, 8),
         harap: item?.harap && typeof item.harap === 'object' ? (item.harap as SimScenario['harap']) : undefined,
       }))
       .filter((item: SimScenario) => item.giliran.length)
@@ -708,8 +715,32 @@ export default class Beta3Controller {
         custom,
         judge: request.input('judge') !== false,
         label: String(request.input('label') || ''),
+        parallel: Number(request.input('parallel')) || 1,
+        ...(Number(request.input('generate')) > 0
+          ? { generate: { count: Number(request.input('generate')), seed: Number(request.input('seed')) || Math.floor(Math.random() * 1_000_000) } }
+          : {}),
       })
     )
+  }
+
+  /** v3.6.79 Ruang simulasi: chat uji langsung + putaran yang sedang berjalan. */
+  async simRoom({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    return response.json(await simRoom())
+  }
+
+  async simRoomSend({ request, response }: HttpContext) {
+    const settings = await readSettings(true)
+    const result = await sendSimRoom({ ...settings, aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt' } as any, {
+      teks: String(request.input('teks') || ''),
+      gambar: String(request.input('gambar') || '').slice(0, 500) || undefined,
+    })
+    return result.started ? response.json(result) : response.conflict({ error: result.reason })
+  }
+
+  async simRoomReset({ response }: HttpContext) {
+    await resetSimRoom()
+    return response.json({ ok: true })
   }
 
   /** Pengaturan → Jev: status, kunci API (terenkripsi), saklar per keputusan. */

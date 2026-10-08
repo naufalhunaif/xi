@@ -80,12 +80,37 @@
     </div>
   </section>
 
+  <section id="simRoom" class="wa-lean-card wa-sim-room">
+    <div class="wa-lean-card-head">
+      <div><h2 class="wa-card-eyebrow" data-i18n="Ruang simulasi">Ruang simulasi</h2></div>
+      <div class="actions">
+        <div class="wa-sim-tabs" role="group" aria-label="Tampilan" data-i18n-aria-label="Tampilan">
+          <button type="button" data-room="live" aria-pressed="true" data-i18n="Uji berjalan">Uji berjalan</button>
+          <button type="button" data-room="mine" aria-pressed="false" data-i18n="Chat uji">Chat uji</button>
+        </div>
+        <button id="simRoomReset" class="wa-mini" type="button" aria-label="Mulai chat uji baru" title="Mulai chat uji baru" data-i18n-aria-label="Mulai chat uji baru" data-i18n-title="Mulai chat uji baru"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg></button>
+      </div>
+    </div>
+    <p id="simRoomInfo" class="wa-sim-room-info" role="status"></p>
+    <div id="simRoomChat" class="wa-sim-room-chat" aria-live="polite"></div>
+    <form id="simRoomForm" class="wa-sim-room-form">
+      <input id="simRoomText" type="text" autocomplete="off" placeholder="Tulis sebagai pelanggan…" data-i18n-placeholder="Tulis sebagai pelanggan…" aria-label="Pesan pelanggan" data-i18n-aria-label="Pesan pelanggan">
+      <input id="simRoomImage" type="text" list="simRoomImages" autocomplete="off" placeholder="Gambar (opsional)" data-i18n-placeholder="Gambar (opsional)" aria-label="Gambar dari katalog" data-i18n-aria-label="Gambar dari katalog">
+      <datalist id="simRoomImages"></datalist>
+      <button id="simRoomSend" class="button primary" type="submit" data-i18n="Kirim">Kirim</button>
+    </form>
+  </section>
+
   <section class="wa-lean-card wa-sim-card">
     <div class="wa-lean-card-head">
       <div><h2 class="wa-card-eyebrow" data-i18n="Uji percakapan">Uji percakapan</h2><span id="beta3SimCount" class="wa-card-count"></span></div>
       <div class="actions"><button id="beta3SimRun" class="wa-mini" type="button" aria-label="Jalankan semua uji" title="Jalankan semua uji" data-i18n-aria-label="Jalankan semua uji" data-i18n-title="Jalankan semua uji"><svg class="wa-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M7 5v14l11-7z" /></svg></button></div>
     </div>
     <p class="wa-muted wa-sim-note" data-i18n="Pelanggan tiruan bertanya dengan bahasa beragam; balasan diproses seperti chat sungguhan tanpa dikirim, lalu dinilai.">Pelanggan tiruan bertanya dengan bahasa beragam; balasan diproses seperti chat sungguhan tanpa dikirim, lalu dinilai.</p>
+    <div class="wa-sim-generate">
+      <label><span data-i18n="Skenario acak">Skenario acak</span><input id="beta3SimGenCount" type="number" min="1" max="500" value="50" inputmode="numeric"></label>
+      <button id="beta3SimGenerate" class="button" type="button" data-i18n="Buat & jalankan">Buat & jalankan</button>
+    </div>
     <p id="beta3SimSummary" class="wa-sim-summary" role="status"></p>
     <ol id="beta3SimList" class="wa-sim-list"></ol>
     <details class="wa-line-more"><summary data-i18n="Coba percakapan sendiri">Coba percakapan sendiri</summary>

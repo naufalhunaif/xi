@@ -28,9 +28,13 @@ export function heartNote(heart: Heart | undefined, momentGreeted = false) {
   const parts = [
     FORM[heart.form || ''],
     heart.feeling && FEELING[heart.feeling] ? `rasa: ${FEELING[heart.feeling]}` : '',
-    heart.moment && MOMENT[heart.moment]
-      ? `momen: ${MOMENT[heart.moment]}${momentGreeted ? ' (ucapan selamat sudah dikirim, jangan diulang)' : ' → "wah selamat ya bos" sekali'}`
-      : '',
+    // v3.6.79: acara orang lain (kondangan, tamu nikahan) → saran sesuai acara, tanpa ucapan selamat
+    // (uji: "suit for wedding" dijawab "selamat ya buat nikahannya").
+    heart.moment === 'acara_lain'
+      ? 'momen: acara (bisa acara orang lain) → sesuaikan saran, tanpa ucapan selamat'
+      : heart.moment && MOMENT[heart.moment]
+        ? `momen: ${MOMENT[heart.moment]}${momentGreeted ? ' (ucapan selamat sudah dikirim, jangan diulang)' : ' → "wah selamat ya bos" sekali'}`
+        : '',
   ].filter(Boolean)
   return parts.length ? `CATATAN HATI: ${parts.join('; ')}.` : ''
 }

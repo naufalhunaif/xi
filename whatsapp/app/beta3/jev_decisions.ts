@@ -92,13 +92,13 @@ export const HEART_QUESTIONS: Record<'bentuk' | 'rasa' | 'momen', JevQuestion> =
   },
   momen: {
     type: 'choice',
-    instructions: 'Apakah pelanggan menyebut momen penting yang menjadi alasan membeli?',
+    instructions: 'Apakah pelanggan menyebut momen penting MILIKNYA SENDIRI yang menjadi alasan membeli? Datang ke acara orang lain (tamu nikahan, kondangan, "for wedding" tanpa bilang dia yang menikah) = acara_lain.',
     criteria: {
       tidak_ada: 'Tidak menyebut momen',
-      nikah: 'Nikah, lamaran, resepsi, tunangan',
-      wisuda: 'Wisuda, sidang, kelulusan',
+      nikah: 'Pelanggan SENDIRI menikah, lamaran, tunangan (mis. "saya mau nikah", "buat nikahan saya")',
+      wisuda: 'Wisuda, sidang, kelulusan pelanggan sendiri',
       kerja: 'Kerja baru, interview, pelantikan, kantor',
-      acara_lain: 'Acara lain (pesta, kondangan, foto, lomba)',
+      acara_lain: 'Acara lain atau acara orang lain (pesta, kondangan, tamu nikahan, foto, lomba)',
     },
   },
 }

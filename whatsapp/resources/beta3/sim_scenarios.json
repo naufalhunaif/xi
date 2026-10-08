@@ -144,7 +144,7 @@
     "judul": "COD karena takut tertipu",
     "maksud": "Pelanggan minta bayar di tempat karena takut ditipu. Benar: COD tidak tersedia, pembayaran transfer; tenangkan dengan info toko (alamat Cilacap) tanpa mengarang.",
     "giliran": ["bisa bayar ditempat ga, takut ketipu jujur aja"],
-    "harap": { "serah_cs": false, "tidak_sebut": ["bisa cod"] }
+    "harap": { "serah_cs": false, "tidak_sebut": ["(?<!belum |tidak |gak |ga |nggak )bisa cod"] }
   },
   {
     "id": "shopee",

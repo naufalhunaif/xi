@@ -6,6 +6,7 @@ import { askJev, confident, jevOn, logDecision, maskPii, scoreLevel, type JevAns
 import { findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
 import type { LeanDecision, LeanHistoryRow } from '#beta3/prompt'
 import type { TokenUsage } from '#services/usage_service'
+import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
 
 export type CheckIssue = {
   code: 'foto_tidak_ada' | 'foto_kurang' | 'foto_lebih' | 'foto_beda' | 'tidak_menjawab' | 'fakta_salah' | 'mengulang'
@@ -85,12 +86,16 @@ export async function checkReply(input: {
   decision: Pick<LeanDecision, 'pesan' | 'foto' | 'serah_cs'>
   rows: LeanCatalogRow[]
   extraFacts?: string[]
-}): Promise<{ issues: CheckIssue[]; jev: boolean }> {
+  /** Ada → pemeriksa AI ikut menilai bersamaan dengan Jev (v3.6.79). */
+  settings?: LeanProviderSettings
+}): Promise<{ issues: CheckIssue[]; jev: boolean; ai?: boolean }> {
   const issues: CheckIssue[] = []
   const { sent, missing } = photoCaptions(input.rows, input.decision.foto || [])
   if (missing.length)
     issues.push({ code: 'foto_tidak_ada', detail: `Tidak ada foto katalog untuk: ${missing.join(', ')}. Pakai nama varian persis dari KATALOG yang bertanda foto.` })
-  if (input.decision.serah_cs || !input.decision.pesan.length || !(await jevOn('cek_balasan'))) return { issues, jev: false }
+  if (input.decision.serah_cs || !input.decision.pesan.length) return { issues, jev: false }
+  const jevAllowed = await jevOn('cek_balasan')
+  if (!jevAllowed && !input.settings) return { issues, jev: false }
   const recent = recentLines(input.history)
   const facts = [
     ...relevantFacts(input.rows, [input.customerText, ...recent, ...input.decision.pesan, ...sent]),
@@ -103,7 +108,8 @@ export async function checkReply(input: {
     foto_dikirim: sent,
     fakta_katalog: facts,
   }
-  const answers = await askJev(
+  const reviewing = input.settings ? aiReview(input.settings, state, input.jid).catch(() => null) : Promise.resolve(null)
+  const answers = !jevAllowed ? null : await askJev(
     'cek-balasan',
     state,
     {
@@ -146,7 +152,12 @@ export async function checkReply(input: {
     },
     { timeoutMs: 3000, jid: input.jid }
   )
-  if (!answers) return { issues, jev: false }
+  const review = await reviewing
+  const add = (issue: CheckIssue) => {
+    if (!issues.some((item) => item.code === issue.code)) issues.push(issue)
+  }
+  for (const item of review?.issues || []) add(item)
+  if (!answers) return { issues, jev: false, ai: Boolean(review) }
   const logged = `Pelanggan: ${state.pesan_pelanggan}\nBalasan: ${state.balasan.join(' / ')}\nFoto: ${sent.join(', ') || '-'}`
   const sure = (answer: JevAnswer | undefined) => confident('cek_balasan', answer)
   const foto = answers.foto
@@ -172,7 +183,107 @@ export async function checkReply(input: {
       detail: key,
       input: logged,
     })
-  return { issues, jev: true }
+  return { issues, jev: true, ai: Boolean(review) }
+}
+
+const REVIEW_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    ok: { type: 'boolean' },
+    masalah: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          jenis: { type: 'string', enum: ['foto_kurang', 'foto_lebih', 'foto_beda', 'tidak_menjawab', 'fakta_salah', 'mengulang'] },
+          penjelasan: { type: 'string' },
+        },
+        required: ['jenis', 'penjelasan'],
+      },
+    },
+  },
+  required: ['ok', 'masalah'],
+}
+
+/**
+ * v3.6.79 — Pemeriksa AI (model biasa, prompt kecil) di samping Jev: uji 8 Okt menunjukkan Jev
+ * menilai "sesuai" pada foto yang kurang dan salah tangkap "item" (= hitam). Hanya masalah jelas.
+ */
+async function aiReview(settings: LeanProviderSettings, state: Record<string, unknown>, jid: string) {
+  const reply = await runLeanProvider(
+    settings,
+    {
+      system: [
+        'Kamu pemeriksa balasan CS toko jas SEBELUM dikirim ke pelanggan. Balas HANYA JSON sesuai skema.',
+        'Periksa: (1) maksud pesan_pelanggan terjawab — pahami bahasa tidak baku, daerah, salah ketik, singkatan, dan sebutan warna (item/hitem/ireng = hitam, dongker = navy, marun = maroon, krem = cream, abu = gray, pth = putih); (2) foto_dikirim PERSIS sama dengan produk & warna yang disebut atau dijanjikan balasan — warna yang disebut "ini fotonya/tersedia" tapi tidak ada fotonya = foto_kurang, foto yang tidak disebut/diminta = foto_lebih, produk/warna berbeda = foto_beda; pelanggan minta semua warna tapi hanya sebagian padahal fakta_katalog punya foto (✓) lainnya = foto_kurang; (3) harga, warna, size ready sesuai fakta_katalog/info_toko; (4) tidak menanyakan ulang yang sudah dijawab.',
+        'Laporkan hanya masalah yang JELAS. Bila balasan benar atau kamu ragu → ok=true, masalah=[]. penjelasan: satu kalimat bahasa Indonesia yang menyebut apa yang harus diubah.',
+      ].join('\n'),
+      user: JSON.stringify(state),
+    },
+    [],
+    'beta3-check-ai',
+    REVIEW_SCHEMA,
+    { jid, tier: 'standard' }
+  )
+  const parsed = JSON.parse(reply.text.slice(reply.text.indexOf('{'), reply.text.lastIndexOf('}') + 1)) as {
+    ok?: boolean
+    masalah?: Array<{ jenis?: string; penjelasan?: string }>
+  }
+  const codes = new Set(Object.keys(CHECK_LABEL))
+  const issues: CheckIssue[] = parsed.ok === true
+    ? []
+    : (parsed.masalah || [])
+        .filter((item) => item.jenis && codes.has(item.jenis))
+        .map((item) => ({ code: item.jenis as CheckIssue['code'], detail: `${CHECK_LABEL[item.jenis as CheckIssue['code']]}: ${String(item.penjelasan || '').slice(0, 300)}` }))
+  return { issues, usage: reply.usage }
+}
+
+/** Kata warna sehari-hari untuk warna katalog (dasar tanpa "2.0"). */
+const COLOR_ALIASES: Record<string, string[]> = {
+  black: ['black', 'hitam', 'item'],
+  white: ['white', 'putih'],
+  putih: ['putih', 'white'],
+  gray: ['gray', 'grey', 'abu'],
+  navy: ['navy', 'dongker'],
+  maroon: ['maroon', 'marun'],
+  cream: ['cream', 'krem'],
+  brown: ['brown'],
+  choco: ['choco'],
+}
+const baseColor = (color: string) => fold(color).replace(/\s*\d+(?:\.\d+)?$/, '')
+
+/**
+ * v3.6.79 — Foto diselaraskan dengan teks (pasti, berdasarkan katalog): warna produk yang sedang
+ * difoto dan disebut di balasan ikut dikirim bila punya foto; ≥3 foto satu produk (menunjukkan
+ * pilihan warna) → semua warna produk itu yang punya foto ikut (maks 10).
+ */
+export function alignPhotos(pesan: string[], foto: string[], rows: LeanCatalogRow[], max = 10) {
+  const text = ` ${fold(pesan.join(' ')).replace(/[^a-z0-9.\s-]/g, ' ')} `
+  const chosen = foto.map((label) => findCatalogVariant(rows, label)).filter((row): row is LeanCatalogRow => Boolean(row?.photoUrl))
+  const labels = [...foto]
+  const added: string[] = []
+  const has = (row: LeanCatalogRow) => chosen.some((item) => item.product === row.product && item.color === row.color)
+  const push = (row: LeanCatalogRow) => {
+    if (labels.length >= max || has(row)) return
+    const label = row.color ? `${row.product} - ${row.color}` : row.product
+    chosen.push(row)
+    labels.push(label)
+    added.push(label)
+  }
+  for (const product of [...new Set(chosen.map((row) => row.product))]) {
+    const variants = rows.filter((row) => row.product === product && row.active && row.photoUrl && !/tidak tampil di web/i.test(row.note || ''))
+    const shown = chosen.filter((row) => row.product === product).length
+    for (const row of variants) {
+      const base = baseColor(row.color)
+      if (!base) continue
+      const words = COLOR_ALIASES[base] || [base]
+      if (words.some((word) => text.includes(` ${word} `) || text.includes(` ${word},`) || text.includes(` ${word}.`))) push(row)
+    }
+    if (shown >= 3) for (const row of variants) push(row)
+  }
+  return { foto: labels, added }
 }
 
 /** Catatan untuk AI menulis ulang draf (sekali). */

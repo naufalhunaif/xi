@@ -272,4 +272,90 @@ test.group('uji percakapan · ujung ke ujung dengan AI tiruan (v3.6.78)', (group
     const leftovers = await db.from('whatsapp_beta3_chats').where('jid', 'like', 'uji-e2e-%@sim')
     assert.lengthOf(leftovers, 0)
   })
+
+  test('ruang simulasi: pesan diproses di latar, balasan + foto tersimpan, reset membersihkan', async ({ assert }) => {
+    const { importLeanCatalog, catalogDigest } = await import('#beta3/catalog_service')
+    const { setLeanProviderOverride } = await import('#beta3/provider')
+    const { readSettings } = await import('#services/settings_service')
+    const { sendSimRoom, simRoom, resetSimRoom } = await import('#beta3/simulator')
+    await importLeanCatalog([{ product: 'Jas Uji', color: 'Navy', price: 485000, category: 'Suits', photoUrl: 'https://example.test/navy.jpg', sizesReady: 'S M L' }])
+    await catalogDigest(true)
+    setLeanProviderOverride(async ({ phase }) =>
+      phase === 'beta3-reply'
+        ? JSON.stringify({ pesan: ['Jas Uji Navy 485.000 bos'], foto: ['Jas Uji - Navy'], catatan: 'produk: Jas Uji', tahap: 'tanya_size', serah_cs: false, alasan: '', susulan: '', spesifikasi: '' })
+        : '{}'
+    )
+    const settings = { ...(await readSettings(true)), aiProvider: 'chatgpt' } as any
+    await resetSimRoom()
+    assert.deepEqual(await sendSimRoom(settings, { teks: 'jas uji navy brp' }), { started: true })
+    assert.equal((await sendSimRoom(settings, { teks: 'lagi' })).started, false)
+    let room = await simRoom()
+    for (let i = 0; i < 50 && room.busy; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      room = await simRoom()
+    }
+    assert.isFalse(room.busy)
+    assert.lengthOf(room.turns, 1)
+    assert.deepEqual(room.turns[0].balasan, ['Jas Uji Navy 485.000 bos'])
+    assert.deepEqual(room.turns[0].foto, ['Jas Uji - Navy'])
+    assert.deepEqual(room.turns[0].fotoUrl, ['https://example.test/navy.jpg'])
+    await resetSimRoom()
+    assert.lengthOf((await simRoom()).turns, 0)
+  })
+})
+
+test.group('uji acak, foto selaras, grosir lolos pemeriksa harga (v3.6.79)', () => {
+  test('pembuat skenario: seed sama → sama; semua jenis ada; bahasa diacak; jawaban dari katalog', async ({ assert }) => {
+    const { generateScenarios, GENERATOR_KINDS, roughen, rng } = await import('#beta3/sim_generator')
+    const rows = [
+      row('Basic Suit', 'Black 2.0', { sizesReady: 'S M L XL' }),
+      row('Basic Suit', 'Navy', { sizesReady: 'S L' }),
+      row('Basic Suit', 'Maroon'),
+      row('Tuxedo', 'Black', { sizesReady: 'S M' }),
+      row('Tuxedo', 'White'),
+    ]
+    const a = generateScenarios(rows, 40, 7)
+    const b = generateScenarios(rows, 40, 7)
+    assert.deepEqual(a, b)
+    assert.lengthOf(a, 40)
+    for (const kind of GENERATOR_KINDS) assert.isTrue(a.some((item) => item.id.startsWith(`gen-${kind === 'lanjutfoto' ? 'lanjut' : kind}-`)), kind)
+    const harga = a.find((item) => item.id.startsWith('gen-harga-'))!
+    assert.deepEqual(harga.harap?.sebut, ['485\\.000'])
+    const foto = a.find((item) => item.id.startsWith('gen-foto-'))!
+    assert.isAbove(foto.harap?.foto_persis?.length || 0, 0)
+    const grosir = a.filter((item) => item.id.startsWith('gen-grosir-'))
+    assert.isTrue(grosir.every((item) => /≥|</.test(item.maksud)))
+    const gambar = a.find((item) => item.id.startsWith('gen-gambar-'))!
+    assert.match(String((gambar.giliran[0] as any).gambar), / - /)
+    const variants = new Set(Array.from({ length: 30 }, (_, index) => roughen(rng(index), 'yang warna hitam harga berapa kalau ukuran L')))
+    assert.isAbove(variants.size, 20)
+  })
+
+  test('foto diselaraskan: warna yang disebut ikut; ≥3 foto satu produk → semua warnanya', async ({ assert }) => {
+    const reply = await import('#beta3/reply_check')
+    const { alignPhotos } = reply
+    const rows = [row('Tux', 'Army'), row('Tux', 'Black'), row('Tux', 'Brown'), row('Tux', 'Navy'), row('Tux', 'White'), row('Tux', 'Gray', { photoUrl: null })]
+    const one = alignPhotos(['Ini fotonya bos, ada Navy dan Putih juga'], ['Tux - Black'], rows)
+    assert.deepEqual(one.added, ['Tux - Navy', 'Tux - White'])
+    const many = alignPhotos(['Ini warnanya bos'], ['Tux - Army', 'Tux - Black', 'Tux - Brown'], rows)
+    assert.deepEqual(many.added, ['Tux - Navy', 'Tux - White'])
+    assert.deepEqual(alignPhotos(['Ini fotonya'], ['Tux - Black'], rows).added, [])
+  })
+
+  test('pemeriksa harga: potongan grosir & harga sesudah potongan sah', async ({ assert }) => {
+    const { unknownPrices } = await import('#beta3/quality_service')
+    const allowed = allowedPrices([row('Basic Suit', 'Navy')], [], { jas: 15000, setelan: 25000 })
+    assert.deepEqual(unknownPrices(['Mulai 6 jas dapat potongan 15.000 per jas, jadi 470.000 bos'], allowed), [])
+    assert.deepEqual(unknownPrices(['potongan 99.000'], allowed), [99000])
+  })
+})
+
+test.group('Hati: acara orang lain tanpa ucapan selamat (v3.6.79)', () => {
+  test('acara_lain → saran sesuai acara, tidak "selamat"; nikah sendiri tetap selamat', async ({ assert }) => {
+    const { heartNote } = await import('#beta3/hati')
+    assert.notInclude(heartNote({ form: 'bertanya', feeling: 'netral', moment: 'acara_lain' } as any), 'selamat ya')
+    assert.include(heartNote({ form: 'bertanya', feeling: 'netral', moment: 'nikah' } as any), 'selamat')
+    const source = await readFile('app/beta3/jev_decisions.ts', 'utf8')
+    assert.include(source, 'MILIKNYA SENDIRI')
+  })
 })

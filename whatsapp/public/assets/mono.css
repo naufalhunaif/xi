@@ -2030,3 +2030,130 @@ html[data-theme] body.workspace-ui .message-footer .message-time + .message-stat
   width: 100%;
   margin: 8px 0;
 }
+
+/* v3.6.79 — Ruang simulasi (tampilan chat) + kontrol skenario acak. */
+.wa-sim-room .wa-lean-card-head .actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wa-sim-tabs {
+  display: inline-flex;
+  gap: 12px;
+}
+.wa-sim-tabs button {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid transparent;
+  cursor: pointer;
+}
+.wa-sim-tabs button[aria-pressed='true'] {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+.wa-sim-room-info {
+  margin: 0 0 8px;
+  font-family: var(--wa-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.wa-sim-room-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: min(60vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--wa-page, #ebe8e2);
+}
+.wa-sim-room-msg {
+  max-width: 78%;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 19px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wa-sim-room-msg.in {
+  align-self: flex-start;
+  background: var(--wa-surface, #fff);
+  margin-top: 8px;
+}
+.wa-sim-room-msg.out {
+  align-self: flex-end;
+  background: var(--wa-bubble, #dedad2);
+}
+.wa-sim-room-msg img {
+  display: block;
+  width: 200px;
+  max-width: 100%;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+.wa-sim-room-msg.photo span {
+  font-size: 11.5px;
+}
+.wa-sim-room-msg.total {
+  font-family: var(--wa-mono);
+  font-size: 12px;
+}
+.wa-sim-room-note {
+  align-self: center;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.wa-sim-room-note.err {
+  color: var(--wa-err, #b3261e);
+}
+.wa-sim-room-meta {
+  align-self: flex-end;
+  font-family: var(--wa-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.wa-sim-room-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.wa-sim-room-form[hidden] {
+  display: none;
+}
+.wa-sim-room-form #simRoomText {
+  flex: 2;
+  min-width: 0;
+}
+.wa-sim-room-form #simRoomImage {
+  flex: 1;
+  min-width: 0;
+}
+.wa-sim-generate {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.wa-sim-generate label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.wa-sim-generate input {
+  width: 90px;
+}
+@media (max-width: 640px) {
+  .wa-sim-room-form {
+    flex-wrap: wrap;
+  }
+  .wa-sim-room-form #simRoomText {
+    flex: 1 1 100%;
+  }
+}

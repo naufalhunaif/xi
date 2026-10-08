@@ -85,7 +85,7 @@ import {
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
-import { CHECK_LABEL, checkReply, mergeUsage, revisionNote, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, CHECK_LABEL, checkReply, mergeUsage, revisionNote, type CheckIssue } from '#beta3/reply_check'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
 /**
@@ -1207,7 +1207,15 @@ export async function createLeanReply(input: {
   }
   // v3.6.78 Pemeriksa balasan (Jev): draf dinilai sebelum kirim — foto sesuai ucapan, maksud terjawab,
   // fakta sesuai katalog, tidak mengulang. Ada masalah yakin → AI menulis ulang SEKALI dengan catatannya.
-  const check = await checkReply({ jid, customerText: input.text, history: rows, decision, rows: digest.rows }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
+  const check = await checkReply({
+    jid,
+    customerText: input.text,
+    history: rows,
+    decision,
+    rows: digest.rows,
+    extraFacts: [store, priceText].filter(Boolean),
+    settings,
+  }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
   if (check.issues.length) {
     onTrace?.({
       key: 'beta3-check',
@@ -1231,7 +1239,8 @@ export async function createLeanReply(input: {
     } catch (error) {
       onTrace?.({ key: 'beta3-revise', label: 'Tulis ulang gagal · draf awal dipakai', status: 'failed', detail: { error: error instanceof Error ? error.message : String(error) } })
     }
-  } else if (check.jev) onTrace?.({ key: 'beta3-check', label: 'Pemeriksa balasan · sesuai', status: 'completed', detail: {} })
+  } else if (check.jev || (check as { ai?: boolean }).ai)
+    onTrace?.({ key: 'beta3-check', label: 'Pemeriksa balasan · sesuai', status: 'completed', detail: {} })
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
   const jevColor = await jevVariantFix(jid, decision.spesifikasi, digest.rows, rows).catch(() => null)
   const colorFix = jevColor || fixCatalogColors(decision.spesifikasi, digest.rows, rows)
@@ -1343,7 +1352,9 @@ export async function createLeanReply(input: {
       ...rows.map((row) => String(row.body || '')),
       spec || '',
       ...settings.paymentMethods.map((method) => method.destination),
-    ])
+      store,
+      priceText,
+    ], wholesaleDiscounts(storedWholesale))
     const unknown = unknownPrices(decision.pesan, allowed)
     if (unknown.length) {
       decision.serah_cs = true
@@ -1676,6 +1687,12 @@ export async function createLeanReply(input: {
   if (missing.length) {
     decision.foto = [...decision.foto, ...missing]
     onTrace?.({ key: 'beta3-photo-complete', label: `Foto dilengkapi · ${missing.join(', ')}`, status: 'completed', detail: { ditambah: missing } })
+  }
+  // v3.6.79: warna yang disebut ikut difoto; ≥3 foto satu produk → semua warnanya yang punya foto.
+  const aligned = alignPhotos(decision.pesan, decision.foto, digest.rows)
+  if (aligned.added.length) {
+    decision.foto = aligned.foto
+    onTrace?.({ key: 'beta3-photo-align', label: `Foto diselaraskan dengan teks · ${aligned.added.join(', ')}`, status: 'completed', detail: { ditambah: aligned.added } })
   }
   let photos = resolvePhotos(digest.rows, decision.foto)
   // v3.6.58: foto yang baru saja dikirim tidak diulang (kecuali pelanggan minta kirim ulang).

@@ -189,6 +189,8 @@
     byId('beta3CatalogDigest').textContent = result.digest
     byId('beta3PricePattern').textContent = result.pricePattern || t('Belum ada katalog — tekan Sync katalog.')
     renderPriceTable(result.priceTable)
+    const options = [...new Set(result.rows.filter((row) => row.active && row.photoUrl).map((row) => (row.color ? `${row.product} - ${row.color}` : row.product)))]
+    byId('simRoomImages').replaceChildren(...options.map((value) => Object.assign(document.createElement('option'), { value })))
   }
 
   let examples = []
@@ -342,12 +344,126 @@
     }
   }
   byId('beta3SimRun').addEventListener('click', () => startSim({}))
+  byId('beta3SimGenerate').addEventListener('click', () => {
+    const count = Math.max(1, Math.min(500, Number(byId('beta3SimGenCount').value) || 50))
+    startSim({ generate: count })
+  })
+
+  // v3.6.79 Ruang simulasi: tonton uji yang berjalan, atau chat sendiri sebagai pelanggan.
+  let roomView = 'live'
+  let roomTimer = null
+  let roomKey = ''
+  const roomTabs = [...document.querySelectorAll('#simRoom [data-room]')]
+  const checkerNote = (turn) => {
+    const steps = turn.jejak || []
+    if (steps.some((step) => step.includes('ditulis ulang'))) return t('Diperiksa Jev · ditulis ulang')
+    if (steps.some((step) => step.includes('Pemeriksa balasan · sesuai'))) return t('Diperiksa Jev · sesuai')
+    if (steps.some((step) => step.includes('Pemeriksa balasan'))) return t('Diperiksa Jev · ada catatan')
+    return ''
+  }
+  function roomTurn(turn) {
+    const out = []
+    const inBubble = el('div', undefined, 'wa-sim-room-msg in')
+    if (turn.gambar) {
+      const image = el('img')
+      image.src = turn.gambar
+      image.alt = ''
+      image.loading = 'lazy'
+      inBubble.append(image)
+    }
+    if (turn.pelanggan) inBubble.append(el('span', turn.pelanggan))
+    out.push(inBubble)
+    const [first, ...rest] = turn.balasan || []
+    const bubble = (text, extra = '') => el('div', text, `wa-sim-room-msg out ${extra}`)
+    if (first) out.push(bubble(first))
+    ;(turn.foto || []).forEach((caption, index) => {
+      const photo = el('div', undefined, 'wa-sim-room-msg out photo')
+      const url = (turn.fotoUrl || [])[index]
+      if (url) {
+        const image = el('img')
+        image.src = url
+        image.alt = caption
+        image.loading = 'lazy'
+        photo.append(image)
+      }
+      photo.append(el('span', caption))
+      out.push(photo)
+    })
+    for (const text of rest) out.push(bubble(text))
+    if (turn.total) out.push(bubble(turn.total, 'total'))
+    if (turn.serah_cs) out.push(el('div', t('Diserahkan ke CS · {0}', turn.alasan || ''), 'wa-sim-room-note'))
+    if (turn.error) out.push(el('div', turn.error, 'wa-sim-room-note err'))
+    const meta = [checkerNote(turn), turn.ms ? `${(turn.ms / 1000).toFixed(1)} s` : ''].filter(Boolean).join(' · ')
+    if (meta) out.push(el('div', meta, 'wa-sim-room-meta'))
+    return out
+  }
+  async function loadRoom() {
+    const data = await api('/api/beta3/sim/room')
+    const chat = byId('simRoomChat')
+    let turns = []
+    let info = ''
+    let pending = false
+    if (roomView === 'live') {
+      const live = data.live
+      if (live?.current) {
+        turns = live.current.giliran || []
+        info = t('Uji berjalan {0}/{1} · {2} lulus · {3}', live.done + 1, live.total, live.passed, live.current.judul)
+        pending = true
+      } else info = t('Tidak ada uji yang berjalan. Jalankan uji, atau pilih Chat uji untuk mengetik sendiri.')
+    } else {
+      turns = data.turns || []
+      pending = data.busy
+      info = data.busy ? t('AI sedang membalas…') : turns.length ? t('{0} giliran', turns.length) : t('Tulis pesan sebagai pelanggan. Tidak ada yang dikirim ke WhatsApp.')
+    }
+    byId('simRoomInfo').textContent = info
+    byId('simRoomForm').hidden = roomView !== 'mine'
+    byId('simRoomReset').hidden = roomView !== 'mine'
+    byId('simRoomSend').disabled = Boolean(data.busy)
+    const key = JSON.stringify([roomView, turns.length, turns.at(-1)?.ms || 0, pending])
+    if (key !== roomKey) {
+      roomKey = key
+      chat.replaceChildren(...turns.flatMap(roomTurn))
+      if (roomView === 'mine' && data.busy) chat.append(el('div', t('AI sedang membalas…'), 'wa-sim-room-note'))
+      chat.scrollTop = chat.scrollHeight
+    }
+    clearTimeout(roomTimer)
+    if (document.visibilityState === 'visible') roomTimer = setTimeout(() => loadRoom().catch(() => {}), pending || data.live ? 3000 : 15000)
+  }
+  for (const tab of roomTabs)
+    tab.addEventListener('click', () => {
+      roomView = tab.dataset.room
+      for (const other of roomTabs) other.setAttribute('aria-pressed', String(other === tab))
+      roomKey = ''
+      loadRoom().catch((error) => notice(error.message, true))
+    })
+  byId('simRoomForm').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const teks = byId('simRoomText').value.trim()
+    const gambar = byId('simRoomImage').value.trim()
+    if (!teks && !gambar) return
+    try {
+      await api('/api/beta3/sim/room', 'POST', { teks, gambar })
+      byId('simRoomText').value = ''
+      byId('simRoomImage').value = ''
+      await loadRoom()
+    } catch (error) {
+      notice(error.message, true)
+    }
+  })
+  byId('simRoomReset').addEventListener('click', async () => {
+    await api('/api/beta3/sim/room/reset', 'POST', {}).catch((error) => notice(error.message, true))
+    roomKey = ''
+    await loadRoom().catch(() => {})
+  })
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') loadRoom().catch(() => {})
+  })
   byId('beta3SimCustomRun').addEventListener('click', () => {
     const giliran = byId('beta3SimCustom').value.split('\n').map((line) => line.trim()).filter(Boolean)
     if (!giliran.length) return
     startSim({ custom: [{ judul: t('Coba sendiri'), giliran }] })
   })
-  const refresh = () => Promise.all([loadCatalog(), loadExamples(), loadMcp(), loadSim()]).catch((error) => notice(error.message, true))
+  const refresh = () => Promise.all([loadCatalog(), loadExamples(), loadMcp(), loadSim(), loadRoom()]).catch((error) => notice(error.message, true))
   refresh()
   setInterval(() => {
     if (document.visibilityState === 'visible') loadCatalog().catch(() => {})

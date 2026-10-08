@@ -261,13 +261,18 @@ const PRICE_TEXT = /(?<![\d.])(\d{1,3}(?:\.\d{3})+)(?![\d.])/g
 const toNumber = (text: string) => Number(text.replace(/\./g, ''))
 
 /** Semua angka rupiah yang sah: katalog (termasuk size besar), ongkir, dan yang sudah disebut di chat. */
-export function allowedPrices(catalog: LeanCatalogRow[], texts: string[]) {
+export function allowedPrices(catalog: LeanCatalogRow[], texts: string[], discounts: Record<string, number> = {}) {
   const catalogValues = new Set<number>()
   const other = new Set<number>()
   for (const row of catalog) {
     if (row.price) catalogValues.add(Number(row.price))
     for (const big of String(row.note || '').matchAll(PRICE_TEXT)) catalogValues.add(toNumber(big[1]))
   }
+  // v3.6.79: diskon grosir sah — besar potongan per pcs dan harga sesudah potongan (uji 8 Okt:
+  // "potongan 15.000" ditahan pemeriksa harga sehingga pesanan seragam diserahkan ke CS).
+  const cuts = Object.values(discounts).filter((value) => value > 0)
+  for (const cut of cuts) other.add(cut)
+  if (cuts.length) for (const value of [...catalogValues]) for (const cut of cuts) if (value > cut) catalogValues.add(value - cut)
   for (const text of texts) for (const hit of String(text || '').matchAll(PRICE_TEXT)) other.add(toNumber(hit[1]))
   return { catalog: catalogValues, other }
 }
