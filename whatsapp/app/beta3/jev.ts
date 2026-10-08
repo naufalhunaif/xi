@@ -14,6 +14,35 @@ export const JEV_URL = 'https://api.typesafe.ai/v1/systemone'
 export const JEV_DEFAULT_MODEL = 'jev-latest'
 const PURPOSE = 'jev'
 const TIMEOUT_MS = 800
+/** v3.6.64: gangguan sementara penyedia (dicoba lagi sebentar): rate limit, 5xx, overload (529). */
+const RETRY_STATUS = new Set([429, 500, 502, 503, 504, 529])
+const RETRY_DELAYS_MS = [150, 400]
+/** Versi pasti dari penyedia ("jev-1.13.0"), bukan alias ("jev-latest", "jev-preview"). */
+export const isPinnedJevModel = (model: string) => /^jev-\d+(?:\.\d+)+$/.test(String(model || '').trim())
+/** Versi pasti dicek ulang lewat alias sekali sehari supaya versi baru penyedia ikut terpakai. */
+const RESOLVE_EVERY_MS = 24 * 60 * 60_000
+
+type ResolvedModel = { model: string; at: number }
+async function readResolvedModel(): Promise<ResolvedModel | null> {
+  try {
+    const raw = await readLeanState('jev_model_resolved')
+    const parsed = raw ? (JSON.parse(String(raw)) as ResolvedModel) : null
+    return parsed && isPinnedJevModel(parsed.model) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Urutan model yang dicoba. Alias (default "jev-latest") diganti versi pasti yang terakhir dilaporkan
+ * penyedia; alias hanya dipakai bila versi belum diketahui atau sudah > 24 jam (cek versi baru), dan
+ * selalu ada cadangan model yang lain. Model pasti yang diisi pemilik dipakai apa adanya.
+ */
+export function jevModelOrder(configured: string, resolved: ResolvedModel | null, now = Date.now()) {
+  const model = String(configured || '').trim() || JEV_DEFAULT_MODEL
+  if (isPinnedJevModel(model) || !resolved) return [model]
+  return now - resolved.at > RESOLVE_EVERY_MS ? [model, resolved.model] : [resolved.model, model]
+}
 
 /** Sepuluh keputusan yang dipegang Jev, dengan nama yang tampil di Pengaturan. */
 export const JEV_DECISIONS = {
@@ -178,6 +207,8 @@ export async function jevStatus() {
     configured: Boolean(config.apiKey),
     enabled: config.enabled,
     model: config.model,
+    /** Versi pasti yang dipakai (dari penyedia), mis. jev-1.13.0. */
+    activeModel: jevModelOrder(config.model, await readResolvedModel())[0],
     off: config.off,
     decisions: Object.entries(JEV_DECISIONS).map(([key, label]) => ({ key, label })),
     lastError: String((await readLeanState('jev_last_error').catch(() => '')) || ''),
@@ -242,23 +273,44 @@ export async function askJev<K extends string>(
   const config = await readJevConfig()
   if (!config.apiKey || !config.enabled) return null
   const started = Date.now()
+  const models = jevModelOrder(config.model, await readResolvedModel())
+  let tried = models[0]
   try {
-    const response = await fetcher(JEV_URL, {
-      method: 'POST',
-      headers: { 'authorization': `Bearer ${config.apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model: config.model, state, questions }),
-      signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
-    })
+    // v3.6.64: versi pasti dari penyedia dipakai (bukan alias); gangguan sementara (429/5xx/529)
+    // dicoba lagi sebentar, percobaan terakhir memakai model cadangan.
+    let response: Response | null = null
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      tried = attempt === RETRY_DELAYS_MS.length && models[1] ? models[1] : models[0]
+      try {
+        response = await fetcher(JEV_URL, {
+          method: 'POST',
+          headers: { 'authorization': `Bearer ${config.apiKey}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ model: tried, state, questions }),
+          signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
+        })
+      } catch (error) {
+        // Batas waktu habis: tidak diulang (balasan pelanggan tidak boleh tertahan).
+        if (error instanceof Error && /abort|timeout/i.test(`${error.name} ${error.message}`)) throw error
+        response = null
+        if (attempt === RETRY_DELAYS_MS.length) throw error
+      }
+      if (response && (response.ok || !RETRY_STATUS.has(response.status))) break
+      if (attempt < RETRY_DELAYS_MS.length) await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]))
+    }
+    if (!response) throw new Error('Jev tidak bisa dihubungi')
     if (!response.ok) throw new Error(`Jev HTTP ${response.status}`)
     const data = (await response.json()) as {
       model?: string
       answers?: Record<string, any>
       usage?: { input_tokens?: number; output_tokens?: number }
     }
+    // Versi pasti yang dilaporkan penyedia disimpan → dipakai di panggilan berikutnya.
+    if (isPinnedJevModel(String(data.model || '')))
+      await writeLeanState('jev_model_resolved', JSON.stringify({ model: String(data.model), at: Date.now() })).catch(() => {})
     await recordUsage({
       provider: 'typesafe',
       phase: `jev-${phase}`,
-      model: String(data.model || config.model),
+      model: String(data.model || tried),
       status: 'completed',
       usage: {
         input: Number(data.usage?.input_tokens || 0),
@@ -307,7 +359,7 @@ export async function askJev<K extends string>(
     await recordUsage({
       provider: 'typesafe',
       phase: `jev-${phase}`,
-      model: config.model,
+      model: tried,
       status: 'failed',
       usage: null,
       durationMs: Date.now() - started,

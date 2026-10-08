@@ -438,3 +438,10 @@ Perubahan v3.6.6:
 - **Ucapan momen sekali:** "selamat …" tidak diulang bila sudah pernah diucapkan di chat itu ("selamat pagi/siang/sore/malam" tidak terhitung).
 - **Penanda cek:** pelanggan bertanya tapi balasan hanya "dicatat" → jejak "Pertanyaan dijawab "dicatat" — cek" (balasan tidak diubah).
 - Bank uji acak bagian M (15 skenario Hati CS) di `docs/uji-acak-bank.md`.
+
+## v3.6.64 — Jev memakai versi model dari penyedia, gangguan sesaat dicoba ulang
+
+- Penyebab "Jev gagal" 8 Okt: penyedia (TypeSafe) membalas **HTTP 503** (layanan sedang tidak tersedia), langsung tanpa menunggu. Baris gagal tercatat "jev-latest" karena yang dicatat adalah nama yang diminta; baris berhasil tercatat versi asli dari penyedia (jev-1.13.0).
+- Sekarang Jev memakai **versi pasti yang dilaporkan penyedia** (mis. jev-1.13.0), bukan alias "jev-latest". Alias hanya dipakai bila versi belum diketahui atau sekali sehari untuk mengecek versi baru penyedia; selalu ada model cadangan.
+- Gangguan sementara (429, 500, 502, 503, 504, 529) dicoba ulang 2x dengan jeda singkat (150 ms, 400 ms); percobaan terakhir memakai model cadangan. Kunci salah (401), isi tidak sah (422), dan batas waktu habis tidak diulang (balasan pelanggan tidak tertahan).
+- Pengaturan Jev menampilkan model yang sedang dipakai ("Model: jev-1.13.0").

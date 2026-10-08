@@ -48,7 +48,9 @@
     const toggle = byId('jevEnabled')
     toggle.disabled = !state.configured
     toggle.setAttribute('aria-checked', String(state.configured && state.enabled))
+    pill.title = state.activeModel ? `Model: ${state.activeModel}` : ''
     if (state.lastError && state.configured) status(`${t('Masalah terakhir')}: ${state.lastError}`)
+    else if (state.activeModel && state.configured) status(`Model: ${state.activeModel}`)
   }
 
   function paintDecisions() {
