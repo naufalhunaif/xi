@@ -6,6 +6,7 @@ import app from '@adonisjs/core/services/app'
 import db from '#services/workspace_database'
 import { ensureLeanTables, readLeanState, writeLeanState } from '#beta3/tables'
 import { appVersion } from '#services/app_version'
+import { saveRemoteDigest } from '#beta3/skill_digest'
 
 /**
  * Skill bawaan repo (whatsapp/skills-beta3/<nama>/SKILL.md) ikut terpasang otomatis:
@@ -102,6 +103,11 @@ export async function syncRemoteSkills(log?: (line: string) => void) {
       if (!content.startsWith('---')) continue
       const minApp = content.match(/^min_app:\s*([\d.]+)/im)?.[1]
       if (minApp && newer(minApp, appVersion())) continue
+      // v3.6.57: ringkasan (DIGEST.md) ikut diambil supaya cocok dengan skill online.
+      const digest = await fetch(`${base}/${dir}/DIGEST.md`, { signal: AbortSignal.timeout(15_000) })
+        .then((res) => (res.ok ? res.text() : ''))
+        .catch(() => '')
+      if (digest) await saveRemoteDigest(content, digest).catch(() => false)
       const name = await installSkill(dir, content, 'remote')
       if (name) {
         updated.push(name)

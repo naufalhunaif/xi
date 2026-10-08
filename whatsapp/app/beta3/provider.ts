@@ -58,6 +58,10 @@ const TIMEOUT_MS = 120_000
  */
 export const REPLY_TIMEOUT_MS = 75_000
 const timeoutScope = new AsyncLocalStorage<number>()
+/** v3.6.57: dibatalkan karena akun lain lebih dulu menjawab (cadangan paralel). */
+const cancelScope = new AsyncLocalStorage<AbortSignal>()
+/** Akun cadangan mulai paralel bila akun pertama belum menjawab selama ini (balasan normal 13–38 dtk). */
+export const HEDGE_MS = 35_000
 export function providerTimeout(phase: string, imageCount: number) {
   return phase === 'beta3-reply' && !imageCount ? REPLY_TIMEOUT_MS : TIMEOUT_MS
 }
@@ -142,8 +146,8 @@ export async function runLeanProvider(
       retryable: true,
     })
   }
-  let lastError: unknown
-  for (const account of accounts) {
+  const runAccount = async (account: (typeof accounts)[number], signal?: AbortSignal): Promise<LeanProviderResult> => {
+    const inCancel = <T>(action: () => Promise<T>) => (signal ? cancelScope.run(signal, action) : action())
     await recordAiEvent(account.id, 'start', phase, '', null, jid).catch(() => {})
     // Laporan limit Claude selama run → sisa kuota akun ini di Pengaturan → Usage.
     const quota = new Map<string, QuotaWindow>()
@@ -178,7 +182,7 @@ export async function runLeanProvider(
             }
           : settings
       const attempt = (useDefault: boolean) =>
-        withAiAccount(aiAccountRef(account), () =>
+        inCancel(() => withAiAccount(aiAccountRef(account), () =>
           runLeanOnce(
             useDefault ? { ...tuned, chatgptModel: '', claudeModel: '' } : tuned,
             account.provider,
@@ -189,7 +193,7 @@ export async function runLeanProvider(
             schema,
             quota
           )
-        )
+        ))
       // Model yang tidak tersedia untuk langganan akun ini (mis. akun ChatGPT lain paketnya
       // berbeda) → pakai model bawaan akun tersebut, bukan pindah/menjeda akun.
       let result: LeanProviderResult
@@ -202,7 +206,7 @@ export async function runLeanProvider(
           await blockAiModel(account.id, [...blocked, wanted].slice(-4).join(',')).catch(() => {})
           const next = ladder.find((model) => model !== wanted && !blocked.includes(model))
           if (next) {
-            const fallback = runLeanOnce(
+            const fallback = () => runLeanOnce(
               { ...tuned, chatgptModel: '', claudeModel: '' },
               account.provider,
               { model: next, apiKey: account.apiKey, auto: true },
@@ -212,7 +216,7 @@ export async function runLeanProvider(
               schema,
               quota
             )
-            result = await withAiAccount(aiAccountRef(account), () => fallback)
+            result = await inCancel(() => withAiAccount(aiAccountRef(account), fallback))
           } else result = await attempt(true)
         }
       }
@@ -222,11 +226,12 @@ export async function runLeanProvider(
       await recordAiEvent(account.id, 'ok', phase, '', tokens, jid).catch(() => {})
       return result
     } catch (error) {
+      // Dibatalkan karena akun lain lebih dulu menjawab: bukan kegagalan akun ini.
+      if (signal?.aborted) throw error
       const detail = aiFailureDetail(error, {
         stage: 'provider',
         provider: account.provider === 'claude' ? 'claude' : 'chatgpt',
       })
-      lastError = error
       await saveQuota()
       const reason = (error instanceof Error ? error.message : String(error)).replace(/\s+/g, ' ')
       await recordAiEvent(
@@ -245,9 +250,82 @@ export async function runLeanProvider(
         SWITCHABLE.has(detail.code) ? detail.code : 'AI_PROCESS_FAILED',
         SWITCHABLE.has(detail.code) ? `${detail.message} ${reason}` : reason
       ).catch(() => {})
+      throw error
+    }
+  }
+  // v3.6.57: balasan pelanggan — akun cadangan mulai paralel bila akun pertama lambat, bukan
+  // menunggu sampai gagal (dulu 120 dtk × beberapa akun = pelanggan menunggu 6 menit).
+  if (/reply/.test(phase) && accounts.length > 1) return raceAccounts(accounts, runAccount, HEDGE_MS)
+  let lastError: unknown
+  for (const account of accounts) {
+    try {
+      return await runAccount(account)
+    } catch (error) {
+      lastError = error
+      if (STOP_CODES.has(aiFailureDetail(error, { stage: 'provider', provider: account.provider === 'claude' ? 'claude' : 'chatgpt' }).code)) throw error
     }
   }
   throw lastError
+}
+
+/**
+ * Jalankan akun berurutan dengan cadangan paralel: akun berikutnya mulai bila akun yang berjalan
+ * belum selesai dalam `hedgeMs`, atau langsung bila gagal. Jawaban pertama dipakai, sisanya dibatalkan.
+ * Maksimal `maxParallel` akun berjalan bersamaan (server kecil).
+ */
+export function raceAccounts<A, R>(
+  accounts: A[],
+  run: (account: A, signal: AbortSignal) => Promise<R>,
+  hedgeMs: number,
+  maxParallel = 2
+): Promise<R> {
+  return new Promise<R>((resolve, reject) => {
+    const controllers: AbortController[] = []
+    let next = 0
+    let running = 0
+    let done = false
+    let lastError: unknown = new Error('Tidak ada akun AI yang menjawab.')
+    let timer: NodeJS.Timeout | undefined
+    const finishAll = (winner?: AbortController) => {
+      done = true
+      if (timer) clearTimeout(timer)
+      for (const controller of controllers) if (controller !== winner) controller.abort()
+    }
+    const schedule = () => {
+      if (timer) clearTimeout(timer)
+      if (next < accounts.length) timer = setTimeout(() => start(), hedgeMs)
+    }
+    const start = () => {
+      if (done || next >= accounts.length || running >= maxParallel) return
+      const account = accounts[next++]
+      const controller = new AbortController()
+      controllers.push(controller)
+      running++
+      schedule()
+      run(account, controller.signal).then(
+        (result) => {
+          if (done) return
+          finishAll(controller)
+          resolve(result)
+        },
+        (error) => {
+          running--
+          if (done) return
+          if (!controller.signal.aborted) lastError = error
+          if (STOP_CODES.has(aiFailureDetail(error, { stage: 'provider', provider: 'chatgpt' }).code)) {
+            finishAll()
+            return reject(error)
+          }
+          if (next < accounts.length) start()
+          else if (!running) {
+            finishAll()
+            reject(lastError)
+          }
+        }
+      )
+    }
+    start()
+  })
 }
 
 function modelUnavailable(error: unknown) {
@@ -432,6 +510,14 @@ function collect(
         )
       )
     }, timeoutScope.getStore() || TIMEOUT_MS)
+    // Akun lain sudah menjawab → proses ini dihentikan (hemat RAM/CPU).
+    const cancel = cancelScope.getStore()
+    const onCancel = () => {
+      child.kill('SIGKILL')
+      finish(new Error('Dibatalkan: akun AI lain lebih dulu menjawab.'))
+    }
+    if (cancel?.aborted) onCancel()
+    else cancel?.addEventListener('abort', onCancel, { once: true })
     observeProviderProcess(child, provider)
     child.stdout?.on('data', (chunk) => {
       output += String(chunk)
@@ -654,7 +740,9 @@ async function runGeminiLean(
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(timeoutScope.getStore() || TIMEOUT_MS),
+          signal: cancelScope.getStore()
+            ? AbortSignal.any([AbortSignal.timeout(timeoutScope.getStore() || TIMEOUT_MS), cancelScope.getStore()!])
+            : AbortSignal.timeout(timeoutScope.getStore() || TIMEOUT_MS),
         }
       )
     } catch (error) {

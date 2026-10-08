@@ -390,3 +390,9 @@ Perubahan v3.6.6:
 - Pesanan yang dicatat grosir tidak dikirimi total otomatis: totalnya dibuat toko lewat invoice dengan tombol Diskon grosir (pelanggan tetap dibalas).
 - Diskon di luar diskon grosir tetap diteruskan ke tim (dengan balasan singkat).
 
+## v3.6.57 — Balasan AI tidak menunggu akun yang macet
+
+- Bila akun AI pertama belum menjawab dalam 35 detik, akun berikutnya langsung dijalankan bersamaan; jawaban yang lebih dulu selesai dipakai dan yang lain dihentikan. Dulu pelanggan bisa menunggu 6 menit (120 detik per akun yang macet).
+- Akun AI yang lama tidak dipakai dicek otomatis (satu akun tiap 5 menit, pesan uji sangat kecil). Akun yang gagal atau lambat (> 45 detik) dijeda sebelum dipakai membalas pelanggan; akun yang baru pulih dari gagal dicek ulang dulu.
+- Skill yang diperbarui dari rilis online kini membawa ringkasannya (DIGEST.md), jadi ringkasan tetap terpakai sebelum `wa update` (prompt ±2.300 token lebih kecil).
+

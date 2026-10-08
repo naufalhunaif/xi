@@ -87,6 +87,7 @@ import { setHandlingMode } from '#services/message_service'
 import { canonicalRoomJid, mergeKnownLidRooms, mergeLidRoom, rememberCustomerPhone, phoneFromJid } from '#services/customer_identity_service'
 import { cacheOrderGroups, orderRouting } from '#services/order_operations_service'
 import { isAiWorking } from '#services/ai_work_schedule'
+import { probeIdleAccount } from '#services/ai_health'
 import { readSettings } from '#services/settings_service'
 import { describeStatus, saveStatusPost, statusImageFile, statusPost, updateStatusMedia } from '#services/status_posts'
 import env from '#start/env'
@@ -184,6 +185,8 @@ export default class WhatsappListen extends BaseCommand {
   private catalogSyncTimer?: NodeJS.Timeout
   private recapTimer?: NodeJS.Timeout
   private recapRunning = false
+  private aiProbeTimer?: NodeJS.Timeout
+  private aiProbeRunning = false
   private goalSweepRunning = false
   private lastGoalSweepAt = 0
 
@@ -260,6 +263,7 @@ export default class WhatsappListen extends BaseCommand {
       if (this.mediaRetryTimer) clearInterval(this.mediaRetryTimer)
       if (this.catalogSyncTimer) clearInterval(this.catalogSyncTimer)
       if (this.recapTimer) clearInterval(this.recapTimer)
+      if (this.aiProbeTimer) clearInterval(this.aiProbeTimer)
       if (this.igTimer) clearInterval(this.igTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
       this.pendingTurns.clear()
@@ -3002,6 +3006,27 @@ export default class WhatsappListen extends BaseCommand {
           }
         })
       }, 60_000)
+    }
+    if (!this.aiProbeTimer && this.primary) {
+      // v3.6.57: cek kesehatan akun AI yang lama diam (satu akun tiap 5 menit) supaya akun yang
+      // gagal/lambat dijeda sebelum dipakai membalas pelanggan.
+      this.aiProbeTimer = setInterval(() => {
+        const scope = this.timerScope()
+        if (!scope || this.aiProbeRunning) return
+        this.aiProbeRunning = true
+        void inWorkspace(scope, async () => {
+          try {
+            const settings = await readSettings(true)
+            if (!settings.aiEnabled || !settings.hasSkill) return
+            const result = await probeIdleAccount(settings as any)
+            if (result && !result.healthy) this.logger.warning(`Akun AI #${result.id} dijeda: ${result.code}`)
+          } catch (error) {
+            this.logger.error(`Cek akun AI: ${error instanceof Error ? error.message : String(error)}`)
+          } finally {
+            this.aiProbeRunning = false
+          }
+        }).catch(() => (this.aiProbeRunning = false))
+      }, 5 * 60_000)
     }
     if (!this.catalogSyncTimer && this.primary) {
       // Katalog/TOKO/bahan ditarik sendiri tiap 30 menit (murah: if_version), lalu ciri foto di latar.

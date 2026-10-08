@@ -18,6 +18,16 @@ const sha = (text: string) => createHash('sha256').update(text).digest('hex')
 // Nama state maks. 64 karakter: cukup 32 karakter awal sha.
 const stateKey = (hash: string) => `skill-digest:${hash.slice(0, 32)}`
 const OFF_KEY = 'skill-digest-off'
+const remoteKey = (hash: string) => `skill-digest-remote:${hash.slice(0, 32)}`
+
+/** v3.6.57 — simpan DIGEST.md dari rilis online bila `digest_of`-nya menunjuk isi skill ini. */
+export async function saveRemoteDigest(content: string, digest: string) {
+  const hash = sha(content)
+  const of = digest.match(/^digest_of:\s*([a-f0-9]{64})\s*$/m)?.[1]
+  if (of !== hash || !mergeDigest(content, digest)) return false
+  await writeLeanState(remoteKey(hash), digest)
+  return true
+}
 const norm = (text: string) =>
   text
     .toLowerCase()
@@ -110,6 +120,13 @@ async function resolveDigest(skill: { name: string; content: string }) {
   }
   const fromFile = bundledCache.get(hash)
   if (fromFile) return { ...fromFile, source: 'file' as const }
+  // v3.6.57: skill diperbarui dari rilis online lebih dulu dari aplikasinya → DIGEST.md online-nya
+  // juga diambil (state), supaya ringkasan tetap terpakai sebelum `wa update`.
+  const remote = await readLeanState(remoteKey(hash)).catch(() => '')
+  if (remote) {
+    const merged = mergeDigest(skill.content, remote)
+    if (merged) return { ...merged, source: 'file' as const }
+  }
   const saved = await readLeanState(stateKey(hash)).catch(() => '')
   if (saved)
     try {
