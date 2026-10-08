@@ -312,6 +312,24 @@ async function aiReview(settings: LeanProviderSettings, state: Record<string, un
   return { issues, usage: reply.usage }
 }
 
+/**
+ * v3.6.91 — Foto yang warnanya tidak disebut pelanggan maupun balasan, padahal ada warna lain yang disebut,
+ * dibuang (pasti, dari katalog). Tanpa warna yang disebut sama sekali → tidak diubah.
+ */
+export function offColorPhotos(foto: string[], texts: string[], rows: LeanCatalogRow[]) {
+  const text = ` ${fold(texts.join(' ')).replace(/[^a-z0-9.\s-]/g, ' ')} `
+  const said = (color: string) =>
+    [color, ...(COLOR_ALIASES[color] || [])].some((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:nya)?\\b`).test(text))
+  const colorOf = (label: string) => baseColor(findCatalogVariant(rows, label)?.color || label.split(' - ').slice(1).join(' - '))
+  const colors = [...new Set(rows.map((row) => baseColor(row.color)).filter((color) => color.length >= 3))]
+  const mentioned = colors.filter(said)
+  if (!mentioned.length) return []
+  return foto.filter((label) => {
+    const color = colorOf(label)
+    return color && !said(color) && !mentioned.some((other) => other.includes(color) || color.includes(other))
+  })
+}
+
 /** Kata warna sehari-hari untuk warna katalog (dasar tanpa "2.0"). */
 const COLOR_ALIASES: Record<string, string[]> = {
   black: ['black', 'hitam', 'item'],

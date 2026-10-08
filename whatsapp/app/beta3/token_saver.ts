@@ -6,7 +6,7 @@ import { catalogColorSearchHints } from '#services/color_semantics'
 import { seriesOf } from '#beta3/price_pattern'
 
 const OPENER_WORD =
-  /^(?:halo+|hallo+|hai+|hay|hi|hei|p+|ping|permisi|punten|pagi|siang|sore|malam|met\s+(?:pagi|siang|sore|malam)|selamat\s+(?:pagi|siang|sore|malam)|ass?alamu'?\s*alaikum(?:\s+wr\.?\s*wb\.?)?|assalamualaikum|salam|kak|kakak|bos|boss|min|admin|gan|om|mas|mbak|sis)$/i
+  /^(?:halo+|hallo+|hai+|hay|hi|hei|p+|ping|permisi|punten|pagi|siang|sore|malam|met\s+(?:pagi|siang|sore|malam)|selamat\s+(?:pagi|siang|sore|malam)|ass?alamu'?\s*alaikum(?:\s+wr\.?\s*wb\.?)?|assalamualaikum|salam|kak|kakak|bos+|bosku+|min|admin|gan|om|mas|mbak|sis)$/i
 const THANKS =
   /^(?:(?:oke?|ok|siap|sip)\s+)?(?:makasih|makasi|terima\s*kasih|terimakasih|trims|thanks|thank\s+you|thx|tq|tengkyu)(?:\s+(?:ya+|kak|bos|min|banyak|gan|om|mas|mbak))*[\s!.\p{Extended_Pictographic}\uFE0F\u200D]*$/iu
 /** Hanya tanda setuju/ragu tanpa isi ("ya", "oke 😁", "hmm 🤔"). */
@@ -41,9 +41,12 @@ function openerOnly(text: string) {
     .map((line) => line.trim())
     .filter(Boolean)
   if (!words.length) return false
+  const hasGreeting = words.some((line) => /\b(halo+|hallo+|hai+|pagi|siang|sore|malam|salam|alaikum|assalamualaikum|permisi|punten)\b/.test(line))
   return words.every((line) => {
     // "halo kak", "pagi bos", "assalamualaikum kak" → tiap potongan harus kata sapaan.
     const parts = line.match(/selamat\s+\w+|met\s+\w+|ass?alamu'?\s*alaikum(?:\s+wr\s*wb)?|\S+/g) || []
+    // v3.6.91: "Siap boskuu" + "Selamat siang boskuu" → baris tanda setuju boleh ikut bila ada salam di baris lain.
+    if (parts.length <= 3 && parts.every((part) => /^(siap|oke?|ok|sip|baik|bos+|bosku+|kak|min|gan)$/i.test(part)) && hasGreeting) return true
     return parts.length <= 4 && parts.every((part) => OPENER_WORD.test(part))
   })
 }
@@ -88,7 +91,7 @@ const EARLY = ['', 'lain', 'tanya_model', 'tanya_size', 'tawar_celana']
 const PRODUCT =
   /\b(jas|tuxedo|beskap|suit|setelan|celana|rompi|model|warna|harga|berapa|foto|gambar|stok|ready|size|ukuran|bahan|custom|order lagi|pesan lagi|tambah|katalog|produk)/i
 const SIZE =
-  /\b(size|ukuran|tinggi|berat|lingkar|dada|pinggang|panjang|lengan|bahu|cm|kg|celana|nomor|no\.?\s*\d+|muat|pas|kebesaran|kekecilan|ngepress|sempit|longgar|xs|s|m|l|xl|xxl|[2-4]xl)\b|\b\d{2,3}\b/i
+  /\b(size|ukuran|tinggi|berat|lingkar|dada|pinggang|panjang|lengan|tangan|bahu|cm|kg|celana|nomor|no\.?\s*\d+|muat|pas|kebesaran|kekecilan|ngepress|sempit|longgar|xs|s|m|l|xl|xxl|[2-4]xl)\b|\b\d{2,3}\b/i
 const COLOR =
   /\b(warna|bahan|kain|custom|buatkan|dibuatkan|seri|motif|putih|hitam|navy|maroon|abu|grey|gray|cream|krem|coklat|choco|brown|hijau|biru|merah|broken|white|black|gold|silver|olive|mocca|khaki|beige)/i
 

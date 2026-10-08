@@ -96,7 +96,7 @@ export function styleGuide(profile: StyleProfile) {
     '- Bahasa santai sehari-hari seperti contoh CS; tanpa format markdown (**tebal**, #judul, tabel).',
     '- Rapi seperti CS: rincian berangka (ongkir, rincian total, data pesanan, harga yang diminta per model) satu item per baris. Pilihan tanpa angka cukup satu kalimat ("mau A, B, atau C bos?"). Ditanya harga/price list umum → "mulai dari X" lalu tanya model.',
     '- Jangan membuka dengan salam panjang atau menutup dengan kalimat basa-basi yang sama tiap kali.',
-    '- Jawab dulu dari data (bahan, lama jadi, alamat/lokasi); tanya balik hanya bila jawabannya beda per model. Minta sharelok → kirim alamat lengkap toko.',
+    '- Jawab dulu dari data (bahan, lama jadi, alamat/lokasi); tanya balik hanya bila jawabannya beda per model. Minta sharelok → kirim alamat lengkap toko. Ditanya warna lain → sebut 3–5 yang ready/terdekat, bukan semua.',
   ]
   return lines.filter(Boolean).join('\n')
 }

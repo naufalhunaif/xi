@@ -233,7 +233,9 @@ const NOT_A_PLACE = new Set(
     's m l xl xxl xxxl pcs order pesan kirim resi nomor no bos kak gan min ya dong berapa brp ini itu nya ' +
     'saya aku kamu kita dia mereka tinggi berat cm kg custom ' +
     // Pilihan layanan ongkir ("reg aja", "yang yes") bukan nama tempat.
-    'reg reguler regular yes jtr jne pakai pake yang ambil biasa murah cepat kilat ekonomi aja saja'
+    'reg reguler regular yes jtr jne pakai pake yang ambil biasa murah cepat kilat ekonomi aja saja ' +
+    // v3.6.91: "alamat masih sama" bukan nama tempat.
+    'alamat masih sama tadi kemarin kmrn dulu lama sebelumnya seperti kayak'
   ).split(' ')
 )
 

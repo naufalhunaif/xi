@@ -55,6 +55,8 @@ const TIME_CLAIM = /\b(belum selesai|masih dalam proses|baru diproses|sudah sele
  */
 export function inventsProgress(customerText: string, pesan: string[], known: string) {
   if (!PROGRESS_ASK.test(customerText) && !PROGRESS_ASK_EXTRA.test(customerText)) return false
+  // Jawaban status langsung ("Belum bos, …" / "Sudah bos, …") tanpa data juga karangan.
+  if (pesan.some((bubble) => /^\s*(belum|sudah|udah)\b/i.test(bubble)) && !/\b(status|produksi|dikirim|resi)\b/i.test(known)) return true
   return pesan.some((bubble) => {
     const claim = bubble.match(TIME_CLAIM)?.[0]
     return Boolean(claim && !known.toLowerCase().includes(claim.toLowerCase()))

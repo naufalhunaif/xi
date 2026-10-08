@@ -86,7 +86,7 @@ import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { renderPaymentMessage } from '#beta3/order_service'
-import { alignPhotos, CHECK_LABEL, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
 /**
@@ -1064,6 +1064,10 @@ export async function createLeanReply(input: {
   if (understanding.reaction === 'terima' && !systemNote && !toolNotes.length && !form && !loose)
     // Bukan "CATATAN SISTEM" supaya tidak memaksa model berat untuk sekadar "oke".
     systemNote += '\n\n(Pesan ini hanya tanda terima: balas satu kalimat singkat yang nyambung, tanpa pertanyaan baru; isi susulan langkah berikutnya.)'
+  // v3.6.91 — "alamat masih sama": pelanggan lama; jangan tanya alamat/kecamatan lagi.
+  if (/\balamat\w*\s+(?:masih\s+|tetap\s+)?(?:sama|yang\s+(?:dulu|kemarin|kmrn|lama|sebelumnya))\b|\bseperti biasa\b|\bkayak (?:kemarin|biasa)\b/i.test(input.text))
+    systemNote +=
+      '\n\nCATATAN SISTEM: pelanggan bilang alamat sama seperti sebelumnya. Pakai alamat dari percakapan/pesanan sebelumnya bila ada (sebut singkat untuk konfirmasi); bila tidak terlihat, jawab "siap bos, alamat yang sebelumnya ya" tanpa menanyakan kecamatan.'
   // v3.6.87 — link luar (Instagram/TikTok/Shopee…) tidak bisa dibuka AI: jangan memastikan bisa dibuat.
   if (foreignLink(input.text))
     systemNote +=
@@ -1766,6 +1770,12 @@ export async function createLeanReply(input: {
   if (aligned.added.length) {
     decision.foto = aligned.foto
     onTrace?.({ key: 'beta3-photo-align', label: `Foto diselaraskan dengan teks · ${aligned.added.join(', ')}`, status: 'completed', detail: { ditambah: aligned.added } })
+  }
+  // v3.6.91: foto warna lain yang tidak disebut siapa pun dibuang (uji: minta setelan hitam, ikut foto Army).
+  const offColor = offColorPhotos(decision.foto, [input.text, ...decision.pesan], digest.rows)
+  if (offColor.length) {
+    decision.foto = decision.foto.filter((label) => !offColor.includes(label))
+    onTrace?.({ key: 'beta3-photo-offcolor', label: `Foto warna lain dibuang · ${offColor.join(', ')}`, status: 'completed', detail: { dibuang: offColor } })
   }
   let photos = resolvePhotos(digest.rows, decision.foto)
   // v3.6.58: foto yang baru saja dikirim tidak diulang (kecuali pelanggan minta kirim ulang).

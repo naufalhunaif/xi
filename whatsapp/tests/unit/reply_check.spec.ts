@@ -864,3 +864,26 @@ test.group('Beta3 · temuan putaran 10 (v3.6.90)', () => {
     assert.lengthOf(CUSTOM_REPLY, 1)
   })
 })
+
+test.group('Beta3 · temuan putaran 11 (v3.6.91)', () => {
+  test('foto warna lain dibuang; status karangan; salam + siap; alamat masih sama', async ({ assert }) => {
+    const { offColorPhotos } = await import('#beta3/reply_check')
+    const { inventsProgress } = await import('#beta3/reply_guards')
+    const { quickReply } = await import('#beta3/token_saver')
+    const { extractShippingQuery } = await import('#beta3/mcp')
+    const rows = [
+      row('Setelan Basic Suit', 'Black 2.0', { photoUrl: 'https://x/1.jpg' }),
+      row('Basic Suit', 'Army', { photoUrl: 'https://x/2.jpg' }),
+      row('Basic Suit', 'Dark Gray', { photoUrl: 'https://x/3.jpg' }),
+    ]
+    assert.deepEqual(offColorPhotos(['Setelan Basic Suit - Black 2.0', 'Basic Suit - Army'], ['Ukuran L ada ka? setelan hitam', 'Ada bos, ini fotonya'], rows), ['Basic Suit - Army'])
+    assert.deepEqual(offColorPhotos(['Basic Suit - Dark Gray'], ['warna abu gelap', 'ini fotonya'], rows), [])
+    assert.deepEqual(offColorPhotos(['Basic Suit - Army'], ['ini fotonya bos'], rows), [])
+    assert.isTrue(inventsProgress('Gimana Kak? Sudah jadi belum?', ['Belum bos, soalnya belum ada pembayaran yang masuk'], ''))
+    const at = new Date()
+    const before = [{ direction: 'out' as const, senderType: 'cs', body: 'siap bos', createdAt: at }]
+    assert.deepEqual(quickReply({ text: 'Siap boskuu\nSelamat siang boskuu', imageCount: 0, stage: '', rows: before }), ['Siang bos, ada yang bisa kami bantu'])
+    assert.isNull(quickReply({ text: 'siap', imageCount: 0, stage: '', rows: before }))
+    assert.isNull(extractShippingQuery('Alamat masih sama Ka...', true))
+  })
+})
