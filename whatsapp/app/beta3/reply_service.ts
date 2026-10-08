@@ -68,6 +68,7 @@ import { alignFitSize, cancelsOrder, dropGuessedPantsNumber, dropRepeatedWait, f
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
+import { lookupPlace, mapLink, parseAddress, type PlaceLookup } from '#beta3/place_lookup'
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
 import { completePhotos, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
@@ -790,7 +791,10 @@ export async function createLeanReply(input: {
   const extracted = form || loose ? null : extractShippingQuery(input.text, followUp)
   // v3.6.80: jawaban singkat atas pilihan tujuan ("kab", "yang kota") tidak berisi nama tempat.
   const choiceHit = !form && !loose && followUp && last?.pending && last.choices?.length ? pickArea(input.text, last.choices) : null
-  const place = extracted || (choiceHit ? last?.place || choiceHit.label : null)
+  // v3.6.92: link peta / alamat lengkap ditempel → dicari di peta seperti CS (tanpa kata "ongkir").
+  const linkPlace = !form && !loose && (mapLink(input.text) || (followUp && parseAddress(input.text))) ? 'lokasi pelanggan' : null
+  const place = extracted || (choiceHit ? last?.place || choiceHit.label : null) || linkPlace
+  let geoFound: PlaceLookup | null = null
   if (place && mcp.url) {
     try {
       let note = ''
@@ -808,7 +812,7 @@ export async function createLeanReply(input: {
         const fresh = ambiguous
           ? await isNewDestination(jid, input.text, place, last!.resolved!.label).catch(() => undefined)
           : undefined
-        let areas = fresh === false ? [] : groupDestinations(await findDestinations(place, mcp))
+        let areas = fresh === false || place === linkPlace ? [] : groupDestinations(await findDestinations(place, mcp))
         if (!areas.length && fresh !== false && last?.pending && last.place && !place.includes(last.place))
           areas = groupDestinations(await findDestinations(`${place} ${last.place}`, mcp))
         if (!areas.length && ambiguous && last?.resolved) {
@@ -816,6 +820,16 @@ export async function createLeanReply(input: {
           onTrace?.({ key: 'beta3-rates', label: `Bukan tujuan baru · tetap ${last.resolved.label}`, status: 'completed', detail: { place } })
           kept = true
           note = `TUJUAN tetap ${last.resolved.label}; ongkirnya sudah disebut di chat. Pesan ini bukan tujuan baru (mis. memilih layanan) — jangan tanya kecamatan/ongkir lagi, lanjut tahap berikutnya.`
+        }
+        // v3.6.92: tidak ditemukan / terlalu banyak pilihan → cari di peta (OpenStreetMap / link Google Maps),
+        // cocokkan ke tujuan ekspedisi lewat kecamatan + kota + kode pos. Seperti CS membuka Google Maps.
+        if (!kept && (areas.length !== 1 || place === linkPlace) && fresh !== false && mcp.url) {
+          geoFound = await lookupPlace({ text: input.text, place: place === linkPlace ? null : place }, (query) => findDestinations(query, mcp)).catch(() => null)
+          const better = geoFound ? groupDestinations(geoFound.rows) : []
+          if (better.length && (better.length < areas.length || !areas.length || place === linkPlace)) {
+            areas = better
+            onTrace?.({ key: 'beta3-geo', label: `Lokasi dicari di peta · ${geoFound!.display.slice(0, 80)}`, status: 'completed', detail: { place, display: geoFound!.display, source: geoFound!.source } })
+          } else geoFound = null
         }
         if (kept) {
           // tetap memakai tujuan sebelumnya
@@ -851,6 +865,10 @@ export async function createLeanReply(input: {
         await writeLeanState(
           lastKey,
           JSON.stringify({ place, pending, at: Date.now(), choices, resolved } satisfies LastShipping)
+        )
+      if (geoFound && resolved)
+        toolNotes.push(
+          `LOKASI (dicari di peta): ${geoFound.display} → kecamatan ${resolved.label}. Konfirmasi singkat seperti CS: "${geoFound.display.split(',').slice(0, 4).join(',').trim()} alamat ini ya?" lalu sebut ongkir/estimasinya; jangan tanya kecamatan lagi.`
         )
       if (note) {
         toolNotes.push(note)

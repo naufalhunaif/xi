@@ -298,6 +298,6 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
     ? '\nPelanggan menulis "lebar dada/panjang badan" (biasanya ukuran baju dibentangkan, bukan lingkar badan): jangan langsung tentukan size dari angka ini; tanya singkat itu ukuran badan atau ukuran baju yang biasa dipakai.'
     : ''
   return lines.length
-    ? `PERBANDINGAN SIZE CHART (dihitung sistem dari ukuran badan pelanggan; ukuran jadi ±1-2 cm):\n- ${lines.join('\n- ')}\nPakai hasil ini; bila berbeda dengan Fit Advisor, sebutkan keduanya singkat dan utamakan ukuran badan yang diukur.${caution}`
+    ? `PERBANDINGAN SIZE CHART (dihitung sistem dari ukuran badan pelanggan; ukuran jadi ±1-2 cm):\n- ${lines.join('\n- ')}\nPakai hasil ini; bila berbeda dengan Fit Advisor, sebutkan keduanya singkat dan utamakan ukuran badan yang diukur. Pelanggan sudah menyebut size biasanya dan Fit Advisor sama → pakai size itu; satu ukuran saja (mis. bahu) tidak cukup untuk menaikkan size.${caution}`
     : ''
 }

@@ -102,8 +102,10 @@ export function autoModels(provider: 'chatgpt' | 'claude'): Record<AutoTier, str
 }
 const HEAVY_PHASES = new Set(['ig-analysis'])
 const LIGHT_PHASES = new Set(['beta3-test-judge'])
+// v3.6.92: ongkir, ukuran, custom & catatan sistem kembali ke model menengah (lebih cepat; angka & size kini
+// dijaga kode). Model utama hanya untuk uang (form, transfer, DP) dan keluhan/nego.
 const HEAVY_TEXT =
-  /CATATAN SISTEM|<<<ONGKIR|LACAK RESI|form order|bukti|transfer|\btf\b|rekening|\bdp\b|lunas|custom|ukuran|lingkar|komplain|rusak|cacat|salah kirim|refund|retur|tukar|batal|kecewa|nego|diskon|grosir|seragam/i
+  /form order|bukti|transfer|\btf\b|rekening|\bdp\b|lunas|komplain|rusak|cacat|salah kirim|refund|retur|tukar|batal|kecewa|nego|diskon|grosir|seragam/i
 const LIGHT_TEXT =
   /^(p|ping|halo+|hai+|hallo+|pagi|siang|sore|malam|assalamu.?alaikum\S*|wa.?alaikum\S*|mantap|makasih|terima ?kasih|trims|thanks|thx|tq|ditunggu|sebentar|bentar)( (ya|yaa|kak|ka|bos|min|gan|mas|mbak|bang|kakak|sis))*[.!\s]*$/i
 /** Tingkat model untuk satu panggilan "Otomatis" (lokal, tanpa panggilan AI tambahan). */

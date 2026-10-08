@@ -887,3 +887,47 @@ test.group('Beta3 · temuan putaran 11 (v3.6.91)', () => {
     assert.isNull(extractShippingQuery('Alamat masih sama Ka...', true))
   })
 })
+
+test.group('Beta3 · cari lokasi di peta (v3.6.92)', () => {
+  test('nama tempat → OpenStreetMap → tujuan ekspedisi; link share.google → alamat panel', async ({ assert }) => {
+    const { lookupPlace, parseAddress, placeQueries, setGeoFetcher, mapLink, parseMapUrl } = await import('#beta3/place_lookup')
+    const asked: string[] = []
+    setGeoFetcher(async (url) => {
+      asked.push(String(url))
+      if (String(url).includes('share.google'))
+        return {
+          ok: true,
+          url: 'https://www.google.com/search?q=CV.+CONTOH+JAYA',
+          text: async () => '<title>CV. CONTOH JAYA - Penelusuran Google</title><span>Alamat: 5G6P+VRJ, Jagong, Kec. Pangkajene, Kabupaten Pangkajene Dan Kepulauan, Sulawesi Selatan 90612</span>',
+          json: async () => ({}),
+        } as any
+      const ice = [{ display_name: 'Indonesia Convention Exhibition, Pagedangan, Tangerang Regency, Banten, 15339, Indonesia', address: { village: 'Pagedangan', municipality: 'Pagedangan', county: 'Tangerang Regency', postcode: '15339' }, lat: '-6.3', lon: '106.6' }]
+      return { ok: true, url: String(url), json: async () => (String(url).includes('ice') ? ice : []), text: async () => '' } as any
+    })
+    const rows = {
+      pagedangan: [
+        { code: 'TGR1', subdistrict: 'PAGEDANGAN', district: 'PAGEDANGAN', city: 'TANGERANG', zip_code: '15339' },
+      ],
+      pangkajene: [
+        { code: 'MKS9', subdistrict: 'JAGONG', district: 'PANGKAJENE', city: 'PANGKAJENE KEPULAUAN', zip_code: '90612' },
+        { code: 'SDR1', subdistrict: 'X', district: 'PANGKAJENE', city: 'SIDENRENG RAPPANG', zip_code: '91611' },
+      ],
+    } as Record<string, any[]>
+    const find = async (q: string) => rows[q.toLowerCase()] || []
+    try {
+      const bsd = await lookupPlace({ text: 'Tangerang ice bsd', place: 'tangerang ice bsd' }, find)
+      assert.equal(bsd?.rows[0].code, 'TGR1')
+      const link = await lookupPlace({ text: 'CV. CONTOH JAYA https://share.google/AbCdEf' }, find)
+      assert.equal(link?.source, 'link')
+      assert.deepEqual(link?.rows.map((row) => row.code), ['MKS9'])
+      assert.isNull(await lookupPlace({ text: 'halo', place: 'zzz qqq' }, find))
+    } finally {
+      setGeoFetcher(null)
+    }
+    assert.deepEqual(placeQueries('kabupaten pangkep jln pelelangan'), ['kabupaten pangkajene jalan pelelangan', 'kabupaten pangkep jln pelelangan'])
+    const typed = parseAddress('Jl. BSD Grand Boulevard No.1, Pagedangan, Kec. Pagedangan, Kabupaten Tangerang, Banten 15339')
+    assert.deepEqual([typed?.names, typed?.city, typed?.postcode], [['Pagedangan'], 'Tangerang', '15339'])
+    assert.equal(mapLink('lokasinya https://maps.app.goo.gl/abc123 ya'), 'https://maps.app.goo.gl/abc123')
+    assert.deepEqual(parseMapUrl('https://www.google.com/maps/place/Toko+X/@-6.3006,106.6365,17z'), { lat: -6.3006, lon: 106.6365, name: 'Toko X' })
+  })
+})

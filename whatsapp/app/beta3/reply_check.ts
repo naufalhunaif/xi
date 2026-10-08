@@ -297,7 +297,8 @@ async function aiReview(settings: LeanProviderSettings, state: Record<string, un
     [],
     'beta3-check-ai',
     REVIEW_SCHEMA,
-    { jid, tier: 'standard' }
+    // v3.6.92: model ringan (pemeriksa jalan bersamaan; balasan lebih cepat).
+    { jid, tier: 'light' }
   )
   const parsed = JSON.parse(reply.text.slice(reply.text.indexOf('{'), reply.text.lastIndexOf('}') + 1)) as {
     ok?: boolean
