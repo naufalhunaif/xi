@@ -112,3 +112,22 @@ Kolom "6 Okt": ✓ sesuai · ✗ salah (apa yang terjadi) · – belum diuji.
 | 3–4 pesan beruntun | Setiap pertanyaan dijawab | ✗ hanya 2 pesan terakhir dijawab |
 | Pesan baru saat AI masih berpikir | Pesan sebelumnya ikut ke giliran berikutnya | ✗ pertanyaan hilang |
 | "Aku mau tanya yang lain bisa" | "Bisa bos, mau tanya apa?" | ✓ |
+
+## M. Hati CS — pikiran, rasa, jiwa, tindakan (v3.6.61–63)
+| Situasi | Perilaku yang diharapkan | Sebelum (7 Okt) |
+|---|---|---|
+| "Kancing 1 ..ya" (bertanya) | Dijawab: "iya bos, kancingnya 1" | ✗ "dicatat ya" |
+| "Lapisnya hitam ya" lalu "kancingnya 2" (meminta) | "siap bos, dicatat ya" sekali; berikutnya kata lain | ✗ "dicatat ya" berulang |
+| "Takut kebesaran nih" | Bantu dari tinggi & berat: "bisa disesuaikan ukurannya bos, biar pas" | – |
+| "Kok mahal ya" (masih bertanya) | Akui tenang, satu pilihan paling pas, tanpa susulan | – |
+| "Nanti dulu deh, kemahalan" | "siap bos, gak apa-apa, kalau nanti mau lihat lagi kabari saya ya"; tanpa susulan & tawaran | ✗ "Siap sama sama bos" + susulan |
+| "Buat besok bisa?" (buru-buru) | Langsung jawab dari ESTIMASI PRODUKSI / ongkir, singkat | – |
+| "Kok belum dikirim sih" (kesal) | "maaf ya bos" dulu, lalu cek status | – |
+| "Wah keren modelnya" | Hangat satu kalimat, tanpa emoji | – |
+| "Buat wisuda bulan depan" | "wah selamat ya bos" sekali, lalu bantu | – |
+| Momen disebut lagi di pesan berikutnya | Tidak mengucapkan selamat lagi | – |
+| "Buat gaya gen z yang mana?" | Satu saran + alasan + foto; jawaban tidak diganti "Ini fotonya" | ✗ diganti "Ini fotonya bos" + "Mau lihat modelnya?" |
+| "Boleh" sesudah foto terkirim | Foto tidak dikirim ulang; jawab yang ditanya | ✗ foto sama dikirim lagi |
+| "Takut ditipu nih" | "iya bos, aman" + satu alasan dari data toko | – |
+| "Bagus gak bahannya?" | Jujur dari KATALOG, tanpa melebih-lebihkan | – |
+| Pelanggan senang lalu bilang "makasih" | "Siap sama sama bos" saja | – |

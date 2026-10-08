@@ -85,7 +85,7 @@ import {
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
-import { GREETED, heartLabel, heartNote } from '#beta3/hati'
+import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
 /**
  * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
@@ -1212,6 +1212,28 @@ export async function createLeanReply(input: {
     })
   }
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
+  // v3.6.63 Hati CS: kalimat yang sama tidak diulang, ucapan momen sekali, pelanggan kesal/pamit tidak didesak.
+  if (!decision.serah_cs) {
+    const repeated = dropRepeatedSentences(decision.pesan, rows)
+    if (repeated.removed.length) {
+      decision.pesan = repeated.pesan
+      onTrace?.({ key: 'beta3-hati-repeat', label: `Kalimat tidak diulang · ${repeated.removed.join(' / ').slice(0, 120)}`, status: 'completed', detail: { dibuang: repeated.removed } })
+    }
+    const greeting = dropRepeatedGreeting(decision.pesan, rows)
+    if (greeting.changed) {
+      decision.pesan = greeting.pesan
+      onTrace?.({ key: 'beta3-hati-moment', label: 'Ucapan selamat tidak diulang', status: 'completed', detail: {} })
+    }
+  }
+  const calm = calmForFeeling(decision.pesan, understanding.heart?.feeling)
+  if (calm.stopSusulan) {
+    if (calm.changed) decision.pesan = calm.pesan
+    if (calm.changed || decision.susulan)
+      onTrace?.({ key: 'beta3-hati-calm', label: `Tanpa desakan · pelanggan ${String(understanding.heart?.feeling).replace(/_/g, ' ')}`, status: 'completed', detail: { tawaranDibuang: calm.changed, susulan: decision.susulan } })
+    decision.susulan = ''
+  }
+  if (notedInsteadOfAnswer(decision.pesan, understanding.heart?.form))
+    onTrace?.({ key: 'beta3-hati-noted', label: 'Pertanyaan dijawab "dicatat" — cek', status: 'completed', detail: { pesan: decision.pesan } })
   if (style) {
     decision.pesan = normalizeStyle(decision.pesan, style, [policy.text])
   }

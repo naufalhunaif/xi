@@ -430,3 +430,11 @@ Perubahan v3.6.6:
 - Jawaban yang yakin (≥ 0,8) dan tidak netral menjadi satu baris **CATATAN HATI** untuk AI, mis. "pelanggan BERTANYA (jawab pertanyaannya, bukan "dicatat"); rasa: ragu/cemas → tenangkan dari data". Hanya petunjuk — tidak mengubah data, harga, atau tahap.
 - Ucapan "wah selamat ya bos" untuk momen hanya sekali: bila toko sudah mengucapkan selamat di chat itu, catatannya bilang jangan diulang.
 - Jejak chat menampilkan "Hati · bertanya · ragu · wisuda". Keputusan "Maksud, rasa & momen pelanggan (Hati CS)" bisa dinilai Benar/Salah di Usage → Jev accuracy dan dimatikan di pengaturan Jev.
+
+## v3.6.63 — Penjaga Hati CS di sistem
+
+- **Kalimat tidak diulang:** kalimat balasan yang persis sama dengan kalimat toko di 10 pesan keluar terakhir dibuang (mis. "siap bos, dicatat ya" kedua kali). Kalimat berangka (harga/total), salam, dan daftar tidak disentuh; bila seluruh balasan adalah ulangan, balasan tetap dikirim. Jejak: "Kalimat tidak diulang".
+- **Tanpa desakan:** Jev membaca pelanggan kesal atau pamit → susulan tidak dikirim dan tawaran tambahan ("sekalian celananya", "jadi ambil yang mana") dibuang. Keberatan harga → susulan tidak dikirim, satu pilihan yang lebih pas tetap boleh. Jejak: "Tanpa desakan".
+- **Ucapan momen sekali:** "selamat …" tidak diulang bila sudah pernah diucapkan di chat itu ("selamat pagi/siang/sore/malam" tidak terhitung).
+- **Penanda cek:** pelanggan bertanya tapi balasan hanya "dicatat" → jejak "Pertanyaan dijawab "dicatat" — cek" (balasan tidak diubah).
+- Bank uji acak bagian M (15 skenario Hati CS) di `docs/uji-acak-bank.md`.

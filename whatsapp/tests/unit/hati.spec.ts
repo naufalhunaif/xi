@@ -6,7 +6,7 @@ import db from '#services/workspace_database'
 import { resetJevCache, saveJevConfig, setJevFetcher } from '#beta3/jev'
 import { understandTurn } from '#beta3/jev_decisions'
 import { explainDecision } from '#beta3/jev_explain'
-import { GREETED, heartLabel, heartNote } from '#beta3/hati'
+import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
 // v3.6.59 "Rasa" → v3.6.61 "Hati CS" (permintaan pemilik: lebih manusiawi, bukan sekadar mirip
 // manusia). Satu skill inti; tiap balasan lewat 4 lapis: pikiran (mind) → rasa (emotion) →
@@ -146,5 +146,49 @@ test.group('Hati CS · Jev membaca maksud, rasa, momen (v3.6.62)', (group) => {
     assert.equal(row.says, 'Customer feeling: finds it expensive.')
     assert.include(row.effect, 'HATI')
     assert.include(explainDecision({ decision: 'hati', answer: 'nikah', detail: 'momen', used: 1 }).question, 'occasion')
+  })
+})
+
+// v3.6.63 — penjaga sistem Hati CS.
+test.group('Hati CS · penjaga sistem (v3.6.63)', () => {
+  const out = (body: string) => ({ direction: 'out', body })
+  const inn = (body: string, current = false) => ({ direction: 'in', body, current })
+
+  test('kalimat yang sama tidak diulang (kasus Agus); angka, salam, daftar, dan balasan yang seluruhnya ulangan tetap', ({ assert }) => {
+    const rows = [inn('Lapisnya warna hitam'), out('Siap bos, dicatat ya. Cocok ya bos?'), inn('Kancing 1 ..ya', true)]
+    const result = dropRepeatedSentences(['Iya bos, kancingnya 1. Siap bos, dicatat ya.'], rows)
+    assert.deepEqual(result.pesan, ['Iya bos, kancingnya 1.'])
+    assert.deepEqual(result.removed, ['Siap bos, dicatat ya.'])
+    // Seluruhnya ulangan → dibiarkan (lebih baik daripada diam).
+    assert.deepEqual(dropRepeatedSentences(['Siap bos, dicatat ya.'], rows).pesan, ['Siap bos, dicatat ya.'])
+    // Kalimat berangka (harga/total) & salam tidak dijaga.
+    const priced = [out('Harganya 485.000 bos. Halo bos, ada yang bisa kami bantu')]
+    assert.deepEqual(dropRepeatedSentences(['Harganya 485.000 bos. Halo bos, ada yang bisa kami bantu'], priced).removed, [])
+    // Bubble daftar (baris baru) tidak diubah.
+    const list = 'Modelnya:\n- Basic Suit\n- Tuxedo'
+    assert.deepEqual(dropRepeatedSentences([list, 'Mau yang mana bos?'], [out(list)]).pesan, [list, 'Mau yang mana bos?'])
+    // Lebih dari 10 pesan keluar yang lalu → boleh dipakai lagi.
+    const old = [out('Siap bos, dicatat ya.'), ...Array.from({ length: 10 }, (_, index) => out(`pesan lain nomor ${'x'.repeat(index + 1)}`))]
+    assert.deepEqual(dropRepeatedSentences(['Oke bos. Siap bos, dicatat ya.'], old).removed, [])
+  })
+
+  test('kesal / pamit: tanpa susulan & tanpa tawaran tambahan; keberatan harga: tanpa susulan saja', ({ assert }) => {
+    const pamit = calmForFeeling(['Siap bos, gak apa-apa, kalau nanti mau lihat lagi kabari saya ya. Sekalian celananya juga bisa bos.'], 'pamit')
+    assert.isTrue(pamit.stopSusulan)
+    assert.deepEqual(pamit.pesan, ['Siap bos, gak apa-apa, kalau nanti mau lihat lagi kabari saya ya.'])
+    const price = calmForFeeling(['Kalau mau ambil yang lebih hemat ada Basic Suit 485.000 bos'], 'keberatan_harga')
+    assert.isTrue(price.stopSusulan)
+    assert.isFalse(price.changed)
+    assert.isFalse(calmForFeeling(['Jadi ambil yang mana bos?'], 'senang').stopSusulan)
+    assert.isFalse(calmForFeeling(['x'], undefined).stopSusulan)
+  })
+
+  test('ucapan selamat momen hanya sekali; bertanya dijawab "dicatat" ditandai', ({ assert }) => {
+    const rows = [out('Wah selamat ya bos, semoga lancar wisudanya'), inn('size M ready?', true)]
+    assert.deepEqual(dropRepeatedGreeting(['Selamat ya bos untuk wisudanya. Size M ready bos.'], rows).pesan, ['Size M ready bos.'])
+    assert.isFalse(dropRepeatedGreeting(['Wah selamat ya bos'], [out('Selamat pagi bos')]).changed)
+    assert.isTrue(notedInsteadOfAnswer(['Siap bos, dicatat ya'], 'bertanya'))
+    assert.isFalse(notedInsteadOfAnswer(['Iya bos, kancingnya 1, dicatat ya'], 'bertanya'))
+    assert.isFalse(notedInsteadOfAnswer(['Siap bos, dicatat ya'], 'meminta'))
   })
 })
