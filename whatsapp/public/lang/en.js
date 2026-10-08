@@ -2073,5 +2073,8 @@ window.waLocales.en = {
   "Draf sebelum diperbaiki": "Draft before the fix",
   "Dari chat nyata": "From real chats",
   "Pertanyaan dari chat nyata toko, sebagian dikombinasikan (bahasa, singkatan, salah ketik, dua maksud)": "Questions from real store chats, some combined (languages, abbreviations, typos, two intents)",
-  "rasa {0}/5": "human {0}/5"
+  "rasa {0}/5": "human {0}/5",
+  "Susulan bila pelanggan diam: {0}": "Follow-up if the customer goes quiet: {0}",
+  "Susulan dibatalkan pemeriksa: {0} · {1}": "Follow-up cancelled by the checker: {0} · {1}",
+  "Rasa bahasa: {0}": "Tone: {0}"
 }

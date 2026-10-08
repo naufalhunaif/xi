@@ -290,6 +290,7 @@
     if (result.nilai) summary.append(el('span', `${result.nilai}/5`, 'wa-sim-score'))
     if (result.manusia) summary.append(el('span', t('rasa {0}/5', result.manusia), 'wa-sim-score'))
     head.append(summary)
+    if (result.rasa) head.append(el('p', t('Rasa bahasa: {0}', result.rasa), 'wa-sim-feel'))
     if (result.masalah?.length) {
       const issues = el('ul', undefined, 'wa-sim-issues')
       for (const text of result.masalah) issues.append(el('li', text))
@@ -396,6 +397,16 @@
     })
     for (const text of rest) out.push(bubble(text))
     if (turn.total) out.push(bubble(turn.total, 'total'))
+    if (turn.susulan)
+      out.push(
+        el(
+          'div',
+          turn.susulan.kirim
+            ? t('Susulan bila pelanggan diam: {0}', turn.susulan.teks)
+            : t('Susulan dibatalkan pemeriksa: {0} · {1}', turn.susulan.asli, turn.susulan.alasan),
+          `wa-sim-room-msg out nudge${turn.susulan.kirim ? '' : ' cancelled'}`
+        )
+      )
     if (turn.serah_cs) out.push(el('div', t('Diserahkan ke CS · {0}', turn.alasan || ''), 'wa-sim-room-note'))
     if (turn.error) out.push(el('div', turn.error, 'wa-sim-room-note err'))
     const meta = [checkerNote(turn), turn.ms ? `${(turn.ms / 1000).toFixed(1)} s` : ''].filter(Boolean).join(' · ')

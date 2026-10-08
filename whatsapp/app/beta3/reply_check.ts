@@ -334,3 +334,84 @@ export function stripUnknownLinks(pesan: string[], allowedTexts: string[]) {
     .filter(Boolean)
   return { pesan: out.length ? out : pesan.map((bubble) => bubble.replace(LINK, '').trim()).filter(Boolean), removed }
 }
+
+/* ---------------- Susulan: perlu tidaknya & rasa bahasanya (v3.6.82) ---------------- */
+
+export type NudgeVerdict = { kirim: boolean; teks: string; alasan: string; oleh: 'ai' | 'jev' | 'tidak_dinilai' }
+
+const NUDGE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    keputusan: { type: 'string', enum: ['kirim', 'ubah', 'jangan'] },
+    susulan: { type: 'string', description: 'Bila "ubah": susulan yang ditulis ulang, satu kalimat chat santai seperti CS manusia.' },
+    alasan: { type: 'string' },
+  },
+  required: ['keputusan', 'susulan', 'alasan'],
+}
+
+/**
+ * Susulan (dikirim saat pelanggan diam) dinilai dulu: masih perlu dan nyambung? bahasanya seperti CS
+ * manusia, bukan bot/menagih? AI menilai + menulis ulang bila kaku; Jev ikut menilai (yakin "jangan" →
+ * tidak dikirim). Gagal menilai → dikirim apa adanya (perilaku lama).
+ */
+export async function reviewNudge(input: {
+  jid: string
+  settings: LeanProviderSettings
+  susulan: string
+  history: LeanHistoryRow[]
+  address?: string
+}): Promise<NudgeVerdict> {
+  const recent = input.history
+    .filter((row) => row.body || row.mediaType)
+    .slice(-8)
+    .map((row) => `${row.direction === 'in' ? 'Pelanggan' : 'Toko'}: ${row.mediaType ? `[${row.mediaType === 'image' ? 'foto' : row.mediaType}] ` : ''}${maskPii(String(row.body || '')).slice(0, 240)}`)
+  const state = { percakapan: recent, susulan: maskPii(input.susulan).slice(0, 400) }
+  const jevAsk = (await jevOn('cek_balasan'))
+    ? askJev(
+        'cek-susulan',
+        state,
+        {
+          susulan: {
+            type: 'choice',
+            instructions:
+              'Pelanggan belum membalas. Pantaskah CS manusia mengirim susulan ini sekarang (melihat percakapan)?',
+            criteria: {
+              kirim: 'Perlu dan wajar: membantu langkah berikutnya, nyambung dengan yang terakhir dibahas, tidak menagih',
+              jangan: 'Tidak perlu: pelanggan sudah pamit/menunda/menolak, semua sudah tuntas, mengulang pertanyaan yang belum dijawab pelanggan, atau terkesan menagih',
+              kaku: 'Isinya perlu tapi bahasanya kaku seperti bot / template',
+            },
+          },
+        },
+        { timeoutMs: 3000, jid: input.jid }
+      ).catch(() => null)
+    : Promise.resolve(null)
+  const aiAsk = runLeanProvider(
+    input.settings,
+    {
+      system: [
+        'Kamu CS senior toko jas. Pelanggan belum membalas pesan terakhir toko. Nilai SUSULAN yang akan dikirim otomatis. Balas HANYA JSON.',
+        '"jangan" bila: pelanggan sudah pamit/menunda/bilang nanti, sudah tuntas, susulan hanya mengulang pertanyaan yang belum dijawab pelanggan, menagih/memaksa, atau tidak nyambung.',
+        '"ubah" bila perlu tapi bahasanya kaku/template/terlalu panjang: tulis ulang satu kalimat chat santai, hangat, seperti CS manusia (sapaan "' + (input.address || 'bos') + '"), tetap membantu langkah berikutnya, tanpa angka baru.',
+        '"kirim" bila sudah wajar. alasan: satu kalimat.',
+      ].join('\n'),
+      user: JSON.stringify(state),
+    },
+    [],
+    'beta3-nudge-check',
+    NUDGE_SCHEMA,
+    { jid: input.jid, tier: 'standard' }
+  )
+    .then((reply) => JSON.parse(reply.text.slice(reply.text.indexOf('{'), reply.text.lastIndexOf('}') + 1)) as { keputusan?: string; susulan?: string; alasan?: string })
+    .catch(() => null)
+  const [jev, ai] = await Promise.all([jevAsk, aiAsk])
+  const jevAnswer = jev?.susulan
+  if (jevAnswer)
+    await logDecision({ jid: input.jid, decision: 'cek_balasan', answer: jevAnswer, used: confident('cek_balasan', jevAnswer), detail: 'susulan', input: `${recent.slice(-3).join('\n')}\nSusulan: ${state.susulan}` })
+  const jevSaysNo = jevAnswer?.type === 'choice' && jevAnswer.choice === 'jangan' && confident('cek_balasan', jevAnswer)
+  if (ai?.keputusan === 'jangan' || jevSaysNo)
+    return { kirim: false, teks: '', alasan: String(ai?.alasan || 'Jev: susulan tidak perlu').slice(0, 300), oleh: ai?.keputusan === 'jangan' ? 'ai' : 'jev' }
+  if (ai?.keputusan === 'ubah' && ai.susulan?.trim())
+    return { kirim: true, teks: ai.susulan.trim().slice(0, 400), alasan: String(ai.alasan || '').slice(0, 300), oleh: 'ai' }
+  return { kirim: true, teks: input.susulan, alasan: String(ai?.alasan || ''), oleh: ai ? 'ai' : jevAnswer ? 'jev' : 'tidak_dinilai' }
+}

@@ -85,7 +85,7 @@ import {
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
-import { alignPhotos, CHECK_LABEL, checkReply, mergeUsage, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, CHECK_LABEL, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
 /**
@@ -196,7 +196,7 @@ async function history(jid: string, currentIds: Set<string>, long = false): Prom
  */
 export function guardTotalPromise(
   pesan: string[],
-  options: { address: string; hasAddress: boolean; jev?: boolean }
+  options: { address: string; hasAddress: boolean; jev?: boolean; asked?: boolean }
 ) {
   const promise = /\b(ini|berikut|saya kirim\w*|kami kirim\w*|menyusul)\b[^.?!\n]*\btotal\w*\b[^.?!\n]*/i
   const promiseAfter = /\btotal\w*\b[^.?!\n]*\b(saya kirim\w*|kami kirim\w*|menyusul|dikirim\w*)\b[^.?!\n]*/i
@@ -215,7 +215,10 @@ export function guardTotalPromise(
   kept.push(
     options.hasAddress
       ? `Totalnya saya cek dulu ya ${options.address}`
-      : `Boleh kirim data pengirimannya dulu ${options.address}? (nama, alamat lengkap + kecamatan, kota, no HP) biar totalnya langsung saya kirim`
+      : options.asked
+        ? // v3.6.82: format data pengiriman sudah diminta → tidak diulang panjang (terasa seperti bot).
+          `Ditunggu data pengirimannya ya ${options.address}`
+        : `Boleh kirim data pengirimannya dulu ${options.address}? (nama, alamat lengkap + kecamatan, kota, no HP) biar totalnya langsung saya kirim`
   )
   return { pesan: kept, changed: true, waitCs: options.hasAddress }
 }
@@ -1642,9 +1645,31 @@ export async function createLeanReply(input: {
       hasAddress: rows.some(
         (row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos)\b/i.test(String(row.body || ''))
       ),
+      asked: rows.filter((row) => row.direction === 'out' && !row.current).slice(-3).some((row) => /data pengiriman|alamat lengkap/i.test(String(row.body || ''))),
     })
     if (guarded.changed) {
-      decision.pesan = guarded.pesan
+      // v3.6.82: kalimat yang dipotong pola sering patah ("rekeningnya nanti .", "DP-nya sekitar setengah
+      // dari") — AI menulis ulang dulu dengan bahasa wajar; hasilnya dicek pola yang sama, gagal → potongan lama.
+      const hasAddress = rows.some((row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos)\b/i.test(String(row.body || '')))
+      const asked = rows.filter((row) => row.direction === 'out' && !row.current).slice(-3).some((row) => /data pengiriman|alamat lengkap/i.test(String(row.body || '')))
+      const rewritten = await runLeanProvider(
+        settings,
+        {
+          system: prompt.system,
+          user: `${prompt.user}\n\nDRAF BALASANMU: ${JSON.stringify(decision.pesan)}\nMasalah: draf menjanjikan total/rekening, padahal total + rekening hanya dikirim SISTEM setelah ${hasAddress ? 'order dicek' : 'data pengiriman (nama, alamat lengkap + kecamatan, kota, no HP) masuk'}. Tulis ulang keputusan LENGKAP (JSON sama): jawab pertanyaan pelanggan dengan wajar seperti CS manusia, jangan tulis nomor rekening, jangan janji "saya kirim totalnya"; ${hasAddress ? 'bilang totalnya dicek dulu' : asked ? 'data pengiriman sudah diminta sebelumnya — jangan ulang format panjangnya, cukup ingatkan singkat bila perlu' : 'minta data pengirimannya secara singkat'}.`,
+        },
+        [],
+        'beta3-total-rewrite',
+        undefined,
+        { jid, tier: tierChoice.tier }
+      )
+        .then((made) => parseLeanDecision(made.text).pesan)
+        .catch(() => null)
+      const clean =
+        rewritten?.length &&
+        !guardTotalPromise(rewritten, { address: style?.address || 'bos', hasAddress }).changed &&
+        !rewritten.some((bubble) => /\d{9,}/.test(bubble.replace(/[\s.-]/g, '')))
+      decision.pesan = clean ? rewritten! : guarded.pesan
       if (guarded.waitCs) decision.tahap = 'tunggu_cs'
       onTrace?.({
         key: 'beta3-total',
@@ -1898,6 +1923,16 @@ export async function finishLeanGoal(
  * pesan baru sejak balasan AI (pesan terakhir di room adalah AI), dan room
  * tidak dipegang CS. Mengembalikan teks susulan atau null.
  */
+/**
+ * v3.6.82 — Susulan dinilai saat jatuh tempo (bukan saat balasan dibuat, supaya balasan tidak
+ * melambat): masih perlu? bahasanya seperti CS manusia? Tidak perlu → tidak dikirim; kaku → ditulis ulang.
+ */
+export async function vetLeanNudge(jid: string, text: string, settings: LeanSettings) {
+  const rows = await history(jid, new Set()).catch(() => [] as LeanHistoryRow[])
+  const style = await storeStyle(await listLeanExamples()).catch(() => null)
+  return reviewNudge({ jid, settings, susulan: text, history: rows, address: style?.address || 'bos' })
+}
+
 export async function claimLeanNudge(jid: string, now = new Date()) {
   const goal = await db.from('whatsapp_chat_goals').where('jid', jid).first()
   if (!goal || goal.status !== 'waiting' || !goal.next_run_at || new Date(goal.next_run_at) > now)

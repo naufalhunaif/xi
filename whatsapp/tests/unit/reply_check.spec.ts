@@ -465,3 +465,53 @@ test.group('warna: salah ketik & baby blue (v3.6.80)', () => {
     assert.equal(catalogColorSearchHints(['Blue Ice'])[0].catalogColor, 'blue ice')
   })
 })
+
+test.group('susulan dinilai: perlu tidaknya & rasa bahasa (v3.6.82)', (group) => {
+  group.each.setup(async () => {
+    const clean = () => db.from('whatsapp_beta3_state').whereIn('name', ['jev_key', 'jev_settings', 'jev_last_error']).delete().catch(() => {})
+    await clean()
+    return async () => {
+      setJevFetcher(null)
+      const { setLeanProviderOverride } = await import('#beta3/provider')
+      setLeanProviderOverride(null)
+      await clean()
+      resetJevCache()
+    }
+  })
+
+  test('AI: jangan → tidak dikirim; ubah → teks baru; Jev yakin "jangan" → tidak dikirim', async ({ assert }) => {
+    const { reviewNudge } = await import('#beta3/reply_check')
+    const { setLeanProviderOverride } = await import('#beta3/provider')
+    const { readSettings } = await import('#services/settings_service')
+    const settings = { ...(await readSettings(true)), aiProvider: 'chatgpt' } as any
+    const history = [
+      { direction: 'in' as const, body: 'oke nanti dulu ya min, gajian dulu', createdAt: new Date() },
+      { direction: 'out' as const, body: 'Siap bos, ditunggu kabarnya', createdAt: new Date() },
+    ]
+    let answer = { keputusan: 'jangan', susulan: '', alasan: 'Pelanggan menunda sampai gajian' }
+    setLeanProviderOverride(async ({ phase }) => (phase === 'beta3-nudge-check' ? JSON.stringify(answer) : '{}'))
+    const no = await reviewNudge({ jid: 'n@s.whatsapp.net', settings, susulan: 'Jadi gimana bos, mau order?', history })
+    assert.isFalse(no.kirim)
+    answer = { keputusan: 'ubah', susulan: 'Kalau mau lihat warna lain kabari aja ya bos', alasan: 'Lebih santai' }
+    const changed = await reviewNudge({ jid: 'n@s.whatsapp.net', settings, susulan: 'Apakah Anda ingin melanjutkan pemesanan?', history })
+    assert.deepEqual([changed.kirim, changed.teks], [true, 'Kalau mau lihat warna lain kabari aja ya bos'])
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    setJevFetcher((async () =>
+      new Response(JSON.stringify({ model: 'jev-test', answers: { susulan: choice('jangan', 0.95) } }), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch)
+    answer = { keputusan: 'kirim', susulan: '', alasan: 'ok' }
+    const jevNo = await reviewNudge({ jid: 'n@s.whatsapp.net', settings, susulan: 'Mau dibantu cek size bos?', history })
+    assert.isFalse(jevNo.kirim)
+    const listener = await readFile('commands/whatsapp_listen.ts', 'utf8')
+    assert.include(listener, 'vetLeanNudge(jid, nudge.text')
+  })
+})
+
+test.group('janji total: tidak mengulang format data pengiriman (v3.6.82)', () => {
+  test('sudah diminta → pengingat singkat; reply_service menulis ulang dulu', async ({ assert }) => {
+    const { guardTotalPromise } = await import('#beta3/reply_service')
+    const again = guardTotalPromise(['Siap bos, totalnya menyusul ya'], { address: 'bos', hasAddress: false, asked: true })
+    assert.deepEqual(again.pesan, ['Siap bos', 'Ditunggu data pengirimannya ya bos'])
+    const source = await readFile('app/beta3/reply_service.ts', 'utf8')
+    assert.include(source, "'beta3-total-rewrite'")
+  })
+})

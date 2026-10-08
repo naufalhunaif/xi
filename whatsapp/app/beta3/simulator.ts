@@ -18,6 +18,8 @@ import { pricePattern, renderPricePattern } from '#beta3/price_pattern'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { runLeanProvider } from '#beta3/provider'
 import { allowedPrices, unknownPrices } from '#beta3/quality_service'
+import { reviewNudge } from '#beta3/reply_check'
+import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { bubblesToSend, createLeanReply, type LeanSettings } from '#beta3/reply_service'
 import { renderProductionEstimate, type LeanHistoryRow } from '#beta3/prompt'
 import { generateScenarios, rng, roughen } from '#beta3/sim_generator'
@@ -55,6 +57,8 @@ export type SimTurn = {
   fotoUrl?: string[]
   /** Data alat yang dipakai AI giliran ini (ongkir, size, resi, ukuran) — untuk penilai. */
   alat?: string[]
+  /** Susulan bila pelanggan diam: rencana AI + hasil penilaian (v3.6.82). */
+  susulan?: { asli: string; kirim: boolean; teks: string; alasan: string }
   /** Draf AI sebelum ditulis ulang pemeriksa (bila ada) + catatan pemeriksanya. */
   draf?: { pesan: string[]; foto: string[]; masalah: string[] }
   balasan: string[]
@@ -72,8 +76,9 @@ export type SimResult = {
   judul: string
   lulus: boolean
   nilai: number | null
-  /** Rasa manusia 1–5 dari penilai (v3.6.80). */
+  /** Rasa manusia 1–5 dari penilai (v3.6.80) + catatannya (v3.6.82). */
   manusia?: number | null
+  rasa?: string
   masalah: string[]
   giliran: SimTurn[]
 }
@@ -155,6 +160,9 @@ export function transcript(turns: SimTurn[]) {
       ...turn.balasan.map((bubble) => `AI: ${bubble}`),
       ...turn.foto.map((caption) => `AI: [foto] ${caption}`),
       ...(turn.total ? [`Sistem: ${turn.total}`] : []),
+      ...(turn.susulan
+        ? [turn.susulan.kirim ? `(susulan bila pelanggan diam: ${turn.susulan.teks})` : `(susulan "${turn.susulan.asli}" DIBATALKAN pemeriksa: ${turn.susulan.alasan})`]
+        : []),
       ...(turn.serah_cs ? [`(diserahkan ke CS: ${turn.alasan})`] : []),
     ])
     .join('\n')
@@ -166,10 +174,11 @@ const JUDGE_SCHEMA = {
   properties: {
     nilai: { type: 'integer', description: '1 (buruk) – 5 (seperti CS terbaik)' },
     manusia: { type: 'integer', description: 'Rasa manusia 1 (kaku seperti bot) – 5 (seperti CS manusia terbaik toko ini)' },
+    rasa: { type: 'string', description: 'Satu-dua kalimat: bagian mana yang terasa bot/kaku dan contoh kalimat yang lebih manusia. Kosong bila sudah natural.' },
     lulus: { type: 'boolean' },
     masalah: { type: 'array', items: { type: 'string' } },
   },
-  required: ['nilai', 'manusia', 'lulus', 'masalah'],
+  required: ['nilai', 'manusia', 'rasa', 'lulus', 'masalah'],
 }
 
 async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTurn[], facts: string) {
@@ -179,6 +188,7 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
       system: [
         'Kamu auditor CS toko jas Chameleon Cloth. Nilai percakapan uji antara pelanggan dan AI CS. Balas HANYA JSON sesuai skema.',
         'Periksa ketat: (1) maksud pelanggan dipahami walau bahasanya tidak baku/daerah/salah ketik/tidak langsung; (2) setiap angka harga, warna, size ready, dan info toko benar menurut FAKTA; (3) foto yang dikirim persis sesuai yang diucapkan/dijanjikan balasan (tidak kurang, tidak lebih, tidak beda); (4) tidak mengarang, tidak mengulang pertanyaan yang sudah dijawab, tidak menyerahkan ke CS bila jawabannya ada di FAKTA; (5) gaya chat CS singkat dan sopan.',
+        'Baris "(susulan bila pelanggan diam: …)" dikirim otomatis bila pelanggan tidak membalas: nilai juga perlu tidaknya dan rasa manusianya (tidak menagih, tidak mengulang, nyambung).',
         'Baris "(data alat untuk AI — …)" adalah hasil alat toko (ongkir, size, resi) yang dibaca AI: angka yang cocok dengan data itu BENAR, bukan karangan.',
         'Rasa manusia (nilai manusia): balasan harus terasa seperti CS manusia toko ini — santai, singkat, hangat, bahasa chat sehari-hari, menjawab dulu baru bertanya, tidak kaku, tidak bertele-tele, tidak memakai daftar/format bila cukup satu kalimat, tidak mengulang sapaan atau kalimat template. Bila ada "Jawaban CS manusia waktu itu", jadikan acuan gaya (isi harga/stok tetap ikut FAKTA saat ini). Rasa robotik ≤ 2 = masalah.',
         'lulus = true hanya bila tidak ada kesalahan fakta, foto cocok, maksud terjawab, dan rasa manusia ≥ 3. masalah: kalimat pendek bahasa Indonesia, sebut giliran & kutip bagian yang salah. Tanpa masalah → [].',
@@ -194,6 +204,7 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
   const parsed = JSON.parse(reply.text.slice(reply.text.indexOf('{'), reply.text.lastIndexOf('}') + 1)) as {
     nilai?: number
     manusia?: number
+    rasa?: string
     lulus?: boolean
     masalah?: string[]
   }
@@ -201,6 +212,7 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
   return {
     nilai: Math.max(1, Math.min(5, Math.round(Number(parsed.nilai) || 1))),
     manusia: human,
+    rasa: String(parsed.rasa || '').slice(0, 500),
     lulus: parsed.lulus === true && human >= 3,
     masalah: (parsed.masalah || []).map(String).filter(Boolean).slice(0, 8),
   }
@@ -216,6 +228,9 @@ export async function judgeFacts(settings?: LeanSettings) {
     renderWholesaleRule(wholesaleDiscounts(wholesaleText)) || wholesaleText,
     renderPricePattern(pricePattern(digest.rows)),
     production,
+    // Kebijakan dasar yang juga diberikan ke AI (skill & pemeriksa COD).
+    'KEBIJAKAN: pembayaran transfer; COD/bayar di tempat, rekber, Shopee, Tokopedia tidak tersedia. Pengiriman JNE (REG/YES; kargo JTR min 8 kg).',
+    renderExchangePolicy((await readExchangePolicy().catch(() => ({ text: '' }))).text),
     digest.text,
   ]
     .filter(Boolean)
@@ -311,6 +326,10 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
     for (const bubble of rest) out(bubble)
     if (turn.total) out(turn.total)
     if (decision.catatan) await writeBeta3ChatNote(state.jid, decision.catatan)
+    if (decision.susulan && !decision.serah_cs) {
+      const verdict = await reviewNudge({ jid: state.jid, settings, susulan: decision.susulan, history: state.rows.map((row) => ({ ...row, current: false })) }).catch(() => null)
+      turn.susulan = { asli: decision.susulan, kirim: verdict?.kirim ?? true, teks: verdict?.teks || decision.susulan, alasan: verdict?.alasan || '' }
+    }
   } catch (error) {
     turn.error = error instanceof Error ? error.message.slice(0, 300) : String(error)
   } finally {
@@ -351,12 +370,14 @@ export async function runScenario(
     const masalah = deterministicIssues(scenario, turns, allowed)
     let nilai: number | null = null
     let manusia: number | null = null
+    let rasa = ''
     let judged = true
     if (options.judge !== false && !turns.some((turn) => turn.error)) {
       try {
         const verdict = await judge(settings, scenario, turns, options.facts || (await judgeFacts(settings)))
         nilai = verdict.nilai
         manusia = verdict.manusia
+        rasa = verdict.rasa
         judged = verdict.lulus
         masalah.push(...verdict.masalah.map((item) => `Penilai: ${item}`))
       } catch (error) {
@@ -365,7 +386,7 @@ export async function runScenario(
       }
     }
     const hard = masalah.filter((item) => !item.startsWith('Penilai'))
-    return { id: scenario.id, judul: scenario.judul, lulus: !hard.length && judged, nilai, manusia, masalah, giliran: turns }
+    return { id: scenario.id, judul: scenario.judul, lulus: !hard.length && judged, nilai, manusia, rasa, masalah, giliran: turns }
   } finally {
     await cleanupSim(state.jid)
   }

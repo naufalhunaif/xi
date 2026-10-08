@@ -2896,6 +2896,16 @@ export default class WhatsappListen extends BaseCommand {
     if (jid.endsWith('@ig')) return instagramNudge(jid).catch(() => {})
     const nudge = await beta3.claimLeanNudge(jid)
     if (!nudge) return
+    // v3.6.82: susulan dinilai dulu (perlu tidaknya + rasa bahasa manusia).
+    const nudgeSettings = await readSettings(true)
+    const vet = await beta3
+      .vetLeanNudge(jid, nudge.text, { ...nudgeSettings, aiProvider: nudgeSettings.aiProvider === 'claude' ? 'claude' : 'chatgpt' } as any)
+      .catch(() => null)
+    if (vet && !vet.kirim) {
+      this.logger.info(`Susulan ${jid} tidak dikirim: ${vet.alasan}`)
+      return
+    }
+    if (vet?.teks) nudge.text = vet.teks
     const canSend = async () =>
       (await this.waitForDeliverySync(socket)) && (await this.canSendAiReply(jid, socket))
     try {

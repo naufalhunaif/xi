@@ -49,7 +49,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     serah_cs: {
       type: 'boolean',
       description:
-        'true hanya untuk keputusan bisnis di luar wewenang (komplain, refund, hal yang skill sebut serah CS). Diskon/potongan: jawab sendiri dari DISKON GROSIR (di bawah syarat = harga normal), bukan serah CS. Saat true, pesan TETAP diisi satu kalimat singkat untuk pelanggan sesuai topiknya — pelanggan tidak boleh didiamkan.',
+        'true hanya untuk keputusan bisnis di luar wewenang (komplain, refund, tawaran kerja sama dari bisnis lain, hal yang skill sebut serah CS). Diskon/potongan: jawab sendiri dari DISKON GROSIR (di bawah syarat = harga normal), bukan serah CS. Saat true, pesan TETAP diisi satu kalimat singkat untuk pelanggan sesuai topiknya — pelanggan tidak boleh didiamkan.',
     },
     alasan: { type: 'string', description: 'Satu kalimat alasan keputusan untuk audit CS.' },
     spesifikasi: {
