@@ -396,3 +396,8 @@ Perubahan v3.6.6:
 - Akun AI yang lama tidak dipakai dicek otomatis (satu akun tiap 5 menit, pesan uji sangat kecil). Akun yang gagal atau lambat (> 45 detik) dijeda sebelum dipakai membalas pelanggan; akun yang baru pulih dari gagal dicek ulang dulu.
 - Skill yang diperbarui dari rilis online kini membawa ringkasannya (DIGEST.md), jadi ringkasan tetap terpakai sebelum `wa update` (prompt ±2.300 token lebih kecil).
 
+## v3.6.58 — Foto tidak diulang, jawaban AI tetap utuh
+
+- Bila sistem melengkapi foto, jawaban AI yang berisi saran/alasan ("untuk gaya gen z biasanya pilih slimfit …") tidak lagi diganti "Ini fotonya bos". Ringkasan hanya untuk balasan yang sekadar menyebut nama model (nama sudah ada di caption).
+- Foto ikut dikirim → tawaran "Mau lihat modelnya bos?" dibuang (dulu pelanggan jawab "Boleh" dan foto yang sama terkirim lagi). Tawaran "model lainnya" tetap.
+- Foto yang sama sudah dikirim dalam 12 pesan keluar terakhir (≤ 6 jam) tidak dikirim lagi; pengantar menjadi "Fotonya sudah saya kirim di atas bos …". Pelanggan minta "kirim ulang" / "fotonya gak muncul" → dikirim lagi. Jejak: "Foto tidak diulang".

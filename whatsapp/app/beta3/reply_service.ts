@@ -69,7 +69,7 @@ import { focusCatalog, promptNeeds, quickReply, skillContext, trimSkill } from '
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
-import { completePhotos, polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { completePhotos, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -1598,7 +1598,14 @@ export async function createLeanReply(input: {
     decision.foto = [...decision.foto, ...missing]
     onTrace?.({ key: 'beta3-photo-complete', label: `Foto dilengkapi · ${missing.join(', ')}`, status: 'completed', detail: { ditambah: missing } })
   }
-  const photos = resolvePhotos(digest.rows, decision.foto)
+  let photos = resolvePhotos(digest.rows, decision.foto)
+  // v3.6.58: foto yang baru saja dikirim tidak diulang (kecuali pelanggan minta kirim ulang).
+  const fresh = skipSentPhotos(photos, rows, input.text)
+  if (fresh.repeated.length) {
+    photos = fresh.photos
+    if (!photos.length) decision.pesan = pointToSentPhotos(decision.pesan)
+    onTrace?.({ key: 'beta3-photo-repeat', label: `Foto tidak diulang · ${fresh.repeated.join(', ')}`, status: 'completed', detail: { dilewati: fresh.repeated } })
+  }
   // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
   if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')
   // v3.6.55: diserahkan ke CS tetap dibalas singkat — dulu pesan dibuang dan pelanggan didiamkan.

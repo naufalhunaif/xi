@@ -23,6 +23,9 @@ export function dropWrongOpener(pesan: string[], customerText: string) {
 const SEE_REQUEST = /\b(seperti apa|kayak apa|kaya apa|kek apa|modelnya gimana|gimana modelnya|liat|lihat|foto|fotonya|gambar)\b/i
 const ASKS_DETAIL = /\b(beda|bedanya|perbedaan|kerah|kancing|bahan|detail|size|ukuran|ready|stok)\b/i
 const SIZE_INFO = /\b(size|ready|stok|xs|s|m|l|xl|xxl|[2-4]xl)\b/i
+/** Kata saran/alasan: bubble seperti ini adalah jawaban, bukan sekadar daftar nama di caption foto. */
+const ADVICE =
+  /\b(untuk|buat|cocok|biasanya|karena|soalnya|lebih|kalau|kalo|rekomendasi|saran\w*|pilih|gaya|acara|style|slim\w*|regular|nyaman|kesan|elegan|formal|santai|simpel|simple)\b/i
 
 /**
  * Pelanggan minta lihat ("seperti apa?") dan foto dikirim: nama produk & warna sudah ada di caption
@@ -46,6 +49,9 @@ export function compactPhotoIntro(
         .filter((part) => part.length >= 3)
     )
   )
+  // v3.6.58: jawaban yang berisi saran/alasan ("untuk gaya gen z biasanya pilih slimfit …") tetap
+  // utuh — dulu ikut diringkas jadi "Ini fotonya bos" sehingga pertanyaan pelanggan tidak terjawab.
+  if (ADVICE.test(first)) return pesan
   const mentioned = [...names].filter((name) => first.toLowerCase().includes(name)).length
   if (mentioned < 2 && first.length <= 90) return pesan
   const prices = [...new Set(first.match(/\d{1,3}(?:\.\d{3})+/g) || [])]
@@ -119,6 +125,68 @@ export function polishText(pesan: string[], context: PolishContext) {
   return { pesan: out, priceChanges: priceFix.changes }
 }
 
+/** Kalimat tawaran "mau lihat modelnya?" / "mau saya kirim fotonya?" (bukan "model lainnya"). */
+const PHOTO_OFFER =
+  /[^.!?\n]*\b(?:mau|boleh|perlu|ingin|pengen)\b[^.!?\n]{0,20}\b(?:lihat|liat|kirim\w*|tunjuk\w*)\b[^.!?\n]{0,15}\b(?:foto|gambar|model|contoh)\w*\b(?![^.!?\n]*\blain)[^.!?\n]*\?/gi
+
+/**
+ * v3.6.58 — foto sudah ikut dikirim, jadi tawaran "Mau lihat modelnya bos?" dibuang (kasus Nofita:
+ * foto terkirim lalu ditanya "mau lihat?", pelanggan jawab "Boleh" → foto yang sama dikirim lagi).
+ */
+export function dropPhotoOffers(pesan: string[], photoCount: number) {
+  if (!photoCount) return pesan
+  const kept = pesan
+    .map((bubble) => (bubble.match(PHOTO_OFFER) ? bubble.replace(PHOTO_OFFER, '').replace(/^[\s,.!]+/, '').replace(/[ \t]{2,}/g, ' ').trim() : bubble))
+    .filter(Boolean)
+  return kept
+}
+
+const NORM = (value: string) => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim()
+/** Pelanggan minta foto dikirim ulang / foto tidak muncul. */
+const ASKS_AGAIN =
+  /\b(?:kirim\w*|foto\w*|gambar\w*)\s+(?:lagi|ulang)\b|\bulang\w*\s+(?:foto|gambar)|\b(?:gak|ga|gk|nggak|ngga|tidak|belum|blm)\s+(?:muncul|masuk|keliatan|kelihatan|terlihat|kebuka|kebuka)\b/i
+
+type SentRow = { direction: string; body?: unknown; current?: boolean; createdAt?: unknown }
+
+/**
+ * v3.6.58 — foto yang sama baru saja dikirim (caption ada di pesan keluar terakhir: WA = caption
+ * gambar, IG = teks caption sesudah gambar) tidak dikirim lagi, kecuali pelanggan minta ulang.
+ */
+export function skipSentPhotos<P extends { caption: string }>(
+  photos: P[],
+  rows: SentRow[],
+  customerText: string,
+  options: { now?: number; window?: number; maxAgeMs?: number } = {}
+) {
+  if (!photos.length || ASKS_AGAIN.test(customerText || '')) return { photos, repeated: [] as string[] }
+  const now = options.now ?? Date.now()
+  const maxAge = options.maxAgeMs ?? 6 * 60 * 60_000
+  const sent = new Set(
+    rows
+      .filter((row) => row.direction !== 'in' && !row.current)
+      .slice(-(options.window ?? 12))
+      .filter((row) => {
+        const at = row.createdAt ? new Date(row.createdAt as any).getTime() : NaN
+        return !Number.isFinite(at) || now - at <= maxAge
+      })
+      .map((row) => NORM(String(row.body || '')))
+      .filter(Boolean)
+  )
+  const repeated = photos.filter((photo) => sent.has(NORM(photo.caption))).map((photo) => photo.caption)
+  return { photos: photos.filter((photo) => !sent.has(NORM(photo.caption))), repeated }
+}
+
+/** Semua foto sudah dikirim sebelumnya: "Ini fotonya bos" → "Fotonya sudah saya kirim di atas bos". */
+export function pointToSentPhotos(pesan: string[]) {
+  const intro = /\b(?:ini|berikut)\s+(?:(?:contoh|untuk)\s+)?(?:foto|gambar)(?:nya)?\b/i
+  let done = false
+  return pesan.map((bubble) => {
+    if (done || !intro.test(bubble)) return bubble
+    done = true
+    return bubble.replace(intro, (_match, offset: number) => (offset === 0 ? 'Fotonya sudah saya kirim di atas' : 'fotonya sudah saya kirim di atas'))
+  })
+}
+
 /** Perapian yang butuh daftar foto (di akhir): pengantar foto & urutan jawaban → foto → pertanyaan. */
 export function polishWithPhotos(
   pesan: string[],
@@ -126,5 +194,7 @@ export function polishWithPhotos(
   customerText: string,
   address = 'bos'
 ) {
-  return compactPhotoIntro(questionAfterPhotos(pesan, photos.length), photos, customerText, address)
+  let ordered = dropPhotoOffers(questionAfterPhotos(pesan, photos.length), photos.length)
+  if (!ordered.length) ordered = [`Ini fotonya ${address}`]
+  return compactPhotoIntro(ordered, photos, customerText, address)
 }
