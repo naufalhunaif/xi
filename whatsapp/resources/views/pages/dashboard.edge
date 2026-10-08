@@ -768,6 +768,27 @@
                     <ul id="jevRecent" class="wa-quality-list"><li><div class="wa-loading" data-i18n="Memuat…">Memuat…</div></li></ul>
                   </div>
                 </section>
+                <section id="settings-maps" data-settings-panel="maps" aria-labelledby="settings-title-maps">
+                  <h3 class="wa-settings-section-title" id="settings-title-maps">Google Maps</h3>
+                  <div class="wa-card">
+                    <div class="wa-card-head">
+                      <div class="wa-card-title">
+                        <strong><svg class="wa-i" aria-hidden="true"><use href="#i-pin"/></svg>Google Maps</strong>
+                        <small data-i18n="Cari alamat pelanggan (link peta, nama tempat/usaha) lalu cocokkan ke tujuan ekspedisi">Cari alamat pelanggan (link peta, nama tempat/usaha) lalu cocokkan ke tujuan ekspedisi</small>
+                      </div>
+                      <div class="actions"><span id="mapsState" class="wa-pill"><span class="wa-loading inline" data-i18n="Memuat…">Memuat…</span></span></div>
+                    </div>
+                    <div class="wa-form-grid">
+                      <label class="wa-span-full"><span data-i18n="Kunci API (Places API & Geocoding API)">Kunci API (Places API & Geocoding API)</span><input id="mapsKey" type="password" autocomplete="off" data-settings-ignore placeholder="AIza…" /></label>
+                    </div>
+                    <div class="actions wa-actions-start">
+                      <button id="mapsSave" type="button" class="button primary" data-i18n="Simpan">Simpan</button>
+                      <button id="mapsTest" type="button" class="button" data-i18n="Uji koneksi">Uji koneksi</button>
+                      <button id="mapsRemove" type="button" class="button" hidden data-i18n="Hapus kunci">Hapus kunci</button>
+                      <small id="mapsStatus" role="status" aria-live="polite"></small>
+                    </div>
+                  </div>
+                </section>
                 </div>
                 <div class="wa-settings-view" data-settings-view="store" hidden>
                   <h2 class="wa-settings-view-title" data-i18n="Toko">Toko</h2>

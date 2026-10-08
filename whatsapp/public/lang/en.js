@@ -2090,4 +2090,10 @@ window.waLocales.en = {
   "Kuota AI menipis — uji dihentikan agar pelanggan tetap dilayani": "AI quota is running low — testing stopped so customers keep getting replies",
   "Tidak ada akun AI yang siap": "No AI account is ready",
   "ingatan {0} pelanggan": "memory for {0} customers",
+  "Cari alamat pelanggan (link peta, nama tempat/usaha) lalu cocokkan ke tujuan ekspedisi": "Find customer addresses (map links, place or business names) and match them to shipping destinations",
+  "Kunci API (Places API & Geocoding API)": "API key (Places API & Geocoding API)",
+  "Hapus kunci": "Remove key",
+  "Tersimpan.": "Saved.",
+  "Menguji…": "Testing…",
+  "Tersambung ({0} ms): {1}": "Connected ({0} ms): {1}",
 }

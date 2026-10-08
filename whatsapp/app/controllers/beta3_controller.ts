@@ -1,4 +1,5 @@
 // Beta 3 — salinan terisolasi dari LeanController; hanya menyentuh #beta3/*.
+import { googleSearch, mapsStatus, saveMapsKey } from '#beta3/google_maps'
 import { scanShipments } from '#beta3/shipments'
 import type { HttpContext } from '@adonisjs/core/http'
 import { catalogDigest, importLeanCatalog, rupiah } from '#beta3/catalog_service'
@@ -760,6 +761,27 @@ export default class Beta3Controller {
   }
 
   /** Pengaturan → Jev: status, kunci API (terenkripsi), saklar per keputusan. */
+  /** v3.6.98 — Pengaturan Google Maps (pencarian lokasi pelanggan). */
+  async maps({ response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    return response.json(await mapsStatus())
+  }
+
+  async saveMaps({ request, response }: HttpContext) {
+    const body = request.body() as Record<string, unknown>
+    if (body.removeKey === true) return response.json(await saveMapsKey(''))
+    const key = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
+    if (!key) return response.badRequest({ error: 'Isi kunci API dulu.' })
+    return response.json(await saveMapsKey(key))
+  }
+
+  async testMaps({ response }: HttpContext) {
+    const started = Date.now()
+    const place = await googleSearch('Patimuan Cilacap').catch(() => null)
+    if (!place) return response.badRequest({ error: (await mapsStatus()).lastError || 'Google Maps belum bisa dipakai.' })
+    return response.json({ ok: true, ms: Date.now() - started, display: place.display, kecamatan: place.names[0] || '', kota: place.city })
+  }
+
   async jev({ response }: HttpContext) {
     response.header('cache-control', 'no-store')
     return response.json(await jevStatus())

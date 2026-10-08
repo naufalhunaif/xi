@@ -890,6 +890,8 @@ test.group('Beta3 · temuan putaran 11 (v3.6.91)', () => {
 
 test.group('Beta3 · cari lokasi di peta (v3.6.92)', () => {
   test('nama tempat → OpenStreetMap → tujuan ekspedisi; link share.google → alamat panel', async ({ assert }) => {
+    // Hasil pencarian lokasi disimpan 30 hari di basis data: mulai bersih supaya uji tidak memakai sisa uji lain.
+    await db.from('whatsapp_beta3_state').where('name', 'like', 'geo:%').delete().catch(() => 0)
     const { lookupPlace, parseAddress, placeQueries, setGeoFetcher, mapLink, parseMapUrl } = await import('#beta3/place_lookup')
     const asked: string[] = []
     setGeoFetcher(async (url) => {
@@ -1065,6 +1067,8 @@ test.group('Beta3 · ingatan pelanggan dari chat lama (v3.6.96)', () => {
 
 test.group('Beta3 · cari alamat di internet (v3.6.97)', () => {
   test('link nama usaha tidak ada di peta → pencarian internet → tujuan ekspedisi', async ({ assert }) => {
+    // Hasil pencarian lokasi disimpan 30 hari di basis data: mulai bersih supaya uji tidak memakai sisa uji lain.
+    await db.from('whatsapp_beta3_state').where('name', 'like', 'geo:%').delete().catch(() => 0)
     const { lookupPlace, setGeoFetcher } = await import('#beta3/place_lookup')
     setGeoFetcher(async (url) =>
       ({ ok: true, url: String(url).includes('share.google') ? 'https://www.google.com/search?q=CV.+USAHA+UJI97' : String(url), json: async () => [], text: async () => '' }) as any
@@ -1089,5 +1093,55 @@ test.group('Beta3 · cari alamat di internet (v3.6.97)', () => {
     const { WEB_PHASES } = await import('#beta3/provider')
     assert.isTrue(WEB_PHASES.has('beta3-web-place'))
     assert.isFalse(WEB_PHASES.has('beta3-reply'))
+  })
+})
+
+test.group('Beta3 · Google Maps (v3.6.98)', () => {
+  test('Places Text Search → kecamatan/kab/kode pos → tujuan; tanpa kunci tidak dipakai', async ({ assert }) => {
+    // Hasil pencarian lokasi disimpan 30 hari di basis data: mulai bersih supaya uji tidak memakai sisa uji lain.
+    await db.from('whatsapp_beta3_state').where('name', 'like', 'geo:%').delete().catch(() => 0)
+    const { setMapsFetcher, setMapsKeyForTest, googleSearch, placeFromComponents } = await import('#beta3/google_maps')
+    const { lookupPlace, setGeoFetcher } = await import('#beta3/place_lookup')
+    const calls: string[] = []
+    setMapsFetcher(async (url) => {
+      calls.push(String(url))
+      return {
+        ok: true,
+        json: async () => ({
+          places: [
+            {
+              displayName: { text: 'CV. Usaha Uji98' },
+              formattedAddress: 'Jagong, Kec. Pangkajene, Kabupaten Pangkajene Dan Kepulauan, Sulawesi Selatan 90612',
+              addressComponents: [
+                { longText: 'Jagong', types: ['administrative_area_level_4', 'political'] },
+                { longText: 'Kecamatan Pangkajene', types: ['administrative_area_level_3', 'political'] },
+                { longText: 'Kabupaten Pangkajene Dan Kepulauan', types: ['administrative_area_level_2', 'political'] },
+                { longText: '90612', types: ['postal_code'] },
+              ],
+              location: { latitude: -4.8, longitude: 119.5 },
+            },
+          ],
+        }),
+      } as any
+    })
+    setGeoFetcher(async () => ({ ok: true, url: 'https://www.google.com/search?q=CV.+Usaha+Uji98', json: async () => [], text: async () => '' }) as any)
+    try {
+      setMapsKeyForTest('')
+      assert.isNull(await googleSearch('apa saja'))
+      setMapsKeyForTest('uji-key')
+      const place = await googleSearch('CV. Usaha Uji98')
+      assert.deepEqual([place?.names, place?.city, place?.postcode], [['Pangkajene', 'Jagong'], 'Pangkajene Dan Kepulauan', '90612'])
+      const found = await lookupPlace(
+        { text: 'kirim ke sini https://share.google/uji98' },
+        async (q) => (q === 'Pangkajene' ? [{ code: 'PKJ1', district: 'PANGKAJENE', city: 'PANGKAJENE KEPULAUAN', zip_code: '90612' }] : [])
+      )
+      assert.deepEqual(found?.rows.map((row) => row.code), ['PKJ1'])
+      assert.isTrue(calls.some((url) => url.includes('places.googleapis.com')))
+    } finally {
+      setMapsFetcher(null)
+      setGeoFetcher(null)
+      setMapsKeyForTest(null)
+    }
+    assert.isNull(placeFromComponents('x', []))
   })
 })

@@ -4,6 +4,7 @@
 // Hasil disimpan 30 hari supaya tidak mencari ulang (batas Nominatim 1 permintaan/detik).
 import { readLeanState, writeLeanState } from '#beta3/tables'
 import type { DestinationRow } from '#beta3/mcp'
+import { googleReverse, googleSearch, readMapsKey } from '#beta3/google_maps'
 
 export type GeoPlace = {
   display: string
@@ -229,6 +230,24 @@ export type LookupTrail = string[]
  * Cari tujuan dari link peta di pesan, atau dari nama tempat yang tidak dikenal ekspedisi.
  * null bila tidak ketemu (AI lalu menanyakan kecamatan seperti biasa).
  */
+/** Google Maps (bila kunci diisi), hasil disimpan 30 hari supaya hemat biaya API. */
+async function viaGoogle(key: string, load: () => Promise<GeoPlace | null>, trail: LookupTrail) {
+  if (!(await readMapsKey())) return null
+  // Hanya hasil yang ketemu disimpan (kunci salah / gangguan sesaat tidak membuat "tidak ketemu" 30 hari).
+  const name = `geo:g:${key.slice(0, 180)}`
+  let place: GeoPlace | null = null
+  try {
+    const hit = JSON.parse(String((await readLeanState(name).catch(() => '')) || 'null')) as { at: number; value: GeoPlace } | null
+    if (hit && Date.now() - hit.at < CACHE_MS) place = hit.value
+  } catch {}
+  if (!place) {
+    place = await load().catch(() => null)
+    if (place) await writeLeanState(name, JSON.stringify({ at: Date.now(), value: place })).catch(() => {})
+  }
+  trail.push(`google maps → ${place ? `${place.display.slice(0, 120)} | ${place.names.join('/')} | ${place.city} | ${place.postcode}` : 'tidak ketemu'}`)
+  return place
+}
+
 /** Pencarian internet oleh AI (WebSearch) untuk nama usaha/tempat yang tidak ada di peta terbuka. */
 export type WebPlaceSearch = (query: string) => Promise<{ alamat?: string; kecamatan?: string; kabupaten?: string; kode_pos?: string } | null>
 
@@ -247,6 +266,9 @@ export async function lookupPlace(
     const target = await resolveMapLink(link)
     trail.push(`link → ${JSON.stringify(target).slice(0, 240)}`)
     if (target.address) place = parseAddress(target.address)
+    // v3.6.98: Google Maps dulu (bila kuncinya diisi), seperti CS membuka Google Maps.
+    if (!place && target.lat !== undefined && target.lon !== undefined) place = await viaGoogle(`r:${target.lat.toFixed(5)},${target.lon.toFixed(5)}`, () => googleReverse(target.lat!, target.lon!), trail)
+    if (!place && target.name) place = await viaGoogle(`q:${target.name.toLowerCase()}`, () => googleSearch(target.name!), trail)
     if (!place && target.lat !== undefined && target.lon !== undefined) place = await reverseGeocode(target.lat, target.lon)
     if (!place && target.name) {
       place = await geocode(target.name)
@@ -257,6 +279,7 @@ export async function lookupPlace(
   }
   // Alamat lengkap yang ditempel pelanggan ("…, Kec. Pagedangan, Kabupaten Tangerang, Banten 15339").
   if (!place) place = parseAddress(input.text)
+  if (!place && input.place) place = await viaGoogle(`q:${input.place.toLowerCase()}`, () => googleSearch(placeQueries(input.place!)[0] || input.place!), trail)
   if (!place && input.place) {
     for (const query of placeQueries(input.place)) {
       place = await geocode(query)
