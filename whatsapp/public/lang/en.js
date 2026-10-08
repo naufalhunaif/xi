@@ -2070,5 +2070,8 @@ window.waLocales.en = {
   "Tulis pesan sebagai pelanggan. Tidak ada yang dikirim ke WhatsApp.": "Write as the customer. Nothing is sent to WhatsApp.",
   "Balasan sebelumnya masih diproses.": "The previous reply is still being processed.",
   "Pesan kosong.": "Empty message.",
-  "Draf sebelum diperbaiki": "Draft before the fix"
+  "Draf sebelum diperbaiki": "Draft before the fix",
+  "Dari chat nyata": "From real chats",
+  "Pertanyaan dari chat nyata toko, sebagian dikombinasikan (bahasa, singkatan, salah ketik, dua maksud)": "Questions from real store chats, some combined (languages, abbreviations, typos, two intents)",
+  "rasa {0}/5": "human {0}/5"
 }

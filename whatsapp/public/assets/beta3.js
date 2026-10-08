@@ -288,6 +288,7 @@
     const summary = el('summary')
     summary.append(el('span', '', `wa-st ${result.lulus ? 'ok' : 'err'}`), el('span', result.judul, 'wa-sim-title'))
     if (result.nilai) summary.append(el('span', `${result.nilai}/5`, 'wa-sim-score'))
+    if (result.manusia) summary.append(el('span', t('rasa {0}/5', result.manusia), 'wa-sim-score'))
     head.append(summary)
     if (result.masalah?.length) {
       const issues = el('ul', undefined, 'wa-sim-issues')
@@ -344,9 +345,13 @@
     }
   }
   byId('beta3SimRun').addEventListener('click', () => startSim({}))
+  byId('beta3SimReal').addEventListener('click', () => {
+    const count = Math.max(1, Math.min(300, Number(byId('beta3SimGenCount').value) || 50))
+    startSim({ real: count, parallel: 3 })
+  })
   byId('beta3SimGenerate').addEventListener('click', () => {
     const count = Math.max(1, Math.min(500, Number(byId('beta3SimGenCount').value) || 50))
-    startSim({ generate: count })
+    startSim({ generate: count, parallel: 3 })
   })
 
   // v3.6.79 Ruang simulasi: tonton uji yang berjalan, atau chat sendiri sebagai pelanggan.

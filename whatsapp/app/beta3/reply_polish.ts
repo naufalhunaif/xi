@@ -179,8 +179,14 @@ export function skipSentPhotos<P extends { caption: string }>(
 /** Semua foto sudah dikirim sebelumnya: "Ini fotonya bos" → "Fotonya sudah saya kirim di atas bos". */
 export function pointToSentPhotos(pesan: string[]) {
   const intro = /\b(?:ini|berikut)\s+(?:(?:contoh|untuk)\s+)?(?:foto|gambar)(?:nya)?\b/i
+  // v3.6.80: pengantar pendek tanpa kata "foto" ("Ini bos") juga — dulu terkirim tanpa fotonya.
+  const bare = /^\s*(?:ini|berikut|nih)(?:\s+(?:ya|nih|dia))?(?:\s+(?:bos|kak|gan|min|mas|mbak|sis))?\s*[.!]*\s*$/i
   let done = false
   return pesan.map((bubble) => {
+    if (!done && bare.test(bubble)) {
+      done = true
+      return `Fotonya sudah saya kirim di atas ${bubble.match(/\b(bos|kak|gan|min|mas|mbak|sis)\b/i)?.[1] || 'bos'}`
+    }
     if (done || !intro.test(bubble)) return bubble
     done = true
     return bubble.replace(intro, (_match, offset: number) => (offset === 0 ? 'Fotonya sudah saya kirim di atas' : 'fotonya sudah saya kirim di atas'))

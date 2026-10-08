@@ -350,6 +350,16 @@ export function groupDestinations(rows: DestinationRow[]): DestinationArea[] {
 
 /** Pilihan kecamatan yang cocok dengan jawaban pelanggan ("jakarta selatan", "yang depok"). */
 export function pickArea(reply: string, areas: DestinationArea[]): DestinationArea | null {
+  // v3.6.80: jawaban "kab"/"kabupaten" atau "kota" untuk pilihan Kabupaten X / Kota X (uji: "kab" tidak
+  // dikenali sehingga ongkir tidak pernah dicek).
+  const text = reply.toLowerCase()
+  const wantsKab = /\b(?:kab|kabupaten)\b/.test(text)
+  const wantsKota = /\bkota\b/.test(text)
+  if (wantsKab !== wantsKota) {
+    const isKab = (area: DestinationArea) => /^kab\b|kabupaten/i.test(String(area.city || ''))
+    const side = areas.filter((area) => (wantsKab ? isKab(area) : !isKab(area)))
+    if (side.length === 1) return side[0]
+  }
   const words = normalizeCity(reply)
     .replace(/\b(yang|bos|kak|gan|ya|aja|saja|dong)\b/g, ' ')
     .split(/\s+/)
@@ -383,7 +393,8 @@ export function renderFitResult(
     .filter((item) => item.percentage > 0)
     .map((item) => `${item.label} ${item.percentage}%`)
     .join(', ')
-  return `REKOMENDASI SIZE (Fit Advisor, TB ${measure.height} / BB ${measure.weight}, ${type === 'pants' ? 'celana' : 'jas'}): ${fit.recommended_size}${alternatives ? ` (${alternatives})` : ''}. Sampaikan sebagai rekomendasi, tetap konfirmasi ke pelanggan.`
+  // v3.6.80: rekomendasi jas tidak memuat nomor celana (uji: AI menebak "celana no 33" dari TB/BB).
+  return `REKOMENDASI SIZE (Fit Advisor, TB ${measure.height} / BB ${measure.weight}, ${type === 'pants' ? 'celana' : 'jas'}): ${fit.recommended_size}${alternatives ? ` (${alternatives})` : ''}. Sampaikan sebagai rekomendasi, tetap konfirmasi ke pelanggan.${type === 'pants' ? '' : ' Nomor celana TIDAK termasuk: jangan ditebak, tanyakan nomor/lingkar pinggang biasanya bila celana ikut.'}`
 }
 
 export type ShippingRates = {

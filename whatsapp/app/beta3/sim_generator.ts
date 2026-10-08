@@ -103,9 +103,20 @@ export function typo(rand: Rand, word: string) {
   }
 }
 
-/** Acak cara bicara: sapaan, singkatan, salah ketik, huruf besar, akhiran, tanda baca. */
+/** Campur bahasa: sebagian kata diganti Inggris / Jawa / Sunda / Medan. */
+const CODE_MIX: Array<[RegExp, string[]]> = [
+  [/\b(?:berapa|brp)\b/g, ['how much', 'piro', 'sabaraha', 'berapa rupanya', 'brp sih']],
+  [/\b(?:ada|ready)\b/g, ['available', 'ono', 'aya', 'ready gak', 'ada gak']],
+  [/\bukuran\b/g, ['size', 'ukurane', 'ukuranna']],
+  [/\bharga\b/g, ['price', 'regane', 'hargina']],
+  [/\bmau\b/g, ['pengen', 'arep', 'hoyong', 'want']],
+  [/\bkirim\b/g, ['ship', 'kirimke', 'kirimkeun']],
+]
+
+/** Acak cara bicara: sapaan, singkatan, salah ketik, campur bahasa, huruf dipanjangkan, emoji. */
 export function roughen(rand: Rand, text: string) {
   let out = text
+  for (const [pattern, options] of CODE_MIX) if (chance(rand, 0.25)) out = out.replace(pattern, () => pick(rand, options))
   for (const [pattern, options] of ABBREVIATE) if (chance(rand, 0.6)) out = out.replace(pattern, () => pick(rand, options))
   out = out
     .split(' ')
@@ -114,6 +125,9 @@ export function roughen(rand: Rand, text: string) {
   if (chance(rand, 0.45)) out = `${pick(rand, GREET)}${chance(rand, 0.5) ? ',' : ''} ${out}`
   const tail = pick(rand, TAIL)
   if (tail) out = `${out} ${tail}`
+  // Huruf dipanjangkan ("brpppp", "dongg") dan emoji di tengah.
+  if (chance(rand, 0.2)) out = out.replace(/\b(\w*?)([aiueopg])\b/, (_, head, letter) => `${head}${letter.repeat(2 + Math.floor(rand() * 3))}`)
+  if (chance(rand, 0.15)) out = `${out} ${pick(rand, ['😅', '🙏🙏', '👍', '🤔', '😭', 'wkwk', 'hehe'])}`
   if (chance(rand, 0.08)) out = out.toUpperCase()
   if (chance(rand, 0.3)) out = out.replace(/[?.!,]/g, '')
   return out.replace(/\s+/g, ' ').trim()
@@ -303,7 +317,7 @@ const MAKERS: Record<string, Maker> = {
     return {
       id: `gen-lanjut-${n}`,
       judul: `Harga lalu foto · ${caption(row)}`,
-      maksud: `Pelanggan menanyakan harga ${caption(row)}, lalu minta fotonya. Benar: harga ${rupiah(Number(row.price))}; giliran 2 kirim foto ${caption(row)} saja.`,
+      maksud: `Pelanggan menanyakan harga ${caption(row)}, lalu minta fotonya. Benar: harga ${rupiah(Number(row.price))}; foto ${caption(row)} saja (boleh sudah dikirim di giliran 1 sebagai inisiatif; bila sudah, giliran 2 cukup bilang fotonya di atas — tidak boleh 'ini' tanpa foto).`,
       giliran: [
         roughen(rand, `${p} ${color} ${pick(rand, HOW_MUCH)}`),
         roughen(rand, pick(rand, ['fotonya dong', 'liat dong', 'ada pic nya?', 'kirim gambarnya', 'mana fotonya'])),
@@ -311,6 +325,28 @@ const MAKERS: Record<string, Maker> = {
       harap: { serah_cs: false, sebut: [escape(rupiah(Number(row.price)))], foto_persis: [caption(row)] },
     }
   },
+}
+
+/** Dua maksud dalam satu pesan (mis. harga + grosir, foto + stok) dengan penghubung sehari-hari. */
+MAKERS.gabung = (rand, data, n) => {
+  const kinds = ['harga', 'foto', 'stok', 'grosir', 'toko', 'ukuran']
+  const a = MAKERS[pick(rand, kinds)](rand, data, n)
+  const b = MAKERS[pick(rand, kinds)](rand, data, n)
+  if (!a || !b || a.id.split('-')[1] === b.id.split('-')[1]) return null
+  const text = (scenario: SimScenario) => (typeof scenario.giliran[0] === 'string' ? scenario.giliran[0] : scenario.giliran[0].teks)
+  const joiner = pick(rand, ['\n', ' trus ', ' oh iya ', ' sama satu lagi, ', '. btw ', ' & '])
+  return {
+    id: `gen-gabung-${n}`,
+    judul: `Dua maksud · ${a.judul} + ${b.judul}`,
+    maksud: `Pesan berisi DUA maksud, keduanya harus dijawab dalam balasan yang sama.\n1) ${a.maksud}\n2) ${b.maksud}`,
+    giliran: [`${text(a)}${joiner}${text(b)}`],
+    harap: {
+      serah_cs: false,
+      sebut: [...(a.harap?.sebut || []), ...(b.harap?.sebut || [])],
+      tidak_sebut: [...(a.harap?.tidak_sebut || []), ...(b.harap?.tidak_sebut || [])],
+      ...(a.harap?.foto_persis || b.harap?.foto_persis ? { foto_persis: [...(a.harap?.foto_persis || []), ...(b.harap?.foto_persis || [])] } : {}),
+    },
+  }
 }
 
 export const GENERATOR_KINDS = Object.keys(MAKERS)

@@ -400,3 +400,68 @@ test.group('foto selaras: daftar warna bukan janji foto (v3.6.79)', () => {
     assert.deepEqual(list.added, [])
   })
 })
+
+test.group('chat nyata → skenario; jawaban "kab" untuk pilihan tujuan (v3.6.80)', () => {
+  test('realSegments: pesan pelanggan beruntun → balasan CS manusia; dijawab AI tidak dipakai', async ({ assert }) => {
+    const { realSegments } = await import('#beta3/simulator')
+    const at = (m: number) => new Date(Date.UTC(2026, 9, 1, 8, m))
+    const base = { jid: 'x@s.whatsapp.net', media_type: null, media_url: null }
+    const segments = realSegments([
+      { ...base, direction: 'in', sender_type: 'customer', body: 'min', created_at: at(0) },
+      { ...base, direction: 'in', sender_type: 'customer', body: 'tuxedo item brp', created_at: at(1) },
+      { ...base, direction: 'out', sender_type: 'cs', body: '485.000 bos', created_at: at(2) },
+      { ...base, direction: 'in', sender_type: 'customer', body: '', media_type: 'image', media_url: '/media/w2_a.jpg', created_at: at(3) },
+      { ...base, direction: 'in', sender_type: 'customer', body: 'yg ini ada?', created_at: at(4) },
+      { ...base, direction: 'out', sender_type: 'owner', body: 'ada bos', created_at: at(5) },
+      { ...base, direction: 'in', sender_type: 'customer', body: 'ok', created_at: at(6) },
+      { ...base, direction: 'out', sender_type: 'ai', body: 'siap', created_at: at(7) },
+    ])
+    assert.deepEqual(segments, [
+      { teks: 'min\ntuxedo item brp', gambar: undefined, jawaban: ['485.000 bos'] },
+      { teks: 'yg ini ada?', gambar: '/media/w2_a.jpg', jawaban: ['ada bos'] },
+    ])
+  })
+
+  test('pembuat skenario punya pesan dua maksud', async ({ assert }) => {
+    const { generateScenarios } = await import('#beta3/sim_generator')
+    const rows = [row('Basic Suit', 'Black 2.0', { sizesReady: 'S M L XL' }), row('Basic Suit', 'Navy'), row('Tuxedo', 'Black'), row('Tuxedo', 'White')]
+    const gabung = generateScenarios(rows, 60, 3).filter((item) => item.id.startsWith('gen-gabung-'))
+    assert.isAbove(gabung.length, 0)
+    assert.include(gabung[0].maksud, 'DUA maksud')
+  })
+
+  test('pickArea: "kab" / "kota" memilih Kabupaten atau Kota', async ({ assert }) => {
+    const { pickArea } = await import('#beta3/mcp')
+    const areas = [
+      { code: 'A', district: 'TAMBUN SELATAN', city: 'KAB. BEKASI', label: 'Tambun Selatan, Kab. Bekasi', terms: '' },
+      { code: 'B', district: 'TAMBUN SELATAN', city: 'BEKASI', label: 'Tambun Selatan, Bekasi', terms: '' },
+    ]
+    assert.equal(pickArea('kab', areas)?.code, 'A')
+    assert.equal(pickArea('yg kota', areas)?.code, 'B')
+  })
+})
+
+test.group('uji acak putaran 3 (v3.6.80)', () => {
+  test('"Ini bos" tanpa foto → menunjuk foto di atas; fit jas tidak menebak nomor celana; grosir sebut besarnya', async ({ assert }) => {
+    const { pointToSentPhotos } = await import('#beta3/reply_polish')
+    assert.deepEqual(pointToSentPhotos(['Ini bos']), ['Fotonya sudah saya kirim di atas bos'])
+    assert.deepEqual(pointToSentPhotos(['Ini ya kak']), ['Fotonya sudah saya kirim di atas kak'])
+    const { renderFitResult } = await import('#beta3/mcp')
+    assert.include(renderFitResult({ recommended_size: 'L' }, { height: 171, weight: 68 }, 'jacket'), 'jangan ditebak')
+    assert.notInclude(renderFitResult({ recommended_size: '32' }, { height: 171, weight: 68 }, 'pants'), 'jangan ditebak')
+    const { renderWholesaleRule } = await import('#beta3/wholesale')
+    assert.include(renderWholesaleRule({ jas: 15000 }), 'sebut besarnya per pcs')
+  })
+})
+
+test.group('warna: salah ketik & baby blue (v3.6.80)', () => {
+  test('fuzzyColorWords & alias baby blue → blue ice', async ({ assert }) => {
+    const { fuzzyColorWords } = await import('#beta3/token_saver')
+    assert.includeMembers(fuzzyColorWords('baby bllue yg jas'), ['blue'])
+    assert.includeMembers(fuzzyColorWords('yg nevy ada'), ['navy'])
+    assert.deepEqual(fuzzyColorWords('harga jas brp'), [])
+    const { catalogColorSearchHints } = await import('#services/color_semantics')
+    assert.equal(catalogColorSearchHints(['baby blue'])[0].catalogColor, 'blue ice')
+    assert.equal(catalogColorSearchHints(['Blue Ice'])[0].catalogColor, 'blue ice')
+  })
+})

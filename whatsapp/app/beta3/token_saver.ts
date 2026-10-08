@@ -191,6 +191,33 @@ export function trimSkill(skill: string, need: SkillContext) {
   return { text: kept.join('').trim(), skipped }
 }
 
+const COLOR_WORDS = ['black', 'hitam', 'white', 'putih', 'navy', 'maroon', 'marun', 'cream', 'krem', 'brown', 'coklat', 'cokelat', 'choco', 'gray', 'grey', 'army', 'denim', 'coast', 'gold', 'blue', 'biru', 'sage', 'green', 'hijau', 'emerald', 'olive']
+const editDistance = (a: string, b: string) => {
+  const row = Array.from({ length: b.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= a.length; i++) {
+    let previous = row[0]
+    row[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const current = row[j]
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, previous + (a[i - 1] === b[j - 1] ? 0 : 1))
+      previous = current
+    }
+  }
+  return row[b.length]
+}
+/** Kata yang mirip nama warna (beda ≤1 huruf; ≥6 huruf ≤2) → nama warnanya. */
+export function fuzzyColorWords(text: string) {
+  const out = new Set<string>()
+  for (const word of fold(text).split(' ')) {
+    if (word.length < 4 || COLOR_WORDS.includes(word)) continue
+    for (const color of COLOR_WORDS) {
+      if (Math.abs(color.length - word.length) > 2) continue
+      if (editDistance(word, color) <= (color.length >= 6 ? 2 : 1)) out.add(color)
+    }
+  }
+  return [...out]
+}
+
 const GENERIC = new Set(['setelan', 'jas', 'premium', 'signature', 'se', 'double', 'breasted', 'set', 'new', 'the', 'and'])
 const fold = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 const colorKeys = (value: string) => {
@@ -232,7 +259,8 @@ export function focusCatalog(
   // Produk disebut: kata khas pertama nama produk ("tuxedo", "basic", "peak", "beskap").
   const keyOf = (product: string) => fold(product).split(' ').find((word) => word.length >= 3 && !GENERIC.has(word)) || ''
   const products = new Set(active.map((row) => keyOf(row.product)).filter((key) => key && words.has(key)))
-  const colors = colorKeys(context)
+  // v3.6.80: salah ketik warna ("bllue", "nevy") tetap membuka baris warnanya (petunjuk pencarian saja).
+  const colors = colorKeys(`${context}\n${fuzzyColorWords(context).join(' ')}`)
   const picked = active.filter((row) => {
     if (products.has(keyOf(row.product))) return true
     if (series.size && series.has(seriesOf(row) as 'premium' | 'signature')) return true
@@ -249,7 +277,7 @@ export function focusCatalog(
     if (price === undefined || (row.price !== null && (price === null || row.price < price))) others.set(row.product, row.price)
   }
   const otherLine = others.size
-    ? `PRODUK LAIN (tidak dirinci di giliran ini; harga mulai): ${[...others].map(([name, price]) => `${name}${price ? ` ${price.toLocaleString('id-ID')}` : ''}`).join(', ')}. Ditanya detail produk lain → jawab singkat dari baris ini, warna/stoknya "saya cek dulu ya bos".`
+    ? `PRODUK LAIN (tidak dirinci di giliran ini; harga mulai): ${[...others].map(([name, price]) => `${name}${price ? ` ${price.toLocaleString('id-ID')}` : ''}`).join(', ')}. Warna/stok produk lain tidak dirinci di sini: jangan bilang "belum ada" — sebut nama & harga mulai, lalu tanyakan model/warna yang dimaksud.`
     : ''
   return { rows: picked, otherLine, products: [...products], colors: [...colors] }
 }

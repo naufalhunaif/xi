@@ -770,7 +770,10 @@ export async function createLeanReply(input: {
       })
     }
   }
-  const place = form || loose ? null : extractShippingQuery(input.text, followUp)
+  const extracted = form || loose ? null : extractShippingQuery(input.text, followUp)
+  // v3.6.80: jawaban singkat atas pilihan tujuan ("kab", "yang kota") tidak berisi nama tempat.
+  const choiceHit = !form && !loose && followUp && last?.pending && last.choices?.length ? pickArea(input.text, last.choices) : null
+  const place = extracted || (choiceHit ? last?.place || choiceHit.label : null)
   if (place && mcp.url) {
     try {
       let note = ''
@@ -779,7 +782,8 @@ export async function createLeanReply(input: {
       let resolved: DestinationArea | null = null
       let kept = false
       // Jawaban atas pilihan yang tadi ditanyakan: cocokkan dulu, tanpa cari ulang.
-      if (followUp && last?.pending && last.choices?.length)
+      if (choiceHit) resolved = choiceHit
+      else if (followUp && last?.pending && last.choices?.length)
         resolved = pickArea(input.text, last.choices)
       if (!resolved) {
         // Lanjutan obrolan ongkir tanpa kata "ongkir": Jev memastikan ini memang tujuan baru.

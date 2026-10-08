@@ -19,6 +19,7 @@ const COLORS = [
   ['hitam', ['black', 'hitam', 'item', 'hitem', 'ireng', 'hideung'], []],
   ['putih', ['white', 'putih', 'pth', 'bodas'], []],
   ['merah', ['red', 'merah'], []],
+  ['blue ice', ['blue ice', 'baby blue', 'biru muda', 'biru es'], ['biru']],
   ['biru', ['blue', 'biru'], []],
   ['hijau', ['green', 'hijau', 'ijo'], []],
   ['pink', ['pink', 'merah muda'], []],

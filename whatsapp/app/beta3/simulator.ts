@@ -4,10 +4,12 @@
 // pemeriksaan pasti (harga di luar katalog, tidak membalas, serah CS tanpa perlu, kata wajib) dan
 // penilai AI yang membaca katalog lengkap. Data uji (jid "…@sim") dihapus sesudah tiap percakapan.
 import app from '@adonisjs/core/services/app'
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { access, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import db from '#services/workspace_database'
+import { ownsWorkspaceMedia } from '#services/workspace_context'
+import { maskPii } from '#beta3/jev'
 import { ensureLeanTables, readLeanState, writeBeta3ChatNote } from '#beta3/tables'
 import { catalogDigest, findCatalogVariant } from '#beta3/catalog_service'
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
@@ -18,7 +20,7 @@ import { runLeanProvider } from '#beta3/provider'
 import { allowedPrices, unknownPrices } from '#beta3/quality_service'
 import { bubblesToSend, createLeanReply, type LeanSettings } from '#beta3/reply_service'
 import { renderProductionEstimate, type LeanHistoryRow } from '#beta3/prompt'
-import { generateScenarios } from '#beta3/sim_generator'
+import { generateScenarios, rng, roughen } from '#beta3/sim_generator'
 
 export type SimScenario = {
   id: string
@@ -70,6 +72,8 @@ export type SimResult = {
   judul: string
   lulus: boolean
   nilai: number | null
+  /** Rasa manusia 1–5 dari penilai (v3.6.80). */
+  manusia?: number | null
   masalah: string[]
   giliran: SimTurn[]
 }
@@ -96,6 +100,8 @@ const SIM_TABLES = [
 export async function cleanupSim(jid: string) {
   if (!isSimJid(jid)) return
   for (const table of SIM_TABLES) await db.from(table).where('jid', jid).delete().catch(() => 0)
+  // Keadaan per chat di tabel state (mis. "ongkir:last:<jid>", cache catatan).
+  await db.from('whatsapp_beta3_state').where('name', 'like', `%${jid}%`).delete().catch(() => 0)
 }
 
 export async function loadScenarios(): Promise<SimScenario[]> {
@@ -159,10 +165,11 @@ const JUDGE_SCHEMA = {
   additionalProperties: false,
   properties: {
     nilai: { type: 'integer', description: '1 (buruk) – 5 (seperti CS terbaik)' },
+    manusia: { type: 'integer', description: 'Rasa manusia 1 (kaku seperti bot) – 5 (seperti CS manusia terbaik toko ini)' },
     lulus: { type: 'boolean' },
     masalah: { type: 'array', items: { type: 'string' } },
   },
-  required: ['nilai', 'lulus', 'masalah'],
+  required: ['nilai', 'manusia', 'lulus', 'masalah'],
 }
 
 async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTurn[], facts: string) {
@@ -173,7 +180,8 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
         'Kamu auditor CS toko jas Chameleon Cloth. Nilai percakapan uji antara pelanggan dan AI CS. Balas HANYA JSON sesuai skema.',
         'Periksa ketat: (1) maksud pelanggan dipahami walau bahasanya tidak baku/daerah/salah ketik/tidak langsung; (2) setiap angka harga, warna, size ready, dan info toko benar menurut FAKTA; (3) foto yang dikirim persis sesuai yang diucapkan/dijanjikan balasan (tidak kurang, tidak lebih, tidak beda); (4) tidak mengarang, tidak mengulang pertanyaan yang sudah dijawab, tidak menyerahkan ke CS bila jawabannya ada di FAKTA; (5) gaya chat CS singkat dan sopan.',
         'Baris "(data alat untuk AI — …)" adalah hasil alat toko (ongkir, size, resi) yang dibaca AI: angka yang cocok dengan data itu BENAR, bukan karangan.',
-        'lulus = true hanya bila tidak ada kesalahan fakta, foto cocok, dan maksud terjawab. masalah: kalimat pendek bahasa Indonesia, sebut giliran & kutip bagian yang salah. Tanpa masalah → [].',
+        'Rasa manusia (nilai manusia): balasan harus terasa seperti CS manusia toko ini — santai, singkat, hangat, bahasa chat sehari-hari, menjawab dulu baru bertanya, tidak kaku, tidak bertele-tele, tidak memakai daftar/format bila cukup satu kalimat, tidak mengulang sapaan atau kalimat template. Bila ada "Jawaban CS manusia waktu itu", jadikan acuan gaya (isi harga/stok tetap ikut FAKTA saat ini). Rasa robotik ≤ 2 = masalah.',
+        'lulus = true hanya bila tidak ada kesalahan fakta, foto cocok, maksud terjawab, dan rasa manusia ≥ 3. masalah: kalimat pendek bahasa Indonesia, sebut giliran & kutip bagian yang salah. Tanpa masalah → [].',
         `FAKTA TOKO:\n${facts}`,
       ].join('\n\n'),
       user: `MAKSUD PELANGGAN & JAWABAN YANG DIHARAPKAN:\n${scenario.maksud}\n\nPERCAKAPAN:\n${transcript(turns)}`,
@@ -185,12 +193,15 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
   )
   const parsed = JSON.parse(reply.text.slice(reply.text.indexOf('{'), reply.text.lastIndexOf('}') + 1)) as {
     nilai?: number
+    manusia?: number
     lulus?: boolean
     masalah?: string[]
   }
+  const human = Math.max(1, Math.min(5, Math.round(Number(parsed.manusia) || 3)))
   return {
     nilai: Math.max(1, Math.min(5, Math.round(Number(parsed.nilai) || 1))),
-    lulus: parsed.lulus === true,
+    manusia: human,
+    lulus: parsed.lulus === true && human >= 3,
     masalah: (parsed.masalah || []).map(String).filter(Boolean).slice(0, 8),
   }
 }
@@ -216,12 +227,18 @@ const TOOL_TRACES = new Set(['beta3-rates', 'beta3-fit', 'beta3-sizechart', 'bet
 
 /** Gambar pelanggan untuk uji: label katalog ("Produk - Warna") atau URL https → file sementara. */
 async function simImage(ref: string, rows: Awaited<ReturnType<typeof catalogDigest>>['rows']) {
+  // v3.6.80: gambar dari chat nyata (/media/… milik workspace ini) dipakai langsung dari disk.
+  if (/^\/media\/[\w./-]+$/.test(ref) && !ref.includes('..') && ownsWorkspaceMedia(ref.slice('/media/'.length))) {
+    const path = app.publicPath(ref.slice(1))
+    await access(path)
+    return { url: ref, path, keep: true }
+  }
   const url = /^https:\/\//i.test(ref) ? ref : findCatalogVariant(rows, ref)?.photoUrl || ''
   if (!url) throw new Error(`Gambar uji tidak ditemukan: ${ref}`)
   const bytes = await downloadOutgoingImage(url)
   const path = join(tmpdir(), `wa-sim-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.jpg`)
   await writeFile(path, bytes)
-  return { url, path }
+  return { url, path, keep: false }
 }
 
 export type SimState = { jid: string; rows: LeanHistoryRow[]; turns: SimTurn[] }
@@ -239,11 +256,13 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
   const began = Date.now()
   const turn: SimTurn = { pelanggan: text, balasan: [], foto: [], fotoUrl: [], serah_cs: false, alasan: '', jejak, ms: 0 }
   let file = ''
+  let keep = false
   try {
     const digest = await catalogDigest()
     if (image) {
       const got = await simImage(image, digest.rows)
       file = got.path
+      keep = got.keep
       turn.gambar = got.url
     }
     for (const row of state.rows) row.current = false
@@ -295,7 +314,7 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
   } catch (error) {
     turn.error = error instanceof Error ? error.message.slice(0, 300) : String(error)
   } finally {
-    if (file) await rm(file, { force: true }).catch(() => {})
+    if (file && !keep) await rm(file, { force: true }).catch(() => {})
   }
   turn.ms = Date.now() - began
   state.turns.push(turn)
@@ -331,11 +350,13 @@ export async function runScenario(
     )
     const masalah = deterministicIssues(scenario, turns, allowed)
     let nilai: number | null = null
+    let manusia: number | null = null
     let judged = true
     if (options.judge !== false && !turns.some((turn) => turn.error)) {
       try {
         const verdict = await judge(settings, scenario, turns, options.facts || (await judgeFacts(settings)))
         nilai = verdict.nilai
+        manusia = verdict.manusia
         judged = verdict.lulus
         masalah.push(...verdict.masalah.map((item) => `Penilai: ${item}`))
       } catch (error) {
@@ -344,10 +365,108 @@ export async function runScenario(
       }
     }
     const hard = masalah.filter((item) => !item.startsWith('Penilai'))
-    return { id: scenario.id, judul: scenario.judul, lulus: !hard.length && judged, nilai, masalah, giliran: turns }
+    return { id: scenario.id, judul: scenario.judul, lulus: !hard.length && judged, nilai, manusia, masalah, giliran: turns }
   } finally {
     await cleanupSim(state.jid)
   }
+}
+
+/* ---------------- Skenario dari chat nyata (v3.6.80) ---------------- */
+
+type RealRow = { jid: string; direction: string; sender_type: string | null; body: string | null; media_type: string | null; media_url: string | null; created_at: Date | string }
+type RealSegment = { teks: string; gambar?: string; jawaban: string[] }
+
+/** Potong chat menjadi giliran: pesan pelanggan beruntun → balasan CS manusia (cs/owner) sesudahnya. */
+export function realSegments(rows: RealRow[]) {
+  const segments: RealSegment[] = []
+  let asked: RealRow[] = []
+  let answered: string[] = []
+  const flush = () => {
+    const texts = asked.map((row) => String(row.body || '').trim()).filter(Boolean)
+    const image = asked.find((row) => row.media_type === 'image' && row.media_url)?.media_url || undefined
+    if ((texts.length || image) && answered.length) segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered })
+    asked = []
+    answered = []
+  }
+  for (const row of rows) {
+    if (row.direction === 'in') {
+      if (answered.length) flush()
+      if (row.media_type && row.media_type !== 'image') continue
+      asked.push(row)
+    } else if (asked.length && ['cs', 'owner'].includes(String(row.sender_type || '')) && row.body) {
+      answered.push(String(row.body).slice(0, 600))
+    } else if (asked.length && row.sender_type === 'ai') {
+      // Dijawab AI (bukan manusia): tidak dipakai sebagai acuan.
+      asked = []
+      answered = []
+    }
+  }
+  flush()
+  return segments
+}
+
+/**
+ * Pertanyaan dari chat nyata toko (dijawab CS manusia), dipakai ulang sebagai pelanggan uji. Sebagian
+ * dikombinasikan: kalimat diacak (singkatan, salah ketik, bahasa daerah) dan digabung dengan pertanyaan
+ * pelanggan lain, supaya maksud yang sama diuji dalam bentuk yang lebih rumit.
+ */
+export async function realScenarios(count: number, seed: number, mix = 0.5) {
+  const rand = rng(seed)
+  const since = new Date(Date.now() - 180 * 86_400_000)
+  const jids = (await db
+    .from('whatsapp_messages')
+    .select('jid')
+    .where('created_at', '>', since)
+    .whereIn('sender_type', ['cs', 'owner'])
+    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid'))
+    .groupBy('jid')
+    .orderByRaw('RAND(?)', [seed])
+    .limit(Math.min(400, count * 3))) as Array<{ jid: string }>
+  const pool: Array<{ jid: string; segments: RealSegment[] }> = []
+  for (const { jid } of jids) {
+    const rows = (await db
+      .from('whatsapp_messages')
+      .select('jid', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
+      .where('jid', jid)
+      .where('created_at', '>', since)
+      .orderBy('created_at', 'asc')
+      .orderBy('id', 'asc')
+      .limit(120)) as RealRow[]
+    const segments = realSegments(rows).filter((segment) => segment.teks.length >= 2 || segment.gambar)
+    if (segments.length) pool.push({ jid, segments })
+    if (pool.length >= count * 2) break
+  }
+  const out: SimScenario[] = []
+  for (const [index, chat] of pool.entries()) {
+    if (out.length >= count) break
+    const start = Math.floor(rand() * Math.max(1, chat.segments.length - 1))
+    const picked = chat.segments.slice(start, start + 2)
+    const other = pool[(index + 1 + Math.floor(rand() * (pool.length - 1 || 1))) % pool.length]?.segments[0]
+    const combined = rand() < mix
+    const giliran = picked.map((segment, turn) => {
+      let teks = segment.teks
+      if (combined) {
+        teks = roughen(rand, teks.replace(/\n+/g, ' '))
+        // Giliran pertama digabung dengan pertanyaan pelanggan lain (dua maksud dalam satu pesan).
+        if (turn === 0 && other && other.teks !== segment.teks) teks = `${teks}\n${roughen(rand, other.teks.replace(/\n+/g, ' '))}`
+      }
+      return segment.gambar ? { teks, gambar: segment.gambar } : teks
+    })
+    const reference = picked
+      .map((segment, turn) => `Giliran ${turn + 1} — CS manusia waktu itu: ${segment.jawaban.join(' / ')}`)
+      .concat(combined && other ? [`Pertanyaan tambahan (digabung) — CS manusia waktu itu: ${other.jawaban.join(' / ')}`] : [])
+    out.push({
+      id: `real-${out.length + 1}-s${seed}`,
+      judul: `${combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
+      maksud: [
+        'Pertanyaan dari chat nyata toko. Jawab semua maksudnya dengan benar menurut FAKTA saat ini, dengan rasa bahasa CS manusia.',
+        'Acuan (harga/stok bisa sudah berubah — FAKTA saat ini yang berlaku):',
+        ...reference,
+      ].join('\n'),
+      giliran,
+    })
+  }
+  return out
 }
 
 /* ---------------- Riwayat uji (satu baris per putaran) ---------------- */
@@ -383,7 +502,15 @@ let running = false
 /** Putaran berjalan di latar; hasil disimpan per percakapan supaya bisa dipantau. */
 export async function startSimRun(
   settings: LeanSettings,
-  input: { ids?: string[]; custom?: SimScenario[]; judge?: boolean; label?: string; generate?: { count: number; seed?: number }; parallel?: number } = {}
+  input: {
+    ids?: string[]
+    custom?: SimScenario[]
+    judge?: boolean
+    label?: string
+    generate?: { count: number; seed?: number }
+    real?: { count: number; seed?: number; mix?: number }
+    parallel?: number
+  } = {}
 ) {
   await ensureSimTable()
   if (running) return { started: false, reason: 'Uji sedang berjalan.' }
@@ -391,9 +518,13 @@ export async function startSimRun(
   const generated = input.generate?.count
     ? generateScenarios((await catalogDigest()).rows, Math.min(500, Math.max(1, input.generate.count)), input.generate.seed)
     : []
+  const real = input.real?.count
+    ? await realScenarios(Math.min(300, Math.max(1, input.real.count)), input.real.seed ?? Math.floor(Math.random() * 1_000_000), input.real.mix ?? 0.5)
+    : []
   const picked = [
-    ...(input.ids?.length ? all.filter((item) => input.ids!.includes(item.id)) : input.custom?.length || generated.length ? [] : all),
+    ...(input.ids?.length ? all.filter((item) => input.ids!.includes(item.id)) : input.custom?.length || generated.length || real.length ? [] : all),
     ...(input.custom || []),
+    ...real,
     ...generated,
   ]
   if (!picked.length) return { started: false, reason: 'Tidak ada percakapan uji.' }
@@ -402,7 +533,13 @@ export async function startSimRun(
     total: picked.length,
     label: String(
       input.label ||
-        (generated.length ? `Acak ${generated.length} · seed ${input.generate?.seed ?? ''}` : input.custom?.length && !input.ids?.length ? 'Coba sendiri' : 'Semua skenario')
+        (real.length
+          ? `Chat nyata ${real.length}${generated.length ? ` + acak ${generated.length}` : ''}`
+          : generated.length
+            ? `Acak ${generated.length} · seed ${input.generate?.seed ?? ''}`
+            : input.custom?.length && !input.ids?.length
+              ? 'Coba sendiri'
+              : 'Semua skenario')
     ).slice(0, 190),
     results: '[]',
     started_at: new Date(),
