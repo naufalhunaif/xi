@@ -116,6 +116,21 @@ const INFO: Record<string, Info> = {
     },
     effect: () => 'Prices quoted by the AI are checked against this series/item.',
   },
+  hati: {
+    question: (sub) =>
+      sub === 'rasa'
+        ? "How does the customer feel in this message (read literally)?"
+        : sub === 'momen'
+          ? 'Does the customer mention an important occasion (wedding, graduation, new job)?'
+          : 'Is the customer asking, requesting, complaining, or just chatting?',
+    labels: {
+      bertanya: 'Asking', meminta: 'Requesting', mengeluh: 'Complaining', basa_basi: 'Small talk', lain: 'Other',
+      netral: 'Neutral', senang: 'Happy', ragu: 'Unsure / worried', buru_buru: 'In a hurry', kesal: 'Annoyed / disappointed',
+      keberatan_harga: 'Finds it expensive', pamit: 'Leaving / not now',
+      tidak_ada: 'No occasion', nikah: 'Wedding', wisuda: 'Graduation', kerja: 'New job / interview', acara_lain: 'Other event',
+    },
+    effect: () => 'The AI gets a short "HATI" note so it answers the feeling first (hint only, no data changes).',
+  },
   janji_total: {
     question: () => 'Does the AI reply promise to send the total/bank account?',
     labels: yesNo,
@@ -214,6 +229,8 @@ const SAY: Record<string, (answer: string, label: string, sub: string) => string
   lanjut: (answer) => (answer === 'batal' ? 'The customer is cancelling.' : answer === 'tunda' ? 'The customer is postponing.' : 'The customer is still going ahead.'),
   urgensi: (answer) => `Urgency ${answer} of 5${Number(answer) >= 4 ? ' — needs attention.' : '.'}`,
   harga_konteks: (_a, label, sub) => (sub === 'seri' ? `The fabric series discussed is ${label}.` : `The price question is about: ${label.toLowerCase()}.`),
+  hati: (_answer, label, sub) =>
+    sub === 'rasa' ? `Customer feeling: ${label.toLowerCase()}.` : sub === 'momen' ? `Occasion: ${label.toLowerCase()}.` : `Message type: ${label.toLowerCase()}.`,
   janji_total: yn('This AI reply promises to send the total/bank account.', 'This AI reply makes no promise about the total.'),
   total_toko: yn('The store sent the total to pay / bank account here.', 'The store did not send a total here.'),
   terjawab: (answer) => (answer.endsWith('3') ? "The store answered all the customer's questions." : answer.endsWith('2') ? 'The store answered only part of the questions.' : "The store hasn't answered the questions yet."),
@@ -250,7 +267,7 @@ export function answerLabel(decision: string, answer: string, sub = '') {
 /** Penjelasan satu baris log keputusan Jev untuk ditampilkan ke CS. */
 export function explainDecision(row: Row) {
   const info = INFO[row.decision]
-  const sub = ['topik', 'harga_konteks', 'varian'].includes(row.decision) ? String(row.detail || '') : ''
+  const sub = ['topik', 'harga_konteks', 'varian', 'hati'].includes(row.decision) ? String(row.detail || '') : ''
   const answer = String(row.answer || '')
   const used = Boolean(Number(row.used))
   return {

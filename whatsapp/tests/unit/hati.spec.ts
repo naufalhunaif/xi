@@ -2,6 +2,11 @@ import { test } from '@japa/runner'
 import { readFile } from 'node:fs/promises'
 import { mergeDigest } from '#beta3/skill_digest'
 import { trimSkill } from '#beta3/token_saver'
+import db from '#services/workspace_database'
+import { resetJevCache, saveJevConfig, setJevFetcher } from '#beta3/jev'
+import { understandTurn } from '#beta3/jev_decisions'
+import { explainDecision } from '#beta3/jev_explain'
+import { GREETED, heartLabel, heartNote } from '#beta3/hati'
 
 // v3.6.59 "Rasa" → v3.6.61 "Hati CS" (permintaan pemilik: lebih manusiawi, bukan sekadar mirip
 // manusia). Satu skill inti; tiap balasan lewat 4 lapis: pikiran (mind) → rasa (emotion) →
@@ -66,5 +71,80 @@ test.group('skill Hati CS (v3.6.61)', () => {
     const trimmed = trimSkill(merged.text, none)
     assert.include(trimmed.text, '**4. Tindakan — satu langkah nyata**')
     assert.notInclude(trimmed.skipped, 'Hati CS')
+  })
+})
+
+// v3.6.62 — Jev membaca bentuk kalimat, rasa, dan momen pelanggan; AI menerima CATATAN HATI singkat.
+const jevReply = (answers: Record<string, unknown>) =>
+  (async () =>
+    new Response(JSON.stringify({ model: 'jev-test', answers, usage: { input_tokens: 10, output_tokens: 1 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as unknown as typeof fetch
+const choice = (value: string, confidence = 0.92) => ({ type: 'choice', choice: value, probabilities: {}, confidence })
+
+test.group('Hati CS · Jev membaca maksud, rasa, momen (v3.6.62)', (group) => {
+  group.each.setup(async () => {
+    const clean = () => db.from('whatsapp_beta3_state').whereIn('name', ['jev_key', 'jev_settings', 'jev_last_error']).delete().catch(() => {})
+    await clean()
+    return async () => {
+      setJevFetcher(null)
+      await clean()
+      resetJevCache()
+    }
+  })
+
+  test('jawaban yakin → heart; ragu (< 0.8) tidak dipakai', async ({ assert }) => {
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true })
+    let sent: any = null
+    const answers = { hati_bentuk: choice('bertanya'), hati_rasa: choice('ragu'), hati_momen: choice('wisuda', 0.6) }
+    setJevFetcher((async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body))
+      return (jevReply(answers) as any)()
+    }) as unknown as typeof fetch)
+    const result = await understandTurn({
+      jid: 'hatitest@s.whatsapp.net',
+      text: 'Kancing 1 ..ya, takut kebesaran buat wisuda',
+      history: [{ direction: 'out', body: 'Basic Suit hitam 485.000 bos' }],
+      services: [],
+      offerPending: false,
+    })
+    assert.deepEqual(result.heart, { form: 'bertanya', feeling: 'ragu' })
+    // Ketiga pertanyaan Hati ikut dalam satu panggilan Jev yang sama.
+    assert.includeMembers(Object.keys(sent.questions), ['hati_bentuk', 'hati_rasa', 'hati_momen'])
+    assert.include(sent.questions.hati_rasa.criteria.ragu, 'takut kebesaran')
+  })
+
+  test('Hati dimatikan di pengaturan Jev → tidak ditanyakan', async ({ assert }) => {
+    await saveJevConfig({ apiKey: 'ts_x', enabled: true, off: ['hati'] })
+    let sent: any = null
+    setJevFetcher((async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body))
+      return (jevReply({}) as any)()
+    }) as unknown as typeof fetch)
+    const result = await understandTurn({ jid: 'hatitest@s.whatsapp.net', text: 'kok mahal ya', history: [], services: [], offerPending: false })
+    assert.isUndefined(result.heart)
+    assert.notProperty(sent?.questions || {}, 'hati_rasa')
+  })
+
+  test('CATATAN HATI: hanya yang tidak netral; ucapan momen tidak diulang', ({ assert }) => {
+    assert.equal(heartNote(undefined), '')
+    assert.equal(heartNote({ form: 'lain', feeling: 'netral', moment: 'tidak_ada' }), '')
+    const note = heartNote({ form: 'bertanya', feeling: 'ragu', moment: 'wisuda' })
+    assert.include(note, 'CATATAN HATI: pelanggan BERTANYA')
+    assert.include(note, 'rasa: ragu/cemas')
+    assert.include(note, 'momen: wisuda → "wah selamat ya bos" sekali')
+    assert.include(heartNote({ moment: 'wisuda' }, true), 'jangan diulang')
+    assert.include(heartNote({ feeling: 'pamit' }), 'tanpa susulan')
+    assert.equal(heartLabel({ form: 'bertanya', feeling: 'keberatan_harga', moment: 'tidak_ada' }), 'Hati · bertanya · keberatan harga')
+    assert.isTrue(GREETED.test('wah selamat ya bos, semoga lancar wisudanya'))
+    assert.isFalse(GREETED.test('Selamat pagi bos'))
+  })
+
+  test('keputusan Hati dijelaskan di Usage → Jev accuracy', ({ assert }) => {
+    const row = explainDecision({ decision: 'hati', answer: 'keberatan_harga', detail: 'rasa', used: 1 })
+    assert.equal(row.says, 'Customer feeling: finds it expensive.')
+    assert.include(row.effect, 'HATI')
+    assert.include(explainDecision({ decision: 'hati', answer: 'nikah', detail: 'momen', used: 1 }).question, 'occasion')
   })
 })

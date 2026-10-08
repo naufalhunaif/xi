@@ -58,6 +58,49 @@ export type TurnUnderstanding = {
   series?: 'reguler' | 'signature' | 'premium'
   /** Barang yang ditanya harganya di pesan ini. */
   item?: 'jas' | 'celana' | 'setelan' | 'rompi'
+  /** v3.6.62 Hati CS: bentuk kalimat, rasa, dan momen pelanggan (hanya yang yakin). */
+  heart?: Heart
+}
+
+export type Heart = { form?: string; feeling?: string; moment?: string }
+
+/** v3.6.62 — pertanyaan Hati CS ke Jev: bentuk kalimat, rasa, momen. */
+export const HEART_QUESTIONS: Record<'bentuk' | 'rasa' | 'momen', JevQuestion> = {
+  bentuk: {
+    type: 'choice',
+    instructions: 'Bentuk pesan_terbaru pelanggan (lihat percakapan)?',
+    criteria: {
+      bertanya: 'Bertanya / minta kepastian, termasuk kalimat pendek berakhiran "ya/kah/kan" ("kancing 1 ..ya")',
+      meminta: 'Meminta sesuatu dibuat/dicatat/dikirim (mau, pakai, tolong, minta)',
+      mengeluh: 'Mengeluh atau kecewa',
+      basa_basi: 'Salam, terima kasih, oke, atau basa-basi',
+      lain: 'Selain itu (menjawab pertanyaan toko, mengirim data)',
+    },
+  },
+  rasa: {
+    type: 'choice',
+    instructions: 'Perasaan pelanggan di pesan_terbaru (pahami apa adanya, jangan menafsir terlalu jauh)?',
+    criteria: {
+      netral: 'Biasa saja / tidak terlihat',
+      senang: 'Senang, memuji, antusias',
+      ragu: 'Ragu atau cemas (takut tidak pas, takut kebesaran/kekecilan, ragu bahan/kualitas)',
+      buru_buru: 'Buru-buru / butuh cepat (acara dekat, minta segera)',
+      kesal: 'Kesal, kecewa, marah, atau tidak sabar',
+      keberatan_harga: 'Merasa harga mahal / budget kurang (masih bertanya)',
+      pamit: 'Pamit atau mundur: nanti dulu, lihat-lihat dulu, gak jadi karena harga',
+    },
+  },
+  momen: {
+    type: 'choice',
+    instructions: 'Apakah pelanggan menyebut momen penting yang menjadi alasan membeli?',
+    criteria: {
+      tidak_ada: 'Tidak menyebut momen',
+      nikah: 'Nikah, lamaran, resepsi, tunangan',
+      wisuda: 'Wisuda, sidang, kelulusan',
+      kerja: 'Kerja baru, interview, pelantikan, kantor',
+      acara_lain: 'Acara lain (pesta, kondangan, foto, lomba)',
+    },
+  },
 }
 
 export type TurnTopic = 'ongkir' | 'ukuran' | 'bayar' | 'custom' | 'warna'
@@ -95,6 +138,7 @@ export async function understandTurn(input: {
     sudah_tf: Boolean(input.awaitingPayment) && (await jevOn('sudah_tf')),
     lanjut: await jevOn('lanjut'),
     urgensi: await jevOn('urgensi'),
+    hati: await jevOn('hati'),
     harga_konteks:
       /harga|berapa|brp|\bset\b|setel|celana|rompi|vest|premium|signature|bahan|sekalian/i.test(input.text) &&
       (await jevOn('harga_konteks')),
@@ -238,6 +282,7 @@ export async function understandTurn(input: {
       },
     }
   }
+  if (on.hati) for (const [key, question] of Object.entries(HEART_QUESTIONS)) questions[`hati_${key}`] = question
   if (!Object.keys(questions).length) return {}
   const answers = await askJev(
     'pahami',
@@ -311,6 +356,16 @@ export async function understandTurn(input: {
     if (sure) result.urgency = scoreLevel(answers.urgensi, 5)
     await logDecision({ jid: input.jid, decision: 'urgensi', answer: answers.urgensi, used: sure, input: input.text })
   }
+  const heart: Heart = {}
+  const field = { bentuk: 'form', rasa: 'feeling', momen: 'moment' } as const
+  for (const key of Object.keys(HEART_QUESTIONS) as Array<keyof typeof field>) {
+    const answer = answers[`hati_${key}`]
+    if (!answer) continue
+    const sure = confident('hati', answer)
+    if (sure && choiceOf(answer)) heart[field[key]] = choiceOf(answer)
+    await logDecision({ jid: input.jid, decision: 'hati', answer, used: sure, detail: key, input: input.text })
+  }
+  if (Object.keys(heart).length) result.heart = heart
   return result
 }
 

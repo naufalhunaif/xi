@@ -423,3 +423,10 @@ Perubahan v3.6.6:
 - Contoh sebelum → sesudah dari chat Agus & Nofita ikut di skill. "Takut kebesaran" = ingin pas di badan (bukan soal uang).
 - Aturan yang sama di "Cara bicara" (satu pertanyaan, tawaran = janji, nego/takut ditipu/pujian) dipindah ke Hati CS — tidak dobel. Beberapa kalimat bagian lain dipadatkan; prompt penuh tetap < 10 ribu token.
 - Tetap satu skill inti; bagian ini selalu dimuat (juga di ringkasan) dan bisa diedit di halaman Skill.
+
+## v3.6.62 — Jev membaca hati pelanggan (maksud, rasa, momen)
+
+- Di panggilan Jev yang sudah ada (tanpa panggilan tambahan) ditambah 3 pertanyaan: **bentuk** pesan (bertanya / meminta / mengeluh / basa-basi), **rasa** (netral, senang, ragu/cemas, buru-buru, kesal, keberatan harga, pamit), dan **momen** (nikah, wisuda, kerja baru, acara lain).
+- Jawaban yang yakin (≥ 0,8) dan tidak netral menjadi satu baris **CATATAN HATI** untuk AI, mis. "pelanggan BERTANYA (jawab pertanyaannya, bukan "dicatat"); rasa: ragu/cemas → tenangkan dari data". Hanya petunjuk — tidak mengubah data, harga, atau tahap.
+- Ucapan "wah selamat ya bos" untuk momen hanya sekali: bila toko sudah mengucapkan selamat di chat itu, catatannya bilang jangan diulang.
+- Jejak chat menampilkan "Hati · bertanya · ragu · wisuda". Keputusan "Maksud, rasa & momen pelanggan (Hati CS)" bisa dinilai Benar/Salah di Usage → Jev accuracy dan dimatikan di pengaturan Jev.

@@ -85,6 +85,7 @@ import {
 import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3/context_service'
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
+import { GREETED, heartLabel, heartNote } from '#beta3/hati'
 
 /**
  * Jalur balas ramping (beta 2): satu panggilan AI, tanpa tool, prompt ≈ 6–10rb
@@ -1043,6 +1044,13 @@ export async function createLeanReply(input: {
     systemNote += `\n\nCATATAN SISTEM: pesan ini kemungkinan perlu ditangani manusia (${understanding.csReason.replace(/_/g, ' ')}). Ikuti aturan serah_cs di skill.`
   if (understanding.agreed && pendingForJev?.status === 'pending')
     systemNote += '\n\nCATATAN SISTEM: pelanggan sudah menyetujui. Isi field order lengkap supaya total + rekening terkirim otomatis.'
+  // v3.6.62 Hati CS: bacaan Jev (bentuk kalimat, rasa, momen) → petunjuk singkat untuk AI.
+  const greeted = rows.some((row) => row.direction === 'out' && !row.current && GREETED.test(String(row.body || '')))
+  const hati = heartNote(understanding.heart, greeted)
+  if (hati) {
+    systemNote += `\n\n${hati}`
+    onTrace?.({ key: 'beta3-hati', label: heartLabel(understanding.heart), status: 'completed', detail: { ...understanding.heart } })
+  }
   const storeProfile = await readLeanState('store_profile')
   // v3.6.56: diskon grosir ikut bagian TOKO hanya saat dibahas (hemat token).
   const storedWholesale = String((await readLeanState('wholesale').catch(() => '')) || '')
