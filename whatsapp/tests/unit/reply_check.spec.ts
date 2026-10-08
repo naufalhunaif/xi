@@ -829,3 +829,38 @@ test.group('Beta3 · rekening, stok ready, bot lain (v3.6.89)', () => {
     assert.lengthOf(readyClaimIssues(['Basic Suit Maroon size L ready bos'], rows), 0)
   })
 })
+
+test.group('Beta3 · sapaan bu/pak (v3.6.90)', () => {
+  test('CS memanggil "bu" di chat itu → AI ikut', async ({ assert }) => {
+    const { chatAddress, styleForChat, normalizeStyle } = await import('#beta3/style_service')
+    const cs = (body: string) => ({ direction: 'out', senderType: 'cs', body })
+    assert.equal(chatAddress([cs('siap bu'), cs('ditunggu ya bu')], 'bos'), 'bu')
+    const mine = styleForChat({ address: 'bos', emoji: false, length: 60, samples: 20 }, [cs('siap bu'), cs('makasih bu')])
+    assert.deepEqual(normalizeStyle(['Siap sama sama bos'], mine), ['Siap sama sama bu'])
+  })
+})
+
+test.group('Beta3 · temuan putaran 10 (v3.6.90)', () => {
+  test('estimasi resmi, size Fit Advisor, progres, custom', async ({ assert }) => {
+    const { fixWeekEstimate, alignFitSize, inventsProgress, CUSTOM_REPLY } = await import('#beta3/reply_guards')
+    const { productionRanges } = await import('#beta3/reply_service')
+    const ranges = productionRanges({
+      rules: {
+        preorder: { enabled: true, minDays: 5, maxDays: 10, estimateDays: null, dayType: 'working', startsAfter: 'payment' },
+        custom: { enabled: true, minDays: 7, maxDays: 14, estimateDays: null, dayType: 'working', startsAfter: 'payment' },
+      },
+    } as any)
+    assert.deepEqual(ranges, { preorder: '5-10 hari kerja', custom: '7-14 hari kerja' })
+    assert.deepEqual(fixWeekEstimate(['Proses pembuatannya kurang lebih 1 minggu bos'], ranges).pesan, ['Proses pembuatannya sekitar 5-10 hari kerja bos'])
+    assert.include(fixWeekEstimate(['custom jadi 2 minggu bos'], ranges).pesan[0], '7-14 hari kerja')
+    assert.isFalse(fixWeekEstimate(['siap kirim 5-10 hari kerja'], ranges).changed)
+    const note = 'REKOMENDASI SIZE (Fit Advisor, TB 183 / BB 87, jas): XL (XL 60%, XXL 40%). Sampaikan sebagai rekomendasi.'
+    assert.deepEqual(alignFitSize(['Untuk tinggi 183 berat 87 rekomendasi size XXL bos. Mau pakai XXL ya?'], note).pesan, [
+      'Untuk tinggi 183 berat 87 rekomendasi size XL bos. Mau pakai XL ya?',
+    ])
+    assert.isFalse(alignFitSize(['rekomendasi XL bos, kalau mau longgar XXL'], note).changed)
+    assert.isTrue(inventsProgress('Kaaa ud jadi belum?', ['Belum bos, pesanan baru diproses setelah DP masuk'], ''))
+    assert.isTrue(inventsProgress('sudah selesai atau belum jas yang saya pesan?', ['belum selesai bos, masih dalam proses pembuatan'], ''))
+    assert.lengthOf(CUSTOM_REPLY, 1)
+  })
+})

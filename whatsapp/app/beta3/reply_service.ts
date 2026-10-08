@@ -64,7 +64,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { cancelsOrder, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, inventsProgress, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, fixWeekEstimate, inventsProgress, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -1239,7 +1239,7 @@ export async function createLeanReply(input: {
     history: rows,
     decision,
     rows: digest.rows,
-    extraFacts: [store, priceText, productionText, STORE_BASICS, ...toolNotes].filter(Boolean),
+    extraFacts: [store, priceText, productionText, STORE_BASICS, `Waktu sekarang: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date())} WIB`, ...toolNotes].filter(Boolean),
     settings,
   }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
   if (check.issues.length) {
@@ -1785,6 +1785,21 @@ export async function createLeanReply(input: {
       decision.pesan = pants.pesan
       onTrace?.({ key: 'beta3-pants-guess', label: 'Nomor celana tebakan dibuang → ditanyakan', status: 'completed', detail: {} })
     }
+    // Hanya bila tidak ada ukuran badan (size chart) dan pelanggan belum menyebut size huruf sendiri.
+    const ownSize = [input.text, ...rows.filter((row) => row.direction === 'in').map((row) => String(row.body || ''))].some((text) =>
+      /\b(?:size|ukuran|uk|pakai|biasa)\s*(?:xs|s|m|l|xl|xxl|[2-5]xl)\b/i.test(text)
+    )
+    const chart = toolNotes.some((note) => note.startsWith('PERBANDINGAN SIZE CHART'))
+    const fit = ownSize || chart ? { pesan: decision.pesan, changed: false } : alignFitSize(decision.pesan, toolNotes.find((note) => note.startsWith('REKOMENDASI SIZE')) || '')
+    if (fit.changed) {
+      decision.pesan = fit.pesan
+      onTrace?.({ key: 'beta3-fit-align', label: 'Size disamakan dengan Fit Advisor', status: 'completed', detail: {} })
+    }
+    const week = fixWeekEstimate(decision.pesan, productionRanges(settings.production))
+    if (week.changed) {
+      decision.pesan = week.pesan
+      onTrace?.({ key: 'beta3-estimate', label: 'Estimasi "1 minggu" diganti estimasi resmi', status: 'completed', detail: {} })
+    }
     const same = qualifySamePrice(decision.pesan, style?.address || 'bos')
     if (same.changed) {
       decision.pesan = same.pesan
@@ -1845,6 +1860,20 @@ const ASKS_ACCOUNT =
 /** Pelanggan menanyakan rekening / tujuan transfer (pasti, tanpa AI). */
 export function asksAccountText(text: string) {
   return ASKS_ACCOUNT.test(String(text || ''))
+}
+
+/** Rentang estimasi resmi per jenis ("5-10 hari kerja"). */
+export function productionRanges(production?: LeanSettings['production']) {
+  const out: { preorder?: string; custom?: string } = {}
+  for (const kind of ['preorder', 'custom'] as const) {
+    const rule = production?.rules?.[kind]
+    if (!rule?.enabled) continue
+    const lo = rule.minDays ?? rule.estimateDays ?? rule.maxDays
+    const hi = rule.maxDays ?? rule.estimateDays ?? rule.minDays
+    if (!lo || !hi) continue
+    out[kind] = `${lo === hi ? lo : `${lo}-${hi}`} ${rule.dayType === 'working' ? 'hari kerja' : 'hari'}`
+  }
+  return out
 }
 
 /** Fakta dasar toko untuk pemeriksa & penilai (bukan prompt AI). */

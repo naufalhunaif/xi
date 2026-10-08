@@ -5,9 +5,9 @@ const OTHER_HANDOFF =
 const CUSTOM = /custom|kustom|costum|cust[a-z]?m\b|ukuran sendiri/i
 const WAITING = /\b(cek|tanyakan|tanya)\b.*\b(dulu|ke)\b/i
 
+// v3.6.90: satu bubble yang menjawab "bisa" sekaligus "caranya" (uji: "cara pesan custom gimana" dijawab template).
 export const CUSTOM_REPLY = [
-  'Bisa bos, untuk custom nanti di sesuaikan ukuran ya',
-  'Mau custom ukurannya atau ada detail model yang mau diubah bos?',
+  'Bisa bos, kirim aja contoh model atau detail yang mau diubah, sama tinggi dan berat badannya ya, nanti saya bantu sesuaikan',
 ]
 
 /**
@@ -46,18 +46,53 @@ export function qualifySamePrice(pesan: string[], address = 'bos') {
   return { pesan: out, changed }
 }
 
+const PROGRESS_ASK_EXTRA = /\b(?:u?d(?:ah)?|udh|sudah|sdh)\s+(?:jadi|selesai|beres|dikirim|kirim)\b|\bselesai\s+(?:atau\s+)?belum\b|\bjadi\s+belum\b/i
 const PROGRESS_ASK = /\b(progres\w*|udah jadi|sudah jadi|sdh jadi|kapan jadi|kapan (?:di)?kirim|bl[mu]?m?\s*d\w*kirim|belum dikirim|sudah dikirim|udah dikirim|sampai mana|gimana pesanan|pesanan saya|orderan saya)\b/i
-const TIME_CLAIM = /\b(minggu depan|besok|lusa|hari (?:senin|selasa|rabu|kamis|jumat|sabtu|minggu|ini)|tanggal \d{1,2}|tgl \d{1,2}|\d+\s*hari lagi|sudah (?:jadi|dikirim)|udah (?:jadi|dikirim)|sedang (?:dikirim|finishing)|masih proses)\b/i
+const TIME_CLAIM = /\b(belum selesai|masih dalam proses|baru diproses|sudah selesai|minggu depan|besok|lusa|hari (?:senin|selasa|rabu|kamis|jumat|sabtu|minggu|ini)|tanggal \d{1,2}|tgl \d{1,2}|\d+\s*hari lagi|sudah (?:jadi|dikirim)|udah (?:jadi|dikirim)|sedang (?:dikirim|finishing)|masih proses)\b/i
 /**
  * v3.6.89 — Progres pesanan lama tidak diketahui AI: klaim waktu/status ("minggu depan", "masih proses")
  * yang tidak ada di data = mengarang. Dicek CS.
  */
 export function inventsProgress(customerText: string, pesan: string[], known: string) {
-  if (!PROGRESS_ASK.test(customerText)) return false
+  if (!PROGRESS_ASK.test(customerText) && !PROGRESS_ASK_EXTRA.test(customerText)) return false
   return pesan.some((bubble) => {
     const claim = bubble.match(TIME_CLAIM)?.[0]
     return Boolean(claim && !known.toLowerCase().includes(claim.toLowerCase()))
   })
+}
+
+/**
+ * v3.6.90 — "kurang lebih 1 minggu" dari contoh lama diganti estimasi resmi toko (ESTIMASI PRODUKSI).
+ * `ranges`: {preorder: '5-10 hari kerja', custom: '7-14 hari kerja'}.
+ */
+export function fixWeekEstimate(pesan: string[], ranges: { preorder?: string; custom?: string }) {
+  let changed = false
+  const out = pesan.map((bubble) => {
+    const range = /custom/i.test(bubble) ? ranges.custom || ranges.preorder : ranges.preorder || ranges.custom
+    if (!range) return bubble
+    const next = bubble.replace(/\b(?:kurang lebih|kurleb|sekitar|kira-kira|±)?\s*(?:1|satu|2|dua|3|tiga)\s+minggu(?:an)?\b/i, (match) => {
+      changed = true
+      return `${/^\s/.test(match) ? ' ' : ''}sekitar ${range}`
+    })
+    return next
+  })
+  return { pesan: out, changed }
+}
+
+/**
+ * v3.6.90 — Size dari Fit Advisor tidak dinaikkan/diturunkan sendiri (uji: alat bilang XL, AI bilang XXL
+ * "biar panjangnya pas"; CS asli: XL). Hanya bila balasan tidak menyebut size alat sama sekali.
+ */
+export function alignFitSize(pesan: string[], fitNote: string) {
+  const recommended = fitNote.match(/REKOMENDASI SIZE \(Fit Advisor[^)]*\):\s*([A-Z0-9]+)/)?.[1]
+  if (!recommended) return { pesan, changed: false }
+  const text = pesan.join('\n')
+  if (new RegExp(`\\b${recommended}\\b`, 'i').test(text)) return { pesan, changed: false }
+  const pattern = /\b(rekomendasi(?:nya)?\s+(?:size\s+)?|pakai\s+size\s+|cocok(?:nya)?\s+(?:di\s+)?size\s+|pas\s+(?:di\s+)?size\s+)(XS|S|M|L|XL|XXL|[2-5]XL)\b/i
+  if (!pattern.test(text)) return { pesan, changed: false }
+  const wrong = text.match(pattern)![2]
+  const out = pesan.map((bubble) => bubble.replace(new RegExp(`\\b${wrong}\\b`, 'g'), recommended))
+  return { pesan: out, changed: true }
 }
 
 const PANTS_NUMBER = /\b(?:no\.?|nomor|nomer|size|ukuran)\s*(2[6-9]|3\d|4[0-6])\b/i
