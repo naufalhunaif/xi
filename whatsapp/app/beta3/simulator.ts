@@ -287,7 +287,7 @@ export async function judgeFacts(settings?: LeanSettings) {
 }
 
 /** Langkah yang membawa data alat (dibaca AI) — ikut ke penilai & pemeriksa harga uji. */
-const TOOL_TRACES = new Set(['beta3-rates', 'beta3-fit', 'beta3-sizechart', 'beta3-awb', 'beta3-total', 'beta3-wholesale', 'beta3-price-context'])
+const TOOL_TRACES = new Set(['beta3-geo', 'beta3-rates', 'beta3-fit', 'beta3-sizechart', 'beta3-awb', 'beta3-total', 'beta3-wholesale', 'beta3-price-context'])
 
 /** Gambar pelanggan untuk uji: label katalog ("Produk - Warna") atau URL https → file sementara. */
 async function simImage(ref: string, rows: Awaited<ReturnType<typeof catalogDigest>>['rows']) {

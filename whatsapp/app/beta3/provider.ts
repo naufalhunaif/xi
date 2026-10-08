@@ -68,8 +68,11 @@ export const REPLY_TIMEOUT_MS = 75_000
 const timeoutScope = new AsyncLocalStorage<number>()
 /** v3.6.57: dibatalkan karena akun lain lebih dulu menjawab (cadangan paralel). */
 const cancelScope = new AsyncLocalStorage<AbortSignal>()
-/** Akun cadangan mulai paralel bila akun pertama belum menjawab selama ini (balasan normal 13–38 dtk). */
-export const HEDGE_MS = 35_000
+/**
+ * Akun cadangan mulai paralel bila akun pertama belum menjawab selama ini. v3.6.93: 35 → 20 dtk (data 8 Okt:
+ * balasan ChatGPT median 15 dtk, Claude Sonnet median 27 dtk / p90 45 dtk → yang lambat disusul lebih awal).
+ */
+export const HEDGE_MS = 20_000
 export function providerTimeout(phase: string, imageCount: number) {
   return phase === 'beta3-reply' && !imageCount ? REPLY_TIMEOUT_MS : TIMEOUT_MS
 }

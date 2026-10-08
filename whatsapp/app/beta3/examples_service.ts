@@ -62,7 +62,12 @@ export function pickExamples(
     .sort((a, b) => b.score - a.score || (a.example.id || 0) - (b.example.id || 0))
   // v3.6.87: contoh dari riwayat chat (ribuan) hanya dipakai bila cukup mirip (≥ 2 kata kunci sama).
   const relevant = (item: { example: LeanExample; score: number }) => (item.example.source === 'riwayat' ? item.score >= 2 : item.score > 0)
-  const chosen = scored.filter(relevant).slice(0, limit)
+  // v3.6.93: maks 4 contoh riwayat (prompt membengkak ~12–14 rb token → balasan lambat).
+  let history = 0
+  const chosen = scored
+    .filter(relevant)
+    .filter((item) => item.example.source !== 'riwayat' || ++history <= 4)
+    .slice(0, limit)
   // Kalau pesan terlalu pendek untuk dicocokkan, tetap beri contoh tahap saat ini.
   if (chosen.length < 3)
     for (const item of scored) {
@@ -72,13 +77,15 @@ export function pickExamples(
   return chosen.map((item) => item.example)
 }
 
+const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, '')}…` : text)
+
 export function renderExamples(examples: LeanExample[]) {
   if (!examples.length) return ''
   return [
     'CONTOH JAWABAN CS ASLI (tiru panjang, nada, dan caranya memilih satu langkah berikut):',
     ...examples.map(
       (example, index) =>
-        `${index + 1}. ${example.situation ? `[${example.situation}] ` : ''}Pelanggan: ${example.customerText}\n   CS: ${example.csText.replace(/\n/g, '\n       ')}`
+        `${index + 1}. ${example.situation ? `[${example.situation}] ` : ''}Pelanggan: ${clip(example.customerText, 160)}\n   CS: ${clip(example.csText, 220).replace(/\n/g, '\n       ')}`
     ),
   ].join('\n')
 }

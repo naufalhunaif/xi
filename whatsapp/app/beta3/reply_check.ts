@@ -297,8 +297,8 @@ async function aiReview(settings: LeanProviderSettings, state: Record<string, un
     [],
     'beta3-check-ai',
     REVIEW_SCHEMA,
-    // v3.6.92: model ringan (pemeriksa jalan bersamaan; balasan lebih cepat).
-    { jid, tier: 'light' }
+    // v3.6.93: model ringan ChatGPT (median 5 dtk); Claude Haiku lewat jalur ini median 34 dtk.
+    { jid, tier: 'light', providers: ['chatgpt'] }
   )
   const parsed = JSON.parse(reply.text.slice(reply.text.indexOf('{'), reply.text.lastIndexOf('}') + 1)) as {
     ok?: boolean

@@ -142,7 +142,8 @@ export async function resolveMapLink(url: string): Promise<{ lat?: number; lon?:
         ''
       // Panel Google (share.google → google.com/search?q=…): "Alamat: …, Kec. X, Kabupaten Y, … 90612".
       const address = html.replace(/<[^>]+>/g, ' ').match(/Alamat\s*:?\s*([^|]{10,220}?\b\d{5}\b)/)?.[1] || ''
-      const name = parsed.name || fromHtml.name || title
+      // Judul halaman sering memuat lokasi ("CV. X Kabupaten Y"); nama dari q= tidak.
+      const name = /\b(kabupaten|kota|kab\.|kec\.)/i.test(title) ? title : parsed.name || fromHtml.name || title
       return { ...fromHtml, ...(name ? { name } : {}), ...(address ? { address: address.trim() } : {}) }
     } catch {
       return null
@@ -212,12 +213,17 @@ export async function matchDestination(place: GeoPlace, find: (q: string) => Pro
     const byZip = place.postcode ? rows.filter((row) => String(row.zip_code || '') === place.postcode) : []
     if (byZip.length) return byZip
     const byCity = rows.filter(sameCity)
+    // Nama = kecamatan (bukan desa bernama mirip di kecamatan lain, mis. "Pagedangan Ilir" di Kronjo).
+    const district = byCity.filter((row) => norm(row.district) === norm(name))
+    if (district.length) return district
     if (byCity.length) return byCity
   }
   return []
 }
 
-export type PlaceLookup = { rows: DestinationRow[]; display: string; source: 'link' | 'peta' }
+export type PlaceLookup = { rows: DestinationRow[]; display: string; source: 'link' | 'peta'; city?: string }
+/** Jejak pencarian terakhir (untuk trace): apa yang dicoba & ditemukan. */
+export type LookupTrail = string[]
 
 /**
  * Cari tujuan dari link peta di pesan, atau dari nama tempat yang tidak dikenal ekspedisi.
@@ -225,17 +231,25 @@ export type PlaceLookup = { rows: DestinationRow[]; display: string; source: 'li
  */
 export async function lookupPlace(
   input: { text: string; place?: string | null },
-  find: (q: string) => Promise<DestinationRow[]>
+  find: (q: string) => Promise<DestinationRow[]>,
+  trail: LookupTrail = []
 ): Promise<PlaceLookup | null> {
   const link = mapLink(input.text)
   let place: GeoPlace | null = null
   let source: PlaceLookup['source'] = 'peta'
+  let cityHint = ''
   if (link) {
     source = 'link'
     const target = await resolveMapLink(link)
+    trail.push(`link → ${JSON.stringify(target).slice(0, 240)}`)
     if (target.address) place = parseAddress(target.address)
     if (!place && target.lat !== undefined && target.lon !== undefined) place = await reverseGeocode(target.lat, target.lon)
-    if (!place && target.name) place = await geocode(target.name)
+    if (!place && target.name) {
+      place = await geocode(target.name)
+      // "CV. X Kabupaten Pangkajene Dan Kepulauan" → minimal kota/kabupatennya (nama usaha jarang ada di peta).
+      cityHint = target.name.match(/\b(?:Kabupaten|Kota|Kab\.)\s+(.+)$/i)?.[1]?.trim() || ''
+      if (!place && cityHint) place = await geocode(`Kabupaten ${cityHint}`)
+    }
   }
   // Alamat lengkap yang ditempel pelanggan ("…, Kec. Pagedangan, Kabupaten Tangerang, Banten 15339").
   if (!place) place = parseAddress(input.text)
@@ -245,7 +259,12 @@ export async function lookupPlace(
       if (place) break
     }
   }
-  if (!place) return null
+  if (!place) {
+    trail.push('peta: tidak ketemu')
+    return null
+  }
+  trail.push(`peta → ${place.display.slice(0, 120)} | ${place.names.join('/')} | ${place.city} | ${place.postcode}`)
   const rows = await matchDestination(place, find)
-  return rows.length ? { rows, display: place.display, source } : null
+  trail.push(`tujuan → ${rows.length} baris`)
+  return rows.length ? { rows, display: place.display, source, city: place.city } : null
 }

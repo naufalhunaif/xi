@@ -906,7 +906,8 @@ test.group('Beta3 · cari lokasi di peta (v3.6.92)', () => {
     })
     const rows = {
       pagedangan: [
-        { code: 'TGR1', subdistrict: 'PAGEDANGAN', district: 'PAGEDANGAN', city: 'TANGERANG', zip_code: '15339' },
+        { code: 'KRJ1', subdistrict: 'PAGEDANGAN ILIR', district: 'KRONJO', city: 'TANGERANG', zip_code: '15550' },
+        { code: 'TGR1', subdistrict: 'CIJANTRA', district: 'PAGEDANGAN', city: 'TANGERANG', zip_code: '15336' },
       ],
       pangkajene: [
         { code: 'MKS9', subdistrict: 'JAGONG', district: 'PANGKAJENE', city: 'PANGKAJENE KEPULAUAN', zip_code: '90612' },
@@ -916,7 +917,7 @@ test.group('Beta3 · cari lokasi di peta (v3.6.92)', () => {
     const find = async (q: string) => rows[q.toLowerCase()] || []
     try {
       const bsd = await lookupPlace({ text: 'Tangerang ice bsd', place: 'tangerang ice bsd' }, find)
-      assert.equal(bsd?.rows[0].code, 'TGR1')
+      assert.deepEqual(bsd?.rows.map((row) => row.code), ['TGR1'])
       const link = await lookupPlace({ text: 'CV. CONTOH JAYA https://share.google/AbCdEf' }, find)
       assert.equal(link?.source, 'link')
       assert.deepEqual(link?.rows.map((row) => row.code), ['MKS9'])

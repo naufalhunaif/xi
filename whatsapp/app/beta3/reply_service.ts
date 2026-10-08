@@ -793,7 +793,9 @@ export async function createLeanReply(input: {
   const choiceHit = !form && !loose && followUp && last?.pending && last.choices?.length ? pickArea(input.text, last.choices) : null
   // v3.6.92: link peta / alamat lengkap ditempel → dicari di peta seperti CS (tanpa kata "ongkir").
   const linkPlace = !form && !loose && (mapLink(input.text) || (followUp && parseAddress(input.text))) ? 'lokasi pelanggan' : null
-  const place = extracted || (choiceHit ? last?.place || choiceHit.label : null) || linkPlace
+  // Link peta selalu didahulukan; kata umum ("alamat ini", "sini") bukan nama tempat.
+  const genericPlace = (value: string | null) => Boolean(value && /^(?:alamat|ini|itu|sini|situ|sana|rumah|kantor|saya|aku|tempat|lokasi|yang|di|ke|\s)+$/i.test(value))
+  const place = (mapLink(input.text) && linkPlace) || (genericPlace(extracted) ? null : extracted) || (choiceHit ? last?.place || choiceHit.label : null) || linkPlace
   let geoFound: PlaceLookup | null = null
   if (place && mcp.url) {
     try {
@@ -824,11 +826,13 @@ export async function createLeanReply(input: {
         // v3.6.92: tidak ditemukan / terlalu banyak pilihan → cari di peta (OpenStreetMap / link Google Maps),
         // cocokkan ke tujuan ekspedisi lewat kecamatan + kota + kode pos. Seperti CS membuka Google Maps.
         if (!kept && (areas.length !== 1 || place === linkPlace) && fresh !== false && mcp.url) {
-          geoFound = await lookupPlace({ text: input.text, place: place === linkPlace ? null : place }, (query) => findDestinations(query, mcp)).catch(() => null)
+          const trail: string[] = []
+          geoFound = await lookupPlace({ text: input.text, place: place === linkPlace ? null : place }, (query) => findDestinations(query, mcp), trail).catch(() => null)
+          if (!geoFound) onTrace?.({ key: 'beta3-geo', label: 'Lokasi tidak ketemu di peta', status: 'completed', detail: { place, trail } })
           const better = geoFound ? groupDestinations(geoFound.rows) : []
           if (better.length && (better.length < areas.length || !areas.length || place === linkPlace)) {
             areas = better
-            onTrace?.({ key: 'beta3-geo', label: `Lokasi dicari di peta · ${geoFound!.display.slice(0, 80)}`, status: 'completed', detail: { place, display: geoFound!.display, source: geoFound!.source } })
+            onTrace?.({ key: 'beta3-geo', label: `Lokasi dicari di peta · ${geoFound!.display.slice(0, 80)}`, status: 'completed', detail: { place, display: geoFound!.display, source: geoFound!.source, trail } })
           } else geoFound = null
         }
         if (kept) {
