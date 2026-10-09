@@ -159,6 +159,8 @@ export async function checkReply(input: {
   extraFacts?: string[]
   /** Ada → pemeriksa AI ikut menilai bersamaan dengan Jev (v3.6.79). */
   settings?: LeanProviderSettings
+  /** v3.6.101 — keadaan chat (resi, pembayaran, harga yang sudah disebut, data pelanggan). */
+  chatState?: string
 }): Promise<{ issues: CheckIssue[]; jev: boolean; ai?: boolean }> {
   const issues: CheckIssue[] = []
   const { sent, missing } = photoCaptions(input.rows, input.decision.foto || [])
@@ -179,6 +181,7 @@ export async function checkReply(input: {
     balasan: input.decision.pesan.map((bubble) => maskPii(bubble).slice(0, 900)),
     foto_dikirim: sent,
     fakta_katalog: facts,
+    ...(input.chatState ? { keadaan_chat: maskPii(input.chatState).slice(0, 1500) } : {}),
   }
   const reviewing = input.settings ? aiReview(input.settings, state, input.jid).catch(() => null) : Promise.resolve(null)
   const answers = !jevAllowed ? null : await askJev(
@@ -289,7 +292,7 @@ async function aiReview(settings: LeanProviderSettings, state: Record<string, un
     {
       system: [
         'Kamu pemeriksa balasan CS toko jas SEBELUM dikirim ke pelanggan. Balas HANYA JSON sesuai skema.',
-        'Periksa: (1) maksud pesan_pelanggan terjawab — pahami bahasa tidak baku, daerah, salah ketik, singkatan, dan sebutan warna (item/hitem/ireng = hitam, dongker = navy, marun = maroon, krem = cream, abu = gray, pth = putih); (2) foto_dikirim PERSIS sama dengan produk & warna yang disebut atau dijanjikan balasan — warna yang dijanjikan fotonya ("ini fotonya …") tapi tidak ada fotonya = foto_kurang (sekadar menyebut daftar warna tanpa menjanjikan foto tiap warna BUKAN foto_kurang), foto yang tidak disebut/diminta = foto_lebih, produk/warna berbeda = foto_beda; pelanggan minta semua warna tapi hanya sebagian padahal fakta_katalog punya foto (✓) lainnya = foto_kurang; (3) harga, warna, size ready, dan TOTAL gabungan (mis. jas + celana = harga setelan) sesuai fakta_katalog; angka ongkir harus dari data alat di fakta_katalog — tanpa data, menanyakan info yang kurang itu BENAR; (4) tidak menanyakan ulang yang sudah dijawab; data yang sudah diberi pelanggan (size, nomor celana, alamat) diakui dulu; (5) tidak mengarang = fakta_salah: alasan (mis. kenaikan harga), janji layanan (mis. dikabari saat diantar), klaim (terlaris), atau paket yang tidak ada di fakta_katalog (setelan hanya untuk produk berlabel Setelan); lama/tanggal pengerjaan beda dengan ESTIMASI PRODUKSI, atau bilang "belum ada fotonya" padahal fakta_katalog bertanda ✓ = fakta_salah; size yang disarankan beda dengan "Paling dekat" di PERBANDINGAN SIZE CHART = fakta_salah; menyatakan pesanan/data "belum tercatat" atau meminta ulang data yang ada di percakapan_sebelumnya = mengulang; pertanyaan yang jawabannya ada di data (bahan, lama jadi, alamat) malah dibalas pertanyaan balik = tidak_menjawab; pelanggan mau datang saat toko tutup (lihat Waktu sekarang & jam buka) tapi tidak diberi tahu = tidak_menjawab; (6) pesan bukan soal produk (keluhan website, tawaran kerja sama/jasa dari bisnis lain) dijawab dengan topik lain = tidak_menjawab.',
+        'Periksa: (1) maksud pesan_pelanggan terjawab — pahami bahasa tidak baku, daerah, salah ketik, singkatan, dan sebutan warna (item/hitem/ireng = hitam, dongker = navy, marun = maroon, krem = cream, abu = gray, pth = putih); (2) foto_dikirim PERSIS sama dengan produk & warna yang disebut atau dijanjikan balasan — warna yang dijanjikan fotonya ("ini fotonya …") tapi tidak ada fotonya = foto_kurang (sekadar menyebut daftar warna tanpa menjanjikan foto tiap warna BUKAN foto_kurang), foto yang tidak disebut/diminta = foto_lebih, produk/warna berbeda = foto_beda; pelanggan minta semua warna tapi hanya sebagian padahal fakta_katalog punya foto (✓) lainnya = foto_kurang; (3) harga, warna, size ready, dan TOTAL gabungan (mis. jas + celana = harga setelan) sesuai fakta_katalog; angka ongkir harus dari data alat di fakta_katalog — tanpa data, menanyakan info yang kurang itu BENAR; (4) tidak menanyakan ulang yang sudah dijawab; data yang sudah diberi pelanggan (size, nomor celana, alamat) diakui dulu; (5) tidak mengarang = fakta_salah: alasan (mis. kenaikan harga), janji layanan (mis. dikabari saat diantar), klaim (terlaris), atau paket yang tidak ada di fakta_katalog (setelan hanya untuk produk berlabel Setelan); lama/tanggal pengerjaan beda dengan ESTIMASI PRODUKSI, atau bilang "belum ada fotonya" padahal fakta_katalog bertanda ✓ = fakta_salah; size yang disarankan beda dengan "Paling dekat" di PERBANDINGAN SIZE CHART = fakta_salah; menyatakan pesanan/data "belum tercatat" atau meminta ulang data yang ada di percakapan_sebelumnya = mengulang; pertanyaan yang jawabannya ada di data (bahan, lama jadi, alamat) malah dibalas pertanyaan balik = tidak_menjawab; pelanggan mau datang saat toko tutup (lihat Waktu sekarang & jam buka) tapi tidak diberi tahu = tidak_menjawab; (6) pesan bukan soal produk (keluhan website, tawaran kerja sama/jasa dari bisnis lain) dijawab dengan topik lain = tidak_menjawab; (7) keadaan_chat = hal yang SUDAH terjadi di chat (resi, pembayaran, harga yang sudah disebut, data pelanggan): balasan yang membantahnya = fakta_salah, yang menanyakannya ulang atau bilang "saya cek dulu" padahal sudah ada = mengulang.',
         'Laporkan hanya masalah yang JELAS. Bila balasan benar atau kamu ragu → ok=true, masalah=[]. penjelasan: satu kalimat bahasa Indonesia yang menyebut apa yang harus diubah.',
       ].join('\n'),
       user: JSON.stringify(state),
@@ -385,6 +388,75 @@ export function revisionNote(decision: Pick<LeanDecision, 'pesan' | 'foto'>, iss
     `DRAF foto: ${JSON.stringify(decision.foto)}`,
     'Tulis ulang keputusan LENGKAP (format JSON yang sama) yang sudah memperbaiki masalah di atas. Isi foto harus persis produk/warna yang kamu sebut atau janjikan (nama varian dari KATALOG yang punya foto); kalau tidak ada fotonya, jangan janjikan foto. Jawab maksud pelanggan, angka harus dari KATALOG/POLA HARGA/data alat. JANGAN mengarang angka: data belum ada (mis. tujuan ongkir tidak ditemukan) → tanyakan info yang kurang.',
   ].join('\n')
+}
+
+/** v3.6.101 — skema perbaikan: hanya kata-kata & foto (kolom lain tetap dari draf). */
+export const FIX_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    pesan: { type: 'array', items: { type: 'string' }, description: 'Bubble WhatsApp yang sudah diperbaiki, urut. Biasanya 1, maksimal 2.' },
+    foto: { type: 'array', items: { type: 'string' }, description: 'Nama varian persis dari FAKTA (Produk - Warna, bertanda ✓) yang fotonya dikirim; kosong bila tidak ada.' },
+  },
+  required: ['pesan', 'foto'],
+} as const
+
+/**
+ * v3.6.101 — Perbaikan bagian yang salah saja (bukan tulis ulang penuh): bahan kecil tapi konteks tetap
+ * lengkap — riwayat terakhir, keadaan chat, catatan, fakta yang dipakai pemeriksa, draf, dan masalahnya.
+ * Uji: tulis ulang penuh 45–120 dtk dan hanya lulus 49% (putaran 10–15).
+ */
+export function fixPrompt(input: {
+  rules?: string
+  style?: string
+  customerText: string
+  history: LeanHistoryRow[]
+  chatState?: string
+  notes?: string[]
+  facts: string[]
+  draft: Pick<LeanDecision, 'pesan' | 'foto'>
+  issues: CheckIssue[]
+}) {
+  const system = [
+    'Kamu CS toko jas di WhatsApp. Tugasmu sekarang HANYA memperbaiki draf balasan yang ditandai pemeriksa: ubah bagian yang bermasalah, pertahankan bagian lain yang sudah benar, gaya bicara tetap sama (singkat, santai, sapaan sama). Angka, warna, stok, dan info toko hanya dari FAKTA dan KEADAAN CHAT; data tidak ada → tanyakan yang kurang, jangan mengarang. Balas HANYA JSON sesuai skema.',
+    input.style || '',
+    input.rules || '',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+  const recent = input.history.slice(-12).map((row) => {
+    const who = row.direction === 'in' ? 'Pelanggan' : 'Toko'
+    const media = row.mediaType ? `[${row.mediaType === 'image' ? 'foto' : row.mediaType}${row.mediaNote ? `: ${row.mediaNote}` : ''}] ` : ''
+    return `${row.current ? '>> ' : ''}${who}: ${row.replyTo ? `(membalas "${row.replyTo}") ` : ''}${media}${String(row.body || '').replace(/\s+/g, ' ').slice(0, 400)}`
+  })
+  const user = [
+    `RIWAYAT TERAKHIR (">>" = pesan yang dijawab):\n${recent.join('\n')}`,
+    input.chatState || '',
+    ...(input.notes || []).filter(Boolean),
+    `FAKTA:\n${input.facts.filter(Boolean).join('\n')}`,
+    `PESAN PELANGGAN SEKARANG:\n${input.customerText || '(hanya media)'}`,
+    'PEMERIKSA BALASAN menemukan masalah pada drafmu (belum terkirim):',
+    ...input.issues.map((issue) => `- ${issue.detail}`),
+    `DRAF pesan: ${JSON.stringify(input.draft.pesan)}`,
+    `DRAF foto: ${JSON.stringify(input.draft.foto)}`,
+    'Perbaiki HANYA yang bermasalah. Foto harus persis produk/warna yang disebut atau dijanjikan (✓ di FAKTA); tidak ada fotonya → jangan janjikan foto.',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+  return { system, user }
+}
+
+/** Hasil perbaikan: {pesan, foto}; null bila tidak terbaca / kosong (pakai cara lama). */
+export function parseFix(text: string): Pick<LeanDecision, 'pesan' | 'foto'> | null {
+  try {
+    const raw = String(text || '')
+    const parsed = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)) as { pesan?: unknown; foto?: unknown }
+    const pesan = Array.isArray(parsed.pesan) ? parsed.pesan.map((item) => String(item || '').trim()).filter(Boolean) : []
+    const foto = Array.isArray(parsed.foto) ? parsed.foto.map((item) => String(item || '').trim()).filter(Boolean) : []
+    return pesan.length ? { pesan: pesan.slice(0, 3), foto: foto.slice(0, 10) } : null
+  } catch {
+    return null
+  }
 }
 
 /** Jumlah pemakaian token dua panggilan (draf + tulis ulang). */

@@ -1191,3 +1191,90 @@ test.group('v3.6.100 audit jalur kilat', () => {
     assert.match(both!.join(' '), /buka/i)
   })
 })
+
+test.group('v3.6.101 keadaan chat & perbaikan bagian yang salah', () => {
+  const at = (day: number, hour = 10) => new Date(Date.UTC(2026, 9, day, hour))
+  test('keadaan chat: resi, kirim, bayar, total, harga, foto, data pelanggan', async ({ assert }) => {
+    const { chatStateLines, renderChatState } = await import('#beta3/chat_state')
+    const rows: any[] = [
+      { direction: 'in', body: 'Nama: Budi\nAlamat: Jl. Contoh 1\nKec: Patimuan\nKab: Cilacap\nKode pos: 53264\nNo HP: 08xx', createdAt: at(1) },
+      { direction: 'out', senderType: 'cs', body: 'Basic Suit hitam 485.000 bos, setelannya 705.000', createdAt: at(1, 11) },
+      { direction: 'out', senderType: 'ai', mediaType: 'image', body: 'Basic Suit - Black', createdAt: at(1, 11) },
+      { direction: 'in', body: 'tinggi 170 berat 65, celana no 32', createdAt: at(2) },
+      { direction: 'out', senderType: 'cs', body: 'Total 727.000 ya bos, ongkir 22.000', createdAt: at(2, 11) },
+      { direction: 'out', senderType: 'cs', body: 'Pembayaran sudah kami terima ya bos, prosess', createdAt: at(3) },
+      { direction: 'out', senderType: 'cs', body: 'Pesanan masih proses dijahit bos', createdAt: at(5) },
+      { direction: 'out', senderType: 'cs', body: 'Sudah dikirim bos, resi JNE 1234567890123', createdAt: at(8) },
+      { direction: 'in', body: 'kak orderan saya udah dikirim?', createdAt: at(9), current: true },
+    ]
+    const lines = chatStateLines(rows)
+    const text = lines.join('\n')
+    assert.include(text, 'Resi sudah dikirim toko')
+    assert.include(text, '1234567890123')
+    assert.include(text, 'Pembayaran sudah dikonfirmasi')
+    assert.include(text, 'Total terakhir yang dikirim toko')
+    assert.include(text, '727.000')
+    assert.include(text, '705.000')
+    assert.include(text, 'Basic Suit - Black')
+    assert.include(text, 'Tinggi/berat 170 cm / 65 kg')
+    assert.include(text, 'Celana no 32')
+    // Progres "masih dijahit" sudah lewat (sesudahnya dikirim) → tidak ditampilkan.
+    assert.notInclude(text, 'masih proses dijahit')
+    assert.include(renderChatState(rows), 'KEADAAN CHAT')
+    assert.equal(renderChatState([{ direction: 'in', body: 'halo', createdAt: at(1) } as any]), '')
+  })
+  test('"sudah dikirim fotonya" bukan pengiriman pesanan; progres terakhir tampil bila belum dikirim', async ({ assert }) => {
+    const { chatStateLines } = await import('#beta3/chat_state')
+    const lines = chatStateLines([
+      { direction: 'out', senderType: 'cs', body: 'Sudah saya kirim fotonya ya bos', createdAt: at(1) },
+      { direction: 'out', senderType: 'cs', body: 'Pesanannya tahap finishing bos, besok siap kirim', createdAt: at(2) },
+    ] as any)
+    assert.isFalse(lines.some((line) => line.includes('pesanan dikirim')))
+    assert.isTrue(lines.some((line) => line.startsWith('Progres pesanan terakhir')))
+  })
+  test('perbaikan: bahan kecil + konteks lengkap; hasil hanya pesan & foto', async ({ assert }) => {
+    const { fixPrompt, parseFix, FIX_SCHEMA } = await import('#beta3/reply_check')
+    const prompt = fixPrompt({
+      rules: 'ATURAN TOKO: x',
+      customerText: 'orderan saya udah dikirim?',
+      history: [
+        { direction: 'out', body: 'Sudah dikirim bos, resi JNE 1234567890123', createdAt: at(8) },
+        { direction: 'in', body: 'orderan saya udah dikirim?', createdAt: at(9), current: true },
+      ],
+      chatState: 'KEADAAN CHAT:\n- Resi sudah dikirim toko: 1234567890123',
+      notes: ['CATATAN CHAT:\ntahap: selesai'],
+      facts: ['DASAR TOKO: JNE'],
+      draft: { pesan: ['Saya cek dulu progres pesanannya ya bos'], foto: [] },
+      issues: [{ code: 'mengulang', detail: 'Resi sudah dikirim, jangan bilang cek dulu' }],
+    })
+    assert.include(prompt.user, 'PEMERIKSA BALASAN')
+    assert.include(prompt.user, 'KEADAAN CHAT')
+    assert.include(prompt.user, '>> Pelanggan: orderan saya udah dikirim?')
+    assert.include(prompt.user, 'CATATAN CHAT')
+    assert.include(prompt.system, 'ATURAN TOKO')
+    assert.isBelow(prompt.system.length + prompt.user.length, 4000)
+    assert.deepEqual(FIX_SCHEMA.required, ['pesan', 'foto'])
+    assert.deepEqual(parseFix('{"pesan":["Sudah dikirim bos, resinya 1234567890123"],"foto":[]}'), { pesan: ['Sudah dikirim bos, resinya 1234567890123'], foto: [] })
+    assert.isNull(parseFix('{"pesan":[],"foto":[]}'))
+    assert.isNull(parseFix('bukan json'))
+  })
+  test('reply_service: perbaikan dulu, tulis ulang penuh hanya cadangan; keadaan chat ikut ke AI & pemeriksa', async ({ assert }) => {
+    const source = await readFile('app/beta3/reply_service.ts', 'utf8')
+    assert.include(source, 'fixPrompt({')
+    assert.include(source, 'FIX_SCHEMA')
+    assert.include(source, 'renderChatState([...olderRows, ...rows])')
+    assert.match(source, /chatState,\n\s+history: rows,/)
+    assert.match(source, /settings,\n\s+chatState,\n\s+\}\)\.catch/)
+  })
+})
+
+test.group('v3.6.101 keadaan chat: status dari AI tidak dianggap fakta', () => {
+  test('progres/kirim yang ditulis AI tidak masuk keadaan chat', async ({ assert }) => {
+    const { chatStateLines } = await import('#beta3/chat_state')
+    const lines = chatStateLines([
+      { direction: 'out', senderType: 'ai', body: 'Pesanan masih proses dijahit bos', createdAt: new Date() },
+      { direction: 'out', senderType: 'ai', body: 'Sudah dikirim ya bos', createdAt: new Date() },
+    ] as any)
+    assert.deepEqual(lines, [])
+  })
+})

@@ -257,6 +257,8 @@ export function buildLeanPrompt(input: {
   corrections?: LeanExample[]
   policy?: string
   activeOrder?: string
+  /** v3.6.101 — keadaan chat (ringkasan pasti dari seluruh percakapan). */
+  chatState?: string
 }) {
   const payment = input.paymentMethods.length
     ? `REKENING RESMI (satu-satunya sumber rekening; sebut hanya saat pelanggan tanya transfer kemana atau total sudah disepakati):\n${input.paymentMethods.map((method) => `${method.name} ${method.destination}${method.accountName ? ` an ${method.accountName}` : ''}`).join('\n')}`
@@ -293,6 +295,7 @@ export function buildLeanPrompt(input: {
         ? `SPESIFIKASI PESANAN SAAT INI (tulis ulang lengkap di field spesifikasi, tambahkan detail baru, jangan hilangkan yang lama kecuali pelanggan mengubahnya):\n${input.spec}`
         : 'SPESIFIKASI PESANAN: belum ada. Begitu pelanggan memilih produk/warna/size/detail, mulai isi field spesifikasi.',
     ],
+    ['keadaan', input.chatState || ''],
     ['riwayat', renderHistory(input.history)],
     ['konteks', input.context || ''],
     ['rekening', payment],

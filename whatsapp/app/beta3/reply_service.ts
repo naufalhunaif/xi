@@ -90,7 +90,8 @@ import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { renderPaymentMessage } from '#beta3/order_service'
-import { alignPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, CHECK_LABEL, colorPriceIssues, FIX_SCHEMA, fixPrompt, offColorPhotos, checkReply, mergeUsage, parseFix, photoCaptions, readyClaimIssues, relevantFacts, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
+import { renderChatState } from '#beta3/chat_state'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
 /**
@@ -146,6 +147,26 @@ export function susulanNeedsTotal(text: string) {
 function stageFromNote(note: string) {
   const match = note.match(/tahap\s*[:=]\s*([a-z_]+)/i)
   return match ? match[1].toLowerCase() : ''
+}
+
+/** v3.6.101 — pesan sebelum RIWAYAT (maks 200) untuk keadaan chat; tanpa keterangan gambar/kutipan. */
+async function olderHistory(jid: string, before: Date | string): Promise<LeanHistoryRow[]> {
+  const rows = await db
+    .from('whatsapp_messages')
+    .select('direction', 'sender_type', 'body', 'media_type', 'created_at')
+    .where('jid', jid)
+    .where('created_at', '<', new Date(before))
+    .whereNotIn('status', ['failed', 'queued'])
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(200)
+  return rows.reverse().map((row) => ({
+    direction: row.direction === 'in' ? 'in' : 'out',
+    senderType: row.sender_type,
+    body: row.body,
+    mediaType: row.media_type,
+    createdAt: row.created_at,
+  }))
 }
 
 async function history(jid: string, currentIds: Set<string>, long = false): Promise<LeanHistoryRow[]> {
@@ -556,6 +577,10 @@ export async function createLeanReply(input: {
     listRules(),
   ])
   const stage = stageFromNote(chatNote)
+  // v3.6.101 — keadaan chat dari SELURUH percakapan (juga pesan yang lebih lama dari RIWAYAT): resi, pembayaran,
+  // harga yang sudah disebut, foto terkirim, data pelanggan. Selalu ikut ke AI, pemeriksa, dan perbaikan.
+  const olderRows = input.history || !rows.length ? [] : await olderHistory(jid, rows[0].createdAt).catch(() => [])
+  const chatState = renderChatState([...olderRows, ...rows])
   // Gaya balasan toko: sama untuk ChatGPT, Claude, dan Gemini; sapaan mengikuti CS di chat ini.
   const style = styleForChat(await storeStyle(examples).catch(() => null), rows)
   // Sapaan / terima kasih: jawabannya selalu sama → tanpa memanggil AI (0 token).
@@ -1290,6 +1315,7 @@ export async function createLeanReply(input: {
     customerNote: customerNote || Object.entries(memoryFromChat(rows)).map(([label, value]) => `${label}: ${value}`).join('\n'),
     chatNote,
     spec,
+    chatState,
     history: rows,
     context: collectContext({ history: rows, catalog: digest.rows, text: input.text }),
     message: `${replyContext(rows)}${acceptedOffer(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}${priceNote}${input.note ? `\n\nCATATAN SISTEM: ${input.note}` : ''}`,
@@ -1346,6 +1372,7 @@ export async function createLeanReply(input: {
     rows: digest.rows,
     extraFacts: [store, priceText, productionText, STORE_BASICS, `Waktu sekarang: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date())} WIB`, ...toolNotes].filter(Boolean),
     settings,
+    chatState,
   }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
   if (check.issues.length) {
     onTrace?.({
@@ -1354,22 +1381,69 @@ export async function createLeanReply(input: {
       status: 'failed',
       detail: { masalah: check.issues, draf: { pesan: decision.pesan, foto: decision.foto } },
     })
+    // v3.6.101 — perbaiki bagian yang salah saja (bahan kecil, konteks tetap lengkap); kolom lain tetap dari draf.
+    // Gagal terbaca atau masih salah menurut pemeriksaan pasti → cara lama (tulis ulang penuh) sekali.
+    let fixedPart: Pick<LeanDecision, 'pesan' | 'foto'> | null = null
     try {
-      const revised = await runLeanProvider(
+      const fixFacts = [
+        ...relevantFacts(digest.rows, [input.text, ...rows.slice(-6).map((row) => String(row.body || '')), ...decision.pesan]),
+        store,
+        priceText,
+        productionText,
+        STORE_BASICS,
+        ...toolNotes,
+      ]
+      const fixing = await runLeanProvider(
         settings,
-        { system: prompt.system, user: `${prompt.user}\n\n${revisionNote(decision, check.issues)}` },
+        fixPrompt({
+          rules: renderRules(rules),
+          style: style ? styleGuide(style) : '',
+          customerText: input.text,
+          history: rows,
+          chatState,
+          notes: [chatNote ? `CATATAN CHAT:\n${chatNote}` : '', spec ? `SPESIFIKASI PESANAN:\n${spec}` : ''],
+          facts: fixFacts.filter(Boolean) as string[],
+          draft: decision,
+          issues: check.issues,
+        }),
         input.imagePaths || [],
         'beta3-revise',
-        undefined,
+        FIX_SCHEMA,
         { jid, tier: tierChoice.tier }
       )
-      const fixed = parseLeanDecision(revised.text)
-      decision = fixed
-      result.usage = mergeUsage(result.usage, revised.usage)
-      onTrace?.({ key: 'beta3-revise', label: 'Balasan ditulis ulang sesuai pemeriksa', status: 'completed', detail: { pesan: fixed.pesan, foto: fixed.foto } })
-    } catch (error) {
-      onTrace?.({ key: 'beta3-revise', label: 'Tulis ulang gagal · draf awal dipakai', status: 'failed', detail: { error: error instanceof Error ? error.message : String(error) } })
+      fixedPart = parseFix(fixing.text)
+      if (fixedPart) {
+        const still = [
+          ...photoCaptions(digest.rows, fixedPart.foto).missing,
+          ...colorPriceIssues(fixedPart.pesan, digest.rows),
+          ...readyClaimIssues(fixedPart.pesan, digest.rows),
+        ]
+        if (still.length) fixedPart = null
+      }
+      result.usage = mergeUsage(result.usage, fixing.usage)
+    } catch {
+      fixedPart = null
     }
+    if (fixedPart) {
+      decision = { ...decision, pesan: fixedPart.pesan, foto: fixedPart.foto }
+      onTrace?.({ key: 'beta3-revise', label: 'Balasan diperbaiki (bagian yang salah saja) · ditulis ulang sesuai pemeriksa', status: 'completed', detail: { pesan: fixedPart.pesan, foto: fixedPart.foto } })
+    } else
+      try {
+        const revised = await runLeanProvider(
+          settings,
+          { system: prompt.system, user: `${prompt.user}\n\n${revisionNote(decision, check.issues)}` },
+          input.imagePaths || [],
+          'beta3-revise',
+          undefined,
+          { jid, tier: tierChoice.tier }
+        )
+        const fixed = parseLeanDecision(revised.text)
+        decision = fixed
+        result.usage = mergeUsage(result.usage, revised.usage)
+        onTrace?.({ key: 'beta3-revise', label: 'Balasan ditulis ulang sesuai pemeriksa (penuh)', status: 'completed', detail: { pesan: fixed.pesan, foto: fixed.foto } })
+      } catch (error) {
+        onTrace?.({ key: 'beta3-revise', label: 'Tulis ulang gagal · draf awal dipakai', status: 'failed', detail: { error: error instanceof Error ? error.message : String(error) } })
+      }
   } else if (check.jev || (check as { ai?: boolean }).ai)
     onTrace?.({ key: 'beta3-check', label: 'Pemeriksa balasan · sesuai', status: 'completed', detail: {} })
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
