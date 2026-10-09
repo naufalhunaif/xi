@@ -152,6 +152,32 @@ function stageFromNote(note: string) {
   return match ? match[1].toLowerCase() : ''
 }
 
+const photoKey = (url: unknown) => String(url || '').split('?')[0].split('/').pop()?.toLowerCase() || ''
+/**
+ * v3.6.107 — Pelanggan membalas (kutip) FOTO tanpa teks: sebut fotonya. Instagram mengirim caption sebagai
+ * pesan terpisah sesudah foto, jadi kutipannya hanya "[image]" (kasus IG: 6 foto dikirim, pelanggan membalas foto
+ * Peak Suit - Black, AI menjawab produk foto terakhir). Urutan: foto katalog (URL sama) → caption sesudahnya.
+ */
+async function describeQuotedImage(item: { id: number; jid: string; direction: string; media_url?: string | null; created_at: Date | string }) {
+  const key = photoKey(item.media_url)
+  if (key) {
+    const row = (await catalogDigest()).rows.find((entry) => entry.photoUrl && photoKey(entry.photoUrl) === key)
+    if (row) return `[foto katalog: ${row.color ? `${row.product} - ${row.color}` : row.product}]`
+  }
+  const next = await db
+    .from('whatsapp_messages')
+    .select('body', 'media_type', 'created_at')
+    .where('jid', item.jid)
+    .where('direction', item.direction)
+    .where('id', '>', item.id)
+    .orderBy('id', 'asc')
+    .first()
+  const caption = String(next?.body || '').trim()
+  if (next && !next.media_type && caption && caption.length <= 120 && Math.abs(new Date(next.created_at).getTime() - new Date(item.created_at).getTime()) <= 2 * 60_000)
+    return `[foto: ${caption.replace(/\s+/g, ' ')}]`
+  return ''
+}
+
 /** v3.6.101 — pesan sebelum RIWAYAT (maks 200) untuk keadaan chat; tanpa keterangan gambar/kutipan. */
 async function olderHistory(jid: string, before: Date | string): Promise<LeanHistoryRow[]> {
   const rows = await db
@@ -191,11 +217,12 @@ async function history(jid: string, currentIds: Set<string>, long = false): Prom
   if (quotedIds.length) {
     const found = await db
       .from('whatsapp_messages')
-      .select('message_id', 'body', 'media_type')
+      .select('id', 'jid', 'message_id', 'direction', 'body', 'media_type', 'media_url', 'created_at')
       .whereIn('message_id', quotedIds as string[])
     for (const item of found) {
       const text = String(item.body || '').trim().replace(/\s+/g, ' ').slice(0, 160)
-      quoted.set(String(item.message_id), text || (item.media_type ? `[${item.media_type}]` : ''))
+      const media = item.media_type === 'image' && !text ? await describeQuotedImage(item).catch(() => '') : ''
+      quoted.set(String(item.message_id), text || media || (item.media_type ? `[${item.media_type}]` : ''))
     }
     // Kutipan ke status WhatsApp toko (diunggah dari HP): bukan pesan chat, disimpan terpisah.
     const missing = (quotedIds as string[]).filter((id) => !quoted.has(String(id)))
@@ -1273,7 +1300,8 @@ export async function createLeanReply(input: {
   const trimmedSkill = trimSkill(skillUsed.content, skillNeed)
   const focus = needs.catalog
     ? focusCatalog(digest.rows, {
-        text: input.text,
+        // v3.6.107: produk di foto/pesan yang dikutip pelanggan ikut dirinci.
+        text: [input.text, ...rows.filter((row) => row.current && row.replyTo).map((row) => String(row.replyTo))].join('\n'),
         history: rows,
         spec: String(spec || ''),
         chatNote,

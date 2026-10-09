@@ -1341,3 +1341,40 @@ test.group('v3.6.106 jalur kilat dimatikan (semua lewat AI)', () => {
     assert.include(source, 'if (FAST_LANE && shipFast')
   })
 })
+
+test.group('v3.6.107 kutipan foto (Instagram: caption terpisah)', () => {
+  test('pelanggan membalas foto tanpa teks → foto katalog / caption sesudahnya', async ({ assert }) => {
+    const { importLeanCatalog, catalogDigest } = await import('#beta3/catalog_service')
+    const { createLeanReply } = await import('#beta3/reply_service')
+    const { setLeanProviderOverride } = await import('#beta3/provider')
+    await importLeanCatalog([
+      { product: 'Peak Suit', color: 'Black', price: 485000, category: 'Suits', photoUrl: 'https://cdn.example.test/uploads/peak-black.jpg', sizesReady: 'M L' },
+      { product: 'Premium Basic Suit', color: 'Green Emerald', price: 685000, category: 'Suits', photoUrl: 'https://cdn.example.test/uploads/pbs-green.jpg', sizesReady: '' },
+    ] as any)
+    await catalogDigest(true)
+    const jid = '7700000000001@ig'
+    await db.from('whatsapp_messages').where('jid', jid).delete()
+    const t = (s: number) => new Date(Date.now() - 600_000 + s * 1000)
+    await db.table('whatsapp_messages').insert([
+      { jid, message_id: 'q-img-1', direction: 'out', sender_type: 'ai', body: '', media_type: 'image', media_url: 'https://cdn.example.test/uploads/peak-black.jpg?x=1', status: 'sent', created_at: t(1) },
+      { jid, message_id: 'q-cap-1', direction: 'out', sender_type: 'ai', body: 'Peak Suit - Black', status: 'sent', created_at: t(2) },
+      { jid, message_id: 'q-img-2', direction: 'out', sender_type: 'ai', body: '', media_type: 'image', media_url: 'https://other.test/x.jpg', status: 'sent', created_at: t(3) },
+      { jid, message_id: 'q-cap-2', direction: 'out', sender_type: 'ai', body: 'Jas Lain - Navy', status: 'sent', created_at: t(4) },
+      { jid, message_id: 'q-in-1', direction: 'in', sender_type: 'customer', body: 'Model seperti ini, satu stel berapa?', reply_to_message_id: 'q-img-1', status: 'received', created_at: t(10) },
+      { jid, message_id: 'q-in-2', direction: 'in', sender_type: 'customer', body: 'kalau yang ini?', reply_to_message_id: 'q-img-2', status: 'received', created_at: t(11) },
+    ])
+    let seen = ''
+    setLeanProviderOverride(async ({ phase, prompt }) => {
+      if (phase === 'beta3-reply' && !seen) seen = prompt.user
+      return JSON.stringify({ pesan: ['Siap bos'], foto: [], catatan: '', tahap: 'lain', serah_cs: false, alasan: '', susulan: '', spesifikasi: '', referensi: [], bukti: [], pembayaran: null, order: null })
+    })
+    const { readSettings } = await import('#services/settings_service')
+    const settings = await readSettings(true)
+    await createLeanReply({ jid, messageIds: ['q-in-1', 'q-in-2'], text: 'Model seperti ini, satu stel berapa?\nkalau yang ini?', settings: { ...settings, aiProvider: 'chatgpt' } as any, simulate: true }).catch(() => null)
+    setLeanProviderOverride(null)
+    await db.from('whatsapp_messages').where('jid', jid).delete()
+    assert.include(seen, 'foto katalog: Peak Suit - Black')
+    assert.include(seen, 'foto: Jas Lain - Navy')
+    assert.notInclude(seen, 'membalas "[image]"')
+  })
+})

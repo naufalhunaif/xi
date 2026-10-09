@@ -610,7 +610,18 @@ export function realSegments(rows: RealRow[]) {
     // v3.6.86: pesan yang dikutip pelanggan ("yang ini berapa" sambil membalas foto) ikut, seperti di chat asli.
     const quotedId = asked.find((row) => row.reply_to_message_id)?.reply_to_message_id
     const quoted = quotedId ? rows.find((row) => row.message_id && row.message_id === quotedId) : undefined
-    const kutip = quoted ? String(quoted.body || '').trim().slice(0, 160) || (quoted.media_type ? `[${quoted.media_type}]` : '') : ''
+    // v3.6.107: foto tanpa teks (Instagram: caption menyusul sebagai pesan sendiri) → sebut caption-nya.
+    const captionOf = (row: RealRow) => {
+      const next = rows[rows.indexOf(row) + 1]
+      const text = String(next?.body || '').trim()
+      return next && next.direction === row.direction && !next.media_type && text && text.length <= 120 &&
+        Math.abs(new Date(next.created_at).getTime() - new Date(row.created_at).getTime()) <= 2 * 60_000
+        ? `[foto: ${text.replace(/\s+/g, ' ')}]`
+        : ''
+    }
+    const kutip = quoted
+      ? String(quoted.body || '').trim().slice(0, 160) || (quoted.media_type === 'image' ? captionOf(quoted) : '') || (quoted.media_type ? `[${quoted.media_type}]` : '')
+      : ''
     if ((texts.length || image) && answered.length)
       segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered, mulai: askedAt, ...(kutip ? { kutip } : {}) })
     asked = []
