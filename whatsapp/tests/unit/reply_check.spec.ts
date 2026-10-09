@@ -1378,3 +1378,26 @@ test.group('v3.6.107 kutipan foto (Instagram: caption terpisah)', () => {
     assert.notInclude(seen, 'membalas "[image]"')
   })
 })
+
+test.group('v3.6.108 postingan Instagram yang dibagikan', () => {
+  test('keterangan postingan ikut; pratinjau gagal diunduh → tautan di teks, tanpa media rusak', async ({ assert }) => {
+    const { ingestInstagramWebhook } = await import('#services/instagram_inbox')
+    const mid = `mid-share-${Date.now()}`
+    await ingestInstagramWebhook({
+      entry: [{ messaging: [{ sender: { id: '7712345' }, recipient: { id: '999' }, timestamp: Date.now(), message: { mid, attachments: [{ type: 'ig_post', payload: { url: 'http://127.0.0.1:9/post.jpg', title: 'Peak Suit Black siap kondangan' } }] } }] }],
+    })
+    const row = await db.from('whatsapp_messages').where('message_id', mid).first()
+    assert.exists(row)
+    assert.include(row.body, '[membagikan postingan] "Peak Suit Black siap kondangan"')
+    assert.include(row.body, 'http://127.0.0.1:9/post.jpg')
+    assert.isNull(row.media_type)
+    await db.from('whatsapp_messages').where('message_id', mid).delete()
+    await db.from('whatsapp_ig_turns').where('jid', '7712345@ig').delete()
+  })
+  test('tinggi ruang chat mengikuti jendela (--app-h)', async ({ assert }) => {
+    const theme = await readFile('public/assets/theme.js', 'utf8')
+    assert.include(theme, "setProperty('--app-h'")
+    const css = await readFile('public/assets/app.css', 'utf8')
+    assert.include(css, 'height: var(--app-h, 100dvh);')
+  })
+})

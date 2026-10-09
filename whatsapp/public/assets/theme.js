@@ -35,3 +35,14 @@
     document.getElementById('uiTheme')?.addEventListener('change', (event) => setPreference(event.target.value))
   })
 })()
+
+// v3.6.108 — tinggi layar dari jendela (bukan hanya 100dvh): sesudah jendela dibesarkan/diubah, Chrome kadang
+// tidak memperbarui 100dvh sehingga ruang chat hanya terisi setengah layar (bawahnya hitam kosong).
+;(() => {
+  const set = () => document.documentElement.style.setProperty('--app-h', `${Math.round(window.innerHeight)}px`)
+  set()
+  window.addEventListener('resize', set)
+  window.addEventListener('pageshow', set)
+  window.addEventListener('focus', set)
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && set())
+})()

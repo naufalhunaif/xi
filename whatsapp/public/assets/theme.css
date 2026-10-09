@@ -581,7 +581,7 @@ html[data-theme="dark"] .workspace-ui .message-ig-caption { background: rgba(255
   html body.workspace-ui .sidebar .app-launcher-popover { left: 8px; right: 8px; bottom: calc(var(--wa-tabbar-h) + 8px); width: auto; }
   html body.workspace-ui .sidebar .nav-badge { top: 4px; right: calc(50% - 20px); }
   html body.workspace-ui .shell { margin-left: 0; padding-bottom: var(--wa-tabbar-h); }
-  html body.workspace-ui .wa-shell-chat { height: 100dvh; }
+  html body.workspace-ui .wa-shell-chat { height: var(--app-h, 100dvh); }
   html body.workspace-ui:has(#main.wa-main-chat[data-room='open']) .sidebar { display: none; }
   html body.workspace-ui:has(#main.wa-main-chat[data-room='open']) .shell { padding-bottom: 0; }
 }

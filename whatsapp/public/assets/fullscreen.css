@@ -73,7 +73,7 @@
   margin: 0 0 0 var(--wa-rail-width);
 }
 .workspace-ui .wa-shell-chat {
-  height: 100dvh;
+  height: var(--app-h, 100dvh);
   min-height: 0;
   overflow: hidden;
 }

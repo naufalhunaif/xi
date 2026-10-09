@@ -24,9 +24,12 @@ type Messaging = {
     is_deleted?: boolean
     is_unsupported?: boolean
     reply_to?: { mid?: string; story?: { url?: string } }
-    attachments?: Array<{ type?: string; payload?: { url?: string; title?: string } }>
+    attachments?: Array<{ type?: string; payload?: { url?: string; title?: string; ig_post_media_id?: string } }>
   }
 }
+
+/** Lampiran yang punya gambar pratinjau (postingan / story yang dibagikan). Reel = video, tetap teks. */
+const SHARED_PREVIEW = new Set(['share', 'ig_post', 'story_mention'])
 
 const ATTACHMENT_NOTE: Record<string, string> = {
   image: '',
@@ -92,9 +95,17 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
   if (await db.from('whatsapp_messages').where('message_id', mid).first()) return
   const created = new Date(Number(event.timestamp) || Date.now())
   const attachments = Array.isArray(message.attachments) ? message.attachments : []
-  const image = attachments.find((item) => item?.type === 'image' && item.payload?.url)
+  const photo = attachments.find((item) => item?.type === 'image' && item.payload?.url)
+  // v3.6.108 — postingan/story yang dibagikan pelanggan: gambar pratinjaunya disimpan & tampil di room
+  // (dulu hanya teks "[membagikan postingan]"), keterangan postingan ikut sebagai teks.
+  const shared = photo ? undefined : attachments.find((item) => SHARED_PREVIEW.has(String(item?.type || '')) && item.payload?.url)
+  const image = photo || shared
   const notes = attachments
-    .map((item) => ATTACHMENT_NOTE[String(item?.type || '')] ?? '')
+    .map((item) => {
+      const note = ATTACHMENT_NOTE[String(item?.type || '')] ?? ''
+      const title = String(item?.payload?.title || '').replace(/\s+/g, ' ').trim()
+      return note && title ? `${note} "${title.slice(0, 300)}"` : note
+    })
     .filter(Boolean)
   const text = [String(message.text || '').trim(), ...notes].filter(Boolean).join('\n')
   if (echo) {
@@ -148,19 +159,21 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
     status: 'received',
     created_at: created,
   })
-  if (image?.payload?.url) await downloadImage(mid, image.payload.url).catch(() => {})
+  if (photo?.payload?.url) await downloadImage(mid, photo.payload.url).catch(() => {})
+  else if (shared?.payload?.url) await downloadSharedPreview(mid, shared.payload.url).catch(() => {})
   await invalidateConversationGoal(jid).catch(() => {})
   await scheduleTurn(jid, mid)
 }
 
 /** Gambar CDN Instagram kedaluwarsa: disalin ke media aplikasi seperti WhatsApp. */
 /** Unduh gambar Instagram ke public/media; kembalikan path lokal. */
-export async function saveRemoteImage(name: string, url: string) {
+export async function saveRemoteImage(name: string, url: string, requireImage = false) {
   const response = await fetch(url, { signal: AbortSignal.timeout(20_000) })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   const bytes = Buffer.from(await response.arrayBuffer())
   if (bytes.byteLength > 25 * 1024 * 1024) throw new Error('Media terlalu besar')
   const type = String(response.headers.get('content-type') || '')
+  if (requireImage && !/^image\//i.test(type)) throw new Error('Bukan gambar')
   const extension = type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : 'jpg'
   const directory = app.makePath('public', 'media')
   await mkdir(directory, { recursive: true })
@@ -178,6 +191,26 @@ export async function downloadImage(messageId: string, url: string) {
       .update({ media_url: local, thumbnail_url: local, media_status: 'ready' })
   } catch {
     await db.from('whatsapp_messages').where('message_id', messageId).update({ media_status: 'failed' })
+  }
+}
+
+/**
+ * v3.6.108 — pratinjau postingan yang dibagikan. Bukan gambar (mis. tautan halaman) → tanpa media, tautannya
+ * ditambahkan ke teks supaya CS tetap bisa membukanya.
+ */
+export async function downloadSharedPreview(messageId: string, url: string) {
+  try {
+    const local = await saveRemoteImage(`ig-${messageId}`, url, true)
+    await db
+      .from('whatsapp_messages')
+      .where('message_id', messageId)
+      .update({ media_url: local, thumbnail_url: local, media_status: 'ready' })
+  } catch {
+    const row = await db.from('whatsapp_messages').where('message_id', messageId).first()
+    await db
+      .from('whatsapp_messages')
+      .where('message_id', messageId)
+      .update({ media_type: null, media_mime: null, media_status: null, body: [String(row?.body || '').trim(), url].filter(Boolean).join('\n').slice(0, 4000) })
   }
 }
 
