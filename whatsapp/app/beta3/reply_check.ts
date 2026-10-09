@@ -114,6 +114,86 @@ export function colorPriceIssues(pesan: string[], rows: LeanCatalogRow[]): Check
   return issues
 }
 
+/**
+ * v3.6.112 — Harga per produk (pasti, dari katalog): uji 88 chat — "Premium Basic Suit satu set 705.000" (setelannya
+ * 955.000), "jas aja tetap 700.000" (harga setelan). Satu produk + satu harga dalam satu kalimat → harga harus milik
+ * produk itu (jas) atau setelannya; "setelan/satu stel/jas+celana" → harga setelan; "jas aja" → harga jas.
+ */
+export function productPriceIssues(pesan: string[], rows: LeanCatalogRow[]): CheckIssue[] {
+  const active = rows.filter((row) => row.active !== false && Number(row.price) > 0)
+  const bigOf = (row: LeanCatalogRow) => {
+    const hit = String(row.note || '').match(/XXL(?:-\d?X*L)?\s+([\d.]+)/)
+    return hit ? Number(hit[1].replace(/\./g, '')) : 0
+  }
+  const pricesOf = (name: string) => {
+    const set = new Set<number>()
+    for (const row of active)
+      if (fold(row.product) === name) {
+        set.add(Number(row.price))
+        const big = bigOf(row)
+        if (big) set.add(big)
+      }
+    return set
+  }
+  const bases = [...new Set(active.map((row) => fold(row.product)).filter((name) => !/^setelan\b/.test(name) && name.length >= 4))].sort((a, b) => b.length - a.length)
+  const issues: CheckIssue[] = []
+  const DOT = '\u2024'
+  for (const bubble of pesan) {
+    const sentences = bubble.replace(/(\d)\.(?=\d{3}\b)/g, `$1${DOT}`).split(/(?<=[.!?\n])/).map((part) => part.split(DOT).join('.'))
+    for (const sentence of sentences) {
+      if (/\b(total|ongkir|ongkos|dp|diskon|potongan|tambah\w*|selisih|sisa|\+|x\s*\d|kali|lusin|pcs)\b/i.test(sentence)) continue
+      const prices = [...sentence.matchAll(/\b(\d{1,3}(?:\.\d{3})+)\b/g)].map((match) => Number(match[1].replace(/\./g, '')))
+      if (new Set(prices).size !== 1 || prices[0] < 50_000) continue
+      let text = ` ${fold(sentence).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ')} `
+      const named: string[] = []
+      for (const name of bases)
+        if (text.includes(` ${name} `)) {
+          named.push(name)
+          text = text.split(` ${name} `).join(' ')
+        }
+      if (named.length !== 1) continue
+      const name = named[0]
+      // Seri disebut terpisah ("Tuxedo premium") tapi nama produk yang cocok tanpa seri → ragu, lewati.
+      const series = (fold(sentence).match(/\b(premium|signature)\b/g) || []).filter((word) => !name.includes(word))
+      if (series.length) continue
+      const jas = pricesOf(name)
+      const setelan = pricesOf(`setelan ${name}`)
+      const wantSet = /\b(setelan|stelan|satu\s+stel|1\s+stel|set|full\s*set|jas\s+(?:dan|sama|\+|&)\s+celana)\b/i.test(sentence)
+      const jasOnly = /\b(jas|jasnya)\s+(?:aja|saja|doang|nya\s+aja)\b|\bhanya\s+jas\b|\btanpa\s+celana\b/i.test(sentence)
+      const allowed = wantSet && setelan.size ? setelan : jasOnly && jas.size ? jas : new Set([...jas, ...setelan])
+      if (!allowed.size || allowed.has(prices[0])) continue
+      const label = active.find((row) => fold(row.product) === name)?.product || name
+      const list = (values: Set<number>) => [...values].sort((a, b) => a - b).map((value) => value.toLocaleString('id-ID')).join(' / ')
+      issues.push({
+        code: 'fakta_salah',
+        detail: `${CHECK_LABEL.fakta_salah}: harga ${label}${jas.size ? ` jas ${list(jas)}` : ''}${setelan.size ? `, setelan ${list(setelan)}` : ''} (KATALOG), bukan ${prices[0].toLocaleString('id-ID')}.`,
+      })
+    }
+  }
+  return issues
+}
+
+const words = (text: string) => new Set(fold(text).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((word) => word.length > 2))
+/**
+ * v3.6.112 — Mengulang isi balasan toko sebelumnya (uji: daftar 8 model yang sama dikirim dua giliran berturut-turut,
+ * daftar ukuran diulang kata per kata). Bubble panjang yang ≥ 80% sama dengan pesan toko 6 terakhir → mengulang.
+ */
+export function repeatIssues(pesan: string[], history: LeanHistoryRow[]): CheckIssue[] {
+  const previous = history.filter((row) => row.direction === 'out' && !row.current && String(row.body || '').length >= 80).slice(-6)
+  for (const bubble of pesan) {
+    // Rekening, total, dan format order memang boleh dikirim ulang bila diminta lagi.
+    if (bubble.length < 80 || /\b(rek|rekening|total|nama\s*:|alamat\s*:)/i.test(bubble)) continue
+    const mine = words(bubble)
+    for (const row of previous) {
+      const theirs = words(String(row.body || ''))
+      const shared = [...mine].filter((word) => theirs.has(word)).length
+      if (shared / Math.max(1, Math.min(mine.size, theirs.size)) >= 0.8)
+        return [{ code: 'mengulang', detail: `${CHECK_LABEL.mengulang}: isi ini sudah dikirim toko sebelumnya ("${String(row.body).slice(0, 80)}…"). Jangan kirim ulang daftar/rincian yang sama; jawab pertanyaan barunya saja, singkat.` }]
+    }
+  }
+  return []
+}
+
 const NOT_READY = /\b(kosong|habis|pre[\s-]?order|belum ready|tidak ready|gak ready|ga ready|belum ada stok|stoknya (?:lagi )?kosong)\b/i
 /**
  * v3.6.89 — Stok ready (pasti, dari katalog): "jas Maroon size L pre order, stok kosong" padahal Basic Suit
@@ -167,7 +247,12 @@ export async function checkReply(input: {
   if (missing.length)
     issues.push({ code: 'foto_tidak_ada', detail: `Tidak ada foto katalog untuk: ${missing.join(', ')}. Pakai nama varian persis dari KATALOG yang bertanda foto.` })
   if (input.decision.serah_cs || !input.decision.pesan.length) return { issues, jev: false }
-  issues.push(...colorPriceIssues(input.decision.pesan, input.rows), ...readyClaimIssues(input.decision.pesan, input.rows))
+  issues.push(
+    ...colorPriceIssues(input.decision.pesan, input.rows),
+    ...readyClaimIssues(input.decision.pesan, input.rows),
+    ...productPriceIssues(input.decision.pesan, input.rows),
+    ...repeatIssues(input.decision.pesan, input.history)
+  )
   const jevAllowed = await jevOn('cek_balasan')
   if (!jevAllowed && !input.settings) return { issues, jev: false }
   const recent = recentLines(input.history)

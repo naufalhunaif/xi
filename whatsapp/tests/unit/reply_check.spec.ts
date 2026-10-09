@@ -1533,3 +1533,46 @@ test.group('v3.6.111 hasil uji beban 88 chat', () => {
     assert.isTrue(out.changed)
   })
 })
+
+test.group('v3.6.112 masalah berulang dari uji beban', () => {
+  const r = (product: string, price: number, extra: Record<string, unknown> = {}) =>
+    ({ product, color: 'Black', category: 'Suits', price, active: true, sizesReady: '', photoUrl: null, note: '', ...extra }) as any
+  const rows = [
+    r('Basic Suit', 485000, { note: 'XXL 635.000' }),
+    r('Setelan Basic Suit', 705000, { note: 'XXL 855.000' }),
+    r('Premium Basic Suit', 685000),
+    r('Setelan Premium Basic Suit', 955000),
+  ]
+  test('harga produk: setelan Premium bukan 705.000; jas aja bukan harga setelan', async ({ assert }) => {
+    const { productPriceIssues } = await import('#beta3/reply_check')
+    assert.lengthOf(productPriceIssues(['Premium Basic Suit satu set jas dan celana 705.000 bos'], rows), 1)
+    assert.include(productPriceIssues(['Premium Basic Suit satu set jas dan celana 705.000 bos'], rows)[0].detail, '955.000')
+    assert.lengthOf(productPriceIssues(['Kalau Basic Suit jas aja harganya 705.000 bos'], rows), 1)
+    // Benar / ragu → tidak dipermasalahkan.
+    assert.lengthOf(productPriceIssues(['Basic Suit mulai 485.000 bos'], rows), 0)
+    assert.lengthOf(productPriceIssues(['Setelan Basic Suit 705.000, XXL 855.000 bos'], rows), 0)
+    assert.lengthOf(productPriceIssues(['Basic Suit size XXL 635.000 bos'], rows), 0)
+    assert.lengthOf(productPriceIssues(['Basic Suit premium 685.000 bos'], rows), 0)
+    assert.lengthOf(productPriceIssues(['Total Basic Suit 485.000 + ongkir 15.000 = 500.000'], rows), 0)
+  })
+  test('mengulang daftar yang sama dengan pesan toko sebelumnya', async ({ assert }) => {
+    const { repeatIssues } = await import('#beta3/reply_check')
+    const list = 'Model jas yang ada: Basic Suit, Peak Suit, Tuxedo, Bescap Cross Placket, Beskap Clean Look, Casual Suit, Double Breasted, Premium Basic Suit'
+    const history = [{ direction: 'out', body: list, createdAt: new Date() }, { direction: 'in', body: 'yang paling laris?', createdAt: new Date(), current: true }] as any
+    assert.lengthOf(repeatIssues([list.replace('Model jas yang ada', 'Pilihan modelnya')], history), 1)
+    assert.lengthOf(repeatIssues(['Yang paling sering dipesan Basic Suit Black bos, simpel dan cocok buat kondangan maupun kerja'], history), 0)
+  })
+  test('foto sebelumnya ikut dilihat AI saat pesan merujuk "ini/foto"; aturan DP ikut ke AI', async ({ assert }) => {
+    const source = await readFile('app/beta3/reply_service.ts', 'utf8')
+    assert.include(source, 'PHOTO_REF.test(input.text) ? await recentCustomerImage(jid, input.messageIds)')
+    assert.include(source, 'DP minimal 50% dari total, pelunasan setelah pesanan jadi')
+  })
+})
+
+test.group('v3.6.112 mengulang: rekening/total/format boleh diulang', () => {
+  test('rekening diminta lagi tidak dianggap mengulang', async ({ assert }) => {
+    const { repeatIssues } = await import('#beta3/reply_check')
+    const rek = 'Untuk pembayaran tf ke rek BANK 000 an TOKO agar pesanan langsung kami proses ya bos, terima kasih banyak'
+    assert.lengthOf(repeatIssues([rek], [{ direction: 'out', body: rek, createdAt: new Date() }] as any), 0)
+  })
+})

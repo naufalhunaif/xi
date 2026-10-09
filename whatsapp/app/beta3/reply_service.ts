@@ -191,6 +191,40 @@ export function socialClosing(text: string, address = 'bos') {
   return ''
 }
 
+/** Pesan merujuk sesuatu yang sudah dikirim ("yang ini", "model seperti ini", "foto tadi"). */
+const PHOTO_REF =
+  /\b(ini|itu|tadi|td|tsb|tersebut|gini|gitu|begini|begitu|kayak\s+gini|kaya\s+gini|kek\s+gini|seperti\s+(?:ini|itu|foto|gambar)|foto\w*|gambar\w*|pic|screenshot|ss)\b/i
+
+/**
+ * v3.6.112 — Foto terakhir dari pelanggan (bukan giliran ini) di 12 pesan terakhir & 3 hari terakhir, sebagai path
+ * file lokal (public/media). Kosong bila tidak ada / file tidak ada.
+ */
+async function recentCustomerImage(jid: string, currentIds: string[]) {
+  const recent = (await db
+    .from('whatsapp_messages')
+    .select('message_id', 'direction', 'media_type', 'media_url', 'media_status', 'created_at')
+    .where('jid', jid)
+    .orderBy('id', 'desc')
+    .limit(12)) as Array<{ message_id: string; direction: string; media_type: string | null; media_url: string | null; media_status: string | null; created_at: Date | string }>
+  const hit = recent.find(
+    (row) =>
+      row.direction === 'in' &&
+      row.media_type === 'image' &&
+      row.media_url &&
+      (!row.media_status || row.media_status === 'ready') &&
+      !currentIds.includes(String(row.message_id)) &&
+      Date.now() - new Date(row.created_at).getTime() < 3 * 86_400_000
+  )
+  if (!hit) return ''
+  const name = String(hit.media_url).split('?')[0].split('/').pop() || ''
+  if (!/^[a-zA-Z0-9_.-]+$/.test(name)) return ''
+  const { default: app } = await import('@adonisjs/core/services/app')
+  const path = app.makePath('public', 'media', name)
+  const { access } = await import('node:fs/promises')
+  await access(path)
+  return path
+}
+
 /** v3.6.101 — pesan sebelum RIWAYAT (maks 200) untuk keadaan chat; tanpa keterangan gambar/kutipan. */
 async function olderHistory(jid: string, before: Date | string): Promise<LeanHistoryRow[]> {
   const rows = await db
@@ -1396,8 +1430,16 @@ export async function createLeanReply(input: {
     status: 'completed',
     detail: { ...tierChoice, difficulty: understanding.difficulty ?? null },
   })
+  // v3.6.112 — "yang ini / model seperti ini" merujuk foto yang dikirim pelanggan sebelumnya: foto itu ikut dilihat
+  // AI (uji 88 chat: AI menanyakan ulang model/warna padahal pelanggan sudah kirim foto).
+  const contextImage =
+    !input.imagePaths?.length && !input.simulate && PHOTO_REF.test(input.text) ? await recentCustomerImage(jid, input.messageIds).catch(() => '') : ''
+  if (contextImage) {
+    prompt.user += '\n\n(Lampiran gambar adalah FOTO yang dikirim pelanggan SEBELUMNYA dan dirujuk pesan ini — pakai untuk memahami produk/model yang dimaksud; jangan dimasukkan ke referensi/bukti, jangan menanyakan ulang modelnya.)'
+    onTrace?.({ key: 'beta3-photo-context', label: 'Foto sebelumnya dari pelanggan ikut dilihat AI', status: 'completed', detail: {} })
+  }
   onTrace?.({ key: 'beta3-ai', label: 'Menyusun balasan · tanpa tool', status: 'running' })
-  const result = await runLeanProvider(settings, prompt, input.imagePaths || [], undefined, undefined, {
+  const result = await runLeanProvider(settings, prompt, contextImage ? [contextImage] : input.imagePaths || [], undefined, undefined, {
     jid,
     tier: tierChoice.tier,
   })
@@ -2090,7 +2132,7 @@ export function productionRanges(production?: LeanSettings['production']) {
 
 /** Fakta dasar toko untuk pemeriksa & penilai (bukan prompt AI). */
 export const STORE_BASICS =
-  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer.'
+  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer; bisa DP minimal 50% dari total, pelunasan setelah pesanan jadi.'
 
 const WEB_PLACE_SCHEMA = {
   type: 'object',
