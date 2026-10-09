@@ -7,7 +7,7 @@ import { invalidateConversationGoal } from '#services/conversation_goal_service'
 import { resumeAiAfterHumanReply } from '#services/message_service'
 import { readSettings } from '#services/settings_service'
 import { ensureIgTables, igJid, readIgConfig, type IgConfig } from '#services/instagram_store'
-import { mediaInfo, messageDetail, profile } from '#services/instagram_api'
+import { conversationMessages, mediaInfo, messageDetail, profile } from '#services/instagram_api'
 
 /**
  * Webhook Instagram → tabel pesan yang sama dengan WhatsApp. Balasan AI dikerjakan worker
@@ -348,13 +348,36 @@ export async function repairSharedPosts(limit = 40) {
     )
     .whereNot('body', 'like', '%http%')
     .orderBy('id', 'desc')
-    .limit(limit)) as Array<{ message_id: string; body: string | null }>
+    .limit(limit)) as Array<{ message_id: string; jid: string; body: string | null }>
   let fixed = 0
   let sample: unknown = null
+  const report: Array<{ id: string; found: string; tries?: unknown; conversation?: string }> = []
+  // v3.6.115: cadangan dari daftar pesan percakapan (sekali per pelanggan).
+  const threads = new Map<string, any[] | string>()
+  const fromThread = async (jid: string, messageId: string) => {
+    if (!threads.has(jid))
+      threads.set(
+        jid,
+        await conversationMessages(config.token, jid.replace(/@ig$/, '')).catch((error) =>
+          (error instanceof Error ? error.message : String(error)).slice(0, 200)
+        )
+      )
+    const list = threads.get(jid)
+    if (typeof list === 'string') return { detail: null, note: list }
+    const hit = list!.find((item) => String(item?.id || '') === messageId)
+    return { detail: hit || null, note: hit ? 'ada' : `tidak ada di ${list!.length} pesan terbaru` }
+  }
   for (const row of rows) {
-    const detail = await messageDetail(config.token, row.message_id).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }))
+    const detail: any = await messageDetail(config.token, row.message_id).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }))
     if (!sample) sample = JSON.stringify(detail).slice(0, 1500)
-    const { url, mediaId } = sharedUrlFromDetail(detail)
+    let { url, mediaId } = sharedUrlFromDetail(detail)
+    let conversation = ''
+    if (!url && !mediaId && row.jid) {
+      const thread = await fromThread(row.jid, row.message_id)
+      conversation = thread.note
+      if (thread.detail) ({ url, mediaId } = sharedUrlFromDetail(thread.detail))
+    }
+    report.push({ id: row.message_id.slice(-12), found: url ? 'url' : mediaId ? 'media' : '-', tries: detail?._tries, conversation })
     let target = url
     if (!target && mediaId) target = (await mediaInfo(config.token, mediaId)).image
     if (!target) continue
@@ -364,7 +387,7 @@ export async function repairSharedPosts(limit = 40) {
     else await downloadSharedPreview(row.message_id, target).catch(() => {})
     fixed++
   }
-  return { checked: rows.length, fixed, sample }
+  return { checked: rows.length, fixed, sample, report }
 }
 
 async function ingestComment(value: any, config: IgConfig) {

@@ -553,6 +553,7 @@ html[data-theme="dark"] .workspace-ui .nav-item .nav-badge { background: #f08c4a
 .workspace-ui .message.has-media .message-ig-caption { margin: 8px 9px 2px; }
 .workspace-ui .message-ig-caption small { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
 .workspace-ui .message-ig-caption span { font-size: 11px; line-height: 15px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.workspace-ui .message-ig-caption a { font-size: 11px; line-height: 15px; color: var(--text, inherit); text-decoration: underline; text-underline-offset: 2px; justify-self: start; }
 html[data-theme="dark"] .workspace-ui .message-ig-caption { background: rgba(255, 255, 255, 0.07); }
 /* Akun & keluar di halaman Pengaturan. */
 .workspace-ui .wa-account-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--wa-surface, #fff); }

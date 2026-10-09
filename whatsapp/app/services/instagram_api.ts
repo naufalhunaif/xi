@@ -186,10 +186,46 @@ export async function mediaInfo(token: string, mediaId: string) {
 }
 
 /** v3.6.113 — isi satu pesan DM (lampiran, postingan dibagikan, story) untuk memperbaiki pesan lama. */
+/**
+ * v3.6.115 — isi pesan DM dari API. Bidang lampiran/postingan baru keluar bila sub-bidangnya diminta
+ * (attachments{image_data,…}, shares{link}); format API bisa berbeda, jadi dicoba beberapa susunan dan
+ * hasilnya digabung. `_tries` = ringkasan percobaan (tanpa token) untuk diagnosa.
+ */
+const DETAIL_FIELDS = [
+  'id,message,is_unsupported,attachments{image_data,video_data,audio_data,file_url,generic_template,name,mime_type},shares{link,name,description,template},story',
+  'id,message,shares{link,name}',
+  'id,message,attachments{image_data,video_data,file_url}',
+  'id,message,attachments,shares,story',
+]
 export async function messageDetail(token: string, messageId: string) {
-  const ask = (fields: string) =>
-    call(`${IG_GRAPH}/${encodeURIComponent(messageId)}?fields=${fields}`, { headers: bearer(token) })
-  return ask('id,message,attachments,shares,story').catch(() => ask('id,message,attachments'))
+  const merged: Record<string, any> = {}
+  const tries: Array<{ fields: string; keys?: string[]; error?: string }> = []
+  for (const fields of DETAIL_FIELDS) {
+    try {
+      const data = await call(`${IG_GRAPH}/${encodeURIComponent(messageId)}?fields=${encodeURIComponent(fields)}`, { headers: bearer(token) })
+      for (const [key, value] of Object.entries(data || {})) if (merged[key] === undefined || merged[key] === '') merged[key] = value
+      tries.push({ fields: fields.slice(0, 48), keys: Object.keys(data || {}) })
+    } catch (error) {
+      tries.push({ fields: fields.slice(0, 48), error: (error instanceof Error ? error.message : String(error)).slice(0, 200) })
+    }
+  }
+  return { ...merged, _tries: tries }
+}
+
+/**
+ * v3.6.115 — cadangan: pesan-pesan percakapan dengan satu pelanggan (IGSID), lengkap dengan lampiran &
+ * postingan yang dibagikan. API hanya memberi pesan terbaru; pesan lama bisa tidak ada.
+ */
+export async function conversationMessages(token: string, igsid: string) {
+  const list = await call(
+    `${IG_GRAPH}/me/conversations?platform=instagram&user_id=${encodeURIComponent(igsid)}&fields=id`,
+    { headers: bearer(token) }
+  )
+  const id = String(list?.data?.[0]?.id || '')
+  if (!id) return [] as any[]
+  const fields = 'messages.limit(50){id,created_time,message,attachments{image_data,video_data,audio_data,file_url,generic_template},shares{link,name,description},story}'
+  const data = await call(`${IG_GRAPH}/${encodeURIComponent(id)}?fields=${encodeURIComponent(fields)}`, { headers: bearer(token) })
+  return (Array.isArray(data?.messages?.data) ? data.messages.data : []) as any[]
 }
 
 /** X-Hub-Signature-256 = HMAC-SHA256(Instagram app secret, body mentah). */

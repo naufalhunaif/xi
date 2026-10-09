@@ -1608,3 +1608,32 @@ test.group('v3.6.114 video / pesan suara / file Instagram disimpan sebagai media
     await db.from('whatsapp_ig_turns').where('jid', '7712347@ig').delete()
   })
 })
+
+test.group('v3.6.115 postingan Instagram dibagikan: kartu & petunjuk AI', () => {
+  test('AI diberi tahu apakah gambar postingan ada', async ({ assert }) => {
+    const { igShareHint, renderHistory } = await import('#beta3/prompt')
+    assert.include(igShareHint({ direction: 'in', body: '[membagikan postingan]', mediaType: null }), 'tidak terbaca')
+    assert.include(igShareHint({ direction: 'in', body: '[membagikan postingan] "Jas Navy"', mediaType: 'image' }), 'terlampir')
+    assert.equal(igShareHint({ direction: 'in', body: 'cek harga', mediaType: null }), '')
+    assert.equal(igShareHint({ direction: 'out', body: '[membagikan postingan]', mediaType: null }), '')
+    const text = renderHistory([{ direction: 'in', body: '[membagikan postingan]', createdAt: new Date(), current: true }])
+    assert.include(text, 'jangan menebak modelnya')
+  })
+  test('kartu di room: label, keterangan, tautan; teks lain tetap', async ({ assert }) => {
+    const source = await readFile('public/assets/app.js', 'utf8')
+    const start = source.indexOf('  const IG_SHARE_LABEL')
+    const end = source.indexOf('  window.waIgShare = igShare')
+    const igShare = new Function(`${source.slice(start, end)}; return igShare`)()
+    const card = igShare({ jid: '1@ig', body: '[membagikan postingan] "Jas Navy Slimfit"\nhttps://www.instagram.com/p/abc/\nini ready kak?' })
+    assert.deepEqual(card, { label: 'Postingan dibagikan', caption: 'Jas Navy Slimfit', link: 'https://www.instagram.com/p/abc/', text: 'ini ready kak?' })
+    assert.equal(igShare({ jid: '1@ig', body: '[membalas story toko]\nmasih ada?' }).text, 'masih ada?')
+    assert.isNull(igShare({ jid: '62812@s.whatsapp.net', body: '[membagikan postingan]' }))
+    assert.isNull(igShare({ jid: '1@ig', body: 'halo' }))
+  })
+  test('detail pesan dicoba beberapa susunan bidang, hasil digabung', async ({ assert }) => {
+    const source = await readFile('app/services/instagram_api.ts', 'utf8')
+    assert.include(source, 'attachments{image_data')
+    assert.include(source, 'shares{link')
+    assert.include(source, 'export async function conversationMessages')
+  })
+})

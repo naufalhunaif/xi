@@ -215,6 +215,18 @@ const stamp = (value: Date | string) =>
     minute: '2-digit',
   }).format(new Date(value))
 
+/**
+ * v3.6.115 — postingan/reel/story Instagram yang dibagikan pelanggan: AI diberi tahu apakah gambarnya ada.
+ * Tanpa gambar, AI dulu menjawab "berikut contoh modelnya" padahal tidak tahu postingan mana.
+ */
+const IG_SHARED = /\[(?:membagikan postingan|membagikan reel|menyebut toko di story|membalas story toko)\]/
+export function igShareHint(row: Pick<LeanHistoryRow, 'direction' | 'body' | 'mediaType'>) {
+  if (row.direction !== 'in' || !IG_SHARED.test(String(row.body || ''))) return ''
+  return row.mediaType
+    ? ' (gambar postingan/story itu terlampir: tanggapi produk di gambar itu)'
+    : ' (isi postingan tidak terbaca sistem: jangan menebak modelnya / bilang "berikut contohnya"; tanya singkat model yang dimaksud atau minta screenshot)'
+}
+
 export function renderHistory(rows: LeanHistoryRow[]) {
   if (!rows.length) return 'RIWAYAT: chat baru, belum ada pesan sebelumnya.'
   const lines = rows.map((row) => {
@@ -230,7 +242,7 @@ export function renderHistory(rows: LeanHistoryRow[]) {
       .replace(/\s*\n\s*/g, ' / ')
       .slice(0, 600)
     const quote = row.replyTo ? `(membalas "${row.replyTo}") ` : ''
-    return `${row.current ? '>> ' : ''}[${stamp(row.createdAt)}] ${who}: ${quote}${media}${body || '(tanpa teks)'}`
+    return `${row.current ? '>> ' : ''}[${stamp(row.createdAt)}] ${who}: ${quote}${media}${body || '(tanpa teks)'}${igShareHint(row)}`
   })
   return `RIWAYAT (lama → baru; baris ">>" adalah pesan yang harus dijawab sekarang):\n${lines.join('\n')}`
 }

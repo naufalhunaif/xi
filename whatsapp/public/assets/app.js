@@ -275,11 +275,45 @@
     const match = String(message.body || '').match(IG_COMMENT)
     return match ? { caption: (match[1] || '').trim(), text: (match[2] || '').trim() } : null
   }
-  const cleanPreview = (text) => String(text || '').replace(IG_COMMENT, (_, caption, rest) => `💬 ${rest}`.trim())
+  // v3.6.115 — postingan/reel/story yang dibagikan pelanggan Instagram tampil sebagai kartu (label, keterangan,
+  // tautan), bukan teks mentah "[membagikan postingan]".
+  const IG_SHARE_LABEL = {
+    'membagikan postingan': 'Postingan dibagikan',
+    'membagikan reel': 'Reel dibagikan',
+    'menyebut toko di story': 'Menyebut toko di story',
+    'membalas story toko': 'Membalas story',
+  }
+  const IG_SHARE = /^\[(membagikan postingan|membagikan reel|menyebut toko di story|membalas story toko)\](?:\s*"([^"\n]*)")?\s*$/
+  function igShare(message) {
+    if (!String(message.jid || '').endsWith('@ig')) return null
+    let kind = ''
+    let caption = ''
+    let link = ''
+    const rest = []
+    for (const line of String(message.body || '').split('\n')) {
+      const match = line.trim().match(IG_SHARE)
+      if (match) {
+        if (!kind) [kind, caption] = [match[1], (match[2] || '').trim()]
+        continue
+      }
+      if (!link && /^https?:\/\/\S+$/.test(line.trim())) {
+        link = line.trim()
+        continue
+      }
+      rest.push(line)
+    }
+    return kind ? { label: IG_SHARE_LABEL[kind], caption, link, text: rest.join('\n').trim() } : null
+  }
+  window.waIgShare = igShare
+  const cleanPreview = (text) =>
+    String(text || '')
+      .replace(IG_COMMENT, (_, caption, rest) => `💬 ${rest}`.trim())
+      .replace(/\[(membagikan postingan|membagikan reel|menyebut toko di story|membalas story toko)\](?:\s*"[^"\n]*")?/g, (_, kind) => `📷 ${t(IG_SHARE_LABEL[kind])}`)
   function messageElement(message) {
     const article = document.createElement('article')
     const senderType = message.sender_type || (message.direction === 'out' ? 'cs' : 'customer')
     const comment = igComment(message)
+    const share = comment ? null : igShare(message)
     const hasMedia = Boolean(message.media_type)
     // v3.6.45: balasan CS dari HP (owner) tampil sama dengan balasan CS dari web.
     const sourceClass = senderType === 'owner' ? 'source-owner source-cs' : `source-${senderType}`
@@ -429,6 +463,27 @@
       post.append(label, caption)
       article.append(post)
     }
+    if (share) {
+      const post = document.createElement('div')
+      post.className = 'message-ig-caption message-ig-share'
+      const label = document.createElement('small')
+      label.textContent = t(share.label)
+      post.append(label)
+      if (share.caption || !hasMedia) {
+        const caption = document.createElement('span')
+        caption.textContent = share.caption || t('Pratinjau tidak dikirim Instagram — buka di aplikasi Instagram')
+        post.append(caption)
+      }
+      if (share.link) {
+        const open = document.createElement('a')
+        open.href = share.link
+        open.target = '_blank'
+        open.rel = 'noopener noreferrer'
+        open.textContent = t('Buka di Instagram')
+        post.append(open)
+      }
+      article.append(post)
+    }
     const meta = document.createElement('div')
     meta.className = 'message-meta'
     if (message.direction === 'out') {
@@ -440,10 +495,11 @@
       meta.textContent = message.contact_name || roomTitle || fallbackName(message.jid)
     }
     article.append(meta)
-    if (comment ? comment.text : message.body) {
+    const bodyText = comment ? comment.text : share ? share.text : message.body
+    if (bodyText) {
       const body = document.createElement('div')
       body.className = 'message-body'
-      body.textContent = comment ? comment.text : message.body
+      body.textContent = bodyText
       article.append(body)
     }
     const footer = document.createElement('div')

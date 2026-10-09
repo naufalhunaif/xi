@@ -2096,4 +2096,10 @@ window.waLocales.en = {
   "Tersimpan.": "Saved.",
   "Menguji…": "Testing…",
   "Tersambung ({0} ms): {1}": "Connected ({0} ms): {1}",
+  "Postingan dibagikan": "Shared post",
+  "Reel dibagikan": "Shared reel",
+  "Menyebut toko di story": "Mentioned the store in a story",
+  "Membalas story": "Replied to story",
+  "Pratinjau tidak dikirim Instagram — buka di aplikasi Instagram": "Instagram did not send a preview — open it in the Instagram app",
+  "Buka di Instagram": "Open in Instagram",
 }
