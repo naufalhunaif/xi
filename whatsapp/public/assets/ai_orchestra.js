@@ -1,22 +1,22 @@
 ;(() => {
-  // Orkestra AI: peta ala graph view Obsidian. Pusat WhatsApp, cincin akun AI, dan awan
-  // pelanggan yang menempel ke akun yang terakhir melayani. Akun yang bekerja menyala,
-  // denyut mengalir pelanggan → akun → pelanggan, perpindahan akun tampil sebagai busur.
+  // v3.6.121 — Orkestra AI ala n8n: alur kerja balasan sebagai simpul & garis.
+  // Pesan masuk → Jev → akun AI (urutan cadangan) → Pemeriksa → Kirim → Order / Bayar / CS.
+  // Panel sempit: atas → bawah; mode Perbesar: kiri → kanan. Posisi tetap (tanpa simulasi fisika), hanya
+  // status yang berubah; garis yang sedang dilalui bergerak lewat CSS → ringan.
   const root = document.getElementById('aiOrchestra')
   if (!root) return
   const svg = document.getElementById('aiOrchestraGraph')
+  const stage = svg.parentElement
   const tip = document.getElementById('aiOrchestraTip')
   const logList = document.getElementById('aiOrchestraLog')
   const nowText = document.getElementById('aiOrchestraNow')
   const expandButton = document.getElementById('aiOrchestraExpand')
   const NS = 'http://www.w3.org/2000/svg'
-  // offsetParent selalu null untuk elemen position:fixed (mode Perbesar), jadi cek ukuran.
   const shown = () => root.getClientRects().length > 0
   const base = document.querySelector('meta[name="app-url"]').content.replace(/\/$/, '')
   const workspace = () => document.querySelector('meta[name="whatsapp-workspace"]')?.content || ''
   const t = (value, ...args) =>
     window.waI18n?.t(value, ...args) ?? value.replace(/\{(\d+)\}/g, (match, index) => args[index] ?? match)
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)')
   const make = (tag, attrs = {}, parent) => {
     const node = document.createElementNS(NS, tag)
     for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value))
@@ -24,410 +24,365 @@
     return node
   }
   const clock = (ms) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-  const ago = (ms) => (ms ? window.waTime.ago(ms) : t('belum pernah'))
+  const ago = (ms) => (ms ? window.waTime?.ago(ms) || clock(ms) : t('belum pernah'))
   const phaseLabel = (phase) =>
     /recap/.test(phase) ? t('rekap order') : /catalog|vision|ciri/.test(phase) ? t('baca katalog') : t('balasan chat')
 
-  // ── kanvas: zoom (roda/pinch) & geser (seret latar) ──
-  const view = { x: -200, y: -200, w: 400, h: 400 }
-  // Tanpa zoom manual, kamera mengikuti seluruh graf (seperti Obsidian).
-  let userView = false
-  const applyView = () => svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`)
-  applyView()
-  const camera = make('g', {}, svg)
-  const defs = make('defs', {}, svg)
-  const marker = make('marker', { id: 'orcArrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs)
-  make('path', { d: 'M0,0 L10,5 L0,10 z', class: 'orc-arrow' }, marker)
-  const layerLinks = make('g', { class: 'orc-links' }, camera)
-  const layerEdges = make('g', { class: 'orc-edges' }, camera)
-  const layerArcs = make('g', { class: 'orc-arcs' }, camera)
-  const layerPulses = make('g', { class: 'orc-pulses' }, camera)
-  const layerCustomers = make('g', { class: 'orc-customers' }, camera)
-  const layerNodes = make('g', { class: 'orc-nodes' }, camera)
+  // Ikon garis sederhana (24×24), digambar dengan stroke.
+  const ICON = {
+    trigger: 'M4 5h16v11H10l-6 4z',
+    jev: 'M12 3l2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6z',
+    ai: 'M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9zM18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z',
+    check: 'M12 3l7 3v5.5c0 4.3-2.9 7.6-7 9.5-4.1-1.9-7-5.2-7-9.5V6zM8.5 12l2.4 2.4L15.5 10',
+    send: 'M3 11.5L21 4l-7.5 17-2.2-7.3z',
+    order: 'M6 8h12l-1 12H7zM9 8V7a3 3 0 0 1 6 0v1',
+    pay: 'M3 6.5h18v11H3zM3 10.5h18M7 14.5h3',
+    cs: 'M4.5 14v-2a7.5 7.5 0 0 1 15 0v2M4.5 13.5h3v5h-3zM16.5 13.5h3v5h-3z',
+  }
+  const SIZE = 54
+  const HALF = SIZE / 2
 
-  const hub = { id: 'hub', x: 0, y: 0, vx: 0, vy: 0, fixed: true }
-  hub.el = make('g', { class: 'orc-node orc-hub' }, layerNodes)
-  hub.halo = make('circle', { class: 'halo', r: 16 }, hub.el)
-  hub.core = make('circle', { class: 'core', r: 9 }, hub.el)
-  hub.label = make('text', { class: 'label', y: 20, 'text-anchor': 'middle' }, hub.el)
-  hub.label.textContent = 'Chat'
-  hub.baseR = 9
+  // ── lapisan ──
+  const viewport = make('g', {}, svg)
+  const layerEdges = make('g', { class: 'orc-edges' }, viewport)
+  const layerNodes = make('g', { class: 'orc-nodes' }, viewport)
 
-  const nodes = new Map() // akun AI
-  const people = new Map() // pelanggan
   let accounts = []
+  let customers = []
   let busy = new Set()
   let lastEventId = 0
   let loaded = false
-  let pulses = []
-  let arcs = []
   let lastTrouble = null
-  const logItems = []
+  let horizontal = false
+  const nodes = new Map() // id → { el, shape, icon, label, sub, badge, x, y, kind, info }
+  const edges = new Map() // key → { path, label, from, to }
+  const flashes = new Map()
 
-  function toGraph(event) {
-    const point = svg.createSVGPoint()
-    point.x = event.clientX
-    point.y = event.clientY
-    return point.matrixTransform(svg.getScreenCTM().inverse())
+  // ── simpul ──
+  function roundedPath(w, h, left, right) {
+    const x = -w / 2
+    const y = -h / 2
+    return `M${x + left},${y}H${x + w - right}A${right},${right} 0 0 1 ${x + w},${y + right}V${y + h - right}A${right},${right} 0 0 1 ${x + w - right},${y + h}H${x + left}A${left},${left} 0 0 1 ${x},${y + h - left}V${y + left}A${left},${left} 0 0 1 ${x + left},${y}Z`
+  }
+  function nodeFor(id, kind) {
+    let node = nodes.get(id)
+    if (node) return node
+    const el = make('g', { class: `orc-n k-${kind}`, tabindex: 0, role: 'img' }, layerNodes)
+    const shape = make('path', { class: 'box', d: roundedPath(SIZE, SIZE, kind === 'trigger' ? HALF : 10, 10) }, el)
+    const icon = make('path', { class: 'icon', d: ICON[kind] || ICON.ai, transform: 'translate(-12 -12)' }, el)
+    const spin = make('circle', { class: 'spin', r: 6, cx: HALF - 3, cy: -HALF + 3 }, el)
+    const badge = make('g', { class: 'badge' }, el)
+    make('circle', { r: 7, cx: HALF - 3, cy: -HALF + 3 }, badge)
+    const badgeText = make('text', { x: HALF - 3, y: -HALF + 6, 'text-anchor': 'middle' }, badge)
+    const inPort = make('rect', { class: 'port in', width: 4, height: 10, rx: 1.5 }, el)
+    const outPort = make('circle', { class: 'port out', r: 4 }, el)
+    const label = make('text', { class: 'label', 'text-anchor': 'middle' }, el)
+    const sub = make('text', { class: 'sub', 'text-anchor': 'middle' }, el)
+    node = { id, kind, el, shape, icon, spin, badge, badgeText, inPort, outPort, label, sub, x: 0, y: 0, info: [] }
+    el.addEventListener('mouseenter', () => showTip(node))
+    el.addEventListener('focus', () => showTip(node))
+    el.addEventListener('mouseleave', hideTip)
+    el.addEventListener('blur', hideTip)
+    nodes.set(id, node)
+    return node
+  }
+  function place(node, x, y) {
+    node.x = x
+    node.y = y
+    node.el.setAttribute('transform', `translate(${x} ${y})`)
+    const port = horizontal
+      ? { x: -HALF - 2, y: -5, width: 4, height: 10, cx: HALF, cy: 0 }
+      : { x: -5, y: -HALF - 2, width: 10, height: 4, cx: 0, cy: HALF }
+    for (const key of ['x', 'y', 'width', 'height']) node.inPort.setAttribute(key, port[key])
+    node.outPort.setAttribute('cx', port.cx)
+    node.outPort.setAttribute('cy', port.cy)
+    node.label.setAttribute('y', HALF + 16)
+    node.sub.setAttribute('y', HALF + 29)
+  }
+  function setNode(node, { label, sub = '', state = 'idle', provider = '', count = '', info = [] }) {
+    node.el.setAttribute('class', `orc-n k-${node.kind} s-${state}${provider ? ` p-${provider}` : ''}${flashes.get(node.id) ? ` f-${flashes.get(node.id)}` : ''}`)
+    node.label.textContent = label
+    node.sub.textContent = sub
+    node.badge.style.display = count === '' ? 'none' : ''
+    node.badgeText.textContent = String(count)
+    node.info = [label, ...info].filter(Boolean)
+    node.el.setAttribute('aria-label', node.info.join(' · '))
+  }
+
+  // ── garis ──
+  function edgeFor(from, to, labelText = '') {
+    const key = `${from.id}>${to.id}`
+    let edge = edges.get(key)
+    if (!edge) {
+      const path = make('path', { class: 'orc-e' }, layerEdges)
+      const label = make('text', { class: 'orc-e-label', 'text-anchor': 'middle' }, layerEdges)
+      edge = { key, path, label }
+      edges.set(key, edge)
+    }
+    edge.from = from
+    edge.to = to
+    edge.used = true
+    const [ox, oy] = horizontal ? [from.x + HALF + 2, from.y] : [from.x, from.y + HALF + 2]
+    const [ix, iy] = horizontal ? [to.x - HALF - 2, to.y] : [to.x, to.y - HALF - 2]
+    const bend = Math.max(30, (horizontal ? ix - ox : iy - oy) / 2)
+    edge.path.setAttribute(
+      'd',
+      horizontal
+        ? `M${ox},${oy} C${ox + bend},${oy} ${ix - bend},${iy} ${ix},${iy}`
+        : `M${ox},${oy} C${ox},${oy + bend} ${ix},${iy - bend} ${ix},${iy}`
+    )
+    edge.label.textContent = labelText
+    edge.label.setAttribute('x', ((ox + ix) / 2 + (horizontal ? 0 : 10)).toFixed(1))
+    edge.label.setAttribute('y', ((oy + iy) / 2 - (horizontal ? 6 : 0)).toFixed(1))
+    return edge
+  }
+  function edgeState(edge, state, provider = '') {
+    edge.path.setAttribute('class', `orc-e s-${state}${provider ? ` p-${provider}` : ''}`)
+  }
+
+  // ── tata letak & isi ──
+  const JEV = (account) => account.provider === 'jev'
+  function render() {
+    horizontal = stage.clientWidth >= 560
+    for (const edge of edges.values()) edge.used = false
+    const aiAccounts = accounts.filter((account) => !JEV(account))
+    const jev = accounts.find(JEV)
+    const working = aiAccounts.filter((account) => busy.has(account.id))
+    const anyBusy = working.length > 0 || (jev && busy.has(jev.id))
+    const waiting = customers.filter((c) => c.mode === 'ai' && c.unanswered > 0).length
+    const orders = customers.filter((c) => c.order).length
+    const payments = customers.filter((c) => c.payment).length
+    const handover = customers.filter((c) => c.mode === 'cs').length
+    const lastReply = Math.max(0, ...aiAccounts.map((account) => account.lastUsedAt || 0))
+
+    // Kolom alur (setiap kolom berisi satu atau beberapa simpul).
+    const columns = []
+    const trigger = nodeFor('trigger', 'trigger')
+    setNode(trigger, {
+      label: t('Pesan masuk'),
+      sub: waiting ? t('{0} menunggu', waiting) : t('WhatsApp · Instagram'),
+      state: waiting ? 'wait' : 'idle',
+      count: waiting || '',
+      info: [t('Pesan pelanggan dari WhatsApp & Instagram'), waiting ? t('{0} chat belum dibalas', waiting) : t('Semua chat sudah dibalas')],
+    })
+    columns.push([trigger])
+    let jevNode = null
+    if (jev) {
+      jevNode = nodeFor(`a${jev.id}`, 'jev')
+      setNode(jevNode, {
+        label: 'Jev',
+        sub: busy.has(jev.id) ? t('memahami…') : !jev.enabled ? t('mati') : t('pemahaman'),
+        state: !jev.enabled ? 'off' : busy.has(jev.id) ? 'busy' : 'idle',
+        provider: 'jev',
+        info: [t('Membaca maksud pelanggan sebelum AI menjawab'), t('Terakhir {0}', ago(jev.lastUsedAt))],
+      })
+      columns.push([jevNode])
+    }
+    const accountNodes = aiAccounts.map((account, index) => {
+      const node = nodeFor(`a${account.id}`, 'ai')
+      const state = !account.enabled ? 'off' : busy.has(account.id) ? 'busy' : account.limitedUntil ? 'paused' : 'idle'
+      setNode(node, {
+        label: account.name,
+        sub:
+          state === 'busy'
+            ? t('bekerja…')
+            : state === 'paused'
+              ? t('jeda s/d {0}', clock(account.limitedUntil))
+              : state === 'off'
+                ? t('mati')
+                : account.lastUsedAt
+                  ? ago(account.lastUsedAt)
+                  : t('siap'),
+        state,
+        provider: account.provider,
+        count: index + 1,
+        info: [
+          t('Urutan cadangan #{0}', index + 1),
+          account.tokens5h ? t('{0} token dalam 5 jam', Number(account.tokens5h).toLocaleString('id-ID')) : '',
+          t('Terakhir {0}', ago(account.lastUsedAt)),
+        ],
+      })
+      node.account = account
+      node.state = state
+      return node
+    })
+    if (accountNodes.length) columns.push(accountNodes)
+    const check = nodeFor('check', 'check')
+    setNode(check, {
+      label: t('Pemeriksa'),
+      sub: anyBusy ? t('menunggu draf') : t('harga · fakta · foto'),
+      state: anyBusy ? 'wait' : 'idle',
+      info: [t('Memeriksa balasan sebelum dikirim: harga, fakta katalog, foto, tidak mengulang')],
+    })
+    columns.push([check])
+    const send = nodeFor('send', 'send')
+    setNode(send, {
+      label: t('Kirim balasan'),
+      sub: lastReply ? ago(lastReply) : '',
+      state: anyBusy ? 'wait' : 'idle',
+      info: [t('Balasan terkirim ke pelanggan'), t('Terakhir {0}', ago(lastReply))],
+    })
+    columns.push([send])
+    const outOrder = nodeFor('order', 'order')
+    setNode(outOrder, { label: t('Order'), sub: t('{0} chat', orders), count: orders || '', info: [t('Chat dengan pesanan berjalan')] })
+    const outPay = nodeFor('pay', 'pay')
+    setNode(outPay, { label: t('Bayar'), sub: t('{0} chat', payments), count: payments || '', state: payments ? 'wait' : 'idle', info: [t('Menunggu / mengecek pembayaran')] })
+    const outCs = nodeFor('cs', 'cs')
+    setNode(outCs, { label: 'CS', sub: t('{0} chat', handover), count: handover || '', info: [t('Ditangani CS (AI diam)')] })
+    columns.push([outOrder, outPay, outCs])
+
+    // Posisi: kolom berurutan, simpul dalam kolom ditengahkan.
+    const step = horizontal ? 150 : 112
+    const spread = horizontal ? 104 : 96
+    columns.forEach((column, c) => {
+      column.forEach((node, i) => {
+        const along = c * step
+        const across = (i - (column.length - 1) / 2) * spread
+        if (horizontal) place(node, along, across)
+        else place(node, across, along)
+      })
+    })
+    const keep = new Set(columns.flat().map((node) => node.id))
+    for (const [id, node] of nodes)
+      if (!keep.has(id)) {
+        node.el.remove()
+        nodes.delete(id)
+      }
+
+    // Garis.
+    const entry = jevNode || trigger
+    if (jevNode) edgeState(edgeFor(trigger, jevNode), anyBusy ? 'run' : 'idle', 'jev')
+    for (const node of accountNodes) {
+      const run = node.state === 'busy'
+      edgeState(edgeFor(entry, node), run ? 'run' : node.state === 'idle' ? 'idle' : 'muted', run ? node.account.provider : '')
+      edgeState(edgeFor(node, check), run ? 'run' : node.state === 'idle' ? 'idle' : 'muted', run ? node.account.provider : '')
+    }
+    if (!accountNodes.length) edgeState(edgeFor(entry, check), 'idle')
+    edgeState(edgeFor(check, send), anyBusy ? 'run' : 'idle')
+    edgeState(edgeFor(send, outOrder, orders ? String(orders) : ''), 'idle')
+    edgeState(edgeFor(send, outPay, payments ? String(payments) : ''), 'idle')
+    edgeState(edgeFor(send, outCs, handover ? String(handover) : ''), 'idle')
+    for (const [key, edge] of edges)
+      if (!edge.used) {
+        edge.path.remove()
+        edge.label.remove()
+        edges.delete(key)
+      }
+
+    nowText.textContent = working.length
+      ? t('Sedang bekerja: {0}', working.map((account) => account.name).join(', '))
+      : lastReply
+        ? t('Siaga · terakhir {0} ({1})', ago(lastReply), aiAccounts.find((a) => a.lastUsedAt === lastReply)?.name || '')
+        : t('Siaga')
+    fit()
+  }
+
+  // ── kamera: muat semua simpul; roda = zoom, seret = geser, klik 2x = reset ──
+  let view = null
+  let userView = false
+  function bounds() {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    for (const node of nodes.values()) {
+      minX = Math.min(minX, node.x - HALF - 40)
+      maxX = Math.max(maxX, node.x + HALF + 40)
+      minY = Math.min(minY, node.y - HALF - 14)
+      maxY = Math.max(maxY, node.y + HALF + 38)
+    }
+    return { minX, maxX, minY, maxY }
+  }
+  function apply() {
+    if (view) svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`)
+  }
+  function fit(force = false) {
+    if (userView && !force) return
+    if (!nodes.size) return
+    const box = bounds()
+    const width = stage.clientWidth || 300
+    const height = stage.clientHeight || 300
+    const ratio = height / width
+    let w = box.maxX - box.minX
+    let h = box.maxY - box.minY
+    if (h / w > ratio) w = h / ratio
+    else h = w * ratio
+    // Graf kecil tidak diperbesar berlebihan (maks 1.25×; mode Perbesar 1.8×).
+    const minW = width / (root.classList.contains('expanded') ? 1.8 : 1.25)
+    if (w < minW) {
+      w = minW
+      h = w * ratio
+    }
+    view = { x: (box.minX + box.maxX) / 2 - w / 2, y: (box.minY + box.maxY) / 2 - h / 2, w, h }
+    apply()
   }
   svg.addEventListener(
     'wheel',
     (event) => {
+      if (!view) return
       event.preventDefault()
-      const p = toGraph(event)
-      const factor = Math.exp(event.deltaY * 0.0015)
-      const w = Math.min(1400, Math.max(120, view.w * factor))
-      const k = w / view.w
-      view.x = p.x - (p.x - view.x) * k
-      view.y = p.y - (p.y - view.y) * k
-      view.w = w
-      view.h = w * aspect()
+      const rect = svg.getBoundingClientRect()
+      const px = view.x + ((event.clientX - rect.left) / rect.width) * view.w
+      const py = view.y + ((event.clientY - rect.top) / rect.height) * view.h
+      const factor = Math.min(1.5, Math.max(0.67, Math.exp(event.deltaY * 0.0015)))
+      view = { x: px - (px - view.x) * factor, y: py - (py - view.y) * factor, w: view.w * factor, h: view.h * factor }
       userView = true
-      applyView()
-      labelDensity()
+      apply()
     },
     { passive: false }
   )
+  let drag = null
   svg.addEventListener('pointerdown', (event) => {
-    if (event.target.closest('.orc-node, .orc-person')) return
-    const start = toGraph(event)
-    userView = true
+    if (!view || event.button !== 0) return
+    drag = { x: event.clientX, y: event.clientY, view: { ...view } }
+    svg.setPointerCapture(event.pointerId)
     svg.classList.add('panning')
-    const move = (next) => {
-      const p = toGraph(next)
-      view.x -= p.x - start.x
-      view.y -= p.y - start.y
-      applyView()
-    }
-    const end = () => {
-      svg.classList.remove('panning')
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', end)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', end)
   })
+  svg.addEventListener('pointermove', (event) => {
+    if (!drag) return
+    const rect = svg.getBoundingClientRect()
+    view = {
+      ...drag.view,
+      x: drag.view.x - ((event.clientX - drag.x) / rect.width) * drag.view.w,
+      y: drag.view.y - ((event.clientY - drag.y) / rect.height) * drag.view.h,
+    }
+    if (Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y) > 3) userView = true
+    apply()
+  })
+  const endDrag = () => {
+    drag = null
+    svg.classList.remove('panning')
+  }
+  svg.addEventListener('pointerup', endDrag)
+  svg.addEventListener('pointercancel', endDrag)
   svg.addEventListener('dblclick', () => {
     userView = false
-    fitBoost = 45
-    kick()
+    fit(true)
   })
-  // Label pelanggan muncul saat diperbesar (seperti Obsidian), selalu untuk yang aktif.
-  function labelDensity() {
-    // Label pelanggan tampil bila cukup besar di layar (panel besar atau diperbesar).
-    const width = svg.clientWidth || 300
-    svg.classList.toggle('orc-zoomed', width / view.w > 1.45)
-  }
-  // Ukuran simpul & teks tetap mungil di layar walau panel diperbesar (mode Perbesar):
-  // skala dihitung dari kamera otomatis; zoom manual tetap memperbesar seperti biasa.
-  let nodeScale = 1
-  let textScale = 1
-  function applyScale(force = false) {
-    const s = nodeScale
-    const ts = textScale
-    svg.style.setProperty('--orc-t', ts.toFixed(3))
-    const size = (node, halo) => {
-      if (node.sized && !force) return
-      node.sized = true
-      const r = node.baseR * s
-      ;(node.core || node.dot).setAttribute('r', r.toFixed(2))
-      if (node.halo) node.halo.setAttribute('r', (r + (halo || 8) * s).toFixed(2))
-      if (node.label) node.label.setAttribute('y', (r + (node.kind === 'person' ? 5.5 : 8) * ts).toFixed(2))
-      if (node.sub) node.sub.setAttribute('y', (r + 15.5 * ts).toFixed(2))
-      if (node.badge) node.badge.setAttribute('y', (2.2 * ts).toFixed(2))
-    }
-    size(hub, 7)
-    for (const node of nodes.values()) size(node, 8)
-    for (const node of people.values()) size(node)
-  }
-  function setFitScale(pxPerUnit) {
-    const s = Math.min(1, 0.75 / pxPerUnit)
-    const ts = Math.min(1, Math.max(s, 8 / (6.5 * pxPerUnit)))
-    if (Math.abs(s - nodeScale) < 0.01 && Math.abs(ts - textScale) < 0.01) return
-    nodeScale = s
-    textScale = ts
-    applyScale(true)
-  }
-  /** Rasio tinggi/lebar panggung agar kamera memakai seluruh area (penting di mode Perbesar). */
-  const aspect = () => {
-    const w = svg.clientWidth || 1
-    const h = svg.clientHeight || w
-    return Math.max(0.3, Math.min(3, h / w))
-  }
+  new ResizeObserver(() => {
+    const wasHorizontal = horizontal
+    if ((stage.clientWidth >= 560) !== wasHorizontal) render()
+    else fit()
+  }).observe(stage)
 
-  expandButton?.addEventListener('click', () => {
-    const open = !root.classList.contains('expanded')
-    root.classList.toggle('expanded', open)
-    expandButton.setAttribute('aria-pressed', String(open))
-    expandButton.textContent = open ? t('Kecilkan') : t('Perbesar')
-    userView = false
-    fitBoost = 45
-    requestAnimationFrame(() => kick())
-  })
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && root.classList.contains('expanded')) expandButton?.click()
-  })
-
-  // ── simpul akun AI ──
-  function nodeFor(account, index, total) {
-    let node = nodes.get(account.id)
-    if (!node) {
-      const angle = (index / Math.max(1, total)) * Math.PI * 2 - Math.PI / 2
-      node = { id: account.id, kind: 'account', x: Math.cos(angle) * 115, y: Math.sin(angle) * 115, vx: 0, vy: 0 }
-      node.edge = make('line', { class: 'orc-edge' }, layerEdges)
-      node.el = make('g', { class: 'orc-node', tabindex: 0 }, layerNodes)
-      node.halo = make('circle', { class: 'halo', r: 14 }, node.el)
-      node.core = make('circle', { class: 'core', r: 6 }, node.el)
-      node.baseR = 6
-      node.badge = make('text', { class: 'badge', y: 2.3, 'text-anchor': 'middle' }, node.el)
-      node.label = make('text', { class: 'label', y: 17, 'text-anchor': 'middle' }, node.el)
-      node.sub = make('text', { class: 'sub', y: 25, 'text-anchor': 'middle' }, node.el)
-      bindHover(node)
-      node.el.addEventListener('pointerdown', (event) => startDrag(event, node))
-      nodes.set(account.id, node)
-      reheat(0.8)
-    }
-    return node
-  }
-
-  // ── simpul pelanggan ──
-  function personFor(customer) {
-    let node = people.get(customer.jid)
-    if (!node) {
-      const anchor = nodes.get(customer.accountId) || hub
-      const angle = Math.random() * Math.PI * 2
-      const r = anchor === hub ? 170 : 40
-      node = {
-        id: customer.jid,
-        kind: 'person',
-        x: anchor.x + Math.cos(angle) * r,
-        y: anchor.y + Math.sin(angle) * r,
-        vx: 0,
-        vy: 0,
-        seed: Math.random() * 100,
-      }
-      node.link = make('line', { class: 'orc-link' }, layerLinks)
-      node.el = make('g', { class: 'orc-person', tabindex: 0 }, layerCustomers)
-      node.dot = make('circle', { class: 'dot', r: 2.5 }, node.el)
-      node.label = make('text', { class: 'plabel', y: 8, 'text-anchor': 'middle' }, node.el)
-      bindHover(node)
-      node.el.addEventListener('click', () => {
-        if (node.dragged) return
-        location.href = `${base}/?jid=${encodeURIComponent(node.customer.jid)}`
-      })
-      node.el.addEventListener('pointerdown', (event) => startDrag(event, node))
-      people.set(customer.jid, node)
-      reheat(0.6)
-    }
-    return node
-  }
-
-  function render(customers) {
-    const seen = new Set()
-    const maxTokens = Math.max(1, ...accounts.map((a) => a.tokens5h || 0))
-    accounts.forEach((account, index) => {
-      const node = nodeFor(account, index, accounts.length)
-      node.account = account
-      node.order = index + 1
-      seen.add(account.id)
-      const state = !account.enabled ? 'off' : busy.has(account.id) ? 'busy' : account.limitedUntil ? 'paused' : 'ready'
-      node.state = state
-      node.el.setAttribute('class', `orc-node p-${account.provider} s-${state}`)
-      node.edge.setAttribute('class', `orc-edge p-${account.provider} s-${state}`)
-      node.badge.textContent = String(index + 1)
-      node.label.textContent = account.name
-      node.sub.textContent =
-        state === 'paused' ? t('jeda s/d {0}', clock(account.limitedUntil)) : state === 'busy' ? t('bekerja…') : ''
-      // Ukuran = porsi token 5 jam terakhir.
-      node.baseR = 5 + 4 * Math.sqrt((account.tokens5h || 0) / maxTokens)
-      node.sized = false
-    })
-    for (const [id, node] of nodes)
-      if (!seen.has(id)) {
-        node.el.remove()
-        node.edge.remove()
-        nodes.delete(id)
-      }
-
-    if (customers) {
-      const keep = new Set()
-      const now = Date.now()
-      for (const customer of customers) {
-        const node = personFor(customer)
-        if (node.customer && node.customer.accountId !== customer.accountId) reheat(0.3)
-        node.customer = customer
-        keep.add(customer.jid)
-        const fresh = now - customer.at < 10 * 60_000
-        const status = customer.payment
-          ? 'payment'
-          : customer.order
-            ? 'order'
-            : customer.mode === 'cs'
-              ? 'cs'
-              : customer.unanswered
-                ? 'waiting'
-                : 'ai'
-        const provider = nodes.get(customer.accountId)?.account?.provider || ''
-        node.el.setAttribute('class', `orc-person c-${status} ${fresh ? 'fresh' : ''} ${customer.unread ? 'unread' : ''}`)
-        node.link.setAttribute('class', `orc-link ${customer.accountId && nodes.has(customer.accountId) ? `p-${provider}` : 'loose'} ${fresh ? 'fresh' : ''}`)
-        node.baseR = 2.2 + Math.min(2.5, Math.log2(1 + customer.unread + customer.unanswered))
-        node.sized = false
-        node.label.textContent = customer.name
-      }
-      for (const [jid, node] of people)
-        if (!keep.has(jid)) {
-          node.el.remove()
-          node.link.remove()
-          people.delete(jid)
-        }
-    }
-
-    const working = accounts.filter((a) => busy.has(a.id))
-    const last = [...accounts].sort((a, b) => b.lastUsedAt - a.lastUsedAt)[0]
-    nowText.textContent = working.length
-      ? t('Sedang bekerja: {0}', working.map((a) => a.name).join(', '))
-      : last?.lastUsedAt
-        ? t('Siaga · terakhir {0} ({1})', last.name, ago(last.lastUsedAt))
-        : t('Siaga')
-  }
-
-  // ── keterangan saat kursor di atas simpul ──
-  function bindHover(node) {
-    node.el.addEventListener('pointerenter', () => showTip(node))
-    node.el.addEventListener('pointerleave', hideTip)
-    node.el.addEventListener('focus', () => showTip(node))
-    node.el.addEventListener('blur', hideTip)
-  }
-  // Sorot simpul & tetangganya, redupkan sisanya (seperti hover di Obsidian).
-  function highlight(node) {
-    svg.classList.add('orc-focus')
-    const lit = new Set([node])
-    const litLines = new Set()
-    if (node.kind === 'account') {
-      lit.add(hub)
-      litLines.add(node.edge)
-      for (const person of people.values())
-        if (person.customer.accountId === node.id) {
-          lit.add(person)
-          litLines.add(person.link)
-        }
-    } else if (node.kind === 'person') {
-      const anchor = nodes.get(node.customer.accountId) || hub
-      lit.add(anchor)
-      litLines.add(node.link)
-    } else {
-      for (const account of nodes.values()) {
-        lit.add(account)
-        litLines.add(account.edge)
-      }
-    }
-    for (const item of [hub, ...nodes.values(), ...people.values()]) item.el.classList.toggle('hl', lit.has(item))
-    for (const item of [...nodes.values()]) item.edge.classList.toggle('hl', litLines.has(item.edge))
-    for (const item of [...people.values()]) item.link.classList.toggle('hl', litLines.has(item.link))
-  }
-  function unhighlight() {
-    svg.classList.remove('orc-focus')
-  }
-  hub.el.addEventListener('pointerenter', () => highlight(hub))
-  hub.el.addEventListener('pointerleave', unhighlight)
+  // ── keterangan simpul ──
   function showTip(node) {
-    const lines = []
-    if (node.kind === 'account' && node.account) {
-      const a = node.account
-      const state =
-        node.state === 'off'
-          ? t('Nonaktif')
-          : node.state === 'busy'
-            ? t('Sedang bekerja')
-            : node.state === 'paused'
-              ? t('Jeda s/d {0}', clock(a.limitedUntil))
-              : t('Siap')
-      lines.push(`${node.order}. ${a.name}`, `${state} · ${t('dipakai')} ${ago(a.lastUsedAt)}`)
-      lines.push(t('{0} token dalam 5 jam', (a.tokens5h || 0).toLocaleString('id-ID')))
-      const served = [...people.values()].filter((p) => p.customer.accountId === a.id).length
-      if (served) lines.push(t('{0} pelanggan dilayani', served))
-    } else if (node.kind === 'person' && node.customer) {
-      const c = node.customer
-      const by = nodes.get(c.accountId)?.account?.name
-      lines.push(c.name)
-      lines.push(
-        [
-          c.payment ? t('Menunggu konfirmasi bayar') : c.order ? t('Ada order') : c.mode === 'cs' ? t('Ditangani CS') : t('Ditangani AI'),
-          c.unanswered ? t('{0} belum dibalas', c.unanswered) : '',
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      )
-      lines.push(`${by ? t('dilayani {0}', by) + ' · ' : ''}${ago(c.at)}`)
-      lines.push(t('Klik untuk membuka chat'))
-    } else return
+    const rect = stage.getBoundingClientRect()
+    const box = node.shape.getBoundingClientRect()
     tip.replaceChildren(
-      ...lines.map((text, i) => {
-        const el = document.createElement(i ? 'span' : 'strong')
-        el.textContent = text
+      ...node.info.map((line, index) => {
+        const el = document.createElement(index ? 'span' : 'strong')
+        el.textContent = line
         return el
       })
     )
+    tip.style.left = `${box.left + box.width / 2 - rect.left}px`
+    tip.style.top = `${box.top - rect.top}px`
     tip.hidden = false
-    highlight(node)
-    const box = svg.getBoundingClientRect()
-    const stage = svg.parentElement.getBoundingClientRect()
-    const point = svg.createSVGPoint()
-    point.x = node.x
-    point.y = node.y
-    const screen = point.matrixTransform(svg.getScreenCTM())
-    tip.style.left = `${screen.x - stage.left}px`
-    tip.style.top = `${screen.y - stage.top}px`
-    void box
   }
   function hideTip() {
     tip.hidden = true
-    unhighlight()
   }
 
-  function startDrag(event, node) {
-    event.preventDefault()
-    event.stopPropagation()
-    node.fixed = true
-    node.dragged = false
-    const origin = { x: event.clientX, y: event.clientY }
-    const move = (next) => {
-      if (Math.hypot(next.clientX - origin.x, next.clientY - origin.y) > 3) node.dragged = true
-      const p = toGraph(next)
-      node.x = p.x
-      node.y = p.y
-      node.vx = node.vy = 0
-      reheat(0.3)
-    }
-    const end = () => {
-      node.fixed = false
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', end)
-      window.removeEventListener('pointercancel', end)
-      setTimeout(() => (node.dragged = false), 0)
-      kick()
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', end)
-    window.addEventListener('pointercancel', end)
-  }
-
-  function pulse(from, to, kind, provider) {
-    if (reduce.matches || !from || !to) return
-    const dot = make('circle', { class: `orc-pulse k-${kind} p-${provider || ''}`, r: (2 * nodeScale).toFixed(2) }, layerPulses)
-    pulses.push({ from, to, t: 0, dot })
-    kick()
-  }
-  function flash(node, kind) {
-    node.el.classList.add(`flash-${kind}`)
-    setTimeout(() => node.el.classList.remove(`flash-${kind}`), 1600)
-  }
-  function switchArc(from, to) {
-    const path = make('path', { class: 'orc-arc', 'marker-end': 'url(#orcArrow)' }, layerArcs)
-    arcs.push({ from, to, path, born: performance.now() })
-    kick()
-  }
-
+  // ── aktivitas (seperti daftar eksekusi n8n) ──
+  const logItems = []
   function addLog(text, kind, at, jid = '') {
     logItems.unshift({ text, kind, at, jid })
     logItems.length = Math.min(logItems.length, 6)
@@ -440,7 +395,6 @@
         const span = document.createElement('span')
         span.textContent = item.text
         li.append(time, span)
-        // Baris aktivitas chat bisa diklik → membuka chat pelanggan (seperti simpul pelanggan).
         if (item.jid) {
           li.classList.add('clickable')
           li.tabIndex = 0
@@ -458,251 +412,60 @@
       })
     )
   }
-
-  function handleEvent(event, animate) {
-    const node = nodes.get(event.accountId)
-    const name = node?.account?.name || `#${event.accountId}`
-    const person = event.jid ? people.get(event.jid) : null
-    const who = person?.customer?.name
+  function flash(id, kind) {
+    flashes.set(id, kind)
+    setTimeout(() => {
+      if (flashes.get(id) === kind) flashes.delete(id)
+      render()
+    }, 2200)
+  }
+  function handleEvent(event, live) {
+    const account = accounts.find((item) => item.id === event.accountId)
+    const name = account?.name || `#${event.accountId}`
+    const who = customers.find((c) => c.jid === event.jid)?.name
     if (event.kind === 'start') {
       if (lastTrouble && lastTrouble.id !== event.accountId && event.at - lastTrouble.at < 15000) {
-        const from = nodes.get(lastTrouble.id)
+        const from = accounts.find((item) => item.id === lastTrouble.id)
         addLog(
-          t('{0} {1} → pindah ke {2}', from?.account?.name || '', lastTrouble.kind === 'limited' ? t('habis kuota/perlu login') : t('gagal'), name),
+          t('{0} {1} → pindah ke {2}', from?.name || '', lastTrouble.kind === 'limited' ? t('habis kuota/perlu login') : t('gagal'), name),
           'switch',
           event.at
         )
-        if (animate && from && node) switchArc(from, node)
         lastTrouble = null
       }
-      if (animate && node) {
-        const provider = node.account?.provider
-        if (person) {
-          // Pelanggan pindah menempel ke akun yang sedang melayani.
-          if (person.customer.accountId !== event.accountId) reheat(0.3)
-          person.customer.accountId = event.accountId
-          pulse(person, node, 'start', provider)
-        } else pulse(hub, node, 'start', provider)
-      }
-    } else if (event.kind === 'ok') {
-      if (node?.account?.provider === 'jev') {
-        // Jev: hanya denyut (keputusan kecil terjadi tiap giliran, tidak memenuhi log).
-        if (animate) pulse(node, person || hub, 'start', 'jev')
-        return
-      }
-      addLog(
-        who ? t('{0} membalas {1}', name, who) : t('{0} menyelesaikan {1}', name, phaseLabel(event.phase)),
-        'ok',
-        event.at,
-        event.jid || ''
-      )
-      if (animate && node) pulse(node, person || hub, 'ok', node.account?.provider)
-      if (animate && person) flash(person, 'ok')
-    } else {
-      if (node?.account?.provider !== 'jev') lastTrouble = { id: event.accountId, at: event.at, kind: event.kind }
-      addLog(
-        event.kind === 'limited'
-          ? t('{0} habis kuota / perlu login', name)
-          : t('{0} gagal ({1})', name, (event.detail || '-').replace(/^[A-Z_]+: /, '').slice(0, 90)),
-        event.kind,
-        event.at,
-        event.jid || ''
-      )
-      if (animate && node) flash(node, event.kind)
+      return
     }
+    if (event.kind === 'ok') {
+      if (account?.provider === 'jev') return
+      addLog(who ? t('{0} membalas {1}', name, who) : t('{0} menyelesaikan {1}', name, phaseLabel(event.phase)), 'ok', event.at, event.jid || '')
+      if (live) {
+        flash(`a${event.accountId}`, 'ok')
+        flash('send', 'ok')
+      }
+      return
+    }
+    if (account?.provider !== 'jev') lastTrouble = { id: event.accountId, at: event.at, kind: event.kind }
+    addLog(
+      event.kind === 'limited'
+        ? t('{0} habis kuota / perlu login', name)
+        : t('{0} gagal ({1})', name, (event.detail || '-').replace(/^[A-Z_]+: /, '').slice(0, 90)),
+      event.kind,
+      event.at
+    )
+    if (live) flash(`a${event.accountId}`, 'err')
   }
 
-  // ── simulasi: pegas + tolak-menolak ──
-  let running = false
-  let lastFrame = 0
-  let busyTimer = 0
-  const ALPHA_MIN = 0.004
-  const ALPHA_DECAY = 0.0228
-  let alpha = 1
-  /** Paksa kamera menyesuaikan ulang beberapa frame (mis. setelah Perbesar/Kecilkan). */
-  let fitBoost = 0
-  /** Panaskan tata letak (data berubah / simpul diseret) agar bergerak lalu tenang lagi. */
-  function reheat(value = 0.3) {
-    alpha = Math.max(alpha, value)
-    kick()
-  }
-  function kick() {
-    if (running || document.hidden || !shown()) return
-    running = true
-    lastFrame = performance.now()
-    requestAnimationFrame(frame)
-  }
-  function frame(now) {
-    const dt = Math.min(50, now - lastFrame)
-    lastFrame = now
-    const accountList = [...nodes.values()]
-    const peopleList = [...people.values()]
-    const all = [...accountList, ...peopleList]
-    // Tata letak gaya d3-force (seperti graph view Obsidian): pegas di garis, tolak-menolak,
-    // tarikan ke tengah, anti-tumpuk, lalu "mendingin" sampai diam. Dipanaskan lagi bila berubah.
-    if (alpha > ALPHA_MIN) {
-      alpha += (0 - alpha) * ALPHA_DECAY
-      const bodies = [hub, ...all]
-      const links = []
-      // [asal, tujuan, panjang, kekuatan]
-      for (const node of accountList) links.push([hub, node, 70, 0.8])
-      for (const node of peopleList) {
-        const anchor = nodes.get(node.customer.accountId)
-        links.push(anchor ? [anchor, node, 30, 0.6] : [hub, node, 125, 0.15])
-      }
-      const degree = new Map()
-      for (const [s, t] of links) {
-        degree.set(s, (degree.get(s) || 0) + 1)
-        degree.set(t, (degree.get(t) || 0) + 1)
-      }
-      // Pegas garis.
-      for (const [source, target, distance, strength] of links) {
-        let dx = target.x + target.vx - source.x - source.vx || 0.01
-        let dy = target.y + target.vy - source.y - source.vy || 0.01
-        const l = Math.hypot(dx, dy)
-        const k = ((l - distance) / l) * alpha * strength
-        dx *= k
-        dy *= k
-        const bias = degree.get(source) / (degree.get(source) + degree.get(target))
-        if (!target.fixed) {
-          target.vx -= dx * bias
-          target.vy -= dy * bias
-        }
-        if (!source.fixed) {
-          source.vx += dx * (1 - bias)
-          source.vy += dy * (1 - bias)
-        }
-      }
-      // Tolak-menolak (muatan) + anti-tumpuk.
-      const radius = (node) => (node === hub ? 12 : node.kind === 'account' ? 10 : 4)
-      for (let i = 0; i < bodies.length; i++) {
-        const a = bodies[i]
-        for (let j = i + 1; j < bodies.length; j++) {
-          const b = bodies[j]
-          let dx = b.x - a.x || (Math.random() - 0.5) * 0.1
-          let dy = b.y - a.y || (Math.random() - 0.5) * 0.1
-          let d2 = dx * dx + dy * dy
-          if (d2 > 90000) continue
-          // Muatan per simpul (seperti d3 manyBody): akun & pusat lebih kuat dari pelanggan.
-          const charge = (node) => (node === hub ? -140 : node.kind === 'account' ? -90 : -14)
-          const inv = alpha / Math.max(d2, 25)
-          if (!a.fixed) {
-            a.vx += dx * charge(b) * inv
-            a.vy += dy * charge(b) * inv
-          }
-          if (!b.fixed) {
-            b.vx -= dx * charge(a) * inv
-            b.vy -= dy * charge(a) * inv
-          }
-          const min = radius(a) + radius(b) + 2
-          const d = Math.sqrt(d2) || 0.01
-          if (d < min) {
-            const push = ((min - d) / d) * 0.5
-            if (!a.fixed) {
-              a.x -= dx * push
-              a.y -= dy * push
-            }
-            if (!b.fixed) {
-              b.x += dx * push
-              b.y += dy * push
-            }
-          }
-        }
-      }
-      // Tarikan lembut ke tengah & redaman kecepatan.
-      for (const node of all) {
-        if (node.fixed) {
-          node.vx = node.vy = 0
-          continue
-        }
-        node.vx -= node.x * 0.004 * alpha
-        node.vy -= node.y * 0.004 * alpha
-        node.vx *= 0.6
-        node.vy *= 0.6
-        node.x += node.vx
-        node.y += node.vy
-      }
-    }
-    const energy = alpha
-    if (!userView && all.length) {
-      // Kamera mengikuti batas graf dengan halus.
-      let minX = -60, maxX = 60, minY = -60, maxY = 60
-      for (const node of all) {
-        minX = Math.min(minX, node.x)
-        maxX = Math.max(maxX, node.x)
-        minY = Math.min(minY, node.y)
-        maxY = Math.max(maxY, node.y)
-      }
-      // Lebar kamera menampung seluruh graf sesuai bentuk panggung. Minimal 380 agar graf
-      // kecil tetap mungil, tidak diperbesar memenuhi panel.
-      const ratio = aspect()
-      const size = Math.max(380, maxX - minX + 70, (maxY - minY + 70) / ratio)
-      setFitScale((svg.clientWidth || 300) / size)
-      const cx = (minX + maxX) / 2
-      const cy = (minY + maxY) / 2
-      const ease = fitBoost > 0 ? 0.25 : 0.12
-      view.w += (size - view.w) * ease
-      view.h = view.w * ratio
-      view.x += (cx - view.w / 2 - view.x) * ease
-      view.y += (cy - view.h / 2 - view.y) * ease
-      applyView()
-      labelDensity()
-    }
-    applyScale()
-    for (const node of accountList) {
-      node.el.setAttribute('transform', `translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})`)
-      node.edge.setAttribute('x1', '0')
-      node.edge.setAttribute('y1', '0')
-      node.edge.setAttribute('x2', node.x.toFixed(1))
-      node.edge.setAttribute('y2', node.y.toFixed(1))
-    }
-    for (const node of peopleList) {
-      node.el.setAttribute('transform', `translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})`)
-      const anchor = nodes.get(node.customer.accountId) || hub
-      node.link.setAttribute('x1', anchor.x.toFixed(1))
-      node.link.setAttribute('y1', anchor.y.toFixed(1))
-      node.link.setAttribute('x2', node.x.toFixed(1))
-      node.link.setAttribute('y2', node.y.toFixed(1))
-    }
-    if (!reduce.matches && busy.size && now - busyTimer > 520) {
-      busyTimer = now
-      for (const id of busy) {
-        const node = nodes.get(id)
-        if (node) pulse(hub, node, 'busy', node.account?.provider)
-      }
-    }
-    pulses = pulses.filter((item) => {
-      item.t += dt / 750
-      if (item.t >= 1) {
-        item.dot.remove()
-        return false
-      }
-      const e = item.t < 0.5 ? 2 * item.t * item.t : 1 - (-2 * item.t + 2) ** 2 / 2
-      item.dot.setAttribute('cx', (item.from.x + (item.to.x - item.from.x) * e).toFixed(1))
-      item.dot.setAttribute('cy', (item.from.y + (item.to.y - item.from.y) * e).toFixed(1))
-      return true
-    })
-    arcs = arcs.filter((arc) => {
-      const age = now - arc.born
-      if (age > 4000) {
-        arc.path.remove()
-        return false
-      }
-      const mx = (arc.from.x + arc.to.x) / 2
-      const my = (arc.from.y + arc.to.y) / 2
-      const len = Math.hypot(mx, my) || 1
-      const cx = mx + (mx / len) * 55
-      const cy = my + (my / len) * 55
-      arc.path.setAttribute('d', `M${arc.from.x},${arc.from.y} Q${cx},${cy} ${arc.to.x},${arc.to.y}`)
-      arc.path.style.opacity = String(Math.min(1, (4000 - age) / 1200))
-      return true
-    })
-    // Diam bila tata letak sudah dingin dan tidak ada animasi: hemat CPU.
-    if (fitBoost > 0) fitBoost--
-    const calm = energy <= ALPHA_MIN && !pulses.length && !arcs.length && !busy.size && fitBoost <= 0
-    if (!document.hidden && shown() && !calm) requestAnimationFrame(frame)
-    else running = false
-  }
+  expandButton?.addEventListener('click', () => {
+    const open = !root.classList.contains('expanded')
+    root.classList.toggle('expanded', open)
+    expandButton.setAttribute('aria-pressed', String(open))
+    expandButton.textContent = open ? t('Kecilkan') : t('Perbesar')
+    userView = false
+    requestAnimationFrame(() => render())
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && root.classList.contains('expanded')) expandButton?.click()
+  })
 
   // ── data ──
   let pollTimer
@@ -719,27 +482,21 @@
           const data = await response.json()
           accounts = data.accounts || []
           busy = new Set(data.busy || [])
-          render(data.customers)
+          customers = data.customers || customers
           for (const event of data.events || []) {
             handleEvent(event, loaded)
             lastEventId = Math.max(lastEventId, event.id)
           }
           loaded = true
-          kick()
+          render()
         }
       } catch {}
     }
-    pollTimer = setTimeout(poll, visible ? 2000 : 8000)
+    // Ada AI bekerja → 2 dtk; diam → 5 dtk; panel tidak terlihat → 15 dtk (hanya cek terlihat).
+    pollTimer = setTimeout(poll, !visible ? 15000 : busy.size ? 2000 : 5000)
   }
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      poll()
-      kick()
-    }
-  })
-  window.addEventListener('resize', () => {
-    fitBoost = 30
-    kick()
+    if (!document.hidden) poll()
   })
   poll()
 })()

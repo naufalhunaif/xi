@@ -249,75 +249,12 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-orchestra-head strong { font-size: 13px; font-weight: 600; color: var(--text); }
 .workspace-ui .wa-orchestra-head small { font-size: 11px; color: var(--muted); min-height: 16px; }
 .workspace-ui .wa-orchestra-stage {
-  position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+  position: relative; aspect-ratio: 3 / 5; border-radius: 8px; overflow: hidden;
   background:
-    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--orc-hub) 7%, transparent), transparent 60%),
-    radial-gradient(circle, color-mix(in srgb, var(--muted) 22%, transparent) 1px, transparent 1.2px) 0 0 / 18px 18px,
+    radial-gradient(circle, color-mix(in srgb, var(--muted) 30%, transparent) 1px, transparent 1.3px) 0 0 / 16px 16px,
     var(--wa-subtle);
 }
 .workspace-ui .wa-orchestra-stage svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
-.workspace-ui .orc-edge { stroke: var(--orc-edge); stroke-width: 1; }
-.workspace-ui .orc-edge.s-busy { stroke-width: 1.6; }
-.workspace-ui .orc-edge.s-busy.p-chatgpt { stroke: var(--orc-chatgpt); }
-.workspace-ui .orc-edge.s-busy.p-claude { stroke: var(--orc-claude); }
-.workspace-ui .orc-edge.s-busy.p-gemini { stroke: var(--orc-gemini); }
-.workspace-ui .orc-edge.s-busy.p-jev { stroke: var(--orc-jev); }
-.workspace-ui .orc-edge.s-off, .workspace-ui .orc-edge.s-paused { stroke-dasharray: 3 4; }
-.workspace-ui .orc-node { cursor: grab; outline: none; }
-.workspace-ui .orc-node .core { stroke: var(--wa-surface, #fff); stroke-width: 1.2; transition: r .3s, opacity .3s; }
-.workspace-ui .orc-node .halo { fill: currentColor; opacity: 0; transition: opacity .4s; }
-.workspace-ui .orc-node.p-chatgpt { color: var(--orc-chatgpt); }
-.workspace-ui .orc-node.p-claude { color: var(--orc-claude); }
-.workspace-ui .orc-node.p-gemini { color: var(--orc-gemini); }
-.workspace-ui .orc-node.p-jev { color: var(--orc-jev); }
-.workspace-ui .orc-node .core { fill: currentColor; }
-.workspace-ui .orc-hub { color: var(--orc-hub); cursor: default; }
-.workspace-ui .orc-hub .halo { opacity: .12; }
-.workspace-ui .orc-node .label { fill: var(--text); font-size: 6.5px; font-weight: 500; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 3px; }
-.workspace-ui .orc-node .sub { fill: var(--muted); font-size: 5.5px; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 3px; }
-.workspace-ui .orc-node .badge { fill: #fff; font-size: 6px; font-weight: 700; pointer-events: none; }
-.workspace-ui .orc-node.s-busy .halo { opacity: .22; animation: orc-breathe 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-.workspace-ui .orc-node.s-paused .core { fill: var(--wa-surface, #fff); stroke: currentColor; stroke-dasharray: 3 2.5; }
-.workspace-ui .orc-node.s-paused .badge { fill: currentColor; }
-.workspace-ui .orc-node.s-off { opacity: .35; }
-.workspace-ui .orc-node.flash-limited .halo { opacity: .5; fill: var(--wa-warn); animation: orc-flash .8s ease-out 2; }
-.workspace-ui .orc-node.flash-fail .halo { opacity: .5; fill: var(--wa-err); animation: orc-flash .8s ease-out 2; }
-.workspace-ui .orc-node:focus-visible .core { stroke: var(--text); }
-.workspace-ui .orc-pulse { fill: currentColor; }
-.workspace-ui .orc-pulse.p-chatgpt { color: var(--orc-chatgpt); }
-.workspace-ui .orc-pulse.p-claude { color: var(--orc-claude); }
-.workspace-ui .orc-pulse.p-gemini { color: var(--orc-gemini); }
-.workspace-ui .orc-pulse.p-jev { color: var(--orc-jev); }
-.workspace-ui .orc-pulse.k-ok { color: var(--orc-hub); }
-.workspace-ui .orc-arc { fill: none; stroke: var(--wa-warn); stroke-width: 1.2; stroke-dasharray: 5 4; animation: orc-dash 1s linear infinite; }
-.workspace-ui .orc-arrow { fill: var(--wa-warn); }
-.workspace-ui .wa-orchestra-tip {
-  position: absolute; transform: translate(-50%, calc(-100% - 18px)); display: grid; gap: 2px; padding: 6px 8px;
-  border-radius: 6px; background: var(--text); color: var(--wa-surface, #fff); font-size: 11px; white-space: nowrap; pointer-events: none;
-}
-.workspace-ui .wa-orchestra-tip[hidden] { display: none; }
-.workspace-ui .wa-orchestra-tip span { opacity: .8; }
-.workspace-ui .wa-orchestra-legend { display: flex; gap: 12px; font-size: 10.5px; color: var(--muted); }
-.workspace-ui .wa-orchestra-legend .dot { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; vertical-align: 0; }
-.workspace-ui .wa-orchestra-legend .dot.chatgpt { background: var(--orc-chatgpt); }
-.workspace-ui .wa-orchestra-legend .dot.claude { background: var(--orc-claude); }
-.workspace-ui .wa-orchestra-legend .dot.jev { background: var(--orc-jev); }
-.workspace-ui .wa-orchestra-legend .dot.gemini { background: var(--orc-gemini); }
-.workspace-ui .wa-orchestra-log { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 11px; }
-.workspace-ui .wa-orchestra-log li { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; color: var(--muted); }
-.workspace-ui .wa-orchestra-log li span { color: var(--text); overflow-wrap: anywhere; }
-.workspace-ui .wa-orchestra-log li.clickable { cursor: pointer; border-radius: 4px; }
-.workspace-ui .wa-orchestra-log li.clickable:hover span, .workspace-ui .wa-orchestra-log li.clickable:focus-visible span { text-decoration: underline; text-underline-offset: 2px; }
-.workspace-ui .wa-orchestra-log li.k-switch span { color: var(--wa-warn); font-weight: 600; }
-.workspace-ui .wa-orchestra-log li.k-limited span { color: var(--wa-warn); }
-.workspace-ui .wa-orchestra-log li.k-fail span { color: var(--wa-err); }
-@keyframes orc-breathe { 50% { transform: scale(1.25); opacity: .1; } }
-@keyframes orc-flash { from { opacity: .6; } to { opacity: 0; } }
-@keyframes orc-dash { to { stroke-dashoffset: -18; } }
-@media (prefers-reduced-motion: reduce) {
-  .workspace-ui .orc-node.s-busy .halo, .workspace-ui .orc-arc, .workspace-ui .orc-node[class*='flash-'] .halo { animation: none; }
-}
-
 /* Usage: tiga penyedia (ChatGPT, Claude, Gemini). */
 .workspace-ui .wa-usage-cards { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 
@@ -333,37 +270,6 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
 .workspace-ui .wa-ai-info small { font-size: 10.5px; color: var(--muted); overflow-wrap: anywhere; }
 .workspace-ui .wa-ai-info small.wa-ai-error { color: var(--wa-err); }
 
-/* Orkestra: pelanggan, zoom/geser, mode besar. */
-.workspace-ui .wa-orchestra { --orc-person: color-mix(in srgb, var(--muted) 70%, transparent); --orc-order: #8b5cf6; --orc-pay: #d4a017; --orc-cs: #e0662f; --orc-wait: #e0457b; }
-.workspace-ui .wa-orchestra-stage svg { cursor: grab; }
-.workspace-ui .wa-orchestra-stage svg.panning { cursor: grabbing; }
-.workspace-ui .orc-link { stroke: color-mix(in srgb, var(--muted) 22%, transparent); stroke-width: .6; }
-.workspace-ui .orc-link.loose { stroke-dasharray: 2 3; }
-.workspace-ui .orc-link.fresh.p-chatgpt { stroke: color-mix(in srgb, var(--orc-chatgpt) 55%, transparent); }
-.workspace-ui .orc-link.fresh.p-claude { stroke: color-mix(in srgb, var(--orc-claude) 55%, transparent); }
-.workspace-ui .orc-link.fresh.p-gemini { stroke: color-mix(in srgb, var(--orc-gemini) 55%, transparent); }
-.workspace-ui .orc-person { cursor: pointer; outline: none; }
-.workspace-ui .orc-person .dot { fill: var(--orc-person); stroke: var(--wa-surface, #fff); stroke-width: 1; transition: r .3s; }
-.workspace-ui .orc-person.c-waiting .dot { fill: var(--orc-wait); }
-.workspace-ui .orc-person.c-order .dot { fill: var(--orc-order); }
-.workspace-ui .orc-person.c-payment .dot { fill: var(--orc-pay); }
-.workspace-ui .orc-person.c-cs .dot { fill: var(--orc-cs); }
-.workspace-ui .orc-person.unread .dot { stroke: var(--text); stroke-width: 1.2; }
-.workspace-ui .orc-person .plabel { fill: var(--muted); font-size: 5px; opacity: 0; pointer-events: none; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 2.5px; transition: opacity .2s; }
-.workspace-ui .orc-person.fresh .plabel,
-.workspace-ui .orc-zoomed .orc-person .plabel,
-.workspace-ui .orc-person:hover .plabel,
-.workspace-ui .orc-person:focus-visible .plabel { opacity: 1; }
-.workspace-ui .orc-person:hover .dot, .workspace-ui .orc-person:focus-visible .dot { stroke: var(--text); stroke-width: 1.5; }
-.workspace-ui .orc-person.flash-ok .dot { animation: orc-pop .9s ease-out; }
-@keyframes orc-pop { 30% { r: 5; } }
-.workspace-ui .wa-orchestra-hint { position: absolute; left: 8px; bottom: 6px; font-size: 9.5px; color: var(--muted); opacity: .75; pointer-events: none; }
-.workspace-ui .wa-orchestra-legend { flex-wrap: wrap; row-gap: 4px; }
-.workspace-ui .wa-orchestra-legend .dot.person { background: var(--orc-person); }
-.workspace-ui .wa-orchestra-legend .dot.waiting { background: var(--orc-wait); }
-.workspace-ui .wa-orchestra-legend .dot.order { background: var(--orc-order); }
-.workspace-ui .wa-orchestra-legend .dot.payment { background: var(--orc-pay); }
-.workspace-ui .wa-orchestra-legend .dot.cs { background: var(--orc-cs); }
 @media (min-width: 1200px) {
   .workspace-ui .wa-orchestra.expanded {
     position: fixed; inset: 16px; z-index: 60; margin: 0; grid-template-rows: auto minmax(0, 1fr) auto auto;
@@ -372,20 +278,6 @@ html[data-theme='dark'] .workspace-ui .wa-orchestra { --orc-chatgpt: #3ccf9f; --
   .workspace-ui .wa-orchestra.expanded .wa-orchestra-stage { aspect-ratio: auto; min-height: 0; }
   .workspace-ui .wa-orchestra.expanded .wa-orchestra-log { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-/* Hover ala Obsidian: simpul & tetangga menyala, sisanya redup. Teks label mengikuti. */
-.workspace-ui .orc-focus .orc-node:not(.hl), .workspace-ui .orc-focus .orc-person:not(.hl) { opacity: .18; }
-.workspace-ui .orc-focus .orc-edge:not(.hl), .workspace-ui .orc-focus .orc-link:not(.hl) { opacity: .08; }
-.workspace-ui .orc-focus .orc-edge.hl, .workspace-ui .orc-focus .orc-link.hl { stroke: var(--wa-ok); stroke-width: 1.1; opacity: 1; }
-.workspace-ui .orc-focus .orc-person.hl .plabel { opacity: 1; }
-.workspace-ui .orc-node, .workspace-ui .orc-person, .workspace-ui .orc-edge, .workspace-ui .orc-link { transition: opacity .18s; }
-
-/* Mode Perbesar: teks & garis tetap tipis/mungil (skala dari --orc-t, garis tidak ikut membesar). */
-.workspace-ui .orc-edge, .workspace-ui .orc-link, .workspace-ui .orc-arc { vector-effect: non-scaling-stroke; }
-.workspace-ui .orc-node .label { font-size: calc(6.5px * var(--orc-t, 1)); }
-.workspace-ui .orc-node .sub { font-size: calc(5.5px * var(--orc-t, 1)); }
-.workspace-ui .orc-node .badge { font-size: calc(6px * var(--orc-t, 1)); }
-.workspace-ui .orc-person .plabel { font-size: calc(5px * var(--orc-t, 1)); }
 
 /* Order: pilih grup tujuan per pesanan. */
 
@@ -617,3 +509,60 @@ html[data-theme='dark'] .workspace-ui .wa-room-menu-item.wa-contact-delete-trigg
 @media (max-width: 600px) {
   .workspace-ui .wa-room-handling { flex: 0 0 auto; margin-left: auto; padding-top: 0; border-top: 0; flex-wrap: nowrap; }
 }
+
+/* v3.6.121 — Orkestra AI ala n8n: simpul kotak berikon, garis kurva, status per simpul. */
+.workspace-ui .wa-orchestra { --orc-order: #8b5cf6; --orc-pay: #d4a017; --orc-cs: #e0662f; --orc-run: var(--wa-ok, #2e9e5b); }
+.workspace-ui .wa-orchestra-stage svg { cursor: grab; }
+.workspace-ui .wa-orchestra-stage svg.panning { cursor: grabbing; }
+.workspace-ui .orc-e { fill: none; stroke: color-mix(in srgb, var(--muted) 55%, transparent); stroke-width: 1.6; }
+.workspace-ui .orc-e.s-muted { stroke-dasharray: 4 5; opacity: .55; }
+.workspace-ui .orc-e.s-run { stroke: var(--orc-run); stroke-width: 2.2; stroke-dasharray: 7 6; animation: orc-flow .7s linear infinite; }
+.workspace-ui .orc-e.s-run.p-chatgpt { stroke: var(--orc-chatgpt); }
+.workspace-ui .orc-e.s-run.p-claude { stroke: var(--orc-claude); }
+.workspace-ui .orc-e.s-run.p-gemini { stroke: var(--orc-gemini); }
+.workspace-ui .orc-e.s-run.p-jev { stroke: var(--orc-jev); }
+.workspace-ui .orc-e-label { fill: var(--muted); font-size: 10px; font-weight: 600; paint-order: stroke; stroke: var(--wa-subtle); stroke-width: 3px; }
+.workspace-ui .orc-n { color: var(--text); outline: none; cursor: default; }
+.workspace-ui .orc-n .box { fill: var(--wa-surface, #fff); stroke: color-mix(in srgb, var(--muted) 45%, transparent); stroke-width: 1.5; transition: stroke .2s; }
+.workspace-ui .orc-n .icon { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.workspace-ui .orc-n .label { fill: var(--text); font-size: 11.5px; font-weight: 600; }
+.workspace-ui .orc-n .sub { fill: var(--muted); font-size: 9.5px; }
+.workspace-ui .orc-n .port { fill: var(--wa-surface, #fff); stroke: color-mix(in srgb, var(--muted) 60%, transparent); stroke-width: 1.3; }
+.workspace-ui .orc-n.k-order .port.out, .workspace-ui .orc-n.k-pay .port.out, .workspace-ui .orc-n.k-cs .port.out { display: none; }
+.workspace-ui .orc-n.k-trigger .port.in { display: none; }
+.workspace-ui .orc-n .badge circle { fill: var(--text); }
+.workspace-ui .orc-n .badge text { fill: var(--wa-surface, #fff); font-size: 8.5px; font-weight: 700; }
+.workspace-ui .orc-n .spin { display: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-dasharray: 22 16; transform-box: fill-box; transform-origin: center; }
+.workspace-ui .orc-n.p-chatgpt { color: var(--orc-chatgpt); }
+.workspace-ui .orc-n.p-claude { color: var(--orc-claude); }
+.workspace-ui .orc-n.p-gemini { color: var(--orc-gemini); }
+.workspace-ui .orc-n.p-jev { color: var(--orc-jev); }
+.workspace-ui .orc-n.k-order { color: var(--orc-order); }
+.workspace-ui .orc-n.k-pay { color: var(--orc-pay); }
+.workspace-ui .orc-n.k-cs { color: var(--orc-cs); }
+.workspace-ui .orc-n.k-trigger .badge circle { fill: var(--wa-err, #d64545); }
+.workspace-ui .orc-n.k-ai .badge circle { fill: currentColor; }
+.workspace-ui .orc-n.s-busy .box { stroke: currentColor; stroke-width: 2.4; }
+.workspace-ui .orc-n.s-busy .spin { display: block; animation: orc-spin .9s linear infinite; }
+.workspace-ui .orc-n.s-busy .badge { display: none; }
+.workspace-ui .orc-n.s-wait .box { stroke: color-mix(in srgb, var(--orc-run) 55%, var(--muted)); stroke-dasharray: 5 4; }
+.workspace-ui .orc-n.s-paused .box { stroke: var(--wa-warn, #d4a017); stroke-dasharray: 4 3; }
+.workspace-ui .orc-n.s-paused .sub { fill: var(--wa-warn, #b8860b); }
+.workspace-ui .orc-n.s-off { opacity: .4; }
+.workspace-ui .orc-n.f-ok .box { stroke: var(--orc-run); stroke-width: 2.4; }
+.workspace-ui .orc-n.f-err .box { stroke: var(--wa-err, #d64545); stroke-width: 2.4; }
+.workspace-ui .orc-n:hover .box, .workspace-ui .orc-n:focus-visible .box { stroke: var(--text); }
+.workspace-ui .wa-orchestra-tip { transform: translate(-50%, calc(-100% - 10px)); white-space: normal; max-width: 220px; text-align: left; }
+.workspace-ui .wa-orchestra-legend .dot.order { background: var(--orc-order); }
+.workspace-ui .wa-orchestra-legend .dot.payment { background: var(--orc-pay); }
+.workspace-ui .wa-orchestra-legend .dot.cs { background: var(--orc-cs); }
+.workspace-ui .wa-orchestra-legend .dot.run { background: var(--orc-run); }
+.workspace-ui .wa-orchestra-legend { flex-wrap: wrap; row-gap: 4px; }
+.workspace-ui .wa-orchestra-hint { position: absolute; left: 8px; bottom: 6px; font-size: 9.5px; color: var(--muted); opacity: .75; pointer-events: none; display: none; }
+.workspace-ui .wa-orchestra.expanded .wa-orchestra-hint { display: block; }
+@keyframes orc-flow { to { stroke-dashoffset: -26; } }
+@keyframes orc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .workspace-ui .orc-e.s-run, .workspace-ui .orc-n.s-busy .spin { animation: none; }
+}
+
