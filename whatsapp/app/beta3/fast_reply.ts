@@ -1,5 +1,5 @@
 // v3.6.95 — Jalur kilat: seperti CS manusia yang sudah hafal jawabannya. Pertanyaan umum yang jelas dan
-// satu maksud (harga mulai, lokasi, jam buka, marketplace, lama pengerjaan, cara order, rekening) dijawab
+// satu maksud (harga mulai, lokasi, jam buka, marketplace, lama pengerjaan, rekening) dijawab
 // langsung dari data toko dalam 1–2 kalimat, tanpa memanggil AI (±0 detik, 0 kuota). Ragu → jalur pikir (AI).
 import type { LeanCatalogRow } from '#beta3/catalog_service'
 import type { LeanHistoryRow } from '#beta3/prompt'
@@ -27,16 +27,18 @@ const TIME = /\b(selamat\s+|met\s+)?(pagi|siang|sore|malam)\b/i
 const INTENTS: Array<[FastIntent, RegExp]> = [
   ['marketplace', /\b(shopee|shoppe|tokped|tokopedia|lazada|tiktok\s*shop|marketplace|blibli|bukalapak)\b/i],
   ['rekening', /\b(no\.?\s*rek\w*|norek\w*|nomor\s+rek\w*|rek(?:ening)?(?:nya)?\s+(?:mana|apa|berapa)|(?:tf|trf|transf\w*|bayar\w*)\s+(?:ke\s+)?(?:rek\w*\s+)?(?:mana|kemana)|ke\s+rek\w*\s+mana)\b/i],
-  ['lokasi', /\b(sharelo[ck]|share\s*lo[ck]\w*|lokasi(?:nya)?(?:\s+toko)?\s*(?:di\s*mana|dmn|dimana|mana)?|alamat\s+(?:toko|store|galeri|gallery)\w*|alamat(?:nya)?\s+(?:di\s*mana|dmn|dimana)|toko(?:nya)?\s+(?:di\s*mana|dmn|dimana)|(?:di\s*mana|dimana|dmn)\s+(?:toko|lokasi|alamat)\w*)\b/i],
-  ['jam_buka', /\b(jam\s+(?:berapa|brp)\s+(?:buka|tutup)|(?:buka|tutup)\s+(?:jam|sampai|sampe)\s*(?:berapa|brp)?|jam\s+(?:buka|operasional)|(?:hari\s+)?(?:minggu|sabtu|libur)\s+(?:buka|tutup)|toko(?:nya)?\s+buka)\b/i],
+  ['lokasi', /\b(lokasi(?:nya)?(?:\s+toko)?\s*(?:di\s*mana|dmn|dimana|mana)?|alamat\s+(?:toko|store|galeri|gallery)\w*|alamat(?:nya)?\s+(?:di\s*mana|dmn|dimana)|toko(?:nya)?\s+(?:di\s*mana|dmn|dimana)|(?:di\s*mana|dimana|dmn)\s+(?:toko|lokasi|alamat)\w*)\b/i],
+  ['jam_buka', /\b(jam\s+(?:berapa|brp)\s+(?:buka|tutup)|(?:buka|tutup)\s+(?:jam|sampai|sampe)\s*(?:berapa|brp)?|jam\s+(?:buka|operasional)|(?:hari\s+)?(?:minggu|sabtu|libur)\s+(?:buka|tutup))\b/i],
   ['lama_pengerjaan', /\b((?:berapa|brp)\s+lama|lama\s+(?:pengerjaan|proses|bikin|buat|jadi|pembuatan)|(?:berapa|brp)\s+hari\s+(?:jadi|selesai|proses|pengerjaan|pembuatan|bikin|buat)|estimasi\s+(?:jadi|pengerjaan|selesai|pembuatan))\b/i],
-  ['cara_order', /\b(cara\s+(?:order|pesan|pesen|beli|pemesanan|ordernya|pesannya)|(?:gimana|bagaimana|gmn)\s+(?:cara\s+)?(?:order|pesan|pesen|beli)\w*)\b/i],
   ['harga_umum', /\b(price\s*list|pricelist|daftar\s+harga|harga\w*\s+(?:jas|setelan|stelan|beskap|blazer|celana|vest|rompi|kemeja)\w*|(?:jas|setelan|stelan|beskap|blazer)\w*\s+(?:harga\w*|brp|berapa)|harga(?:nya)?\s+(?:mulai|dari)\s+(?:berapa|brp))\b/i],
 ]
 
 /** Kata yang menandakan pesan ini lebih dari pertanyaan umum (perlu AI): produk/warna/size/pesanan tertentu. */
 const SPECIFIC =
   /\b(xs|s|m|l|xl|xxl|[2-5]xl|size\s*\w+|ukuran\s+\w+|no\.?\s*\d{2}|warna|hitam|putih|navy|abu|grey|gray|maroon|cream|krem|coklat|brown|army|olive|sage|emerald|blue|biru|merah|hijau|ini|itu|yang\s+(?:ini|itu|tadi|kemarin)|kemarin|pesanan|orderan|order\s+saya|sudah|udah|dikirim|resi|custom|kustom|costum|grosir|seragam|diskon|nego|kurang|murah|anak|cewek|wanita|perempuan|sewa|bahan\s+(?:dari|sendiri)|ongkir|kirim\s+ke|tinggi|berat|tb|bb|kg|cm)\b/i
+/** Kalimat lain yang membawa maksud sendiri (pertanyaan atau hal bisnis). */
+const OTHER_TOPIC =
+  /\b(brp|berapa|apa|apakah|bisa|bs|ada|gimana|bagaimana|gmn|kapan|mana|kah|harga\w*|lunas|dp|tf|transfer\w*|bukti|resmi|ongkir|size|ukuran|model|warna|stok|stock|ready|mahal|murah|online|web|website|custom|diskon|nego)\b/i
 const OTHER_QUESTION = /\b(apa|apakah|bisa|bs|ada|ready|redy|stok|stock|kapan|siapa|kenapa|mengapa|gimana|bagaimana|berapa|brp)\b/gi
 const FILLER =
   /\b(ya+|yah|ka+|kak|kakak|min|admin|bos+|bosku+|gan|mas|mbak|sis|bang|om|pak|bu|dong|deh|sih|nih|kah|ok|oke|mau|tanya|nanya|boleh|izin|ijin|misi|permisi|maaf|tolong|info|infonya|untuk|utk|buat|di|ke|yg|yang|dan|sama|aja|saja|nya|itu|toko|tokonya)\b/gi
@@ -56,6 +58,17 @@ export function fastIntent(text: string): FastIntent | null {
   if (intent !== 'rekening' && intent !== 'lokasi' && intent !== 'jam_buka' && (SPECIFIC.test(value) || /\b(ready|redy|po|pre\s*order|stok|stock)\b/i.test(value))) return null
   if (intent === 'lama_pengerjaan' && /\b(sampai|sampe|nyampe|tiba|kirim|pengiriman|ekspedisi|jne)\b/i.test(value)) return null
   if (intent === 'lokasi' && /\b(alamat\s+(?:saya|aku|rumah|kirim|pengiriman)|kirim\s+ke)\b/i.test(value)) return null
+  // v3.6.102 (audit chat asli): kalimat lain yang bertanya/menyebut hal bisnis ("Lunas", "Sama DP ke mana",
+  // "harga berapa kak? ada shopee?", "Yg tdk resmi") → maksud lebih dari satu → AI.
+  const pattern = INTENTS.find(([name]) => name === intent)![1]
+  const others = value.split(/[\n?!]+|\.\s+/).map((part) => part.trim()).filter((part) => part && !pattern.test(part))
+  if (others.some((part) => OTHER_TOPIC.test(part))) return null
+  // Harga untuk barang yang ditunjuk ("Ni stelan brp") → AI.
+  if (intent === 'harga_umum' && /\b(ni|nih|tsb|tersebut|gini|gitu|begini|begitu)\b/i.test(value)) return null
+  // Marketplace: hanya pertanyaan "ada/bisa di shopee?", bukan cerita ("sdh order di shopee", "dapat nomor dari shopee").
+  if (intent === 'marketplace' && /\b(sdh|sudah|udah|td|tadi|dpt|dapat|dapet|nomor|nmr|co|checkout|reseller)\b/i.test(value)) return null
+  // Lama pengerjaan barang tertentu (celana 3–4 hari, vest, kemeja) → AI.
+  if (intent === 'lama_pengerjaan' && /\b(celana|pants|vest|rompi|kemeja|dasi|beskap|bescap)\w*/i.test(value)) return null
   // Sisa kata sesudah frasa maksud, sapaan & kata pengisi: banyak sisa = ada maksud lain → AI.
   const rest = value
     .replace(INTENTS.find(([name]) => name === intent)![1], ' ')
@@ -147,22 +160,15 @@ export function fastAnswer(intent: FastIntent, text: string, facts: FastFacts): 
           ])
         : null
     case 'lama_pengerjaan': {
-      const { preorder, custom } = facts.ranges
-      if (!preorder && !custom) return null
-      const made = preorder || custom
-      const tail = custom && preorder && custom !== preorder ? `, custom ukuran sekitar ${custom}` : ''
+      // v3.6.102: seperti CS di chat asli ("proses pembuatan kurang lebih 1 minggu bos") — tanpa tambahan ready/custom.
+      const made = facts.ranges.preorder || facts.ranges.custom
+      if (!made) return null
       return pick([
-        [`Kalau ready bisa langsung kirim ${a}, kalau dibuatkan dulu sekitar ${made}${tail}`],
-        [`Yang ready langsung kirim ${a}, kalau pre-order sekitar ${made} setelah pembayaran${tail}`],
-        [`Pengerjaannya sekitar ${made} ${a} kalau stoknya kosong${tail}, kalau ready bisa langsung dikirim`],
+        [`Proses pembuatan sekitar ${made} ${a}`],
+        [`Proses pembuatannya kurang lebih ${made} ${a}`],
+        [`Pembuatannya sekitar ${made} ya ${a}`],
       ])
     }
-    case 'cara_order':
-      return pick([
-        [`Bisa langsung order di chat ini ${a}, pilih model & warnanya dulu`, 'Nanti saya bantu cek size dari tinggi & berat badan'],
-        [`Order di sini aja ${a}, pilih model & warna dulu`, 'Habis itu kirim tinggi & berat badan buat cek size'],
-        [`Langsung di chat ini bisa ${a}, mau model apa?`],
-      ])
     case 'harga_umum': {
       const lower = text.toLowerCase()
       const suits = (row: LeanCatalogRow) => /suit|jas/i.test(row.category) && !/^setelan/i.test(row.product)

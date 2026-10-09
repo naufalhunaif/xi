@@ -633,7 +633,13 @@ export async function createLeanReply(input: {
   // v3.6.95 — Jalur kilat: pertanyaan umum satu maksud dijawab dari data toko tanpa AI (seperti CS yang hafal).
   const fastKind =
     !input.imagePaths?.length && !input.note && !needsContext(rows) ? fastIntent(input.text) : null
-  const fastStageOk = fastKind && (['rekening', 'lokasi', 'jam_buka', 'marketplace'].includes(fastKind) || FAST_EARLY.includes(stage))
+  // v3.6.102 (audit chat asli): rekening kilat hanya bila total sudah dikirim (menunggu bayar); sebelum itu CS
+  // manusia meminta form order / pilihan ongkir dulu → AI.
+  const awaitingPay =
+    fastKind === 'rekening' ? (await latestLeanOrder(jid).catch(() => null))?.status === 'awaiting_payment' : false
+  const fastStageOk =
+    fastKind &&
+    (fastKind === 'rekening' ? awaitingPay : ['lokasi', 'jam_buka', 'marketplace'].includes(fastKind) || FAST_EARLY.includes(stage))
   if (fastKind && fastStageOk) {
     const methods = settings.paymentMethods.filter((method) => method.enabled)
     const fast = fastAnswer(fastKind, input.text, {

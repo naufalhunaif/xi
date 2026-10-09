@@ -961,13 +961,11 @@ test.group('Beta3 · jalur kilat (v3.6.95)', () => {
       ['kak harga jas berapa ya', 'harga_umum'],
       ['pricelist dong min', 'harga_umum'],
       ['Lokasi dmn ya ka ??', 'lokasi'],
-      ['Wahh bisa minta tolong shareloc?', 'lokasi'],
-      ['Mas toko buka?', 'jam_buka'],
       ['tutup jam berapa kak', 'jam_buka'],
       ['Ada link shoppe kak?', 'marketplace'],
       ['tokonya ada di tokped gak?', 'marketplace'],
       ['Brp lama ya ka', 'lama_pengerjaan'],
-      ['cara ordernya bagaimana kak?', 'cara_order'],
+      ['Siaapp mas\nEstimasi brp lama yaa', 'lama_pengerjaan'],
       ['kirim Ke rek Mana yah?', 'rekening'],
       ['Assalamualaikum kak, no rek nya?', 'rekening'],
     ]
@@ -984,6 +982,19 @@ test.group('Beta3 · jalur kilat (v3.6.95)', () => {
       'Kalau dari Kota Banjar baiknya ambil arah mana ... Kalau dikirim kapan sampai ka perlu buat tgl 18',
       'alamat saya di jl. merdeka no 5 bekasi',
       'Hallo kak, mau tanya jasnya',
+      // v3.6.102 — dari audit chat asli: maksud lebih dari satu, menunjuk barang, cerita, atau perlu konteks.
+      'Lunas\nBerapa lama proses nya',
+      'Estimasi pengerjaan brp lama\nSama DP ke mana',
+      'harga berapa kak? ada shopee?',
+      'Ni stelan brp bg?',
+      'Mas jas brp harganya\nYg tdk resmi mas',
+      'Sdh sy order d shopee kak td akhirnya',
+      'Tp aku dpt nmr nya dr shopee deh ky nya',
+      'Mahal juga y..\nKlo d shoppe ga da y..',
+      'berapa lama bikin celananya',
+      'Mas toko buka?',
+      'Share loc aja pak',
+      'cara ordernya bagaimana kak?',
     ]
     for (const text of no) assert.isNull(fastIntent(text), text)
   })
@@ -1020,7 +1031,11 @@ test.group('Beta3 · jalur kilat (v3.6.95)', () => {
     const once = fastAnswer('marketplace', 'ada di shopee?', facts)!
     const again = fastAnswer('marketplace', 'ada di shopee?', { ...facts, avoid: once })!
     assert.notEqual(again[0], once[0])
-    assert.include(fastAnswer('lama_pengerjaan', 'brp lama', facts)![0], '5-10 hari kerja')
+    const lama = fastAnswer('lama_pengerjaan', 'brp lama', facts)!
+    assert.include(lama[0], '5-10 hari kerja')
+    // Seperti CS asli: tanpa tambahan ready/custom yang tidak ditanya.
+    assert.notMatch(lama.join(' '), /ready|custom|pre-order/i)
+    assert.lengthOf(lama, 1)
     assert.isNull(fastAnswer('rekening', 'norek', { ...facts, payment: '' }))
   })
 })
