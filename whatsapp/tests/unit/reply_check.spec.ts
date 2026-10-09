@@ -1275,8 +1275,9 @@ test.group('v3.6.101 keadaan chat & perbaikan bagian yang salah', () => {
   })
   test('reply_service: perbaikan dulu, tulis ulang penuh hanya cadangan; keadaan chat ikut ke AI & pemeriksa', async ({ assert }) => {
     const source = await readFile('app/beta3/reply_service.ts', 'utf8')
-    assert.include(source, 'fixPrompt({')
-    assert.include(source, 'FIX_SCHEMA')
+    // v3.6.106: perbaikan sebagian dimatikan → tulis ulang penuh seperti semula.
+    assert.notInclude(source, 'fixPrompt({')
+    assert.include(source, 'revisionNote(decision, check.issues)')
     assert.include(source, 'renderChatState([...olderRows, ...rows])')
     assert.match(source, /chatState,\n\s+history: rows,/)
     assert.match(source, /settings,\n\s+chatState,\n\s+\}\)\.catch/)
@@ -1326,9 +1327,17 @@ test.group('v3.6.104 kemeja di katalog fokus; susulan batal tidak dinilai', () =
 })
 
 test.group('v3.6.105 perbaikan memakai katalog yang sama', () => {
-  test('fixFacts memuat catalogText (bukan hanya produk yang disebut namanya)', async ({ assert }) => {
+  test('katalog AI penyusun dari catalogText', async ({ assert }) => {
     const source = await readFile('app/beta3/reply_service.ts', 'utf8')
     assert.include(source, 'catalog: catalogText,')
-    assert.match(source, /const fixFacts = \[\n\s+\.\.\.relevantFacts\([^\n]+\n\s+catalogText,/)
+  })
+})
+
+test.group('v3.6.106 jalur kilat dimatikan (semua lewat AI)', () => {
+  test('tanya umum & ongkir tidak lagi dijawab tanpa AI', async ({ assert }) => {
+    const source = await readFile('app/beta3/reply_service.ts', 'utf8')
+    assert.include(source, 'const FAST_LANE = false')
+    assert.include(source, 'FAST_LANE && !input.imagePaths?.length')
+    assert.include(source, 'if (FAST_LANE && shipFast')
   })
 })

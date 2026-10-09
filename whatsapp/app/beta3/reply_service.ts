@@ -72,6 +72,9 @@ import { lookupPlace, mapLink, parseAddress, type PlaceLookup } from '#beta3/pla
 import { fastAnswer, fastIntent, fastShipping, needsContext, pureShippingAsk } from '#beta3/fast_reply'
 /** Tahap awal: jalur kilat untuk harga umum, lama pengerjaan, cara order. */
 const FAST_EARLY = ['', 'lain', 'selesai', 'tanya_model', 'tanya_size']
+// v3.6.106 — jalur kilat (tanya umum & ongkir tanpa AI) DIMATIKAN atas permintaan pemilik: hasil uji tidak lebih
+// efektif; semua balasan kembali lewat AI (lebih lama tapi menimbang konteks). Kodenya disimpan untuk nanti.
+const FAST_LANE = false
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
 import { completePhotos, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
@@ -90,7 +93,7 @@ import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { renderPaymentMessage } from '#beta3/order_service'
-import { alignPhotos, CHECK_LABEL, colorPriceIssues, FIX_SCHEMA, fixPrompt, offColorPhotos, checkReply, mergeUsage, parseFix, photoCaptions, readyClaimIssues, relevantFacts, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
 import { renderChatState } from '#beta3/chat_state'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
@@ -632,7 +635,7 @@ export async function createLeanReply(input: {
   }
   // v3.6.95 — Jalur kilat: pertanyaan umum satu maksud dijawab dari data toko tanpa AI (seperti CS yang hafal).
   const fastKind =
-    !input.imagePaths?.length && !input.note && !needsContext(rows) ? fastIntent(input.text) : null
+    FAST_LANE && !input.imagePaths?.length && !input.note && !needsContext(rows) ? fastIntent(input.text) : null
   // v3.6.102 (audit chat asli): rekening kilat hanya bila total sudah dikirim (menunggu bayar); sebelum itu CS
   // manusia meminta form order / pilihan ongkir dulu → AI.
   const awaitingPay =
@@ -978,7 +981,7 @@ export async function createLeanReply(input: {
   }
 
   // v3.6.96 — Ongkir kilat: pesan hanya soal ongkir & tujuan ketemu → jawab langsung dari data ekspedisi.
-  if (shipFast && !form && !loose && FAST_EARLY.includes(stage) && pureShippingAsk(input.text, askedPlace)) {
+  if (FAST_LANE && shipFast && !form && !loose && FAST_EARLY.includes(stage) && pureShippingAsk(input.text, askedPlace)) {
     const pesan = fastShipping({ ...shipFast, address: style?.address || 'bos', seed: `${jid}|${rows.length}` })
     onTrace?.({ key: 'beta3-fast', label: 'Jalur kilat · ongkir (0 token)', status: 'completed', detail: { pesan } })
     return {
@@ -1391,69 +1394,24 @@ export async function createLeanReply(input: {
       status: 'failed',
       detail: { masalah: check.issues, draf: { pesan: decision.pesan, foto: decision.foto } },
     })
-    // v3.6.101 — perbaiki bagian yang salah saja (bahan kecil, konteks tetap lengkap); kolom lain tetap dari draf.
-    // Gagal terbaca atau masih salah menurut pemeriksaan pasti → cara lama (tulis ulang penuh) sekali.
-    let fixedPart: Pick<LeanDecision, 'pesan' | 'foto'> | null = null
+    // v3.6.106 — kembali ke tulis ulang penuh (perbaikan "bagian yang salah saja" v3.6.101 dimatikan atas
+    // permintaan pemilik: tidak lebih efektif di uji).
     try {
-      const fixFacts = [
-        ...relevantFacts(digest.rows, [input.text, ...rows.slice(-6).map((row) => String(row.body || '')), ...decision.pesan]),
-        catalogText,
-        store,
-        productionText,
-        STORE_BASICS,
-        ...toolNotes,
-      ]
-      const fixing = await runLeanProvider(
+      const revised = await runLeanProvider(
         settings,
-        fixPrompt({
-          rules: renderRules(rules),
-          style: style ? styleGuide(style) : '',
-          customerText: input.text,
-          history: rows,
-          chatState,
-          notes: [chatNote ? `CATATAN CHAT:\n${chatNote}` : '', spec ? `SPESIFIKASI PESANAN:\n${spec}` : ''],
-          facts: fixFacts.filter(Boolean) as string[],
-          draft: decision,
-          issues: check.issues,
-        }),
+        { system: prompt.system, user: `${prompt.user}\n\n${revisionNote(decision, check.issues)}` },
         input.imagePaths || [],
         'beta3-revise',
-        FIX_SCHEMA,
+        undefined,
         { jid, tier: tierChoice.tier }
       )
-      fixedPart = parseFix(fixing.text)
-      if (fixedPart) {
-        const still = [
-          ...photoCaptions(digest.rows, fixedPart.foto).missing,
-          ...colorPriceIssues(fixedPart.pesan, digest.rows),
-          ...readyClaimIssues(fixedPart.pesan, digest.rows),
-        ]
-        if (still.length) fixedPart = null
-      }
-      result.usage = mergeUsage(result.usage, fixing.usage)
-    } catch {
-      fixedPart = null
+      const fixed = parseLeanDecision(revised.text)
+      decision = fixed
+      result.usage = mergeUsage(result.usage, revised.usage)
+      onTrace?.({ key: 'beta3-revise', label: 'Balasan ditulis ulang sesuai pemeriksa', status: 'completed', detail: { pesan: fixed.pesan, foto: fixed.foto } })
+    } catch (error) {
+      onTrace?.({ key: 'beta3-revise', label: 'Tulis ulang gagal · draf awal dipakai', status: 'failed', detail: { error: error instanceof Error ? error.message : String(error) } })
     }
-    if (fixedPart) {
-      decision = { ...decision, pesan: fixedPart.pesan, foto: fixedPart.foto }
-      onTrace?.({ key: 'beta3-revise', label: 'Balasan diperbaiki (bagian yang salah saja) · ditulis ulang sesuai pemeriksa', status: 'completed', detail: { pesan: fixedPart.pesan, foto: fixedPart.foto } })
-    } else
-      try {
-        const revised = await runLeanProvider(
-          settings,
-          { system: prompt.system, user: `${prompt.user}\n\n${revisionNote(decision, check.issues)}` },
-          input.imagePaths || [],
-          'beta3-revise',
-          undefined,
-          { jid, tier: tierChoice.tier }
-        )
-        const fixed = parseLeanDecision(revised.text)
-        decision = fixed
-        result.usage = mergeUsage(result.usage, revised.usage)
-        onTrace?.({ key: 'beta3-revise', label: 'Balasan ditulis ulang sesuai pemeriksa (penuh)', status: 'completed', detail: { pesan: fixed.pesan, foto: fixed.foto } })
-      } catch (error) {
-        onTrace?.({ key: 'beta3-revise', label: 'Tulis ulang gagal · draf awal dipakai', status: 'failed', detail: { error: error instanceof Error ? error.message : String(error) } })
-      }
   } else if (check.jev || (check as { ai?: boolean }).ai)
     onTrace?.({ key: 'beta3-check', label: 'Pemeriksa balasan · sesuai', status: 'completed', detail: {} })
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
