@@ -1688,3 +1688,28 @@ test.group('v3.6.118 stiker tidak ikut jadi referensi pesanan', () => {
     await db.from('whatsapp_messages').where('jid', jid).delete()
   })
 })
+
+test.group('v3.6.119 reaksi tampil (WhatsApp & Instagram)', () => {
+  test('reaksi Instagram pelanggan tersimpan ke pesan yang dituju; unreact menghapus', async ({ assert }) => {
+    const { ingestIgReaction } = await import('#services/instagram_inbox')
+    const mid = `mid-react-${Date.now()}`
+    const config = { userId: '999' } as any
+    await ingestIgReaction({ sender: { id: '7712350' }, recipient: { id: '999' }, reaction: { mid, action: 'react', reaction: 'love', emoji: '❤️' } }, config)
+    let row = await db.from('whatsapp_reactions').where('target_message_id', mid).first()
+    assert.equal(row.emoji, '❤️')
+    assert.equal(row.jid, '7712350@ig')
+    assert.equal(Number(row.from_me), 0)
+    // Pemilik mereaksi dari aplikasi Instagram → from_me.
+    await ingestIgReaction({ sender: { id: '999' }, recipient: { id: '7712350' }, reaction: { mid, action: 'react', reaction: 'like' } }, config)
+    row = await db.from('whatsapp_reactions').where('target_message_id', mid).where('sender', 'me').first()
+    assert.equal(row.emoji, '👍')
+    await ingestIgReaction({ sender: { id: '7712350' }, recipient: { id: '999' }, reaction: { mid, action: 'unreact' } }, config)
+    assert.lengthOf(await db.from('whatsapp_reactions').where('target_message_id', mid).where('sender', '7712350@ig'), 0)
+    await db.from('whatsapp_reactions').where('target_message_id', mid).delete()
+  })
+  test('reaksi WhatsApp: kunci pesan yang dituju = key, pengirim dari reaction.key', async ({ assert }) => {
+    const source = await readFile('commands/whatsapp_listen.ts', 'utf8')
+    assert.include(source, 'const targetId = key?.id')
+    assert.include(source, "const sender = fromMe ? 'me' : by?.participant || by?.remoteJid || jid")
+  })
+})

@@ -179,7 +179,7 @@ async function probe(hub: Hub) {
            (SELECT COUNT(*) FROM whatsapp_messages WHERE direction = 'out' AND created_at >= NOW() - INTERVAL 5 MINUTE AND status IN ('sent', 'delivered', 'read')),
            (SELECT MAX(updated_at) FROM whatsapp_settings),
            ${RECENT_MESSAGES_SQL},
-           (SELECT COALESCE(MAX(id), 0) FROM whatsapp_reactions),
+           (SELECT CONCAT(COUNT(*), ':', COALESCE(MAX(id), 0), ':', COALESCE(MAX(created_at), '')) FROM whatsapp_reactions),
            ${parts}) AS signature`
       )
       return String(((result[0] as any[])[0] || {}).signature || '')

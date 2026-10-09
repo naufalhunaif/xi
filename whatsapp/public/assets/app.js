@@ -349,7 +349,8 @@
     const picker = document.createElement('div')
     picker.className = 'reaction-picker'
     picker.hidden = true
-    for (const emoji of ['👍', '❤️', '😂', '😮', '😢', '🙏']) {
+    // v3.6.119: Instagram hanya menerima ❤️ sebagai reaksi.
+    for (const emoji of String(message.jid || '').endsWith('@ig') ? ['❤️'] : ['👍', '❤️', '😂', '😮', '😢', '🙏']) {
       const button = document.createElement('button')
       button.type = 'button'
       button.dataset.reaction = emoji
@@ -513,7 +514,7 @@
     footer.className = 'message-footer'
     const reactions = document.createElement('span')
     reactions.className = 'message-reactions'
-    for (const reaction of message.reactions || []) {
+    for (const reaction of (message.reactions || []).filter((item) => item.status !== 'failed')) {
       const emoji = document.createElement('span')
       emoji.textContent = reaction.emoji
       reactions.append(emoji)
@@ -592,7 +593,7 @@
         message.thumbnail_url,
         message.media_status,
         message.reply_to_message_id,
-        (message.reactions || []).map((reaction) => reaction.emoji),
+        (message.reactions || []).map((reaction) => `${reaction.emoji}:${reaction.status || ""}`),
       ])
     )
     if (messages.dataset.signature === signature) return

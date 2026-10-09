@@ -17,6 +17,8 @@ type Messaging = {
   sender?: { id?: string }
   recipient?: { id?: string }
   timestamp?: number
+  /** v3.6.119 — reaksi (❤️ dll.) ke sebuah pesan; action "unreact" = dicabut. */
+  reaction?: { mid?: string; action?: string; reaction?: string; emoji?: string }
   message?: {
     mid?: string
     text?: string
@@ -37,7 +39,7 @@ const SAMPLE_LIMIT = 300
  */
 async function recordIgSample(event: Messaging) {
   const message = event.message
-  if (!message || (!message.attachments?.length && !message.reply_to?.story && !message.is_unsupported)) return
+  if (!event.reaction && (!message || (!message.attachments?.length && !message.reply_to?.story && !message.is_unsupported))) return
   const file = app.makePath('storage', 'ig-webhook-samples.jsonl')
   await mkdir(app.makePath('storage'), { recursive: true })
   await appendFile(file, `${JSON.stringify({ at: new Date().toISOString(), event })}\n`)
@@ -101,7 +103,37 @@ async function scheduleTurn(jid: string, anchor: string) {
   )
 }
 
+const REACTION_EMOJI: Record<string, string> = {
+  love: '❤️', like: '👍', haha: '😂', wow: '😮', sad: '😢', angry: '😡', smile: '😊', yay: '🎉',
+}
+
+/** v3.6.119 — reaksi Instagram (pelanggan atau pemilik dari aplikasi IG) tampil di pesan yang dituju. */
+export async function ingestIgReaction(event: Messaging, config: IgConfig) {
+  const reaction = event.reaction
+  const target = String(reaction?.mid || '')
+  if (!reaction || !target) return
+  await recordIgSample(event).catch(() => {})
+  const senderId = String(event.sender?.id || '')
+  const fromMe = Boolean(senderId) && senderId === config.userId
+  const customer = String((fromMe ? event.recipient?.id : event.sender?.id) || '')
+  if (!customer) return
+  const jid = igJid(customer)
+  const sender = fromMe ? 'me' : jid
+  if (String(reaction.action || 'react') === 'unreact') {
+    await db.from('whatsapp_reactions').where('target_message_id', target).where('sender', sender).delete()
+    return
+  }
+  const emoji = String(reaction.emoji || REACTION_EMOJI[String(reaction.reaction || '')] || '❤️').slice(0, 16)
+  await db.rawQuery(
+    `INSERT INTO whatsapp_reactions (target_message_id, jid, sender, emoji, from_me, status, created_at)
+     VALUES (?, ?, ?, ?, ?, 'received', ?)
+     ON DUPLICATE KEY UPDATE emoji = VALUES(emoji), status = IF(status = 'queued', status, 'received'), created_at = VALUES(created_at)`,
+    [target, jid, sender, emoji, fromMe ? 1 : 0, new Date()]
+  )
+}
+
 async function ingestMessaging(event: Messaging, config: IgConfig) {
+  if (event.reaction) return ingestIgReaction(event, config)
   const message = event.message
   const mid = String(message?.mid || '')
   if (!message || !mid || message.is_deleted) return

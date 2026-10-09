@@ -45,7 +45,9 @@ export async function instagramTick() {
     const config = await readIgConfig()
     if (!config.token || !config.userId) return
     await refreshIfNeeded(config)
+    await ensureWebhookFields(config).catch(() => {})
     await flushOutbox(config)
+    await flushIgReactions(config).catch(() => {})
     await runDueTurns(config)
     await runComments(config)
     await backfillPosts(config)
@@ -58,6 +60,52 @@ export async function instagramTick() {
     await noteIgError(error instanceof Error ? error.message : String(error)).catch(() => {})
   } finally {
     running = false
+  }
+}
+
+/**
+ * v3.6.119 — langganan webhook diperbarui sekali (tambah reaksi pesan) tanpa perlu menyambung ulang Instagram.
+ * Ditolak Meta → kembali ke DM + komentar; dicoba lagi besok.
+ */
+async function ensureWebhookFields(config: IgConfig) {
+  const row = await db.from('whatsapp_beta3_state').where('name', 'ig_webhook_fields').first()
+  const [fields, at] = String(row?.value || '').split('|')
+  if (fields === ig.IG_FIELDS || (fields && Date.now() - Number(at || 0) < DAY)) return
+  let saved = ig.IG_FIELDS
+  try {
+    await ig.subscribe(config.token)
+  } catch (error) {
+    saved = 'messages,comments'
+    await ig.subscribe(config.token, saved).catch(() => {})
+    await noteIgError(`Reaksi Instagram belum aktif: ${error instanceof Error ? error.message : String(error)}`).catch(() => {})
+  }
+  await db.rawQuery(
+    `INSERT INTO whatsapp_beta3_state (name, value, updated_at) VALUES ('ig_webhook_fields', ?, ?)
+     ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)`,
+    [`${saved}|${Date.now()}`, new Date()]
+  )
+}
+
+/** v3.6.119 — reaksi dari web ke pesan Instagram. Instagram hanya menerima ❤️; emoji lain ditandai gagal. */
+async function flushIgReactions(config: IgConfig) {
+  const queued = await db
+    .from('whatsapp_reactions')
+    .where('from_me', true)
+    .where('status', 'queued')
+    .where('jid', 'like', '%@ig')
+    .orderBy('id', 'asc')
+    .limit(10)
+  for (const reaction of queued as any[]) {
+    if (!/^❤/.test(String(reaction.emoji))) {
+      await db.from('whatsapp_reactions').where('id', reaction.id).update({ status: 'failed' })
+      continue
+    }
+    try {
+      await ig.sendReaction(config.token, igsidOf(String(reaction.jid)), String(reaction.target_message_id))
+      await db.from('whatsapp_reactions').where('id', reaction.id).update({ status: 'sent' })
+    } catch {
+      await db.from('whatsapp_reactions').where('id', reaction.id).update({ status: 'failed' })
+    }
   }
 }
 

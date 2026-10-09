@@ -120,13 +120,22 @@ export async function me(token: string) {
   }
 }
 
-/** Langganan webhook akun ini: DM dan komentar. */
-export async function subscribe(token: string) {
-  return call(`${IG_GRAPH}/me/subscribed_apps?subscribed_fields=messages,comments`, {
+/** Langganan webhook akun ini: DM, komentar, dan (v3.6.119) reaksi pesan. */
+export const IG_FIELDS = 'messages,comments,message_reactions'
+export async function subscribe(token: string, fields = IG_FIELDS) {
+  return call(`${IG_GRAPH}/me/subscribed_apps?subscribed_fields=${fields}`, {
     method: 'POST',
     headers: bearer(token),
   })
 }
+
+/** v3.6.119 — reaksi ke pesan pelanggan. Instagram hanya mendukung "love" (❤️). */
+export const sendReaction = (token: string, igsid: string, messageId: string, remove = false) =>
+  send(token, {
+    recipient: { id: igsid },
+    sender_action: remove ? 'unreact' : 'react',
+    payload: remove ? { message_id: messageId } : { message_id: messageId, reaction: 'love' },
+  })
 
 export async function profile(token: string, igsid: string) {
   try {

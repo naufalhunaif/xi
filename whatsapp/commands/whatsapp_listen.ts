@@ -1868,14 +1868,20 @@ export default class WhatsappListen extends BaseCommand {
     )
   }
 
+  /**
+   * v3.6.119 — Baileys mengirim `key` = kunci pesan YANG DIBERI reaksi, `reaction.key` = kunci pesan reaksinya
+   * (pengirim reaksi). Dulu keduanya tertukar: reaksi tersimpan ke id pesan reaksi → tidak pernah tampil.
+   */
   private async onReaction(
     key: WAMessageKey,
     reaction: { key?: WAMessageKey | null; text?: string | null }
   ) {
-    const targetId = reaction.key?.id
-    const jid = key.remoteJid
+    const targetId = key?.id
+    const jid = key?.remoteJid || reaction.key?.remoteJid
     if (!targetId || !jid) return
-    const sender = key.fromMe ? 'me' : key.participant || jid
+    const by = reaction.key
+    const fromMe = Boolean(by?.fromMe)
+    const sender = fromMe ? 'me' : by?.participant || by?.remoteJid || jid
     const emoji = String(reaction.text || '')
     if (!emoji) {
       await db
@@ -1889,8 +1895,8 @@ export default class WhatsappListen extends BaseCommand {
       `INSERT INTO whatsapp_reactions
        (target_message_id, jid, sender, emoji, from_me, status, created_at)
        VALUES (?, ?, ?, ?, ?, 'received', ?)
-       ON DUPLICATE KEY UPDATE emoji = VALUES(emoji), status = 'received', created_at = VALUES(created_at)`,
-      [targetId, jid, sender, emoji, key.fromMe ? 1 : 0, new Date()]
+       ON DUPLICATE KEY UPDATE emoji = VALUES(emoji), status = IF(status = 'queued', status, 'received'), created_at = VALUES(created_at)`,
+      [targetId, jid, sender, emoji, fromMe ? 1 : 0, new Date()]
     )
   }
 
@@ -1980,6 +1986,8 @@ export default class WhatsappListen extends BaseCommand {
       .from('whatsapp_reactions')
       .where('from_me', true)
       .where('status', 'queued')
+      // Reaksi di room Instagram dikirim worker Instagram.
+      .whereRaw("jid NOT LIKE '%@ig'")
       .orderBy('id', 'asc')
       .limit(20)
     for (const reaction of queued) {
