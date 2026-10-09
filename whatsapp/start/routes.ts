@@ -193,6 +193,7 @@ router
     router.get('/api/instagram', [InstagramController, 'status'])
     router.post('/api/instagram', [InstagramController, 'save'])
     router.post('/api/instagram/disconnect', [InstagramController, 'disconnect'])
+    router.post('/api/instagram/repair-shares', [InstagramController, 'repairShares'])
     router.get('/instagram/connect', [InstagramController, 'connect'])
     router.get('/instagram/callback', [InstagramController, 'callback'])
     router.get('/comments', [InstagramController, 'page'])

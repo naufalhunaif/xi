@@ -1576,3 +1576,21 @@ test.group('v3.6.112 mengulang: rekening/total/format boleh diulang', () => {
     assert.lengthOf(repeatIssues([rek], [{ direction: 'out', body: rek, createdAt: new Date() }] as any), 0)
   })
 })
+
+test.group('v3.6.113 ruang chat desktop dikunci ke layar', () => {
+  test('shell chat fixed & halaman tidak tergulir', async ({ assert }) => {
+    const css = await readFile('public/assets/fullscreen.css', 'utf8')
+    assert.include(css, 'html body.workspace-ui > .shell.wa-shell-chat {\n    position: fixed;')
+    assert.include(css, 'body.workspace-ui:has(> .wa-shell-chat)')
+  })
+})
+
+test.group('v3.6.113 postingan lama dibagikan: isi diambil ulang dari Instagram', () => {
+  test('URL gambar / tautan / media id dari detail pesan', async ({ assert }) => {
+    const { sharedUrlFromDetail } = await import('#services/instagram_inbox')
+    assert.equal(sharedUrlFromDetail({ attachments: { data: [{ image_data: { url: 'https://scontent.cdninstagram.com/v/x.jpg?a=1', preview_url: 'https://x.test/p' } }] } }).url, 'https://scontent.cdninstagram.com/v/x.jpg?a=1')
+    assert.equal(sharedUrlFromDetail({ shares: { data: [{ link: 'https://www.instagram.com/p/abc/' }] } }).url, 'https://www.instagram.com/p/abc/')
+    assert.equal(sharedUrlFromDetail({ attachments: { data: [{ generic_template: { media_id: '1789' } }] } }).mediaId, '1789')
+    assert.deepEqual(sharedUrlFromDetail({}), { url: '', mediaId: '' })
+  })
+})

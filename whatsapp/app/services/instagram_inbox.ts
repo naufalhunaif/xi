@@ -7,7 +7,7 @@ import { invalidateConversationGoal } from '#services/conversation_goal_service'
 import { resumeAiAfterHumanReply } from '#services/message_service'
 import { readSettings } from '#services/settings_service'
 import { ensureIgTables, igJid, readIgConfig, type IgConfig } from '#services/instagram_store'
-import { profile } from '#services/instagram_api'
+import { mediaInfo, messageDetail, profile } from '#services/instagram_api'
 
 /**
  * Webhook Instagram → tabel pesan yang sama dengan WhatsApp. Balasan AI dikerjakan worker
@@ -191,8 +191,14 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
     status: 'received',
     created_at: created,
   })
+  // Postingan toko sendiri yang dibagikan (ig_post_media_id tanpa url) → gambar & keterangan dari API.
+  const sharedMedia = !photo && !shared ? attachments.find((item) => item?.payload?.ig_post_media_id) : undefined
   if (photo?.payload?.url) await downloadImage(mid, photo.payload.url).catch(() => {})
   else if (shared?.payload?.url) await downloadSharedPreview(mid, shared.payload.url).catch(() => {})
+  else if (sharedMedia && config.token) {
+    const info = await mediaInfo(config.token, String(sharedMedia.payload!.ig_post_media_id))
+    if (info.image) await downloadSharedPreview(mid, info.image).catch(() => {})
+  }
   else if (storyPreview) await downloadSharedPreview(mid, storyPreview.payload.url).catch(() => {})
   await invalidateConversationGoal(jid).catch(() => {})
   await scheduleTurn(jid, mid)
@@ -245,6 +251,59 @@ export async function downloadSharedPreview(messageId: string, url: string) {
       .where('message_id', messageId)
       .update({ media_type: null, media_mime: null, media_status: null, body: [String(row?.body || '').trim(), url].filter(Boolean).join('\n').slice(0, 4000) })
   }
+}
+
+/** URL gambar/video/tautan pertama dari detail pesan DM (format API bisa berbeda-beda). */
+export function sharedUrlFromDetail(data: any): { url: string; mediaId: string } {
+  const found: string[] = []
+  let mediaId = ''
+  const walk = (value: any, depth = 0) => {
+    if (!value || depth > 6) return
+    if (Array.isArray(value)) return value.forEach((item) => walk(item, depth + 1))
+    if (typeof value !== 'object') return
+    for (const [key, item] of Object.entries(value)) {
+      if (typeof item === 'string' && /^https?:\/\//.test(item) && /url|link|src|preview/i.test(key)) found.push(item)
+      else if (typeof item === 'string' && /ig_post_media_id|media_id/.test(key)) mediaId = mediaId || item
+      else walk(item, depth + 1)
+    }
+  }
+  walk({ attachments: data?.attachments, shares: data?.shares, story: data?.story })
+  const image = found.find((url) => /\.(jpe?g|png|webp)(\?|$)/i.test(url) || /scontent|cdninstagram|fbcdn/i.test(url))
+  return { url: image || found[0] || '', mediaId }
+}
+
+/**
+ * v3.6.113 — pesan lama "[membagikan postingan]" / story tanpa gambar (sebelum v3.6.108): ambil ulang isinya dari
+ * API Instagram lalu simpan pratinjaunya. Maks `limit` pesan per jalan, 60 hari terakhir.
+ */
+export async function repairSharedPosts(limit = 40) {
+  const config = await readIgConfig()
+  if (!config.token) return { checked: 0, fixed: 0, sample: null as unknown, error: 'Instagram belum tersambung' }
+  const rows = (await db
+    .from('whatsapp_messages')
+    .where('jid', 'like', '%@ig')
+    .whereNull('media_type')
+    .where('created_at', '>', new Date(Date.now() - 60 * 86_400_000))
+    .where((query) =>
+      query.where('body', 'like', '%[membagikan postingan]%').orWhere('body', 'like', '%[membagikan reel]%').orWhere('body', 'like', '%[menyebut toko di story]%').orWhere('body', 'like', '%[membalas story toko]%')
+    )
+    .whereNot('body', 'like', '%http%')
+    .orderBy('id', 'desc')
+    .limit(limit)) as Array<{ message_id: string; body: string | null }>
+  let fixed = 0
+  let sample: unknown = null
+  for (const row of rows) {
+    const detail = await messageDetail(config.token, row.message_id).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }))
+    if (!sample) sample = JSON.stringify(detail).slice(0, 1500)
+    const { url, mediaId } = sharedUrlFromDetail(detail)
+    let target = url
+    if (!target && mediaId) target = (await mediaInfo(config.token, mediaId)).image
+    if (!target) continue
+    await db.from('whatsapp_messages').where('message_id', row.message_id).update({ media_type: 'image', media_status: 'downloading' })
+    await downloadSharedPreview(row.message_id, target).catch(() => {})
+    fixed++
+  }
+  return { checked: rows.length, fixed, sample }
 }
 
 async function ingestComment(value: any, config: IgConfig) {

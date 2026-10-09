@@ -185,6 +185,13 @@ export async function mediaInfo(token: string, mediaId: string) {
   }
 }
 
+/** v3.6.113 — isi satu pesan DM (lampiran, postingan dibagikan, story) untuk memperbaiki pesan lama. */
+export async function messageDetail(token: string, messageId: string) {
+  const ask = (fields: string) =>
+    call(`${IG_GRAPH}/${encodeURIComponent(messageId)}?fields=${fields}`, { headers: bearer(token) })
+  return ask('id,message,attachments,shares,story').catch(() => ask('id,message,attachments'))
+}
+
 /** X-Hub-Signature-256 = HMAC-SHA256(Instagram app secret, body mentah). */
 export function validSignature(secret: string, raw: string, header: string) {
   if (!secret || !raw || !/^sha256=[a-f0-9]{64}$/.test(String(header || ''))) return false

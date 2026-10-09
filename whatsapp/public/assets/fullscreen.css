@@ -188,3 +188,22 @@
     margin-left: 0;
   }
 }
+
+/* v3.6.113 — ruang chat desktop dikunci ke layar (fixed), halaman tidak bisa ikut tergulir. Dulu tinggi dihitung
+   (100dvh / tinggi jendela) dan kadang meleset di Chrome → chat hanya setengah layar, atas terpotong, bawah hitam. */
+@media (min-width: 901px) {
+  html:has(body.workspace-ui > .wa-shell-chat),
+  body.workspace-ui:has(> .wa-shell-chat) {
+    height: 100%;
+    overflow: hidden;
+  }
+  html body.workspace-ui > .shell.wa-shell-chat {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--wa-rail-width, 0px);
+    height: auto;
+    margin: 0;
+  }
+}

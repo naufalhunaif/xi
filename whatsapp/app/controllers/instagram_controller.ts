@@ -67,6 +67,12 @@ export default class InstagramController {
     })
   }
 
+  /** v3.6.113 — perbaiki pesan lama "[membagikan postingan]" tanpa gambar. */
+  async repairShares({ response }: HttpContext) {
+    const { repairSharedPosts } = await import('#services/instagram_inbox')
+    return response.json(await repairSharedPosts())
+  }
+
   async status({ response }: HttpContext) {
     await ensureIgTables()
     const config = await readIgConfig()
