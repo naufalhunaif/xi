@@ -670,8 +670,10 @@ export default class WhatsappListen extends BaseCommand {
       }
       // Produk di luar katalog (model dari gambar pelanggan): gambar pelanggan jadi foto utama.
       // Juga bila spesifikasi menyebut "sesuai gambar": gambar pelanggan didahulukan dari foto katalog.
-      const refs = await beta3Refs.refsForOrder(Number(order.id)).catch(() => [])
-      const customerModel = /sesuai gambar|seperti gambar|kayak gambar|model dari gambar/i.test(String(order.spec || ''))
+      const listedRefs = await beta3Refs.refsForOrder(Number(order.id)).catch(() => [])
+      // v3.6.118: hanya foto bahan (tanpa foto model) → foto model pelanggan dari chat ikut.
+      const refs = await beta3Refs.withModelFallback(order, listedRefs, true).catch(() => listedRefs)
+      const customerModel = beta3Refs.CUSTOMER_MODEL.test(String(order.spec || order.items || ''))
       let mainRef: (typeof refs)[number] | null = null
       if ((!images.length || customerModel) && refs.length) {
         // v3.6.117: gambar utama = foto MODEL, bukan foto bahan/warna (dulu foto "bahan no 2" jadi foto utama).

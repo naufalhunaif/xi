@@ -391,7 +391,54 @@ async function withoutProofs(jid: string, refs: LeanRef[], spec?: string | null)
   refs = refs.filter((ref) => sizeUsed || !SIZE_PART.test(ref.part))
   if (!refs.some((ref) => ref.message_id)) return refs
   const proofs = await paymentProofIds(jid).catch(() => new Set<string>())
-  return refs.filter((ref) => !ref.message_id || !proofs.has(ref.message_id))
+  refs = refs.filter((ref) => !ref.message_id || !proofs.has(ref.message_id))
+  return withoutStickers(refs)
+}
+
+/**
+ * v3.6.118 — stiker / GIF / video bukan gambar model atau bahan. Dulu stiker yang dikirim pelanggan di giliran
+ * yang sama ikut tercatat sebagai "Model seperti ini" (kasus Christmandani 9 Okt).
+ */
+async function withoutStickers(refs: LeanRef[]) {
+  const ids = refs.map((ref) => ref.message_id).filter(Boolean) as string[]
+  if (!ids.length) return refs
+  const rows = await db
+    .from('whatsapp_messages')
+    .whereIn('message_id', ids)
+    .select('message_id', 'media_type')
+    .catch(() => [] as any[])
+  const notPhoto = new Set(
+    rows.filter((row: any) => row.media_type && row.media_type !== 'image').map((row: any) => String(row.message_id))
+  )
+  return refs.filter((ref) => !ref.message_id || !notPhoto.has(ref.message_id))
+}
+
+/** Rincian pesanan memakai model dari gambar pelanggan. */
+export const CUSTOMER_MODEL = /sesuai gambar|seperti gambar|kayak gambar|model dari gambar/i
+
+/**
+ * v3.6.118 — pesanan "model sesuai gambar" tanpa referensi foto MODEL (hanya foto bahan, atau referensinya
+ * ternyata stiker): foto model pelanggan dari chat order itu ikut sebagai "Model seperti ini".
+ */
+export async function withModelFallback(order: Record<string, any>, refs: LeanRef[], classify = false) {
+  if (!order?.id || !order.created_at) return refs
+  if (refs.some((ref) => !isFabricPart(ref.part) && !SIZE_PART.test(ref.part))) return refs
+  if (!CUSTOMER_MODEL.test(String(order.spec || order.items || ''))) return refs
+  const pictures = await customerImagesForOrder(order, 2, { classify }).catch(() => [])
+  const have = new Set(refs.map((ref) => ref.image_url))
+  const extra: LeanRef[] = pictures
+    .filter((picture) => !have.has(picture.url))
+    .map((picture, index) => ({
+      id: -(index + 1),
+      jid: String(order.jid || ''),
+      order_id: Number(order.id),
+      message_id: null,
+      image_url: picture.url,
+      part: 'model',
+      note: '',
+      box: null,
+    }))
+  return [...refs, ...extra]
 }
 
 /** Referensi pesanan yang sedang berjalan (belum menempel ke order lunas). */
@@ -460,9 +507,11 @@ export async function saveAiRefs(
   for (const ref of refs.slice(0, 6)) {
     const messageId = imageIds[Math.round(ref.gambar) - 1]
     if (!messageId || proofs.has(messageId)) continue
+    // v3.6.118: hanya foto (bukan stiker/GIF) yang bisa jadi referensi model/bahan.
     const message = await db
       .from('whatsapp_messages')
       .where('message_id', messageId)
+      .where('media_type', 'image')
       .whereNotNull('media_url')
       .select('media_url')
       .first()

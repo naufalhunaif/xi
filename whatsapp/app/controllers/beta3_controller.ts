@@ -50,6 +50,7 @@ import {
   proofTotalSince,
   refCaption,
   refsForOrder,
+  withModelFallback,
 } from '#beta3/refs_service'
 import { readRecapProgress, requestRecap } from '#beta3/recap_service'
 import { skillStatus, syncRemoteSkills } from '#beta3/skill_sync'
@@ -248,10 +249,11 @@ export default class Beta3Controller {
     // Gambar dari pelanggan (referensi) ikut tampil di detail order.
     const withRefs = await Promise.all(
       withText.map(async (order: Record<string, any>): Promise<Record<string, any> & { spec?: unknown }> => {
-        const refs =
+        const listed =
           order.status === 'paid' || order.status === 'cancelled'
             ? await refsForOrder(Number(order.id)).catch(() => [])
             : await listActiveRefs(String(order.jid || '')).catch(() => [])
+        const refs = await withModelFallback(order, listed).catch(() => listed)
         return {
           ...order,
           refs: refs.map((ref) => ({ url: ref.image_url, caption: refCaption(ref, String(order.spec || order.items || '')) })),
@@ -470,7 +472,10 @@ export default class Beta3Controller {
     // tidak ikut (gambar "bahan no 2" pelanggan tidak tampil di cart).
     const displayed = order && order.status !== 'cancelled' ? order : null
     const photoText = displayed ? String(displayed.spec || displayed.items || '') : text
-    const orderRefs = displayed && displayed.status === 'paid' ? await refsForOrder(Number(displayed.id)).catch(() => []) : []
+    const orderRefs =
+      displayed && displayed.status === 'paid'
+        ? await withModelFallback(displayed, await refsForOrder(Number(displayed.id)).catch(() => [])).catch(() => [])
+        : []
     const activeRefs = await listActiveRefs(jid).catch(() => [])
     const seen = new Set<string>()
     const refs = [...orderRefs, ...activeRefs].filter((ref) => {

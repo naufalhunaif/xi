@@ -1653,3 +1653,38 @@ test.group('v3.6.117 foto bahan pelanggan di cart, halaman order & grup', () => 
     assert.isNull(mainModelRef([]))
   })
 })
+
+test.group('v3.6.118 stiker tidak ikut jadi referensi pesanan', () => {
+  test('stiker diabaikan; foto model pelanggan jadi cadangan bila hanya ada foto bahan', async ({ assert }) => {
+    const { saveAiRefs, refsForOrder, withModelFallback } = await import('#beta3/refs_service')
+    const { ensureLeanTables } = await import('#beta3/tables')
+    await ensureLeanTables()
+    const jid = `tmpref${Date.now()}@s.whatsapp.net`
+    const at = (min: number) => new Date(Date.now() - min * 60_000)
+    await db.table('whatsapp_messages').insert([
+      { message_id: `${jid}-bahan`, jid, direction: 'in', body: 'bahan no 2', media_type: 'image', media_url: '/media/bahan.jpg', status: 'received', created_at: at(30) },
+      { message_id: `${jid}-model`, jid, direction: 'in', body: '', media_type: 'image', media_url: '/media/model.jpg', status: 'received', created_at: at(28) },
+      { message_id: `${jid}-stiker`, jid, direction: 'in', body: '', media_type: 'sticker', media_url: '/media/stiker.webp', status: 'received', created_at: at(26) },
+    ])
+    await db.table('whatsapp_beta3_proofs').insert([
+      { message_id: `${jid}-bahan`, jid, kind: 'model', note: '', created_at: new Date() },
+      { message_id: `${jid}-model`, jid, kind: 'model', note: '', created_at: new Date() },
+    ])
+    // AI menunjuk stiker sebagai "model" → tidak disimpan; foto bahan disimpan.
+    assert.equal(await saveAiRefs(jid, [{ gambar: 1, bagian: 'model' }], [`${jid}-stiker`]), 0)
+    assert.equal(await saveAiRefs(jid, [{ gambar: 1, bagian: 'warna' }], [`${jid}-bahan`]), 1)
+    // Data lama: stiker sudah terlanjur tercatat → tidak tampil.
+    await db.table('whatsapp_beta3_refs').insert({ jid, message_id: `${jid}-stiker`, image_url: '/media/stiker.webp', part: 'model', note: '', created_at: new Date(), updated_at: new Date() })
+    await db.from('whatsapp_beta3_refs').where('jid', jid).update({ order_id: 999001 })
+    const refs = await refsForOrder(999001)
+    assert.deepEqual(refs.map((ref) => ref.image_url), ['/media/bahan.jpg'])
+    const order = { id: 999001, jid, spec: 'Setelan Tuxedo - Cream 2.0\nModel sesuai gambar\nBahan no 2', created_at: new Date() }
+    const full = await withModelFallback(order, refs)
+    assert.deepEqual(full.map((ref) => ref.image_url), ['/media/bahan.jpg', '/media/model.jpg'])
+    // Tanpa "sesuai gambar" tidak ada tambahan.
+    assert.lengthOf(await withModelFallback({ ...order, spec: 'Setelan Tuxedo - Cream 2.0' }, refs), 1)
+    await db.from('whatsapp_beta3_refs').where('jid', jid).delete()
+    await db.from('whatsapp_beta3_proofs').where('jid', jid).delete()
+    await db.from('whatsapp_messages').where('jid', jid).delete()
+  })
+})
