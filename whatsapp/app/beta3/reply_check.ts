@@ -2,6 +2,7 @@
 // yang diucapkan, maksud pelanggan terjawab, fakta (harga/warna/size) sesuai katalog, tidak mengulang.
 // Ada masalah → AI menulis ulang sekali dengan catatan pemeriksa. Penilaian memakai MAKSUD (Jev), bukan
 // daftar kata; pemeriksaan pasti (foto yang tidak ada di katalog) tetap dilakukan kode.
+import { withPromoPrices, type ChatPromo } from '#beta3/promos'
 import { askJev, confident, jevOn, logDecision, maskPii, scoreLevel, type JevAnswer } from '#beta3/jev'
 import { findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
 import type { LeanDecision, LeanHistoryRow } from '#beta3/prompt'
@@ -241,6 +242,8 @@ export async function checkReply(input: {
   settings?: LeanProviderSettings
   /** v3.6.101 — keadaan chat (resi, pembayaran, harga yang sudah disebut, data pelanggan). */
   chatState?: string
+  /** v3.6.120 — promo biasa yang berlaku: harga promo tidak dianggap salah. */
+  promos?: ChatPromo[]
 }): Promise<{ issues: CheckIssue[]; jev: boolean; ai?: boolean }> {
   const issues: CheckIssue[] = []
   const { sent, missing } = photoCaptions(input.rows, input.decision.foto || [])
@@ -248,9 +251,9 @@ export async function checkReply(input: {
     issues.push({ code: 'foto_tidak_ada', detail: `Tidak ada foto katalog untuk: ${missing.join(', ')}. Pakai nama varian persis dari KATALOG yang bertanda foto.` })
   if (input.decision.serah_cs || !input.decision.pesan.length) return { issues, jev: false }
   issues.push(
-    ...colorPriceIssues(input.decision.pesan, input.rows),
+    ...colorPriceIssues(input.decision.pesan, withPromoPrices(input.rows, input.promos || [])),
     ...readyClaimIssues(input.decision.pesan, input.rows),
-    ...productPriceIssues(input.decision.pesan, input.rows),
+    ...productPriceIssues(input.decision.pesan, withPromoPrices(input.rows, input.promos || [])),
     ...repeatIssues(input.decision.pesan, input.history)
   )
   const jevAllowed = await jevOn('cek_balasan')

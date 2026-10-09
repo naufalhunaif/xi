@@ -1,4 +1,5 @@
 // Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
+import { activePromos, parsePromoState, renderPromoRule } from '#beta3/promos'
 import db from '#services/workspace_database'
 import { phoneFromJid } from '#services/customer_identity_service'
 import { estimateTokens } from '#services/prompt_size_service'
@@ -1306,7 +1307,10 @@ export async function createLeanReply(input: {
   const wholesale = renderWholesaleRule(wholesaleDiscounts(storedWholesale)) || storedWholesale
   // v3.6.78: aturan grosir SELALU ikut (±80 token) — AI memahami maksud "beli banyak/kurang ga"
   // dalam bahasa apa pun; dulu ikut hanya bila pola kata cocok, sehingga kalimat tak biasa terlewat.
-  const store = [storeProfile, wholesale]
+  // v3.6.120: promo biasa website yang berlaku SAAT INI (juga untuk pesanan chat); tidak ada = tidak ada promo.
+  const promoState = parsePromoState(String((await readLeanState('promos').catch(() => '')) || ''))
+  const promos = activePromos(promoState, now)
+  const store = [storeProfile, wholesale, renderPromoRule(promoState, now)]
     .filter(Boolean)
     .join('\n')
   const policy = await readExchangePolicy()
@@ -1473,6 +1477,7 @@ export async function createLeanReply(input: {
     extraFacts: [store, priceText, productionText, STORE_BASICS, `Waktu sekarang: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(now)} WIB`, ...toolNotes].filter(Boolean),
     settings,
     chatState,
+    promos,
   }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
   if (check.issues.length) {
     onTrace?.({
@@ -1622,7 +1627,7 @@ export async function createLeanReply(input: {
       ...settings.paymentMethods.map((method) => method.destination),
       store,
       priceText,
-    ], wholesaleDiscounts(storedWholesale))
+    ], wholesaleDiscounts(storedWholesale), promos)
     const unknown = unknownPrices(decision.pesan, allowed)
     if (unknown.length) {
       decision.serah_cs = true
@@ -1823,7 +1828,8 @@ export async function createLeanReply(input: {
       String(specNow || ''),
       understanding.service,
       // v3.6.60: mulai 6 jas → potongan grosir dihitung di total otomatis (dulu ditahan untuk invoice).
-      wholesaleDiscounts(String((await readLeanState('wholesale').catch(() => '')) || ''))
+      wholesaleDiscounts(String((await readLeanState('wholesale').catch(() => '')) || '')),
+      promos
     )
     const bulk = verdict.ok ? verdict.total.items.match(/^Diskon grosir .+$/m)?.[0] : undefined
     if (verdict.ok && !bulk && wholesaleOrder(decision.catatan || chatNote || '')) {

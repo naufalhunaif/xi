@@ -1,4 +1,5 @@
 // Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
+import { bestPromo, type ChatPromo } from '#beta3/promos'
 import db from '#services/workspace_database'
 import { workspaceSql } from '#services/workspace_context'
 import { queueOutgoingMessage } from '#services/message_service'
@@ -1216,7 +1217,9 @@ export function matchAutoTotal(
   /** Pilihan layanan dari Jev: alias ("reg"/"yes"), null = belum memilih, undefined = pakai pola kata. */
   chosenService?: string | null,
   /** v3.6.60: potongan grosir per pcs (`wholesaleDiscounts`); berlaku mulai 6 jas. */
-  wholesale?: Record<string, number>
+  wholesale?: Record<string, number>,
+  /** v3.6.120: promo biasa website yang berlaku (sudah difilter waktunya). */
+  promos: ChatPromo[] = []
 ):
   | { ok: true; items: string; subtotal: number; shippingService: string; shippingCost: number; discount: number }
   | { ok: false; reason: string } {
@@ -1240,6 +1243,7 @@ export function matchAutoTotal(
   let sum = 0
   const items: string[] = []
   const grouped: Array<{ group: string; qty: number }> = []
+  const priced: Array<{ row: { product: string; color: string; category?: string }; unit: number; qty: number }> = []
   const productNames = [...new Set(rows.map((row) => row.product))]
   for (const line of lines) {
     const text = norm(line)
@@ -1311,17 +1315,29 @@ export function matchAutoTotal(
     sum += unit * qty
     items.push(line)
     grouped.push({ group: wholesaleGroup(String(row.category || ''), row.product), qty })
+    priced.push({ row, unit, qty })
   }
   if (!items.length) return { ok: false, reason: 'tidak ada produk katalog di rincian' }
   // v3.6.60: grosir mulai 6 jas (setelan dihitung jas) → potongan per pcs untuk jas/setelan/celana/rompi.
-  const bulk = wholesaleDiscount(grouped, wholesale || {})
+  const grosir = wholesaleDiscount(grouped, wholesale || {})
+  // v3.6.120: promo biasa website per pcs (potongan terbesar per varian, min belanja dari subtotal katalog).
+  // Grosir dan promo tidak digabung: yang dipakai potongan yang lebih besar.
+  const promoNames = new Map<string, number>()
+  for (const line of priced) {
+    const best = bestPromo(promos, line.row, line.unit, sum)
+    if (best) promoNames.set(best.promo.name, (promoNames.get(best.promo.name) || 0) + best.cut * line.qty)
+  }
+  const promoTotal = [...promoNames.values()].reduce((total, value) => total + value, 0)
+  const usePromo = promoTotal > grosir.discount
+  const bulk = usePromo ? { jas: grosir.jas, discount: promoTotal } : grosir
   const net = sum - bulk.discount
   // subtotal 0 = draft dari kode (spesifikasi), pakai jumlah katalog apa adanya. AI boleh menulis
-  // subtotal sebelum atau sesudah potongan grosir.
+  // subtotal sebelum atau sesudah potongan grosir/promo.
   if (draft.subtotal > 0 && sum !== draft.subtotal && net !== draft.subtotal)
     return { ok: false, reason: `subtotal AI ${draft.subtotal} ≠ katalog ${bulk.discount ? net : sum}` }
   if (sum <= 0 || net <= 0) return { ok: false, reason: 'harga katalog kosong' }
-  if (bulk.discount) items.push(`Diskon grosir ${bulk.jas} jas -${rupiah(bulk.discount)}`)
+  if (usePromo) for (const [name, value] of promoNames) items.push(`${/^promo\b/i.test(name) ? name : `Promo ${name}`} -${rupiah(value)}`)
+  else if (bulk.discount) items.push(`Diskon grosir ${bulk.jas} jas -${rupiah(bulk.discount)}`)
   const key = (text: string) => text.toLowerCase().replace(/[^a-z]/g, '')
   // Pelanggan melihat nama REG/YES/JTR; kode ekspedisi CTC/CTCYES/CTCJTR setara.
   const alias = (text: string) => key(text).replace(/^ctc/, '') || 'reg'
@@ -1406,14 +1422,15 @@ export async function verifyAutoTotal(
   statedPrices: number[] = [],
   spec?: string,
   chosenService?: string | null,
-  wholesale?: Record<string, number>
+  wholesale?: Record<string, number>,
+  promos: ChatPromo[] = []
 ): Promise<{ ok: true; total: VerifiedAutoTotal } | { ok: false; reason: string }> {
   const order = await readLeanOrder(orderId)
   if (!order || order.status !== 'pending') return { ok: false, reason: 'order bukan pending' }
   const options = order.shipping_options ? JSON.parse(String(order.shipping_options)) : null
   if (!options?.prices?.length) return { ok: false, reason: 'tarif ongkir belum ada di order' }
   if (pantsNumberMissing(String(spec ?? order.spec ?? ''), draft.rincian)) return { ok: false, reason: 'nomor celana belum diketahui' }
-  const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices, chosenService, wholesale)
+  const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices, chosenService, wholesale, promos)
   if (!result.ok) return result
   // v3.6.41: bagian (celana/rompi) dicek pada baris yang BERHARGA, bukan seluruh rincian —
   // rincian dari spesifikasi memuat "Jas, Celana" sebagai baris detail tanpa harga, sehingga

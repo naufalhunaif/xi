@@ -3,6 +3,7 @@
 // (createLeanReply + pemeriksa), tanpa mengirim apa pun ke WhatsApp. Tiap percakapan dinilai:
 // pemeriksaan pasti (harga di luar katalog, tidak membalas, serah CS tanpa perlu, kata wajib) dan
 // penilai AI yang membaca katalog lengkap. Data uji (jid "…@sim") dihapus sesudah tiap percakapan.
+import { activePromos, parsePromoState } from '#beta3/promos'
 import app from '@adonisjs/core/services/app'
 import { ACK, isBusinessPitch, isOtherBot } from '#beta3/token_saver'
 import { imageNotes } from '#beta3/refs_service'
@@ -467,7 +468,8 @@ export async function gradeScenario(
         ...turns.flatMap((turn) => [...turn.jejak, ...(turn.alat || [])]),
         renderPricePattern(pricePattern(digest.rows)),
       ],
-      wholesaleDiscounts(wholesale)
+      wholesaleDiscounts(wholesale),
+      activePromos(parsePromoState(String((await readLeanState('promos').catch(() => '')) || '')))
     )
     const masalah = deterministicIssues(scenario, turns, allowed)
     let nilai: number | null = null

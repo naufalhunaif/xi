@@ -1,5 +1,6 @@
 // Kualitas balasan tanpa lapor manual: Aturan Toko, Koreksi dari room, Kasus uji (manual),
 // dan pemeriksa harga sebelum kirim. Semua berlaku sama untuk model AI mana pun.
+import { bestPromo, withPromoPrices, type ChatPromo } from '#beta3/promos'
 import db from '#services/workspace_database'
 import { skillForPrompt } from '#beta3/skill_digest'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
@@ -261,10 +262,18 @@ const PRICE_TEXT = /(?<![\d.])(\d{1,3}(?:\.\d{3})+)(?![\d.])/g
 const toNumber = (text: string) => Number(text.replace(/\./g, ''))
 
 /** Semua angka rupiah yang sah: katalog (termasuk size besar), ongkir, dan yang sudah disebut di chat. */
-export function allowedPrices(catalog: LeanCatalogRow[], texts: string[], discounts: Record<string, number> = {}) {
+export function allowedPrices(
+  catalog: LeanCatalogRow[],
+  texts: string[],
+  discounts: Record<string, number> = {},
+  /** v3.6.120: promo biasa yang berlaku → harga promo & besar potongannya sah. */
+  promos: ChatPromo[] = []
+) {
   const catalogValues = new Set<number>()
   const other = new Set<number>()
   for (const row of catalog) {
+    const best = row.price ? bestPromo(promos, row, Number(row.price)) : null
+    if (best) other.add(best.cut)
     if (row.price) catalogValues.add(Number(row.price))
     for (const big of String(row.note || '').matchAll(PRICE_TEXT)) catalogValues.add(toNumber(big[1]))
   }
@@ -274,6 +283,7 @@ export function allowedPrices(catalog: LeanCatalogRow[], texts: string[], discou
   for (const cut of cuts) other.add(cut)
   if (cuts.length) for (const value of [...catalogValues]) for (const cut of cuts) if (value > cut) catalogValues.add(value - cut)
   for (const text of texts) for (const hit of String(text || '').matchAll(PRICE_TEXT)) other.add(toNumber(hit[1]))
+  for (const row of withPromoPrices(catalog, promos).slice(catalog.length)) if (row.price) catalogValues.add(Number(row.price))
   return { catalog: catalogValues, other }
 }
 

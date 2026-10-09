@@ -1,4 +1,5 @@
 // Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
+import { normalizePromos } from '#beta3/promos'
 import db from '#services/workspace_database'
 import { readLeanState, writeLeanState } from '#beta3/tables'
 import { sharedMcpToken } from '#services/shared_mcp_oauth_service'
@@ -141,7 +142,7 @@ export type CatalogSyncResult = {
  * menyimpan bagian lebih sedikit menarik ulang penuh sekali walau versi katalog belum berubah
  * (kasus 8 Okt: diskon grosir tidak pernah tersimpan karena katalog dianggap "belum berubah").
  */
-export const CATALOG_SYNC_SCHEMA = '3-hidden-models'
+export const CATALOG_SYNC_SCHEMA = '4-promos'
 
 export async function syncLeanCatalog(
   options: { force?: boolean } = {}
@@ -177,6 +178,7 @@ export async function syncLeanCatalog(
     fabrics?: { text?: string }
     size_charts?: { text?: string }
     wholesale?: { text?: string; items?: Array<{ category?: string; discount?: number }> }
+    promos?: unknown
   }
   await writeLeanState(
     'store_profile',
@@ -188,6 +190,8 @@ export async function syncLeanCatalog(
   )
   // v3.6.56: diskon grosir per kategori dari website (Admin → Invoice → Diskon grosir).
   await writeLeanState('wholesale', renderWholesale(extra.wholesale).slice(0, 1000))
+  // v3.6.120: promo biasa website yang berlaku (juga untuk pesanan lewat chat); acak/voucher hanya jumlahnya.
+  await writeLeanState('promos', JSON.stringify(normalizePromos(extra.promos)).slice(0, 20000))
   await writeLeanState(
     'size_charts',
     extra.size_charts?.text ? String(extra.size_charts.text).slice(0, 4000) : ''

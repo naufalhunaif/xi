@@ -134,7 +134,7 @@ test.group('pemeriksa balasan (Jev) sebelum kirim (v3.6.78)', (group) => {
 
   test('reply_service: aturan grosir selalu ikut; draf diperiksa lalu ditulis ulang sekali', async ({ assert }) => {
     const source = await readFile('app/beta3/reply_service.ts', 'utf8')
-    assert.include(source, 'const store = [storeProfile, wholesale]')
+    assert.include(source, 'const store = [storeProfile, wholesale, renderPromoRule(promoState, now)]')
     assert.include(source, "'beta3-revise'")
     assert.include(source, 'revisionNote(decision, check.issues)')
   })
@@ -1280,7 +1280,7 @@ test.group('v3.6.101 keadaan chat & perbaikan bagian yang salah', () => {
     assert.include(source, 'revisionNote(decision, check.issues)')
     assert.include(source, 'renderChatState([...olderRows, ...rows])')
     assert.match(source, /chatState,\n\s+history: rows,/)
-    assert.match(source, /settings,\n\s+chatState,\n\s+\}\)\.catch/)
+    assert.match(source, /settings,\n\s+chatState,\n\s+promos,\n\s+\}\)\.catch/)
   })
 })
 
