@@ -122,7 +122,30 @@ export function polishText(pesan: string[], context: PolishContext) {
   out = tidyReply(out, { address: context.address || 'bos', verbatim: context.verbatim || [] })
   const priceFix = fixContextPrices(out, context.prices, context.series, context.productPrices)
   out = dropWrongOpener(priceFix.pesan, context.customerText)
+  out = answerSalam(out, context.customerText, context.address || 'bos')
   return { pesan: out, priceChanges: priceFix.changes }
+}
+
+const SALAM_IN = /\b(?:ass?alamu'?\s*alaikum\w*|assalamualaikum\w*|asslm\w*|ass?alamu\s*'?a?laikum\w*)\b/i
+const SALAM_OUT = /\b(?:wa'?\s*alaikum\w*|waalaikum\w*|walaikum\w*|wa'?alaikumsalam\w*)\b/i
+const ACK_OPENER = /^\s*(?:siap|oke|ok|okay|baik|iya|ya)\s+(?:bos\w*|kak\w*|gan|sis|mas|mbak|pak|bu)\b\s*[,.!]?\s*/i
+const COMMON_START =
+  /^(?:siap|bisa|ada|untuk|buat|harga\w*|iya|ya|oke|baik|boleh|mohon|silakan|terima|maaf|kalau|kalo|yang|ini|itu|sudah|udah|belum|saya|kami|kita|mulai|lokasi|toko|jam|bahan\w*|ukuran\w*|size\w*|ongkir\w*|total\w*|estimasi|pengerjaan\w*|panjang\w*|lebar\w*|untuk|nanti|sekarang|semua|warna\w*|model\w*|stok\w*|ready)\b/i
+const SAPA_OUT =
+  /^\s*(?:halo|hai|hallo|selamat\s+(?:pagi|siang|sore|malam)|pagi|siang|sore|malam)\b(?:\s+(?:bos\w*|kak\w*|gan|sis|mas|mbak|pak|bu|juga))*\s*[,.!]\s*/i
+
+/**
+ * v3.6.99 — pelanggan memberi salam → balasan dibuka "Waalaikumsalam bos," seperti CS manusia
+ * (uji: "Assalamualaikum, ankle pants panjangnya berapa" dijawab tanpa membalas salam).
+ */
+export function answerSalam(pesan: string[], customerText: string, address = 'bos') {
+  if (!pesan.length || !SALAM_IN.test(customerText || '')) return pesan
+  if (pesan.some((bubble) => SALAM_OUT.test(bubble))) return pesan
+  const [first, ...rest] = pesan
+  const body = first.replace(SAPA_OUT, '').replace(ACK_OPENER, '').trim()
+  if (!body) return [`Waalaikumsalam ${address}`, ...rest]
+  const lower = COMMON_START.test(body) ? body[0].toLowerCase() + body.slice(1) : body
+  return [`Waalaikumsalam ${address}, ${lower}`, ...rest]
 }
 
 /** Kalimat tawaran "mau lihat modelnya?" / "mau saya kirim fotonya?" (bukan "model lainnya"). */

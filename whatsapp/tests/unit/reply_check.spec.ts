@@ -1145,3 +1145,20 @@ test.group('Beta3 · Google Maps (v3.6.98)', () => {
     assert.isNull(placeFromComponents('x', []))
   })
 })
+
+test.group('v3.6.99 balas salam', () => {
+  test('salam pelanggan dibalas di bubble pertama', async ({ assert }) => {
+    const { answerSalam } = await import('#beta3/reply_polish')
+    assert.deepEqual(answerSalam(['Siap bos, dicatat ya'], 'Assalamualaikum, mau pesan celana'), ['Waalaikumsalam bos, dicatat ya'])
+    assert.deepEqual(answerSalam(['Panjang ankle pants sekitar 90 cm bos'], "assalamu'alaikum min"), ['Waalaikumsalam bos, panjang ankle pants sekitar 90 cm bos'])
+    assert.deepEqual(answerSalam(['Halo kak, Peak Suit ready kak'], 'Asslm kak', 'kak'), ['Waalaikumsalam kak, Peak Suit ready kak'])
+    assert.deepEqual(answerSalam(['Siang bos kami buka jam 9'], 'assalamualaikum'), ['Waalaikumsalam bos, Siang bos kami buka jam 9'])
+  })
+  test('tidak dobel & tidak tanpa salam', async ({ assert }) => {
+    const { answerSalam } = await import('#beta3/reply_polish')
+    assert.deepEqual(answerSalam(['Waalaikumsalam bos, ada'], 'Assalamualaikum'), ['Waalaikumsalam bos, ada'])
+    assert.deepEqual(answerSalam(['Ada bos'], 'ada jas hitam?'), ['Ada bos'])
+    assert.deepEqual(answerSalam(['Siap bos'], 'salam kenal'), ['Siap bos'])
+    assert.deepEqual(answerSalam(['Siap bos', 'Ini fotonya'], 'Assalamualaikum'), ['Waalaikumsalam bos', 'Ini fotonya'])
+  })
+})

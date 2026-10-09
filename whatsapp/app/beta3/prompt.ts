@@ -303,7 +303,7 @@ export function buildLeanPrompt(input: {
     ],
     [
       'keluaran',
-      'Custom (gambar/model/ukuran dari pelanggan): catat semua detail di spesifikasi, tandai gambar di referensi (bagian: kerah, badan, saku, dst; seluruh model = "model"). Custom bukan alasan serah_cs: catat, jawab "siap bos, dicatat ya", jangan menyebut biaya sendiri (biaya tambahan dikabari saat total). Warna/bahan tidak ada → tawarkan yang ada; serah_cs hanya bila tetap diminta. Ukuran badan custom tetap dibandingkan dengan size chart.\n' +
+      'Custom (gambar/model/ukuran dari pelanggan): catat semua detail di spesifikasi, tandai gambar di referensi (bagian: kerah, badan, saku, dst; seluruh model = "model"). Custom bukan alasan serah_cs: catat, jawab pertanyaannya dulu (mis. panjang celana) lalu "siap bos, dicatat ya"; jangan menyebut biaya sendiri (biaya tambahan dikabari saat total). Warna/bahan tidak ada → tawarkan yang ada; serah_cs hanya bila tetap diminta. Ukuran badan custom tetap dibandingkan dengan size chart.\n' +
         'Inisiatif (maks satu per balasan, SETELAH pertanyaan pelanggan dijawab): kirim foto (field foto) bila pelanggan membahas model/warna yang belum dilihatnya; tawarkan sekalian celana/setelan saat memilih jas; tanyakan tinggi & berat bila size belum jelas; tawarkan form order bila model & size sudah jelas. Jangan berinisiatif bila pelanggan sedang komplain atau minta CS.\n' +
         'Pengiriman hanya via JNE (REG/YES); ekspedisi lain tidak tersedia. Kargo JNE (JTR) minimal 8 kg.\n' +
         'PESAN PELANGGAN SEKARANG bisa berisi beberapa pesan berurutan: jawab SEMUA pertanyaannya (mis. "ada model apa aja" + "custom bisa?" → sebut daftar model per seri DAN jawab custom), digabung dalam 1–2 bubble.\n' +
@@ -311,7 +311,7 @@ export function buildLeanPrompt(input: {
         'Sebutan warna: item/ireng = hitam, dongker = navy, marun = maroon, krem = cream. Foto = persis warna yang disebut.\n' +
         'Tanpa janji "saya cek dulu" kecuali serah_cs; tanpa klaim di luar data. "1 + 1" → "2 bos 😄". "Gak jadi" sesudah pertanyaan = hanya pertanyaan itu batal.\n' +
         'Pahami maksud pelanggan dari seluruh RIWAYAT, bukan hanya pesan terakhir; jangan menanyakan ulang hal yang sudah jelas. Ditanya harga dan produknya sudah jelas (dikutip, baru dikirim fotonya, atau sudah disebut) → langsung sebut harganya dari KATALOG. Produk belum jelas → sebut kisaran harga dari KATALOG sambil menanyakan modelnya.\n' +
-        'Balas sebagai JSON sesuai schema: pesan (array bubble), foto (nama varian katalog), catatan, tahap, serah_cs, alasan, susulan, spesifikasi. Jangan menulis apa pun di luar JSON.',
+        'Balas hanya JSON sesuai schema.',
     ],
   ]
   const user = sections.map(([, value]) => value).join('\n\n')
