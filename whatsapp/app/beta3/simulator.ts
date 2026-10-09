@@ -12,7 +12,8 @@ import { join } from 'node:path'
 import db from '#services/workspace_database'
 import { ownsWorkspaceMedia, workspaceScope } from '#services/workspace_context'
 import { maskPii } from '#beta3/jev'
-import { ensureLeanTables, readLeanState, writeBeta3ChatNote } from '#beta3/tables'
+import { ensureLeanTables, readLeanState, writeBeta3ChatNote, writeLeanState } from '#beta3/tables'
+import { aiSlotStats, memoryLow, resetAiSlotStats } from '#beta3/ai_slots'
 import { catalogDigest, findCatalogVariant } from '#beta3/catalog_service'
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
 import { renderPaymentMessage, renderTotalMessage } from '#beta3/order_service'
@@ -404,6 +405,18 @@ export async function runScenario(
   settings: LeanSettings,
   options: { judge?: boolean; facts?: string; onTurn?: (turns: SimTurn[]) => Promise<void> | void } = {}
 ): Promise<SimResult> {
+  const played = await playScenario(scenario, settings, options)
+  return gradeScenario(scenario, played, settings, options)
+}
+
+export type PlayedScenario = { rows: LeanHistoryRow[]; turns: SimTurn[] }
+
+/** v3.6.109 — bagian 1: balasan AI giliran demi giliran (tanpa penilai), chat uji dibersihkan sesudahnya. */
+export async function playScenario(
+  scenario: SimScenario,
+  settings: LeanSettings,
+  options: { onTurn?: (turns: SimTurn[]) => Promise<void> | void } = {}
+): Promise<PlayedScenario> {
   const state = newSimState(scenario.id)
   const start = Date.now() - scenario.giliran.length * 90_000
   // Chat nyata: konteks sebelumnya ikut, seperti yang dilihat CS waktu itu.
@@ -423,7 +436,22 @@ export async function runScenario(
       // Diserahkan ke CS: AI berhenti di chat ini (seperti chat sungguhan).
       if (turn.serah_cs || turn.error) break
     }
-    const turns = state.turns
+    return { rows: state.rows.map((row) => ({ ...row })), turns: state.turns }
+  } finally {
+    await cleanupSim(state.jid)
+  }
+}
+
+/** v3.6.109 — bagian 2: pemeriksaan pasti + penilai (bisa dijalankan sesudah semua balasan selesai). */
+export async function gradeScenario(
+  scenario: SimScenario,
+  played: PlayedScenario,
+  settings: LeanSettings,
+  options: { judge?: boolean; facts?: string } = {}
+): Promise<SimResult> {
+  const state = { rows: played.rows }
+  const turns = played.turns
+  {
     const digest = await catalogDigest()
     const wholesale = String((await readLeanState('wholesale').catch(() => '')) || '')
     const allowed = allowedPrices(
@@ -461,8 +489,6 @@ export async function runScenario(
     }
     const hard = masalah.filter((item) => !item.startsWith('Penilai'))
     return { id: scenario.id, judul: scenario.judul, lulus: !hard.length && judged, nilai, manusia, rasa, aturan, dipelajari, masalah, giliran: turns }
-  } finally {
-    await cleanupSim(state.jid)
   }
 }
 
@@ -504,7 +530,7 @@ export async function learnAllRealChats(days = 365) {
     .select('jid')
     .where('created_at', '>', since)
     .whereIn('sender_type', ['cs', 'owner'])
-    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid'))
+    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid').orWhere('jid', 'like', '%@ig'))
     .groupBy('jid')) as Array<{ jid: string }>
   const fold = (text: string) => text.toLowerCase().replace(/\s+/g, ' ').trim()
   const existing = new Set((await listLeanExamples()).map((example) => fold(example.customerText)))
@@ -658,7 +684,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
     .select('jid')
     .where('created_at', '>', since)
     .whereIn('sender_type', ['cs', 'owner'])
-    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid'))
+    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid').orWhere('jid', 'like', '%@ig'))
     .groupBy('jid')
     .orderByRaw('RAND(?)', [seed])
     .limit(Math.min(2000, count * 15))) as Array<{ jid: string }>
@@ -816,6 +842,10 @@ export async function startSimRun(
     parallel?: number
     /** Pemilik mengizinkan memakai kuota sampai 95% (pelanggan ditangani CS). */
     ownerQuota?: boolean
+    /** v3.6.109 — uji beban: semua balasan dulu (seperti chat masuk bersamaan), penilai sesudahnya. */
+    judgeLater?: boolean
+    /** v3.6.109 — kuota habis → tunggu pulih (maks 12 jam), bukan berhenti. */
+    waitQuota?: boolean
   } = {}
 ) {
   const quotaLimit = input.ownerQuota ? SIM_QUOTA_LIMIT_OWNER : SIM_QUOTA_LIMIT
@@ -855,22 +885,56 @@ export async function startSimRun(
   })
   running = true
   stopRequested = ''
+  resetAiSlotStats()
   void (async () => {
     const results: SimResult[] = []
+    const played = new Map<string, PlayedScenario>()
+    const began = Date.now()
+    const save = () =>
+      db
+        .from('whatsapp_beta3_sim_runs')
+        .where('id', id)
+        .update({ done: results.length, passed: results.filter((item) => item.lulus).length, results: JSON.stringify(results) })
+        .catch(() => 0)
+    const setLabel = (suffix: string) =>
+      db
+        .from('whatsapp_beta3_sim_runs')
+        .where('id', id)
+        .update({ label: `${String(input.label || 'Uji')}${suffix ? ` · ${suffix}` : ''}`.slice(0, 190) })
+        .catch(() => 0)
     try {
       const facts = await judgeFacts(settings).catch(() => '')
-      // v3.6.79: beberapa percakapan sekaligus (maks 4) supaya uji banyak skenario lebih cepat.
       const queue = [...picked]
       let checked = 0
+      // Kuota habis: berhenti, atau (izin pemilik) tunggu sampai pulih.
+      const quotaGate = async () => {
+        let headroom = await simQuotaHeadroom(quotaLimit)
+        if (headroom.ok) return true
+        if (!input.waitQuota) {
+          stopRequested = headroom.reason
+          return false
+        }
+        const until = Date.now() + 12 * 3600_000
+        await setLabel('menunggu kuota AI pulih')
+        while (!stopRequested && Date.now() < until) {
+          await new Promise((resolve) => setTimeout(resolve, 5 * 60_000))
+          headroom = await simQuotaHeadroom(quotaLimit)
+          if (headroom.ok) {
+            await setLabel('')
+            return true
+          }
+        }
+        if (!stopRequested) stopRequested = 'Kuota AI tidak pulih dalam 12 jam'
+        return false
+      }
       const one = async () => {
         while (queue.length && !stopRequested) {
           // Kuota dicek tiap 5 percakapan: uji tidak boleh menghabiskan jatah pelanggan.
-          if (++checked % 5 === 0) {
-            const headroom = await simQuotaHeadroom(quotaLimit)
-            if (!headroom.ok) {
-              stopRequested = headroom.reason
-              break
-            }
+          if (++checked % 5 === 0 && !(await quotaGate())) break
+          // Uji beban: memori server menipis → berhenti sebelum koneksi WhatsApp terganggu.
+          if (memoryLow()) {
+            stopRequested = 'Memori server menipis — uji dihentikan'
+            break
           }
           const scenario = queue.shift()!
           const live = (turns: SimTurn[]) =>
@@ -881,24 +945,47 @@ export async function startSimRun(
               .then(() => {})
               .catch(() => {})
           await live([])
-          const result = await runScenario(scenario, settings, { judge: input.judge, facts, onTurn: live }).catch(
-            (error): SimResult => ({
-              id: scenario.id,
-              judul: scenario.judul,
-              lulus: false,
-              nilai: null,
-              masalah: [`Gagal: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300)],
-              giliran: [],
-            })
-          )
-          results.push(result)
-          await db
-            .from('whatsapp_beta3_sim_runs')
-            .where('id', id)
-            .update({ done: results.length, passed: results.filter((item) => item.lulus).length, results: JSON.stringify(results) })
+          const failed = (error: unknown): SimResult => ({
+            id: scenario.id,
+            judul: scenario.judul,
+            lulus: false,
+            nilai: null,
+            masalah: [`Gagal: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300)],
+            giliran: [],
+          })
+          if (input.judgeLater) {
+            const done = await playScenario(scenario, settings, { onTurn: live }).catch((error) => failed(error))
+            if ('rows' in done) {
+              played.set(scenario.id, done)
+              results.push({ id: scenario.id, judul: scenario.judul, lulus: false, nilai: null, masalah: ['(menunggu penilaian)'], giliran: done.turns })
+            } else results.push(done)
+          } else results.push(await runScenario(scenario, settings, { judge: input.judge, facts, onTurn: live }).catch((error) => failed(error)))
+          await save()
         }
       }
-      await Promise.all(Array.from({ length: Math.min(6, Math.max(1, input.parallel || 1)) }, one))
+      await Promise.all(Array.from({ length: Math.min(25, Math.max(1, input.parallel || 1)) }, one))
+      const replyMs = Date.now() - began
+      const load = aiSlotStats()
+      // Penilaian sesudah semua balasan (tidak ikut membebani saat uji beban).
+      if (input.judgeLater && played.size) {
+        await setLabel('menilai balasan')
+        const pending = results.map((item, index) => ({ item, index })).filter(({ item }) => played.has(item.id))
+        const grade = async () => {
+          while (pending.length) {
+            if (!(await quotaGate())) break
+            const { item, index } = pending.shift()!
+            const scenario = picked.find((entry) => entry.id === item.id)!
+            results[index] = await gradeScenario(scenario, played.get(item.id)!, settings, { judge: input.judge, facts }).catch((error) => ({
+              ...item,
+              masalah: [`Penilai gagal: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300)],
+            }))
+            await save()
+          }
+        }
+        await Promise.all(Array.from({ length: 3 }, grade))
+        await setLabel(stopRequested ? stopRequested : '')
+      }
+      await writeLeanState(`sim_metrics:${id}`, JSON.stringify(simMetrics(results, load, replyMs))).catch(() => {})
       await db
         .from('whatsapp_beta3_sim_runs')
         .where('id', id)
@@ -938,11 +1025,35 @@ export async function listSimRuns(limit = 10) {
   }))
 }
 
+/** v3.6.109 — ringkasan uji beban: waktu balas, gagal/timeout, antrian AI, memori server. */
+export function simMetrics(results: SimResult[], load: ReturnType<typeof aiSlotStats>, replyMs: number) {
+  const turns = results.flatMap((item) => item.giliran || [])
+  const ms = turns.filter((turn) => !turn.error).map((turn) => turn.ms).sort((a, b) => a - b)
+  const at = (p: number) => (ms.length ? Math.round(ms[Math.min(ms.length - 1, Math.floor(p * ms.length))] / 1000) : 0)
+  const judged = results.filter((item) => item.manusia !== null && item.manusia !== undefined)
+  return {
+    chats: results.length,
+    passed: results.filter((item) => item.lulus).length,
+    turns: turns.length,
+    errors: turns.filter((turn) => turn.error).length,
+    timeouts: turns.filter((turn) => /terlalu lama|timeout/i.test(String(turn.error || ''))).length,
+    medianSec: at(0.5),
+    p90Sec: at(0.9),
+    maxSec: ms.length ? Math.round(ms[ms.length - 1] / 1000) : 0,
+    humanAvg: judged.length ? Math.round((judged.reduce((sum, item) => sum + Number(item.manusia || 0), 0) / judged.length) * 100) / 100 : null,
+    replyMinutes: Math.round(replyMs / 6000) / 10,
+    load,
+  }
+}
+
 export async function readSimRun(id: number) {
   await ensureSimTable()
   const row = await db.from('whatsapp_beta3_sim_runs').where('id', id).first()
   if (!row) return null
+  const stored = await readLeanState(`sim_metrics:${id}`).catch(() => '')
+  const metrics = stored ? JSON.parse(String(stored)) : row.status === 'running' ? { load: aiSlotStats() } : null
   return {
+    metrics,
     id: Number(row.id),
     status: String(row.status),
     total: Number(row.total),
@@ -1026,7 +1137,7 @@ export async function fastAudit(settings: LeanSettings, days = 365, perIntent = 
     .select('jid')
     .where('created_at', '>', since)
     .whereIn('sender_type', ['cs', 'owner'])
-    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid'))
+    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid').orWhere('jid', 'like', '%@ig'))
     .groupBy('jid')) as Array<{ jid: string }>
   const methods = settings.paymentMethods.filter((method) => method.enabled)
   const facts = {

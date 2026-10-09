@@ -739,6 +739,8 @@ export default class Beta3Controller {
         label: String(request.input('label') || ''),
         parallel: Number(request.input('parallel')) || 1,
         ownerQuota: request.input('ownerQuota') === true || request.input('ownerQuota') === 'true',
+        judgeLater: request.input('judgeLater') === true || request.input('judgeLater') === 'true',
+        waitQuota: request.input('waitQuota') === true || request.input('waitQuota') === 'true',
         ...(Number(request.input('real')) > 0
           ? { real: { count: Number(request.input('real')), seed: Number(request.input('seed')) || Math.floor(Math.random() * 1_000_000), mix: request.input('mix') === undefined ? 0.5 : Number(request.input('mix')) } }
           : {}),

@@ -1,6 +1,6 @@
 import app from '@adonisjs/core/services/app'
 import env from '#start/env'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import db from '#services/workspace_database'
 import { workspaceFileName } from '#services/workspace_context'
 import { invalidateConversationGoal } from '#services/conversation_goal_service'
@@ -23,9 +23,26 @@ type Messaging = {
     is_echo?: boolean
     is_deleted?: boolean
     is_unsupported?: boolean
-    reply_to?: { mid?: string; story?: { url?: string } }
+    reply_to?: { mid?: string; story?: { url?: string; id?: string } }
     attachments?: Array<{ type?: string; payload?: { url?: string; title?: string; ig_post_media_id?: string } }>
   }
+}
+
+/** Reel = video: tautannya disimpan di teks (CS bisa membuka). */
+const REEL = new Set(['ig_reel', 'reel'])
+const SAMPLE_LIMIT = 300
+/**
+ * v3.6.109 — contoh webhook Instagram (lampiran, balasan story, pesan tidak didukung) disimpan (maks 300 baris)
+ * supaya format baru dari Instagram bisa ditangani dari data asli, bukan tebakan.
+ */
+async function recordIgSample(event: Messaging) {
+  const message = event.message
+  if (!message || (!message.attachments?.length && !message.reply_to?.story && !message.is_unsupported)) return
+  const file = app.makePath('storage', 'ig-webhook-samples.jsonl')
+  await mkdir(app.makePath('storage'), { recursive: true })
+  await appendFile(file, `${JSON.stringify({ at: new Date().toISOString(), event })}\n`)
+  const lines = String(await readFile(file, 'utf8').catch(() => '')).split('\n').filter(Boolean)
+  if (lines.length > SAMPLE_LIMIT) await writeFile(file, `${lines.slice(-SAMPLE_LIMIT).join('\n')}\n`)
 }
 
 /** Lampiran yang punya gambar pratinjau (postingan / story yang dibagikan). Reel = video, tetap teks. */
@@ -87,8 +104,11 @@ async function scheduleTurn(jid: string, anchor: string) {
 async function ingestMessaging(event: Messaging, config: IgConfig) {
   const message = event.message
   const mid = String(message?.mid || '')
-  if (!message || !mid || message.is_deleted || message.is_unsupported) return
+  if (!message || !mid || message.is_deleted) return
+  await recordIgSample(event).catch(() => {})
   const echo = Boolean(message.is_echo)
+  // v3.6.109: pesan yang tidak didukung API (mis. stiker/format baru) dulu dibuang → pelanggan tidak terbalas.
+  if (message.is_unsupported && echo) return
   const customer = String((echo ? event.recipient?.id : event.sender?.id) || '')
   if (!customer || customer === config.userId) return
   const jid = igJid(customer)
@@ -99,15 +119,27 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
   // v3.6.108 — postingan/story yang dibagikan pelanggan: gambar pratinjaunya disimpan & tampil di room
   // (dulu hanya teks "[membagikan postingan]"), keterangan postingan ikut sebagai teks.
   const shared = photo ? undefined : attachments.find((item) => SHARED_PREVIEW.has(String(item?.type || '')) && item.payload?.url)
-  const image = photo || shared
+  // v3.6.109 — membalas story toko: dulu story-nya hilang (tidak ada mid) → AI tidak tahu konteksnya.
+  const story = message.reply_to?.story?.url ? message.reply_to.story : undefined
+  const storyPreview = !photo && !shared && story?.url ? { type: 'story', payload: { url: story.url } } : undefined
+  const image = photo || shared || storyPreview
   const notes = attachments
     .map((item) => {
-      const note = ATTACHMENT_NOTE[String(item?.type || '')] ?? ''
+      const type = String(item?.type || '')
+      const note = type in ATTACHMENT_NOTE ? ATTACHMENT_NOTE[type] : type ? `[lampiran ${type}]` : ''
       const title = String(item?.payload?.title || '').replace(/\s+/g, ' ').trim()
-      return note && title ? `${note} "${title.slice(0, 300)}"` : note
+      const link = REEL.has(type) && item?.payload?.url ? `\n${item.payload.url}` : ''
+      return note && title ? `${note} "${title.slice(0, 300)}"${link}` : `${note}${note ? link : ''}`
     })
     .filter(Boolean)
-  const text = [String(message.text || '').trim(), ...notes].filter(Boolean).join('\n')
+  const text = [
+    story ? '[membalas story toko]' : '',
+    String(message.text || '').trim(),
+    ...notes,
+    message.is_unsupported ? '[pesan Instagram yang tidak bisa dibuka di sini — minta pelanggan mengirim ulang dalam bentuk teks/foto]' : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
   if (echo) {
     // Kiriman aplikasi ini sendiri juga kembali sebagai echo: sudah tercatat (isi sama, baru saja).
     const own = await db
@@ -161,6 +193,7 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
   })
   if (photo?.payload?.url) await downloadImage(mid, photo.payload.url).catch(() => {})
   else if (shared?.payload?.url) await downloadSharedPreview(mid, shared.payload.url).catch(() => {})
+  else if (storyPreview) await downloadSharedPreview(mid, storyPreview.payload.url).catch(() => {})
   await invalidateConversationGoal(jid).catch(() => {})
   await scheduleTurn(jid, mid)
 }

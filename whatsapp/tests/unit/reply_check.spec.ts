@@ -1401,3 +1401,94 @@ test.group('v3.6.108 postingan Instagram yang dibagikan', () => {
     assert.include(css, 'height: var(--app-h, 100dvh);')
   })
 })
+
+test.group('v3.6.109 antrian AI & uji beban', () => {
+  test('maksimal N proses bersamaan; pelanggan asli didahulukan dari uji', async ({ assert }) => {
+    const { withAiSlot, setAiSlotLimit, aiSlotStats, resetAiSlotStats, slotPriority, DEFAULT_AI_SLOTS } = await import('#beta3/ai_slots')
+    setAiSlotLimit(2)
+    resetAiSlotStats()
+    let running = 0
+    let peak = 0
+    const order: string[] = []
+    const task = (name: string, priority: number) =>
+      withAiSlot(priority, async () => {
+        running++
+        peak = Math.max(peak, running)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        order.push(name)
+        running--
+        return name
+      })
+    const jobs = [task('sim1', 1), task('sim2', 1), task('sim3', 1), task('cust', 0), task('sim4', 1)]
+    await Promise.all(jobs)
+    assert.equal(peak, 2)
+    // Dua pertama langsung jalan; sesudahnya pelanggan asli mendahului sim3/sim4.
+    assert.isBelow(order.indexOf('cust'), order.indexOf('sim3'))
+    const stats = aiSlotStats()
+    assert.equal(stats.maxActive, 2)
+    assert.isAtLeast(stats.maxQueued, 3)
+    assert.equal(slotPriority('uji-1@sim'), 1)
+    assert.equal(slotPriority('6281@s.whatsapp.net'), 0)
+    // Dibatalkan saat menunggu → keluar dari antrian.
+    setAiSlotLimit(1)
+    const hold = withAiSlot(0, () => new Promise((resolve) => setTimeout(resolve, 30)))
+    const controller = new AbortController()
+    const waiting = withAiSlot(1, async () => 'jalan', controller.signal)
+    controller.abort()
+    await assert.rejects(() => waiting)
+    await hold
+    setAiSlotLimit(DEFAULT_AI_SLOTS)
+  })
+  test('ringkasan uji: waktu balas, gagal, timeout, nilai manusia', async ({ assert }) => {
+    const { simMetrics } = await import('#beta3/simulator')
+    const turn = (ms: number, error?: string) => ({ pelanggan: 'x', balasan: [], foto: [], fotoUrl: [], serah_cs: false, alasan: '', jejak: [], ms, ...(error ? { error } : {}) })
+    const m = simMetrics(
+      [
+        { id: 'a', judul: 'a', lulus: true, nilai: 5, manusia: 4, masalah: [], giliran: [turn(10_000), turn(30_000)] },
+        { id: 'b', judul: 'b', lulus: false, nilai: 2, manusia: 3, masalah: [], giliran: [turn(90_000, 'Claude terlalu lama merespons.')] },
+      ] as any,
+      { limit: 8 } as any,
+      120_000
+    )
+    assert.equal(m.passed, 1)
+    assert.equal(m.errors, 1)
+    assert.equal(m.timeouts, 1)
+    assert.equal(m.humanAvg, 3.5)
+    assert.equal(m.maxSec, 30)
+  })
+  test('simulator & pembelajaran memakai chat Instagram juga; paralel sampai 25', async ({ assert }) => {
+    const source = await readFile('app/beta3/simulator.ts', 'utf8')
+    assert.equal(source.split(".orWhere('jid', 'like', '%@ig')").length - 1, 3)
+    assert.include(source, 'Math.min(25, Math.max(1, input.parallel || 1))')
+  })
+})
+
+test.group('v3.6.109 Instagram: balasan story, pesan tidak didukung, reel', () => {
+  const send = async (message: Record<string, unknown>) => {
+    const { ingestInstagramWebhook } = await import('#services/instagram_inbox')
+    const mid = `mid-${Math.random().toString(36).slice(2)}`
+    await ingestInstagramWebhook({ entry: [{ messaging: [{ sender: { id: '7712346' }, recipient: { id: '999' }, timestamp: Date.now(), message: { mid, ...message } }] }] })
+    const row = await db.from('whatsapp_messages').where('message_id', mid).first()
+    await db.from('whatsapp_messages').where('message_id', mid).delete()
+    await db.from('whatsapp_ig_turns').where('jid', '7712346@ig').delete()
+    return row
+  }
+  test('membalas story toko → dicatat + tautan story', async ({ assert }) => {
+    const row = await send({ text: 'ini ready kak?', reply_to: { story: { url: 'http://127.0.0.1:9/story.jpg', id: 's1' } } })
+    assert.include(row.body, '[membalas story toko]')
+    assert.include(row.body, 'ini ready kak?')
+    assert.include(row.body, 'http://127.0.0.1:9/story.jpg')
+  })
+  test('pesan tidak didukung tetap masuk (tidak didiamkan)', async ({ assert }) => {
+    const row = await send({ is_unsupported: true })
+    assert.exists(row)
+    assert.include(row.body, 'tidak bisa dibuka')
+  })
+  test('reel: keterangan + tautan; lampiran baru tetap tercatat', async ({ assert }) => {
+    const reel = await send({ attachments: [{ type: 'ig_reel', payload: { url: 'https://cdn.example.test/reel.mp4', title: 'Tuxedo hitam' } }] })
+    assert.include(reel.body, '[membagikan reel] "Tuxedo hitam"')
+    assert.include(reel.body, 'https://cdn.example.test/reel.mp4')
+    const other = await send({ attachments: [{ type: 'sticker_baru', payload: {} }] })
+    assert.include(other.body, '[lampiran sticker_baru]')
+  })
+})

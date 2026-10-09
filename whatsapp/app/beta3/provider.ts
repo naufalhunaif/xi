@@ -21,6 +21,7 @@ import {
   pickGeminiModels,
 } from '#beta3/provider_models'
 import { withAiAccount } from '#services/ai_account_context'
+import { slotPriority, withAiSlot } from '#beta3/ai_slots'
 import { claudeQuotaWindows, type QuotaWindow } from '#services/ai_quota_contract'
 import {
   saveAiAccountQuota,
@@ -173,7 +174,10 @@ export async function runLeanProvider(
       retryable: true,
     })
   }
-  const runAccount = async (account: (typeof accounts)[number], signal?: AbortSignal): Promise<LeanProviderResult> => {
+  // v3.6.109: tiap proses AI lewat antrian (maks N bersamaan; pelanggan asli didahulukan dari uji).
+  const runAccount = (account: (typeof accounts)[number], signal?: AbortSignal): Promise<LeanProviderResult> =>
+    withAiSlot(slotPriority(jid), () => runAccountNow(account, signal), signal)
+  const runAccountNow = async (account: (typeof accounts)[number], signal?: AbortSignal): Promise<LeanProviderResult> => {
     const inCancel = <T>(action: () => Promise<T>) => (signal ? cancelScope.run(signal, action) : action())
     await recordAiEvent(account.id, 'start', phase, '', null, jid).catch(() => {})
     // Laporan limit Claude selama run → sisa kuota akun ini di Pengaturan → Usage.
