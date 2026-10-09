@@ -780,10 +780,12 @@ export function quotaHeadroom(accounts: QuotaAccount[], limit = SIM_QUOTA_LIMIT)
     ? { ok: false, used, reason: 'Kuota AI menipis — uji dihentikan agar pelanggan tetap dilayani' }
     : { ok: true, used, reason: '' }
 }
-async function simQuotaHeadroom() {
+/** v3.6.103 — pemilik mengizinkan uji memakai kuota lebih banyak (pelanggan ditangani CS): batas 95%. */
+export const SIM_QUOTA_LIMIT_OWNER = 95
+async function simQuotaHeadroom(limit = SIM_QUOTA_LIMIT) {
   const { readAiAccountQuotas } = await import('#services/ai_account_quota')
   const accounts = (await readAiAccountQuotas().catch(() => null)) as QuotaAccount[] | null
-  return accounts ? quotaHeadroom(accounts) : { ok: true, used: 0, reason: '' }
+  return accounts ? quotaHeadroom(accounts, limit) : { ok: true, used: 0, reason: '' }
 }
 
 export async function startSimRun(
@@ -796,11 +798,14 @@ export async function startSimRun(
     generate?: { count: number; seed?: number }
     real?: { count: number; seed?: number; mix?: number }
     parallel?: number
+    /** Pemilik mengizinkan memakai kuota sampai 95% (pelanggan ditangani CS). */
+    ownerQuota?: boolean
   } = {}
 ) {
+  const quotaLimit = input.ownerQuota ? SIM_QUOTA_LIMIT_OWNER : SIM_QUOTA_LIMIT
   await ensureSimTable()
   if (running) return { started: false, reason: 'Uji sedang berjalan.' }
-  const headroom = await simQuotaHeadroom()
+  const headroom = await simQuotaHeadroom(quotaLimit)
   if (!headroom.ok) return { started: false, reason: headroom.reason }
   const all = await loadScenarios()
   const generated = input.generate?.count
@@ -845,7 +850,7 @@ export async function startSimRun(
         while (queue.length && !stopRequested) {
           // Kuota dicek tiap 5 percakapan: uji tidak boleh menghabiskan jatah pelanggan.
           if (++checked % 5 === 0) {
-            const headroom = await simQuotaHeadroom()
+            const headroom = await simQuotaHeadroom(quotaLimit)
             if (!headroom.ok) {
               stopRequested = headroom.reason
               break

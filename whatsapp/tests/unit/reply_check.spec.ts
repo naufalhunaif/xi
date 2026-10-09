@@ -1293,3 +1293,15 @@ test.group('v3.6.101 keadaan chat: status dari AI tidak dianggap fakta', () => {
     assert.deepEqual(lines, [])
   })
 })
+
+test.group('v3.6.103 uji dengan izin kuota pemilik', () => {
+  test('batas 60% bawaan; izin pemilik sampai 95%', async ({ assert }) => {
+    const { quotaHeadroom, SIM_QUOTA_LIMIT, SIM_QUOTA_LIMIT_OWNER } = await import('#beta3/simulator')
+    const claude = [{ provider: 'claude', enabled: true, limitedUntil: 0, windows: [{ usedPercent: 63 }] }]
+    assert.isFalse(quotaHeadroom(claude, SIM_QUOTA_LIMIT).ok)
+    assert.isTrue(quotaHeadroom(claude, SIM_QUOTA_LIMIT_OWNER).ok)
+    assert.isFalse(quotaHeadroom([{ ...claude[0], windows: [{ usedPercent: 96 }] }], SIM_QUOTA_LIMIT_OWNER).ok)
+    const source = await readFile('app/controllers/beta3_controller.ts', 'utf8')
+    assert.include(source, "ownerQuota: request.input('ownerQuota')")
+  })
+})
