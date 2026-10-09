@@ -1288,6 +1288,18 @@ export async function createLeanReply(input: {
       status: 'completed',
       detail: { needs, skill: skillNeed, focus: focus ? { products: focus.products, colors: focus.colors } : null },
     })
+  // v3.6.105: katalog yang sama dipakai AI penyusun DAN perbaikan (dulu perbaikan hanya melihat produk yang
+  // disebut namanya → "kemeja gak ada" padahal Shirt ada).
+  const catalogText = [
+    priceText,
+    needs.catalog
+      ? focus
+        ? `${renderCatalogDigest(focus.rows).replace(/^KATALOG \(/, 'KATALOG (produk yang sedang dibahas; ')}${focus.otherLine ? `\n${focus.otherLine}` : ''}`
+        : digest.text
+      : 'KATALOG: tidak dimuat di giliran ini (pesanan sudah berjalan, pelanggan tidak menanyakan produk). Ditanya produk/harga baru → "saya cek dulu ya bos".',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
   const productionText = settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : ''
   const prompt = buildLeanPrompt({
     policy: renderExchangePolicy(policy.text),
@@ -1303,16 +1315,7 @@ export async function createLeanReply(input: {
       : sizeCharts
         ? 'SIZE CHART: tidak dimuat di giliran ini (tidak ada pertanyaan ukuran). Ditanya ukuran → jawab dari size ready di KATALOG.'
         : '',
-    catalog: [
-      priceText,
-      needs.catalog
-        ? focus
-          ? `${renderCatalogDigest(focus.rows).replace(/^KATALOG \(/, 'KATALOG (produk yang sedang dibahas; ')}${focus.otherLine ? `\n${focus.otherLine}` : ''}`
-          : digest.text
-        : 'KATALOG: tidak dimuat di giliran ini (pesanan sudah berjalan, pelanggan tidak menanyakan produk). Ditanya produk/harga baru → "saya cek dulu ya bos".',
-    ]
-      .filter(Boolean)
-      .join('\n\n'),
+    catalog: catalogText,
     // Koreksi pemilik selalu ikut (12 terbaru); contoh lain dipilih yang paling mirip.
     examples: pickExamples(examples.filter((example) => example.source !== 'koreksi'), input.text, stage),
     corrections: examples.filter((example) => example.source === 'koreksi').slice(-12),
@@ -1394,8 +1397,8 @@ export async function createLeanReply(input: {
     try {
       const fixFacts = [
         ...relevantFacts(digest.rows, [input.text, ...rows.slice(-6).map((row) => String(row.body || '')), ...decision.pesan]),
+        catalogText,
         store,
-        priceText,
         productionText,
         STORE_BASICS,
         ...toolNotes,

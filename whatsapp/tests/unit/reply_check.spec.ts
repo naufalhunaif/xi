@@ -1324,3 +1324,11 @@ test.group('v3.6.104 kemeja di katalog fokus; susulan batal tidak dinilai', () =
     assert.notInclude(text, 'jadi gimana bos?')
   })
 })
+
+test.group('v3.6.105 perbaikan memakai katalog yang sama', () => {
+  test('fixFacts memuat catalogText (bukan hanya produk yang disebut namanya)', async ({ assert }) => {
+    const source = await readFile('app/beta3/reply_service.ts', 'utf8')
+    assert.include(source, 'catalog: catalogText,')
+    assert.match(source, /const fixFacts = \[\n\s+\.\.\.relevantFacts\([^\n]+\n\s+catalogText,/)
+  })
+})
