@@ -39,6 +39,10 @@ export type SimScenario = {
   giliran: Array<string | SimMessage>
   /** Chat nyata: pertanyaan asli + jawaban CS manusia per giliran (kebenaran toko). */
   asal?: Array<{ teks: string; jawaban: string[] }>
+  /** v3.6.111 — chat nyata: waktu asli pesan pertama (uji memakai waktu ini, bukan hari ini). */
+  waktu?: string
+  /** v3.6.111 — kanal chat asli. */
+  kanal?: 'wa' | 'ig'
   /** Chat nyata: pesan sebelum giliran pertama (konteks yang dilihat CS waktu itu). */
   riwayat?: Array<{ arah: 'in' | 'out'; teks: string; gambar?: boolean; catatan?: string }>
   harap?: {
@@ -227,7 +231,7 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
         'Data internal yang TIDAK ada di FAKTA maupun percakapan (progres produksi pesanan tertentu, status kirim tanpa resi, kapan pesanan tertentu jadi): AI yang bilang "saya cek dulu" dan menyerahkan ke CS itu BENAR, bukan masalah — yang salah adalah mengarang.',
         'Baris "(data alat untuk AI — …)" adalah hasil alat toko (ongkir, size, resi) yang dibaca AI: angka yang cocok dengan data itu BENAR, bukan karangan.',
         'Rasa manusia (nilai manusia): balasan harus terasa seperti CS manusia toko ini — santai, singkat, hangat, bahasa chat sehari-hari, menjawab dulu baru bertanya, tidak kaku, tidak bertele-tele, tidak memakai daftar/format bila cukup satu kalimat, tidak mengulang sapaan atau kalimat template. Bila ada "Jawaban CS manusia waktu itu", jadikan acuan gaya (isi harga/stok tetap ikut FAKTA saat ini). Rasa robotik ≤ 2 = masalah.',
-        `Waktu uji: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date())} WIB. Jawaban soal buka/tutup toko, hari ini/besok, dan tanggal dinilai terhadap waktu uji ini (chat asli bisa terjadi di jam lain).`,
+        `Waktu uji: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(scenario.waktu ? new Date(scenario.waktu) : new Date())} WIB${scenario.waktu ? ' (= waktu chat asli)' : ''}. Jawaban soal buka/tutup toko, hari ini/besok, dan tanggal dinilai terhadap waktu uji ini.${scenario.waktu && settings.production ? ` ESTIMASI PRODUKSI pada waktu chat: ${renderProductionEstimate(settings.production, new Date(scenario.waktu), '')}` : ''}`,
         'lulus = true hanya bila tidak ada kesalahan fakta, foto cocok, maksud terjawab, dan rasa manusia ≥ 3. masalah: kalimat pendek bahasa Indonesia, sebut giliran & kutip bagian yang salah. Tanpa masalah → [].',
         `FAKTA TOKO:\n${facts}`,
       ].join('\n\n'),
@@ -319,7 +323,7 @@ export const newSimState = (label: string): SimState => ({
 })
 
 /** Satu giliran: pesan pelanggan masuk → balasan diproses seperti chat sungguhan (tanpa dikirim). */
-export async function runSimTurn(state: SimState, message: string | SimMessage, settings: LeanSettings, at = new Date()) {
+export async function runSimTurn(state: SimState, message: string | SimMessage, settings: LeanSettings, at = new Date(), fixedNow = false) {
   const text = messageText(message)
   const image = messageImage(message)
   const jejak: string[] = []
@@ -347,6 +351,8 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
       settings,
       history: state.rows.map((row) => ({ ...row })),
       simulate: true,
+      // v3.6.111: chat nyata diuji pada waktu aslinya (dulu "tanggal 13 Mei sudah lewat" karena diuji Oktober).
+      ...(fixedNow ? { now: at } : {}),
       onTrace: (event) => {
         if (event.status !== 'running' && event.label) jejak.push(`${event.status === 'failed' ? '✗' : '·'} ${event.label}`)
         if (event.key === 'beta3-check' && event.status === 'failed' && event.detail) {
@@ -418,7 +424,7 @@ export async function playScenario(
   options: { onTurn?: (turns: SimTurn[]) => Promise<void> | void } = {}
 ): Promise<PlayedScenario> {
   const state = newSimState(scenario.id)
-  const start = Date.now() - scenario.giliran.length * 90_000
+  const start = scenario.waktu ? new Date(scenario.waktu).getTime() : Date.now() - scenario.giliran.length * 90_000
   // Chat nyata: konteks sebelumnya ikut, seperti yang dilihat CS waktu itu.
   for (const [index, item] of (scenario.riwayat || []).entries())
     state.rows.push({
@@ -431,7 +437,7 @@ export async function playScenario(
     })
   try {
     for (const [index, message] of scenario.giliran.entries()) {
-      const turn = await runSimTurn(state, message, settings, new Date(start + index * 90_000))
+      const turn = await runSimTurn(state, message, settings, new Date(start + index * 90_000), Boolean(scenario.waktu))
       await options.onTurn?.(state.turns)
       // Diserahkan ke CS: AI berhenti di chat ini (seperti chat sungguhan).
       if (turn.serah_cs || turn.error) break
@@ -747,6 +753,8 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
     const notes = await imageNotes(chat.jid, before.filter((row) => row.message_id) as any[]).catch(() => new Map<string, string>())
     out.push({
       id: `real-${out.length + 1}-s${seed}`,
+      waktu: new Date(chat.rows[picked[0].mulai ?? 0]?.created_at || Date.now()).toISOString(),
+      kanal: chat.jid.endsWith('@ig') ? ('ig' as const) : ('wa' as const),
       asal: picked.map((segment) => ({ teks: segment.teks, jawaban: segment.jawaban })),
       riwayat: before
         .filter((row) => row.body || row.media_type === 'image')
@@ -756,7 +764,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
           gambar: row.media_type === 'image',
           ...(row.message_id && notes.get(String(row.message_id)) ? { catatan: notes.get(String(row.message_id)) } : {}),
         })),
-      judul: `${combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
+      judul: `${combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'}${chat.jid.endsWith('@ig') ? ' IG' : ''} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
       maksud: [
         'Pertanyaan dari chat nyata toko. Jawab semua maksudnya dengan benar menurut FAKTA saat ini, dengan rasa bahasa CS manusia.',
         'Acuan (harga/stok bisa sudah berubah — FAKTA saat ini yang berlaku):',

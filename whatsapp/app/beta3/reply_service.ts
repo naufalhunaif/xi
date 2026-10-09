@@ -178,6 +178,19 @@ async function describeQuotedImage(item: { id: number; jid: string; direction: s
   return ''
 }
 
+/** v3.6.111 — kalimat penutup untuk pesan sosial (terima kasih, maaf, mengiyakan); kosong = biarkan. */
+export function socialClosing(text: string, address = 'bos') {
+  const value = String(text || '')
+  const thanks = /\b(makasih|makasi|terima\s*kasih|terimakasih|trims|tq|thanks|thank\s*you|thx|nuwun|suwun)\b/i.test(value)
+  const sorry = /\b(maaf|mohon\s+maaf|sorry|ngapunten)\b/i.test(value)
+  const agree = /\b(iya|iyaa|ya|betul|bener|benar|ok|oke|okey|okay|siap|baik|sip|mantap)\b/i.test(value)
+  if (thanks && sorry) return `Sama-sama ${address}, santai aja 🙏`
+  if (thanks) return `Sama-sama ${address} 🙏`
+  if (sorry) return `Santai aja ${address} 🙏`
+  if (agree) return `Siap ${address} 🙏`
+  return ''
+}
+
 /** v3.6.101 — pesan sebelum RIWAYAT (maks 200) untuk keadaan chat; tanpa keterangan gambar/kutipan. */
 async function olderHistory(jid: string, before: Date | string): Promise<LeanHistoryRow[]> {
   const rows = await db
@@ -567,8 +580,11 @@ export async function createLeanReply(input: {
   history?: LeanHistoryRow[]
   /** v3.6.78 Uji percakapan: tanpa efek ke data pelanggan (prioritas, referensi gambar, sinkron order). */
   simulate?: boolean
+  /** v3.6.111 Uji chat nyata: "sekarang" = waktu chat asli. */
+  now?: Date
 }): Promise<LeanReply> {
   const { jid, settings, onTrace } = input
+  const now = input.now || new Date()
   const skill = selectLeanSkill(settings.skills)
   const skillTokens = estimateTokens(skill.content)
 
@@ -1331,7 +1347,7 @@ export async function createLeanReply(input: {
   ]
     .filter(Boolean)
     .join('\n\n')
-  const productionText = settings.production ? renderProductionEstimate(settings.production, new Date(), String(store || '')) : ''
+  const productionText = settings.production ? renderProductionEstimate(settings.production, now, String(store || '')) : ''
   const prompt = buildLeanPrompt({
     policy: renderExchangePolicy(policy.text),
     activeOrder,
@@ -1362,6 +1378,7 @@ export async function createLeanReply(input: {
     message: `${replyContext(rows)}${acceptedOffer(rows)}${input.text}${toolNotes.length ? `\n\n${toolNotes.join('\n')}` : ''}${systemNote}${priceNote}${input.note ? `\n\nCATATAN SISTEM: ${input.note}` : ''}`,
     paymentMethods: settings.paymentMethods.filter((method) => method.enabled),
     production: productionText,
+    now,
     imageCount: input.imagePaths?.length || 0,
   })
   onTrace?.({
@@ -1411,7 +1428,7 @@ export async function createLeanReply(input: {
     history: rows,
     decision,
     rows: digest.rows,
-    extraFacts: [store, priceText, productionText, STORE_BASICS, `Waktu sekarang: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date())} WIB`, ...toolNotes].filter(Boolean),
+    extraFacts: [store, priceText, productionText, STORE_BASICS, `Waktu sekarang: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(now)} WIB`, ...toolNotes].filter(Boolean),
     settings,
     chatState,
   }).catch(() => ({ issues: [] as CheckIssue[], jev: false }))
@@ -1442,6 +1459,14 @@ export async function createLeanReply(input: {
     }
   } else if (check.jev || (check as { ai?: boolean }).ai)
     onTrace?.({ key: 'beta3-check', label: 'Pemeriksa balasan · sesuai', status: 'completed', detail: {} })
+  // v3.6.111 — pelanggan berterima kasih / minta maaf / mengiyakan: CS manusia tetap membalas singkat (uji: AI diam).
+  if (!decision.pesan.length && !decision.serah_cs) {
+    const closing = socialClosing(input.text, style?.address || 'bos')
+    if (closing) {
+      decision.pesan = [closing]
+      onTrace?.({ key: 'beta3-closing', label: 'Balasan penutup singkat (tidak didiamkan)', status: 'completed', detail: { pesan: closing } })
+    }
+  }
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
   const jevColor = await jevVariantFix(jid, decision.spesifikasi, digest.rows, rows).catch(() => null)
   const colorFix = jevColor || fixCatalogColors(decision.spesifikasi, digest.rows, rows)
@@ -1960,7 +1985,13 @@ export async function createLeanReply(input: {
   if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')
   // v3.6.86 — nomor celana tidak ditebak dari TB/BB.
   if (!decision.serah_cs) {
-    const known = [input.text, ...rows.filter((row) => row.direction === 'in' || row.senderType === 'cs' || row.senderType === 'owner').map((row) => String(row.body || '')), ...toolNotes].join('\n')
+    // v3.6.111: angka di hasil alat yang bukan soal celana (mis. Fit Advisor jas, LD 37 cm) tidak dihitung
+    // sebagai nomor celana (uji 9 Okt: "celananya rekomendasi no 37" dari hasil size jas).
+    const known = [
+      input.text,
+      ...rows.filter((row) => row.direction === 'in' || row.senderType === 'cs' || row.senderType === 'owner').map((row) => String(row.body || '')),
+      ...toolNotes.flatMap((note) => note.split('\n')).filter((line) => /celana|pants|pinggang/i.test(line)),
+    ].join('\n')
     const pants = dropGuessedPantsNumber(decision.pesan, known, style?.address || 'bos')
     if (pants.changed) {
       decision.pesan = pants.pesan

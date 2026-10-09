@@ -1510,3 +1510,26 @@ test.group('v3.6.109 Instagram: balasan story, pesan tidak didukung, reel', () =
     assert.include(other.body, '[lampiran sticker_baru]')
   })
 })
+
+test.group('v3.6.111 hasil uji beban 88 chat', () => {
+  test('terima kasih / maaf / mengiyakan tidak didiamkan', async ({ assert }) => {
+    const { socialClosing } = await import('#beta3/reply_service')
+    assert.equal(socialClosing('Terimakasih bnyak boskuu 🙏\nMohon maaf kemarin yah bos'), 'Sama-sama bos, santai aja 🙏')
+    assert.equal(socialClosing('makasih kak', 'kak'), 'Sama-sama kak 🙏')
+    assert.equal(socialClosing('Iya betul kak'), 'Siap bos 🙏')
+    assert.equal(socialClosing('📷'), '')
+  })
+  test('uji chat nyata memakai waktu asli chat; nomor celana dari alat jas tidak dianggap diketahui', async ({ assert }) => {
+    const sim = await readFile('app/beta3/simulator.ts', 'utf8')
+    assert.include(sim, 'const start = scenario.waktu ? new Date(scenario.waktu).getTime()')
+    assert.include(sim, '...(fixedNow ? { now: at } : {}),')
+    assert.include(sim, "kanal: chat.jid.endsWith('@ig')")
+    const reply = await readFile('app/beta3/reply_service.ts', 'utf8')
+    assert.include(reply, 'const now = input.now || new Date()')
+    assert.include(reply, "filter((line) => /celana|pants|pinggang/i.test(line))")
+    const { dropGuessedPantsNumber } = await import('#beta3/reply_guards')
+    const known = ['165/70', 'Fit advisor: size L (chart LD 34 cm)'.split('\n').filter((line) => /celana|pants|pinggang/i.test(line))].flat().join('\n')
+    const out = dropGuessedPantsNumber(['Kalau dari tinggi 165 dan berat 70, rekomendasi celananya no 34 bos.'], known)
+    assert.isTrue(out.changed)
+  })
+})
