@@ -1594,3 +1594,17 @@ test.group('v3.6.113 postingan lama dibagikan: isi diambil ulang dari Instagram'
     assert.deepEqual(sharedUrlFromDetail({}), { url: '', mediaId: '' })
   })
 })
+
+test.group('v3.6.114 video / pesan suara / file Instagram disimpan sebagai media', () => {
+  test('video gagal diunduh → tautan di teks; jenis media tidak tertinggal "downloading"', async ({ assert }) => {
+    const { ingestInstagramWebhook } = await import('#services/instagram_inbox')
+    const mid = `mid-vid-${Date.now()}`
+    await ingestInstagramWebhook({ entry: [{ messaging: [{ sender: { id: '7712347' }, recipient: { id: '999' }, timestamp: Date.now(), message: { mid, attachments: [{ type: 'video', payload: { url: 'http://127.0.0.1:9/v.mp4' } }] } }] }] })
+    const row = await db.from('whatsapp_messages').where('message_id', mid).first()
+    assert.include(row.body, '[video]')
+    assert.include(row.body, 'http://127.0.0.1:9/v.mp4')
+    assert.isNull(row.media_status)
+    await db.from('whatsapp_messages').where('message_id', mid).delete()
+    await db.from('whatsapp_ig_turns').where('jid', '7712347@ig').delete()
+  })
+})

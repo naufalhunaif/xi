@@ -175,6 +175,9 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
   }
   if (!text && !image) return
   await ensureContact(jid, customer, config)
+  // v3.6.114 — video, pesan suara, file, dan reel juga disimpan sebagai media (dulu hanya teks "[video]").
+  const other = image ? undefined : attachments.find((item) => FILE_KIND[String(item?.type || '')] && item?.payload?.url)
+  const otherKind = other ? FILE_KIND[String(other.type)] : null
   await db.table('whatsapp_messages').insert({
     message_id: mid,
     jid,
@@ -182,11 +185,11 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
     direction: 'in',
     sender_type: 'customer',
     body: text,
-    media_type: image ? 'image' : null,
+    media_type: image ? 'image' : otherKind,
     media_url: null,
     thumbnail_url: null,
     media_mime: image ? 'image/jpeg' : null,
-    media_status: image ? 'downloading' : null,
+    media_status: image || otherKind ? 'downloading' : null,
     reply_to_message_id: message.reply_to?.mid || null,
     status: 'received',
     created_at: created,
@@ -200,12 +203,60 @@ async function ingestMessaging(event: Messaging, config: IgConfig) {
     if (info.image) await downloadSharedPreview(mid, info.image).catch(() => {})
   }
   else if (storyPreview) await downloadSharedPreview(mid, storyPreview.payload.url).catch(() => {})
+  else if (other?.payload?.url && otherKind) await downloadAttachment(mid, other.payload.url, otherKind).catch(() => {})
   await invalidateConversationGoal(jid).catch(() => {})
   await scheduleTurn(jid, mid)
 }
 
 /** Gambar CDN Instagram kedaluwarsa: disalin ke media aplikasi seperti WhatsApp. */
 /** Unduh gambar Instagram ke public/media; kembalikan path lokal. */
+const FILE_KIND: Record<string, string> = { video: 'video', audio: 'audio', file: 'document', ig_reel: 'video', reel: 'video' }
+const EXTENSION: Array<[RegExp, string]> = [
+  [/png/i, 'png'], [/webp/i, 'webp'], [/jpe?g/i, 'jpg'], [/gif/i, 'gif'],
+  [/video\/mp4/i, 'mp4'], [/quicktime/i, 'mov'], [/webm/i, 'webm'],
+  [/audio\/(?:mp4|x-m4a|aac)/i, 'm4a'], [/mpeg/i, 'mp3'], [/ogg/i, 'ogg'], [/wav/i, 'wav'],
+  [/pdf/i, 'pdf'],
+]
+/** v3.6.114 — unduh media apa pun (gambar/video/suara/dokumen) ke public/media; jenis dari content-type. */
+export async function saveRemoteMedia(name: string, url: string, accept: RegExp) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const type = String(response.headers.get('content-type') || '').split(';')[0].trim()
+  if (!accept.test(type)) throw new Error(`Jenis ${type || '?'} tidak diterima`)
+  const bytes = Buffer.from(await response.arrayBuffer())
+  if (bytes.byteLength > 25 * 1024 * 1024) throw new Error('Media terlalu besar')
+  const extension = EXTENSION.find(([pattern]) => pattern.test(type))?.[1] || 'bin'
+  await mkdir(app.makePath('public', 'media'), { recursive: true })
+  const filename = workspaceFileName(`${name.replace(/[^a-z0-9_-]/gi, '').slice(-60)}.${extension}`)
+  await writeFile(app.makePath('public', 'media', filename), bytes, { mode: 0o644 })
+  const kind = /^image\//i.test(type) ? 'image' : /^video\//i.test(type) ? 'video' : /^audio\//i.test(type) ? 'audio' : 'document'
+  return { url: `${env.get('APP_BASE_PATH') || ''}/media/${filename}`, mime: type, kind, filename }
+}
+
+/** v3.6.114 — video / pesan suara / file dari DM; gagal → tautannya ditambahkan ke teks. */
+export async function downloadAttachment(messageId: string, url: string, kind: string) {
+  try {
+    const saved = await saveRemoteMedia(`ig-${messageId}`, url, /^(image|video|audio|application)\//i)
+    await db
+      .from('whatsapp_messages')
+      .where('message_id', messageId)
+      .update({
+        media_type: saved.kind === 'image' ? 'image' : kind,
+        media_mime: saved.mime,
+        media_url: saved.url,
+        thumbnail_url: saved.kind === 'image' ? saved.url : null,
+        media_name: kind === 'document' ? saved.filename : null,
+        media_status: 'ready',
+      })
+  } catch {
+    const row = await db.from('whatsapp_messages').where('message_id', messageId).first()
+    await db
+      .from('whatsapp_messages')
+      .where('message_id', messageId)
+      .update({ media_type: null, media_mime: null, media_status: null, body: [String(row?.body || '').trim(), url].filter(Boolean).join('\n').slice(0, 4000) })
+  }
+}
+
 export async function saveRemoteImage(name: string, url: string, requireImage = false) {
   const response = await fetch(url, { signal: AbortSignal.timeout(20_000) })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -239,11 +290,12 @@ export async function downloadImage(messageId: string, url: string) {
  */
 export async function downloadSharedPreview(messageId: string, url: string) {
   try {
-    const local = await saveRemoteImage(`ig-${messageId}`, url, true)
+    // v3.6.114: story/postingan video ikut tampil (dulu hanya gambar); jenis media selalu diisi.
+    const saved = await saveRemoteMedia(`ig-${messageId}`, url, /^(image|video)\//i)
     await db
       .from('whatsapp_messages')
       .where('message_id', messageId)
-      .update({ media_url: local, thumbnail_url: local, media_status: 'ready' })
+      .update({ media_type: saved.kind, media_mime: saved.mime, media_url: saved.url, thumbnail_url: saved.kind === 'image' ? saved.url : null, media_status: 'ready' })
   } catch {
     const row = await db.from('whatsapp_messages').where('message_id', messageId).first()
     await db
@@ -285,7 +337,14 @@ export async function repairSharedPosts(limit = 40) {
     .whereNull('media_type')
     .where('created_at', '>', new Date(Date.now() - 60 * 86_400_000))
     .where((query) =>
-      query.where('body', 'like', '%[membagikan postingan]%').orWhere('body', 'like', '%[membagikan reel]%').orWhere('body', 'like', '%[menyebut toko di story]%').orWhere('body', 'like', '%[membalas story toko]%')
+      query
+        .where('body', 'like', '%[membagikan postingan]%')
+        .orWhere('body', 'like', '%[membagikan reel]%')
+        .orWhere('body', 'like', '%[menyebut toko di story]%')
+        .orWhere('body', 'like', '%[membalas story toko]%')
+        .orWhere('body', 'like', '%[video]%')
+        .orWhere('body', 'like', '%[pesan suara]%')
+        .orWhere('body', 'like', '%[file]%')
     )
     .whereNot('body', 'like', '%http%')
     .orderBy('id', 'desc')
@@ -299,8 +358,10 @@ export async function repairSharedPosts(limit = 40) {
     let target = url
     if (!target && mediaId) target = (await mediaInfo(config.token, mediaId)).image
     if (!target) continue
-    await db.from('whatsapp_messages').where('message_id', row.message_id).update({ media_type: 'image', media_status: 'downloading' })
-    await downloadSharedPreview(row.message_id, target).catch(() => {})
+    const kind = /\[video\]|\[membagikan reel\]/.test(String(row.body)) ? 'video' : /\[pesan suara\]/.test(String(row.body)) ? 'audio' : /\[file\]/.test(String(row.body)) ? 'document' : ''
+    await db.from('whatsapp_messages').where('message_id', row.message_id).update({ media_type: kind || 'image', media_status: 'downloading' })
+    if (kind) await downloadAttachment(row.message_id, target, kind).catch(() => {})
+    else await downloadSharedPreview(row.message_id, target).catch(() => {})
     fixed++
   }
   return { checked: rows.length, fixed, sample }
