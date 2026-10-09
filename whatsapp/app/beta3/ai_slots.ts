@@ -22,8 +22,26 @@ function sample() {
   stats.maxLoad = Math.max(stats.maxLoad, loadavg()[0] || 0)
 }
 
+/**
+ * v3.6.110 — memori dijaga: server 2 GB turun ke 401 MB sisa saat 8 proses AI jalan (uji 9 Okt). Proses baru
+ * baru dimulai bila sisa memori di atas cadangan (maks(500 MB, 25%)); selain itu menunggu proses lain selesai.
+ * Satu proses selalu boleh jalan (tidak macet).
+ */
+export const memoryReserve = () => Math.max(500 * 1048576, totalmem() * 0.25)
+let freeProbe = () => freemem()
+/** Untuk tes saja: sisa memori tiruan. null = sungguhan. */
+export function setFreeMemProbe(next: (() => number) | null) {
+  freeProbe = next || (() => freemem())
+}
+let retry: NodeJS.Timeout | undefined
+let memoryWaits = 0
 function pump() {
   while (active < limit && queue.length) {
+    if (active > 0 && freeProbe() < memoryReserve()) {
+      memoryWaits++
+      if (!retry) retry = setTimeout(() => ((retry = undefined), pump()), 1000)
+      return
+    }
     queue.sort((a, b) => a.priority - b.priority || a.at - b.at)
     const next = queue.shift()!
     next.start()
@@ -103,6 +121,7 @@ export function aiSlotStats() {
     memFreeMinMb: Number.isFinite(stats.minFreeMem) ? Math.round(stats.minFreeMem / 1048576) : Math.round(freemem() / 1048576),
     memFreeNowMb: Math.round(freemem() / 1048576),
     loadMax: Math.round(stats.maxLoad * 100) / 100,
+    memoryWaits,
     sinceMs: Date.now() - stats.since,
   }
 }
@@ -114,10 +133,11 @@ export function resetAiSlotStats() {
   stats.waits = []
   stats.minFreeMem = Number.POSITIVE_INFINITY
   stats.maxLoad = 0
+  memoryWaits = 0
 }
 
-/** Memori server menipis (< 10% atau < 400 MB): uji beban harus berhenti. */
+/** Memori server kritis (< 300 MB atau < 12%): uji beban harus berhenti. */
 export function memoryLow() {
   const free = freemem()
-  return free < Math.max(400 * 1048576, totalmem() * 0.1)
+  return free < Math.max(300 * 1048576, totalmem() * 0.12)
 }

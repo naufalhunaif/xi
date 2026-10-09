@@ -1404,7 +1404,8 @@ test.group('v3.6.108 postingan Instagram yang dibagikan', () => {
 
 test.group('v3.6.109 antrian AI & uji beban', () => {
   test('maksimal N proses bersamaan; pelanggan asli didahulukan dari uji', async ({ assert }) => {
-    const { withAiSlot, setAiSlotLimit, aiSlotStats, resetAiSlotStats, slotPriority, DEFAULT_AI_SLOTS } = await import('#beta3/ai_slots')
+    const { withAiSlot, setAiSlotLimit, aiSlotStats, resetAiSlotStats, slotPriority, DEFAULT_AI_SLOTS, setFreeMemProbe } = await import('#beta3/ai_slots')
+    setFreeMemProbe(() => 64 * 1024 ** 3)
     setAiSlotLimit(2)
     resetAiSlotStats()
     let running = 0
@@ -1437,6 +1438,23 @@ test.group('v3.6.109 antrian AI & uji beban', () => {
     controller.abort()
     await assert.rejects(() => waiting)
     await hold
+    // v3.6.110: memori di bawah cadangan → hanya satu proses jalan, sisanya menunggu.
+    setAiSlotLimit(4)
+    setFreeMemProbe(() => 100 * 1024 ** 2)
+    let now = 0
+    let most = 0
+    await Promise.all(
+      [1, 2, 3].map(() =>
+        withAiSlot(0, async () => {
+          now++
+          most = Math.max(most, now)
+          await new Promise((resolve) => setTimeout(resolve, 15))
+          now--
+        })
+      )
+    )
+    assert.equal(most, 1)
+    setFreeMemProbe(null)
     setAiSlotLimit(DEFAULT_AI_SLOTS)
   })
   test('ringkasan uji: waktu balas, gagal, timeout, nilai manusia', async ({ assert }) => {
