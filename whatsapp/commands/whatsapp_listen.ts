@@ -674,9 +674,11 @@ export default class WhatsappListen extends BaseCommand {
       const customerModel = /sesuai gambar|seperti gambar|kayak gambar|model dari gambar/i.test(String(order.spec || ''))
       let mainRef: (typeof refs)[number] | null = null
       if ((!images.length || customerModel) && refs.length) {
+        // v3.6.117: gambar utama = foto MODEL, bukan foto bahan/warna (dulu foto "bahan no 2" jadi foto utama).
+        const main = beta3Refs.mainModelRef(refs)!
         try {
-          images.unshift({ bytes: await beta3Refs.loadImage(refs[0].image_url), caption: '' })
-          mainRef = refs[0]
+          images.unshift({ bytes: await beta3Refs.loadImage(main.image_url), caption: '' })
+          mainRef = main
         } catch {}
       }
       // Tanpa foto katalog & tanpa referensi: pakai gambar yang dikirim pelanggan di chat order ini.
@@ -689,8 +691,9 @@ export default class WhatsappListen extends BaseCommand {
           } catch {}
         }
       }
+      const orderText = String(order.spec || order.items || '')
       const caption = mainRef
-        ? `${text}\n\n${beta3Refs.refCaption(mainRef)}`
+        ? `${text}\n\n${beta3Refs.refCaption(mainRef, orderText)}`
         : chatImages.length && images.length
           ? `${text}\n\n${images[0].caption}`
           : text
@@ -713,7 +716,7 @@ export default class WhatsappListen extends BaseCommand {
         try {
           await socket.sendMessage(groupJid, {
             image: await beta3Refs.loadImage(ref.image_url),
-            caption: beta3Refs.refCaption(ref),
+            caption: beta3Refs.refCaption(ref, orderText),
           })
         } catch (error) {
           this.logger.error(

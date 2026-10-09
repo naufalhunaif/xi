@@ -254,7 +254,7 @@ export default class Beta3Controller {
             : await listActiveRefs(String(order.jid || '')).catch(() => [])
         return {
           ...order,
-          refs: refs.map((ref) => ({ url: ref.image_url, caption: refCaption(ref) })),
+          refs: refs.map((ref) => ({ url: ref.image_url, caption: refCaption(ref, String(order.spec || order.items || '')) })),
         }
       })
     )
@@ -465,8 +465,21 @@ export default class Beta3Controller {
     const active = order && ['pending', 'awaiting_payment'].includes(String(order.status))
     const shown = active ? order : spec ? null : order && order.status === 'paid' ? order : null
     const text = shown ? renderGroupOrderMessage(shown) : spec ? renderGroupOrderMessage({ spec }) : ''
-    const refs = shown && shown.status === 'paid' ? await refsForOrder(Number(shown.id)) : await listActiveRefs(jid)
-    const [withPhotos] = await attachOrderPhotos([{ spec: text, items: '', chat_note: '' }])
+    // v3.6.117: cart menampilkan rincian order (order.items) → foto & gambar referensi diambil dari order yang
+    // SAMA, seperti halaman order dan kiriman grup. Dulu foto dari spesifikasi chat dan referensi order lunas
+    // tidak ikut (gambar "bahan no 2" pelanggan tidak tampil di cart).
+    const displayed = order && order.status !== 'cancelled' ? order : null
+    const photoText = displayed ? String(displayed.spec || displayed.items || '') : text
+    const orderRefs = displayed && displayed.status === 'paid' ? await refsForOrder(Number(displayed.id)).catch(() => []) : []
+    const activeRefs = await listActiveRefs(jid).catch(() => [])
+    const seen = new Set<string>()
+    const refs = [...orderRefs, ...activeRefs].filter((ref) => {
+      const key = ref.message_id || ref.image_url
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    const [withPhotos] = await attachOrderPhotos([{ spec: photoText, items: '', chat_note: '' }])
     if (order) {
       ;(order as Record<string, any>).shipped = await isOrderShipped(order).catch(() => false)
       ;(order as Record<string, any>).settlement = await pendingSettlement(order).catch(() => null)
@@ -478,7 +491,7 @@ export default class Beta3Controller {
       order,
       proofs,
       photos: withPhotos.photos,
-      refs: refs.map((ref) => ({ image_url: ref.image_url, caption: refCaption(ref) })),
+      refs: refs.map((ref) => ({ image_url: ref.image_url, caption: refCaption(ref, photoText) })),
       groupPreview: text,
       chatNote: chatNote || (contact?.chat_note ? String(contact.chat_note) : ''),
       handling: { mode: contact?.handling_mode === 'cs' ? 'cs' : 'ai' },

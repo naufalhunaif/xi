@@ -1637,3 +1637,19 @@ test.group('v3.6.115 postingan Instagram dibagikan: kartu & petunjuk AI', () => 
     assert.include(source, 'export async function conversationMessages')
   })
 })
+
+test.group('v3.6.117 foto bahan pelanggan di cart, halaman order & grup', () => {
+  test('foto bahan/warna diberi caption bahan, bukan "Model warna"', async ({ assert }) => {
+    const { refCaption, mainModelRef } = await import('#beta3/refs_service')
+    const spec = 'Setelan Tuxedo - Cream 2.0\nJas, Celana, Rompi\nSize XL/37\nBahan no 2\nTanpa merek'
+    assert.equal(refCaption({ part: 'warna' }, spec), 'Bahan no 2 seperti ini')
+    assert.equal(refCaption({ part: 'bahan' }, 'Jas bahan nomor 3'), 'Bahan no 3 seperti ini')
+    assert.equal(refCaption({ part: 'warna' }), 'Bahan & warna seperti ini')
+    assert.equal(refCaption({ part: 'model' }, spec), 'Model seperti ini')
+    assert.equal(refCaption({ part: 'kerah' }, spec), 'Model kerah seperti ini')
+    // Gambar utama untuk penjahit = foto model, bukan foto bahan yang dikirim lebih dulu.
+    assert.equal(mainModelRef([{ part: 'warna' }, { part: 'model' }])!.part, 'model')
+    assert.equal(mainModelRef([{ part: 'bahan' }])!.part, 'bahan')
+    assert.isNull(mainModelRef([]))
+  })
+})

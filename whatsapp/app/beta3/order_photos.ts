@@ -10,8 +10,11 @@ const norm = (value: unknown) =>
 
 /**
  * Foto produk yang dipesan, hanya bila varian katalognya PERSIS sama (produk + warna).
- * "Tuxedo - Broken White" tidak boleh jadi foto "Tuxedo - White"; pesanan dengan model
- * dari gambar pelanggan ("sesuai gambar") tidak memakai foto katalog sama sekali.
+ * "Tuxedo - Broken White" tidak boleh jadi foto "Tuxedo - White".
+ * v3.6.117: "Model sesuai gambar" tidak lagi menghapus foto katalog bila barisnya menyebut varian katalog
+ * yang persis ("Setelan Tuxedo - Cream 2.0"); gambar pelanggan tetap ikut sebagai referensi. Dulu cart
+ * menampilkan foto katalog tetapi halaman order/grup tidak (kasus Christmandani 9 Okt). Model custom tanpa
+ * varian katalog ("Model sesuai gambar - Navy") tetap tanpa foto katalog.
  */
 export async function attachOrderPhotos<
   T extends { spec?: unknown; items?: unknown; chat_note?: unknown },
@@ -33,7 +36,6 @@ export async function attachOrderPhotos<
   return orders.map((order) => {
     const source = String(order.spec || order.items || '')
     const photos: OrderPhoto[] = []
-    if (/sesuai gambar|seperti gambar|kayak gambar|dari gambar/i.test(source)) return { ...order, photos }
     for (const raw of source.split('\n')) {
       if (photos.length >= 4) break
       // Baris item: "Produk - Warna" (boleh diawali "Setelan"/nomor, diakhiri size/keterangan).

@@ -548,11 +548,27 @@ export async function loadImage(url: string) {
   return readFile(app.makePath('public', 'media', basename(url.split('?')[0])))
 }
 
-/** Caption singkat untuk penjahit: "Model kerah seperti ini". */
-export function refCaption(ref: LeanRef) {
-  const part = ref.part.trim().toLowerCase().replace(/^model\s*/, '')
+/** v3.6.117 — foto kain/bahan/warna (mis. "bahan no 2" yang ditunjukkan pelanggan), bukan foto model. */
+const FABRIC_PART = /\b(?:bahan|kain|warna|motif|material|tekstur)\b/i
+export const isFabricPart = (part: string) => FABRIC_PART.test(String(part || ''))
+
+/**
+ * Caption singkat untuk penjahit: "Model kerah seperti ini". Foto bahan/warna → "Bahan no 2 seperti ini"
+ * (nomor bahan dari rincian pesanan bila ada); dulu tertulis "Model warna seperti ini".
+ */
+export function refCaption(ref: Pick<LeanRef, 'part'>, spec?: string | null) {
+  const part = String(ref.part || '').trim().toLowerCase().replace(/^model\s*/, '')
   if (SIZE_PART.test(part)) return 'Ukuran sesuai gambar ini'
+  if (isFabricPart(part)) {
+    const number = String(spec || '').match(/\bbahan\s*(?:no\.?|nomor|nmr)\s*(\d{1,3})\b/i)?.[1]
+    return number ? `Bahan no ${number} seperti ini` : 'Bahan & warna seperti ini'
+  }
   return part ? `Model ${part} seperti ini` : 'Model seperti ini'
+}
+
+/** Gambar utama untuk penjahit: foto model (bukan foto bahan/ukuran); cadangan referensi pertama. */
+export function mainModelRef<T extends Pick<LeanRef, 'part'>>(refs: T[]) {
+  return refs.find((ref) => !isFabricPart(ref.part) && !SIZE_PART.test(ref.part)) || refs[0] || null
 }
 
 
