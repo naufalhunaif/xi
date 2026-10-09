@@ -12,7 +12,6 @@ import { isAiWorking } from '#services/ai_work_schedule'
 import env from '#start/env'
 import { appVersion, appChannel, appVersionLabel } from '#services/app_version'
 import { readAccess, setDomain, unsetDomain } from '#services/access_service'
-import { pendingOrderCount } from '#services/pending_orders'
 import { readRuns, readUsage } from '#services/usage_service'
 import { readTrace } from '#services/trace_service'
 import {
@@ -359,13 +358,8 @@ export default class DashboardController {
   }
   async status({ response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
-    const [state, pendingOrders, lines] = await Promise.all([
-      readConnectionStatus(),
-      pendingOrderCount(),
-      listLines().catch(() => []),
-    ])
-    const linesConnected = lines.filter((line) => line.status === 'connected').length
-    return response.json({ ...state, pendingOrders, linesConnected })
+    const { statusPayload } = await import('#services/live_status')
+    return response.json(await statusPayload())
   }
   async usage({ request, response }: HttpContext) {
     response.header('Cache-Control', 'no-store')
@@ -667,7 +661,9 @@ export default class DashboardController {
     }
     send('retry: 3000\n\n')
     send('event: ready\ndata: {}\n\n')
-    const unsubscribe = subscribeInbox(() => {
+    const unsubscribe = subscribeInbox((event, data) => {
+      // v3.6.116: status sambungan ikut didorong (dulu tiap tab bertanya tiap 2 dtk).
+      if (event === 'status') return send(`event: status\ndata: ${JSON.stringify(data)}\n\n`)
       // Beberapa perubahan beruntun digabung (±300 ms).
       if (pending) return
       pending = setTimeout(() => {

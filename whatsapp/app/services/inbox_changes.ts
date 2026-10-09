@@ -112,14 +112,56 @@ export async function changedRooms(since: InboxCursor) {
 }
 
 /* ------------------------------------------------ dorong (Server-Sent Events) */
-type Listener = () => void
-type Hub = { scope: WorkspaceScope; listeners: Set<Listener>; signature: string; timer: NodeJS.Timeout | null; busy: boolean }
+export type InboxEvent = 'changed' | 'status'
+type Listener = (event: InboxEvent, data?: unknown) => void
+type Hub = {
+  scope: WorkspaceScope
+  listeners: Set<Listener>
+  signature: string
+  timer: NodeJS.Timeout | null
+  busy: boolean
+  /** v3.6.116 — status sambungan terakhir yang dikirim (tanda tangan) + payloadnya untuk tab baru. */
+  statusSignature: string
+  status: unknown
+  ticks: number
+}
 const hubs = new Map<string, Hub>()
 const PROBE_MS = 1500
+/** Status sambungan dibaca tiap 2 putaran (±3 dtk), sekali untuk semua tab. */
+const STATUS_EVERY = 2
 
 function notify(key: string) {
   const hub = hubs.get(key)
-  if (hub) for (const listener of hub.listeners) listener()
+  if (hub) for (const listener of hub.listeners) listener('changed')
+}
+
+/**
+ * v3.6.116 — tanda perubahan pesan yang sudah ada (bukan hanya pesan baru): status kirim (centang), media
+ * selesai diunduh, isi diperbarui (mis. tautan postingan), reaksi. 300 pesan terakhir lewat rentang id (murah).
+ */
+export const RECENT_MESSAGES_SQL = `(SELECT COALESCE(BIT_XOR(CRC32(CONCAT_WS(',', id, status, COALESCE(media_status, ''), COALESCE(media_type, ''),
+     COALESCE(media_url, ''), CHAR_LENGTH(COALESCE(body, ''))))), 0) FROM whatsapp_messages
+     WHERE id > (SELECT COALESCE(MAX(id), 0) - 300 FROM whatsapp_messages))`
+
+async function probeStatus(hub: Hub) {
+  try {
+    const { statusPayload, statusSignature } = await import('#services/live_status')
+    const payload = await inWorkspace(hub.scope, () => statusPayload())
+    const signature = statusSignature(payload as Record<string, any>)
+    hub.status = payload
+    if (signature !== hub.statusSignature) {
+      const first = !hub.statusSignature
+      hub.statusSignature = signature
+      if (!first) for (const listener of hub.listeners) listener('status', payload)
+    }
+  } catch {
+    // Coba lagi di putaran berikutnya.
+  }
+}
+
+/** Status terakhir yang diketahui pemeriksa (untuk tab yang baru tersambung). */
+export function lastStatus() {
+  return hubs.get(scopeKey(workspaceScope()))?.status ?? null
 }
 
 /** Satu pemeriksaan murah per workspace (bukan per tab): berubah → semua tab diberi tahu. */
@@ -136,12 +178,15 @@ async function probe(hub: Hub) {
            (SELECT COALESCE(MAX(id), 0) FROM whatsapp_messages),
            (SELECT COUNT(*) FROM whatsapp_messages WHERE direction = 'out' AND created_at >= NOW() - INTERVAL 5 MINUTE AND status IN ('sent', 'delivered', 'read')),
            (SELECT MAX(updated_at) FROM whatsapp_settings),
+           ${RECENT_MESSAGES_SQL},
+           (SELECT COALESCE(MAX(id), 0) FROM whatsapp_reactions),
            ${parts}) AS signature`
       )
       return String(((result[0] as any[])[0] || {}).signature || '')
     })
-    if (hub.signature && signature !== hub.signature) for (const listener of hub.listeners) listener()
+    if (hub.signature && signature !== hub.signature) for (const listener of hub.listeners) listener('changed')
     hub.signature = signature
+    if (hub.ticks++ % STATUS_EVERY === 0) await probeStatus(hub)
   } catch {
     // Database sibuk sesaat: coba lagi di putaran berikutnya.
   } finally {
@@ -155,7 +200,7 @@ export function subscribeInbox(listener: Listener) {
   const key = scopeKey(scope)
   let hub = hubs.get(key)
   if (!hub) {
-    hub = { scope, listeners: new Set(), signature: '', timer: null, busy: false }
+    hub = { scope, listeners: new Set(), signature: '', timer: null, busy: false, statusSignature: '', status: null, ticks: 0 }
     hubs.set(key, hub)
   }
   hub.listeners.add(listener)

@@ -140,9 +140,18 @@
     const tone = status === 'connected' ? 'ok' : ['connecting', 'qr'].includes(status) ? 'warn' : 'err'
     byId('statusPill').className = `wa-pill ${tone}`
   }
+  // v3.6.116: status juga didorong server lewat sambungan kejadian (renderStatus); bertanya hanya cadangan.
+  let statusUpdatedAt = 0
   async function updateStatus() {
     try {
-      const state = await api('/api/status')
+      renderStatus(await api('/api/status'))
+    } catch {
+      renderConnectionStatus('disconnected')
+    }
+  }
+  function renderStatus(state) {
+    statusUpdatedAt = Date.now()
+    {
       const status = String(state.status || 'disconnected')
       renderConnectionStatus(status, state.phone, Number(state.linesConnected || 0))
       const badge = byId('ordersBadge')
@@ -158,8 +167,6 @@
       byId('connectButton').hidden = canDisconnect
       byId('connectButton').disabled = status === 'worker_offline'
       byId('disconnectButton').hidden = !canDisconnect
-    } catch {
-      renderConnectionStatus('disconnected')
     }
   }
   async function connectionAction(path) {
@@ -639,11 +646,13 @@
     }
     applyRoomSearch(false)
   }
+  let messagesUpdatedAt = 0
   async function updateMessages() {
     if (!messages || updatingMessages) return
     const jid = messages.dataset.jid || ''
     if (!jid) return
     updatingMessages = true
+    messagesUpdatedAt = Date.now()
     let catchUp = false
     try {
       const data = await api(`/api/messages?jid=${encodeURIComponent(jid)}${roomParam(messages.dataset.line)}&latest=1`)
@@ -2694,21 +2703,40 @@
   const whenVisible = (fn) => () => {
     if (!document.hidden) fn()
   }
-  window.setInterval(whenVisible(updateStatus), 2000)
-  window.setInterval(whenVisible(updateMessages), 2500)
-  // v3.6.44: kejadian didorong server (SSE) → daftar diperbarui seketika; tanpa SSE bertanya tiap 3 dtk,
-  // dengan SSE hanya pengaman tiap 15 dtk.
+  // v3.6.116 — server mendorong kejadian (SSE) di SEMUA halaman: pesan, daftar chat, status sambungan, proses AI.
+  // Browser hanya bertanya sebagai cadangan (30 dtk) selama sambungan kejadian terbuka; tanpa sambungan kembali
+  // ke jeda lama (2–3 dtk). Dulu satu tab Chat ±130 permintaan/menit walau tidak ada apa-apa.
+  const FALLBACK_MS = 30_000
   let inboxStream = null
   const streamOpen = () => inboxStream?.readyState === 1
+  const due = (at, fastMs) => Date.now() - at >= (streamOpen() ? FALLBACK_MS : fastMs)
+  window.setInterval(whenVisible(() => due(statusUpdatedAt, 2000) && updateStatus()), 2000)
+  window.setInterval(whenVisible(() => due(messagesUpdatedAt, 2500) && updateMessages()), 2500)
+  window.waLive = { open: streamOpen }
   function connectInboxStream() {
-    if (!contacts || inboxStream || typeof EventSource !== 'function') return
+    if (inboxStream || typeof EventSource !== 'function') return
     inboxStream = new EventSource(`${appUrl}/api/inbox/events`)
     inboxStream.addEventListener('changed', () => {
       if (document.hidden) return
-      void updateContacts()
+      if (contacts) void updateContacts()
       void updateMessages()
+      window.dispatchEvent(new CustomEvent('wa:changed'))
     })
-    inboxStream.addEventListener('ready', () => void updateContacts())
+    inboxStream.addEventListener('status', (event) => {
+      try {
+        renderStatus(JSON.parse(event.data))
+      } catch {
+        void updateStatus()
+      }
+    })
+    // Tersambung (atau tersambung lagi setelah putus): susul yang mungkin terlewat.
+    inboxStream.addEventListener('ready', () => {
+      const stale = (at) => Date.now() - at > 3000
+      if (contacts && stale(contactsUpdatedAt)) void updateContacts()
+      if (stale(messagesUpdatedAt)) void updateMessages()
+      if (stale(statusUpdatedAt)) void updateStatus()
+      window.dispatchEvent(new CustomEvent('wa:changed'))
+    })
   }
   function disconnectInboxStream() {
     inboxStream?.close()
@@ -2716,19 +2744,36 @@
   }
   window.setInterval(
     whenVisible(() => {
-      if (Date.now() - contactsUpdatedAt >= (streamOpen() ? 15_000 : 3000)) void updateContacts()
+      if (contacts && due(contactsUpdatedAt, 3000)) void updateContacts()
     }),
     3000
   )
   connectInboxStream()
   restoreInboxScroll()
-  window.setInterval(whenVisible(updateOAuth), 3000)
-  window.setInterval(whenVisible(updateClaudeOAuth), 3000)
-  window.setInterval(whenVisible(updateMcpOAuth), 3000)
+  // v3.6.116: status login akun AI/MCP hanya dicek cepat (3 dtk) bila panelnya terlihat dan baru saja ada
+  // klik di halaman (sedang login); selain itu tiap 30 dtk. Panel tersembunyi tidak dicek sama sekali.
+  let lastClickAt = 0
+  document.addEventListener('click', () => (lastClickAt = Date.now()), true)
+  const loginPoll = (fn, id) => {
+    let at = 0
+    return whenVisible(() => {
+      // Elemen statusnya sendiri bisa masih tersembunyi; yang dilihat adalah panel pengaturannya.
+      const node = byId(id)
+      const panel = node?.closest('[data-settings-panel], section, details') || node?.parentElement
+      if (!panel || !panel.getClientRects().length) return
+      if (Date.now() - lastClickAt > 3 * 60_000 && Date.now() - at < FALLBACK_MS) return
+      at = Date.now()
+      void fn()
+    })
+  }
+  window.setInterval(loginPoll(updateOAuth, 'oauthStatus'), 3000)
+  window.setInterval(loginPoll(updateClaudeOAuth, 'claudeOauthStatus'), 3000)
+  window.setInterval(loginPoll(updateMcpOAuth, 'mcpConnections'), 3000)
   document.addEventListener('visibilitychange', () => {
     // Tab tidak dilihat: sambungan kejadian ditutup (tidak membebani server), dibuka lagi saat kembali.
     if (document.hidden) return disconnectInboxStream()
-    connectInboxStream()
+    // Saat tersambung lagi server mengirim "ready" → yang terlewat langsung disusul di sana.
+    if (typeof EventSource === 'function') return connectInboxStream()
     updateStatus()
     updateMessages()
     updateContacts()

@@ -99,6 +99,13 @@
   button.addEventListener('click', () => startReset())
   resetButton?.addEventListener('click', () => startReset(true))
   document.addEventListener('ui-language:change', render)
-  window.setInterval(check, 5000)
+  // v3.6.116: cek tiap 5 dtk hanya selama penghapusan berjalan dan tombolnya terlihat; selain itu tiap 60 dtk.
+  let checkedAt = Date.now()
+  window.setInterval(() => {
+    if (!button.getClientRects().length) return
+    if (!pending && Date.now() - checkedAt < 60_000) return
+    checkedAt = Date.now()
+    void check()
+  }, 5000)
   void check()
 })()

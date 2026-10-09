@@ -722,5 +722,17 @@
     }
   }
   refresh()
-  window.setInterval(refresh, 2000)
+  // v3.6.116: progres AI dicek tiap 2 dtk hanya saat AI sedang bekerja atau detail proses terbuka. Selain itu
+  // menunggu kabar dari server (wa:changed — AI mulai bekerja mengubah aktivitas room), cadangan 30 dtk.
+  let lastRefresh = Date.now()
+  const busy = () => latest?.status === 'running' || dialog.open || !window.waLive?.open?.()
+  window.setInterval(() => {
+    if (!busy() && Date.now() - lastRefresh < 30_000) return
+    lastRefresh = Date.now()
+    void refresh()
+  }, 2000)
+  window.addEventListener('wa:changed', () => {
+    lastRefresh = Date.now()
+    void refresh()
+  })
 })()
