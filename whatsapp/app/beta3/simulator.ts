@@ -24,7 +24,8 @@ import { reviewNudge } from '#beta3/reply_check'
 import { addLeanExample, listLeanExamples } from '#beta3/examples_service'
 import { memoryFromChat, mergeChatMemory, readCustomerNote, writeCustomerNote } from '#beta3/customer_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
-import { STORE_BASICS, bubblesToSend, createLeanReply, type LeanSettings } from '#beta3/reply_service'
+import { STORE_BASICS, bubblesToSend, createLeanReply, productionRanges, type LeanSettings } from '#beta3/reply_service'
+import { fastAnswer, fastIntent, type FastIntent } from '#beta3/fast_reply'
 import { renderProductionEstimate, type LeanHistoryRow } from '#beta3/prompt'
 import { generateScenarios, rng, roughen } from '#beta3/sim_generator'
 
@@ -988,4 +989,57 @@ export async function resetSimRoom() {
   const { state } = await readRoom()
   await cleanupSim(state.jid)
   await writeRoom({ ...newSimState('ruang'), started: new Date().toISOString() }, false)
+}
+
+
+export type FastAuditItem = { intent: FastIntent; tanya: string; kilat: string[]; cs: string[] }
+/**
+ * v3.6.100 — Audit jalur kilat: pertanyaan pelanggan di chat nyata yang akan dijawab jalur kilat,
+ * dibandingkan dengan jawaban CS manusia saat itu. Tanpa AI (0 kuota); untuk memastikan jawaban kilat
+ * nyambung, benar, dan tidak menambah kata yang tidak perlu.
+ */
+export async function fastAudit(settings: LeanSettings, days = 365, perIntent = 40) {
+  const since = new Date(Date.now() - days * 86_400_000)
+  const jids = (await db
+    .from('whatsapp_messages')
+    .select('jid')
+    .where('created_at', '>', since)
+    .whereIn('sender_type', ['cs', 'owner'])
+    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid'))
+    .groupBy('jid')) as Array<{ jid: string }>
+  const methods = settings.paymentMethods.filter((method) => method.enabled)
+  const facts = {
+    store: String((await readLeanState('store_profile').catch(() => '')) || ''),
+    rows: (await catalogDigest()).rows,
+    ranges: productionRanges(settings.production),
+    payment: renderPaymentMessage(methods.map((method) => ({ bank: method.name, number: method.destination, holder: method.accountName || '' }))),
+    address: 'bos',
+  }
+  let segments = 0
+  const counts: Record<string, number> = {}
+  const items: FastAuditItem[] = []
+  for (const { jid } of jids) {
+    if (isSimJid(jid)) continue
+    const rows = (await db
+      .from('whatsapp_messages')
+      .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
+      .where('jid', jid)
+      .where('created_at', '>', since)
+      .orderBy('created_at', 'asc')
+      .orderBy('id', 'asc')
+      .limit(600)) as RealRow[]
+    for (const segment of realSegments(rows)) {
+      segments++
+      if (segment.gambar || segment.kutip) continue
+      const intent = fastIntent(segment.teks)
+      if (!intent) continue
+      counts[intent] = (counts[intent] || 0) + 1
+      const kilat = fastAnswer(intent, segment.teks, { ...facts, seed: `${jid}|${segment.mulai || 0}` })
+      if (!kilat) continue
+      items.push({ intent, tanya: maskPii(segment.teks).slice(0, 300), kilat, cs: segment.jawaban.map((text) => maskPii(text).slice(0, 400)) })
+    }
+  }
+  const samples: FastAuditItem[] = []
+  for (const intent of Object.keys(counts)) samples.push(...items.filter((item) => item.intent === intent).slice(-perIntent))
+  return { chats: jids.length, segments, counts, samples }
 }

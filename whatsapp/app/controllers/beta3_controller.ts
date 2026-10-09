@@ -77,7 +77,7 @@ import { pricePattern, renderPricePattern } from '#beta3/price_pattern'
 import { attachOrderPhotos } from '#beta3/order_photos'
 import { ITEM_TYPES, orderWeightGrams, readItemWeights, saveItemWeights } from '#beta3/weights'
 import env from '#start/env'
-import { listSimRuns, loadScenarios, readSimRun, realLearningStatus, resetSimRoom, sendSimRoom, simRoom, startRealLearning, startSimRun, stopSimRun, type SimScenario } from '#beta3/simulator'
+import { fastAudit, listSimRuns, loadScenarios, readSimRun, realLearningStatus, resetSimRoom, sendSimRoom, simRoom, startRealLearning, startSimRun, stopSimRun, type SimScenario } from '#beta3/simulator'
 
 /** Beta 3: katalog digest, contoh CS, order menunggu CS, catatan pelanggan. */
 /** Bukti transfer yang nominalnya sedang/baru dibaca AI (sekali per 10 menit per order). */
@@ -684,6 +684,14 @@ export default class Beta3Controller {
       last,
       learning: realLearningStatus(),
     })
+  }
+
+  /** v3.6.100 — audit jalur kilat terhadap jawaban CS manusia di chat nyata (tanpa AI). */
+  async fastAudit({ request, response }: HttpContext) {
+    response.header('cache-control', 'no-store')
+    const settings = await readSettings(true)
+    const days = Math.min(730, Math.max(7, Number(request.input('days', 365)) || 365))
+    return response.json(await fastAudit(settings as any, days))
   }
 
   /** v3.6.94 — hentikan uji yang sedang berjalan. */

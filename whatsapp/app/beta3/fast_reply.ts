@@ -124,23 +124,26 @@ export function fastAnswer(intent: FastIntent, text: string, facts: FastFacts): 
       ])
     case 'rekening':
       return facts.payment ? [first(facts.payment)] : null
-    case 'lokasi':
+    case 'lokasi': {
       if (!address) return null
+      // v3.6.100: jam buka hanya bila ikut ditanya (tidak menambah info yang tidak diminta).
+      const withHours = hours && INTENTS.find(([name]) => name === 'jam_buka')![1].test(text)
       return pick(
-        hours
+        withHours
           ? [
-              [`Lokasi kami di ${address} ${a}`, `Toko buka ${hours} WIB ya`],
-              [`Tokonya di ${address} ${a}`, `Buka ${hours} WIB, kalau order lewat chat bisa 24 jam`],
+              [`Lokasi kami di ${address} ${a}`, `Buka ${hours} WIB`],
+              [`Tokonya di ${address} ${a}, buka ${hours} WIB`],
               [`Alamatnya ${address} ya ${a}`, `Jam buka ${hours} WIB`],
             ]
-          : [[`Lokasi kami di ${address} ${a}`], [`Tokonya di ${address} ${a}`]]
+          : [[`Lokasi kami di ${address} ${a}`], [`Tokonya di ${address} ${a}`], [`Alamatnya ${address} ya ${a}`]]
       )
+    }
     case 'jam_buka':
       return hours
         ? pick([
-            [`Buka ${hours} WIB ${a}, kalau order lewat chat bisa kapan aja`],
+            [`Buka ${hours} WIB ${a}`],
             [`Toko buka ${hours} WIB ya ${a}`],
-            [`Jam bukanya ${hours} WIB ${a}, order via chat 24 jam`],
+            [`Jam bukanya ${hours} WIB ${a}`],
           ])
         : null
     case 'lama_pengerjaan': {
@@ -156,9 +159,9 @@ export function fastAnswer(intent: FastIntent, text: string, facts: FastFacts): 
     }
     case 'cara_order':
       return pick([
-        [`Bisa langsung order di chat ini ${a} atau lewat website chameleoncloth.com`, 'Tinggal pilih model sama warnanya, nanti saya bantu cek size dari tinggi & berat badan'],
-        [`Order di sini aja ${a}, pilih model & warna dulu`, 'Habis itu kirim tinggi dan berat badan buat size, lalu isi data pengirimannya'],
-        [`Gampang ${a}, pilih model & warna, kirim tinggi berat badan, terus isi alamat pengiriman`, 'Bisa juga lewat website chameleoncloth.com'],
+        [`Bisa langsung order di chat ini ${a}, pilih model & warnanya dulu`, 'Nanti saya bantu cek size dari tinggi & berat badan'],
+        [`Order di sini aja ${a}, pilih model & warna dulu`, 'Habis itu kirim tinggi & berat badan buat cek size'],
+        [`Langsung di chat ini bisa ${a}, mau model apa?`],
       ])
     case 'harga_umum': {
       const lower = text.toLowerCase()

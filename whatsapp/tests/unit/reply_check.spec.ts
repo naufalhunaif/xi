@@ -1162,3 +1162,32 @@ test.group('v3.6.99 balas salam', () => {
     assert.deepEqual(answerSalam(['Siap bos', 'Ini fotonya'], 'Assalamualaikum'), ['Waalaikumsalam bos', 'Ini fotonya'])
   })
 })
+
+test.group('v3.6.100 audit jalur kilat', () => {
+  test('pertanyaan kilat di chat nyata dibandingkan dengan jawaban CS manusia', async ({ assert }) => {
+    const { fastAudit } = await import('#beta3/simulator')
+    const { writeLeanState, ensureLeanTables } = await import('#beta3/tables')
+    const { fastAnswer } = await import('#beta3/fast_reply')
+    await ensureLeanTables()
+    const jid = '6280000000777@s.whatsapp.net'
+    await db.from('whatsapp_messages').where('jid', jid).delete()
+    const at = (minute: number) => new Date(Date.now() - 3600_000 + minute * 60_000)
+    await db.table('whatsapp_messages').insert([
+      { jid, message_id: 'fa-1', direction: 'in', sender_type: 'customer', body: 'lokasi tokonya dimana min?', status: 'received', created_at: at(1) },
+      { jid, message_id: 'fa-2', direction: 'out', sender_type: 'cs', body: 'Di Cilacap bos', status: 'sent', created_at: at(2) },
+      { jid, message_id: 'fa-3', direction: 'in', sender_type: 'customer', body: 'jas hitam size L ready?', status: 'received', created_at: at(3) },
+      { jid, message_id: 'fa-4', direction: 'out', sender_type: 'cs', body: 'Ready bos', status: 'sent', created_at: at(4) },
+    ])
+    await writeLeanState('store_profile', 'TOKO: CHAMELEON CLOTH — Jl. Contoh No 1, Cilacap.\nToko fisik buka Sen-Sab 09:00-17:00, Min tutup WIB.')
+    const result = await fastAudit({ paymentMethods: [], skills: [] } as any, 30)
+    const hit = result.samples.find((item) => item.cs.includes('Di Cilacap bos'))
+    assert.exists(hit)
+    assert.equal(hit!.intent, 'lokasi')
+    assert.notInclude(hit!.kilat.join(' '), 'buka')
+    assert.isFalse(result.samples.some((item) => item.tanya.includes('jas hitam')))
+    await db.from('whatsapp_messages').where('jid', jid).delete()
+    // Lokasi + jam ditanya bersama → jam ikut.
+    const both = fastAnswer('lokasi', 'lokasi dimana, buka jam berapa?', { store: 'TOKO: X — Jl. Contoh No 1, Cilacap.\nbuka Sen-Sab 09:00-17:00, Min tutup WIB', rows: [], ranges: {}, payment: '', address: 'bos' })
+    assert.match(both!.join(' '), /buka/i)
+  })
+})

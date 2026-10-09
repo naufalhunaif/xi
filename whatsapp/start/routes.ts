@@ -89,6 +89,7 @@ router
     router.get('/api/beta3/tests', [Beta3Controller, 'tests'])
     router.post('/api/beta3/tests/run', [Beta3Controller, 'runTests'])
     router.delete('/api/beta3/tests/:id', [Beta3Controller, 'removeTest'])
+    router.get('/api/beta3/fast/audit', [Beta3Controller, 'fastAudit'])
     router.get('/api/beta3/sim', [Beta3Controller, 'sim'])
     router.get('/api/beta3/sim/room', [Beta3Controller, 'simRoom'])
     router.post('/api/beta3/sim/room', [Beta3Controller, 'simRoomSend'])
