@@ -1305,3 +1305,22 @@ test.group('v3.6.103 uji dengan izin kuota pemilik', () => {
     assert.include(source, "ownerQuota: request.input('ownerQuota')")
   })
 })
+
+test.group('v3.6.104 kemeja di katalog fokus; susulan batal tidak dinilai', () => {
+  test('"kemeja" membuka baris Shirt di katalog fokus', async ({ assert }) => {
+    const { focusCatalog } = await import('#beta3/token_saver')
+    const rows: any[] = []
+    for (let i = 0; i < 30; i++) rows.push({ product: `Basic Suit ${i}`, color: 'Black', category: 'Suits', price: 485000, active: true, sizesReady: '', photoUrl: null, materialAvailable: true, features: '', featuresAi: '', material: '', sizeGroup: '', fit: '', note: '', sizesAll: '' })
+    rows.push({ ...rows[0], product: 'Shirt', color: 'White', category: 'Shirt', price: 175000 })
+    const focus = focusCatalog(rows, { text: 'saya butuh komplit sama kemeja', history: [], spec: '', chatNote: '', imageCount: 0 })
+    assert.exists(focus)
+    assert.isTrue(focus!.rows.some((row: any) => row.product === 'Shirt'))
+  })
+  test('transkrip penilai: susulan dibatalkan tidak ikut', async ({ assert }) => {
+    const { transcript } = await import('#beta3/simulator')
+    const text = transcript([
+      { pelanggan: 'halo', balasan: ['Halo bos'], foto: [], fotoUrl: [], serah_cs: false, alasan: '', jejak: [], ms: 1, susulan: { asli: 'jadi gimana bos?', kirim: false, teks: '', alasan: 'menagih' } },
+    ] as any)
+    assert.notInclude(text, 'jadi gimana bos?')
+  })
+})

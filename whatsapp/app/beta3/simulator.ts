@@ -189,7 +189,10 @@ export function transcript(turns: SimTurn[]) {
       ...turn.balasan.slice(1).map((bubble) => `AI: ${bubble}`),
       ...(turn.total ? [`Sistem: ${turn.total}`] : []),
       ...(turn.susulan
-        ? [turn.susulan.kirim ? `(susulan bila pelanggan diam: ${turn.susulan.teks})` : `(susulan "${turn.susulan.asli}" DIBATALKAN pemeriksa: ${turn.susulan.alasan})`]
+        ? // v3.6.104: susulan yang dibatalkan pemeriksa tidak pernah terkirim → tidak ikut dinilai.
+          turn.susulan.kirim
+          ? [`(susulan bila pelanggan diam: ${turn.susulan.teks})`]
+          : []
         : []),
       ...(turn.serah_cs ? [`(diserahkan ke CS: ${turn.alasan})`] : []),
     ])
@@ -379,6 +382,8 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
     for (const bubble of rest) out(bubble)
     if (turn.total) out(turn.total)
     if (decision.catatan) await writeBeta3ChatNote(state.jid, decision.catatan)
+    // v3.6.104: waktu yang dirasakan pelanggan = sampai balasan siap; pemeriksaan susulan (dikirim nanti) tidak dihitung.
+    turn.ms = Date.now() - began
     if (decision.susulan && !decision.serah_cs) {
       const verdict = await reviewNudge({ jid: state.jid, settings, susulan: decision.susulan, history: state.rows.map((row) => ({ ...row, current: false })) }).catch(() => null)
       turn.susulan = { asli: decision.susulan, kirim: verdict?.kirim ?? true, teks: verdict?.teks || decision.susulan, alasan: verdict?.alasan || '' }
@@ -388,7 +393,7 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
   } finally {
     if (file && !keep) await rm(file, { force: true }).catch(() => {})
   }
-  turn.ms = Date.now() - began
+  if (!turn.ms) turn.ms = Date.now() - began
   state.turns.push(turn)
   return turn
 }

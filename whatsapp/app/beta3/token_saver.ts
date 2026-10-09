@@ -275,7 +275,7 @@ export function focusCatalog(
   ].join('\n')
   const words = new Set(fold(context).split(' '))
   // Sebutan pelanggan → nama di katalog.
-  for (const [said, catalog] of [['celana', 'pants'], ['rompi', 'vest'], ['beskap', 'bescap'], ['jas', 'suit']] as const)
+  for (const [said, catalog] of [['celana', 'pants'], ['rompi', 'vest'], ['beskap', 'bescap'], ['jas', 'suit'], ['kemeja', 'shirt'], ['dasi', 'tie']] as const)
     if ([...words].some((word) => word.startsWith(said))) words.add(catalog)
   // Seri yang dibahas (premium/signature): semua barangnya ikut (jas, celana, setelan, rompi).
   const series = new Set(

@@ -1293,7 +1293,8 @@ export async function createLeanReply(input: {
     policy: renderExchangePolicy(policy.text),
     activeOrder,
     skill: trimmedSkill.text,
-    store,
+    // v3.6.104: dasar toko (cara pesan lewat WhatsApp/website, JNE, tanpa marketplace) ikut ke AI, bukan hanya pemeriksa.
+    store: [store, STORE_BASICS].filter(Boolean).join('\n'),
     fabrics: needs.fabrics
       ? await readLeanState('fabrics')
       : 'BAHAN TERSEDIA: tidak dimuat di giliran ini (tidak ada pertanyaan warna/bahan).',
