@@ -63,6 +63,8 @@ export type LeanProviderResult = {
   durationMs: number
   provider: AiProviderName
   model: string
+  /** v3.6.138 — akun yang menjawab (tulis ulang memakai akun yang sama → cache prompt terbaca). */
+  accountId?: number
 }
 
 const TIMEOUT_MS = 120_000
@@ -160,7 +162,7 @@ export async function runLeanProvider(
   imagePaths: string[] = [],
   phase = 'beta3-reply',
   schema: Record<string, unknown> = LEAN_OUTPUT_SCHEMA,
-  meta: { jid?: string; providers?: AiProviderName[]; tier?: AutoTier } = {}
+  meta: { jid?: string; providers?: AiProviderName[]; tier?: AutoTier; preferAccount?: number } = {}
 ): Promise<LeanProviderResult> {
   if (override)
     return { text: await override({ prompt: flatPrompt(prompt), phase }), usage: null, durationMs: 1, provider: 'chatgpt', model: 'tiruan' }
@@ -168,7 +170,11 @@ export async function runLeanProvider(
   const all = await usableAiAccounts(Date.now(), phase).catch(() => null)
   // Tugas tertentu (kasus uji) hanya memakai penyedia tertentu bila ada yang siap.
   const picked = all && meta.providers?.length ? all.filter((a) => meta.providers!.includes(a.provider)) : all
-  const accounts = picked && picked.length ? picked : all
+  const pool = picked && picked.length ? picked : all
+  // Akun yang menjawab sebelumnya didahulukan: cache prompt hanya berlaku di akun yang sama.
+  const accounts = pool && meta.preferAccount
+    ? [...pool.filter((a) => a.id === meta.preferAccount), ...pool.filter((a) => a.id !== meta.preferAccount)]
+    : pool
   if (!accounts) return runLeanOnce(settings, settings.aiProvider, {}, prompt, imagePaths, phase, schema)
   if (!accounts.length) {
     const recovery = await nextAiRecovery().catch(() => 0)
@@ -264,7 +270,7 @@ export async function runLeanProvider(
       const tokens = result.usage ? result.usage.input + result.usage.output : null
       // v3.6.123: model yang benar-benar menjawab ikut dicatat (Orkestra: jalur akun → model).
       await recordAiEvent(account.id, 'ok', phase, result.model ? `model:${result.model}` : '', tokens, jid).catch(() => {})
-      return result
+      return { ...result, accountId: account.id }
     } catch (error) {
       // Dibatalkan karena akun lain lebih dulu menjawab: bukan kegagalan akun ini. v3.6.122: dicatat "cancel"
       // supaya Orkestra tidak menampilkan akun ini terus "bekerja" sampai 3 menit.

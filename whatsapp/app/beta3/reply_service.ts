@@ -1602,7 +1602,7 @@ export async function createLeanReply(input: {
         contextImage ? [contextImage] : input.imagePaths || [],
         'beta3-revise',
         undefined,
-        { jid, tier: tierChoice.tier }
+        { jid, tier: tierChoice.tier, preferAccount: result.accountId }
       )
       const fixed = parseLeanDecision(revised.text)
       decision = fixed

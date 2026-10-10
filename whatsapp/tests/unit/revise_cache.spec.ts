@@ -15,5 +15,10 @@ test.group('Tulis ulang hemat token', () => {
     assert.match(source, /tail: revisionNote[^\n]*\n\s*contextImage \? \[contextImage\] : input\.imagePaths/)
     const provider = await readFile(new URL('../../app/beta3/provider.ts', import.meta.url), 'utf8')
     assert.include(provider, "...(prompt.tail ? ['--input-format', 'stream-json'] : [])")
+    // v3.6.138 — akun yang sama dengan balasan (cache per akun) dan Claude CLI yang membaca blok pertama dari cache.
+    assert.include(source, 'preferAccount: result.accountId')
+    const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'))
+    const [, minor, patch] = String(pkg.dependencies['@anthropic-ai/claude-code']).replace(/^\D*/, '').split('.').map(Number)
+    assert.isTrue(minor > 1 || patch >= 287)
   })
 })

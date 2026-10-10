@@ -65,7 +65,7 @@
     "@adonisjs/session": "^8.1.0",
     "@adonisjs/shield": "^9.0.0",
     "@adonisjs/static": "^2.0.1",
-    "@anthropic-ai/claude-code": "^2.1.270",
+    "@anthropic-ai/claude-code": "^2.1.287",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@openai/codex": "0.154.0",
     "@vinejs/vine": "^4.4.0",
