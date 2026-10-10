@@ -66,7 +66,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, fixWeekEstimate, inventsProgress, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, fixProductionKind, fixWeekEstimate, inventsProgress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -723,10 +723,15 @@ export async function createLeanReply(input: {
   // Balasan otomatis bot bisnis lain ("ketik 1 untuk …") tidak dibalas.
   const pitch = !input.imagePaths?.length && isBusinessPitch(input.text)
   const otherBot = !pitch && !input.imagePaths?.length && isOtherBot(input.text)
+  // v3.6.140 — balasan otomatis bisnis pelanggan atas pesan toko (mis. sesudah info resi): cukup sopan singkat seperti
+  // CS ("siap sama-sama bos"), bukan "pesan otomatisnya ke kirim ke sini".
+  const lastRow = [...rows].reverse().find((row) => !row.current)
   const quickText = pitch
     ? ['Halo, salam kenal. Terima kasih infonya, saya sampaikan ke owner dulu ya']
     : otherBot
-      ? ['Halo kak, ini Chameleon Cloth ya, sepertinya pesan otomatisnya ke kirim ke sini']
+      ? lastRow?.direction === 'out'
+        ? ['Siap sama-sama bos 🙏']
+        : ['Halo kak, ini Chameleon Cloth ya, sepertinya pesan otomatisnya ke kirim ke sini']
       : quickRaw
   const quick = quickText && style && !pitch ? normalizeStyle(quickText, style) : quickText
   if (quick) {
@@ -2185,9 +2190,13 @@ export async function createLeanReply(input: {
   if (!decision.serah_cs) {
     // v3.6.111: angka di hasil alat yang bukan soal celana (mis. Fit Advisor jas, LD 37 cm) tidak dihitung
     // sebagai nomor celana (uji 9 Okt: "celananya rekomendasi no 37" dari hasil size jas).
+    // v3.6.140 — hanya kalimat soal celana/pinggang atau jawaban angka saja (uji chat asli: angka 37 dari pesan lain
+    // di riwayat membuat "rekomendasi no 37" lolos).
+    const aboutPants = (body: string) =>
+      body.split(/(?<=[.!?])\s+|\n+/).filter((line) => /celana|pants|pinggang|\bno(?:mor|mer)?\.?\s*\d{2}\b/i.test(line) || /^\s*\d{2}\s*$/.test(line))
     const known = [
-      input.text,
-      ...rows.filter((row) => row.direction === 'in' || row.senderType === 'cs' || row.senderType === 'owner').map((row) => String(row.body || '')),
+      ...aboutPants(input.text),
+      ...rows.filter((row) => row.direction === 'in' || row.senderType === 'cs' || row.senderType === 'owner').flatMap((row) => aboutPants(String(row.body || ''))),
       ...toolNotes.flatMap((note) => note.split('\n')).filter((line) => /celana|pants|pinggang/i.test(line)),
     ].join('\n')
     const pants = dropGuessedPantsNumber(decision.pesan, known, style?.address || 'bos')
@@ -2209,6 +2218,11 @@ export async function createLeanReply(input: {
     if (week.changed) {
       decision.pesan = week.pesan
       onTrace?.({ key: 'beta3-estimate', label: 'Estimasi "1 minggu" diganti estimasi resmi', status: 'completed', detail: {} })
+    }
+    const kind = fixProductionKind(decision.pesan, productionRanges(settings.production), productionWhens(productionText), input.text)
+    if (kind.changed) {
+      decision.pesan = kind.pesan
+      onTrace?.({ key: 'beta3-estimate-kind', label: 'Estimasi pre-order/custom disesuaikan jenisnya', status: 'completed', detail: { pesan: kind.pesan } })
     }
     const same = qualifySamePrice(decision.pesan, style?.address || 'bos')
     if (same.changed) {

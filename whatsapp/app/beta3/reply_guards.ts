@@ -81,6 +81,53 @@ export function fixWeekEstimate(pesan: string[], ranges: { preorder?: string; cu
   return { pesan: out, changed }
 }
 
+const CUSTOM_WORDS = /\b(?:custom|ukuran badan|ukur badan|\bxs\b|5xl|6xl|menyesuaikan badan)\b/i
+const PREORDER_WORDS = /\b(?:pre-?order|po|dibuatkan|dibuatin|belum ready|belum ada stok|stok (?:habis|kosong)|kosong)\b/i
+const DATE_RANGE = /(\d{1,2}\s+[A-Z][a-z]{2,8})\s*[-–]\s*(\d{1,2}\s+[A-Z][a-z]{2,8})/
+/**
+ * v3.6.140 — Estimasi pre-order vs custom tidak tertukar (uji chat asli: beskap ready size, pre-order, disebut
+ * 7-14 hari = estimasi custom; XS disebut 5-10). Rentang & tanggal "siap kirim" diganti angka resmi sesuai jenis.
+ * `whens`: tanggal siap kirim resmi per jenis (dari ESTIMASI PRODUKSI).
+ */
+export function fixProductionKind(
+  pesan: string[],
+  ranges: { preorder?: string; custom?: string },
+  whens: { preorder?: string; custom?: string },
+  customerText = ''
+) {
+  let changed = false
+  const nums = (range?: string) => range?.match(/^(\d+(?:-\d+)?)/)?.[1] || ''
+  const out = pesan.map((bubble) => {
+    const custom = CUSTOM_WORDS.test(bubble) || (CUSTOM_WORDS.test(customerText) && /\bdibuat/i.test(bubble))
+    const kind: 'custom' | 'preorder' | null = custom ? 'custom' : PREORDER_WORDS.test(bubble) ? 'preorder' : null
+    if (!kind) return bubble
+    const right = nums(ranges[kind])
+    const wrong = nums(ranges[kind === 'custom' ? 'preorder' : 'custom'])
+    let next = bubble
+    if (right && wrong && right !== wrong) {
+      const pattern = new RegExp(`(^|\\D)${wrong.replace('-', '\\s*[-–]\\s*')}(?=\\s*hari)`)
+      next = next.replace(pattern, (_match, lead) => `${lead}${right}`)
+    }
+    const when = whens[kind]
+    if (when && /siap kirim|jadi|selesai/i.test(next)) next = next.replace(DATE_RANGE, when.replace(/\s*–\s*/, '-'))
+    if (next !== bubble) changed = true
+    return next
+  })
+  return { pesan: changed ? out : pesan, changed }
+}
+
+/** Tanggal siap kirim resmi per jenis dari teks ESTIMASI PRODUKSI. */
+export function productionWhens(productionText: string) {
+  const out: { preorder?: string; custom?: string } = {}
+  for (const line of String(productionText || '').split('\n')) {
+    const when = line.match(/siap kirim sekitar (.+)$/)?.[1]?.trim()
+    if (!when) continue
+    if (/^pre-order/i.test(line)) out.preorder = when
+    else if (/^custom/i.test(line)) out.custom = when
+  }
+  return out
+}
+
 /**
  * v3.6.90 — Size dari Fit Advisor tidak dinaikkan/diturunkan sendiri (uji: alat bilang XL, AI bilang XXL
  * "biar panjangnya pas"; CS asli: XL). Hanya bila balasan tidak menyebut size alat sama sekali.

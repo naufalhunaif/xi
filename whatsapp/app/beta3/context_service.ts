@@ -112,6 +112,8 @@ export function collectContext(input: {
   }
 
   lines.push(...shoppingHints(input.text, catalog))
+  const ready = readySizeHint(input.text, rows, catalog)
+  if (ready) lines.push(ready)
 
   // Maksud pesan sekarang.
   const intents = INTENTS.filter(([pattern]) => pattern.test(` ${now} `)).map(([, name]) => name)
@@ -314,6 +316,8 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
 
 /** v3.6.133 — kata warna sehari-hari → warna katalog yang termasuk (uji: "biru" tanpa Navy, "coklat" tanpa Choco). */
 const COLOR_FAMILY: Array<[RegExp, string[]]> = [
+  // v3.6.140 — hitam dulu (uji 3 putaran: "item polos tanpa garis putih" dijawab jas putih).
+  [/\b(hitam|item|hitem|ireng|black)\b/, ['black']],
   [/\b(biru|blue|dongker|benhur)\b/, ['navy', 'blue', 'denim']],
   [/\b(coklat|cokelat|cokat|brown|kopi|mocca|moka)\b/, ['brown', 'choco', 'mahogany']],
   [/\b(abu|abu2|abu abu|grey|gray)\b/, ['gray']],
@@ -322,6 +326,27 @@ const COLOR_FAMILY: Array<[RegExp, string[]]> = [
   [/\b(putih|white|broken white)\b/, ['white', 'putih']],
   [/\b(krem|cream|beige|khaki)\b/, ['cream', 'khaki', 'beige']],
 ]
+
+const SIZE_WORD = /(?:^|\s)(?:size|ukuran|uk|pakai|pake)?\s*(xs|s|m|l|xl|xxl|3xl|4xl)(?=\s|$|[.,!?])/i
+/**
+ * v3.6.140 — "yang ready stok yang mana aja?" dengan size yang sudah disebut → daftar produk ready size itu
+ * (uji chat asli: AI hanya menyebut satu model, padahal banyak model ready size M).
+ */
+export function readySizeHint(text: string, history: LeanHistoryRow[], catalog: LeanCatalogRow[]) {
+  const now = ` ${fold(text)} `
+  if (!/\b(ready|redy|stok|stock|ada)\b/.test(now) || !/\b(mana|mna|apa|ap)\s*(aja|saja|aj|ajah)\b|\b(?:yang|yg) (?:mana|mna)\b|\bmodel apa\b/.test(now)) return ''
+  const said = [text, ...history.filter((row) => row.direction === 'in' && !row.current).slice(-6).reverse().map((row) => String(row.body || ''))]
+  const size = said.map((body) => ` ${fold(body)} `.match(SIZE_WORD)?.[1]).find(Boolean)?.toUpperCase()
+  if (!size) return ''
+  const has = (row: LeanCatalogRow) => String(row.sizesReady || '').toUpperCase().split(/[\s,/]+/).includes(size)
+  const groups = new Map<string, string[]>()
+  for (const row of catalog)
+    if (row.price && has(row) && /suits|jas|setelan/i.test(`${row.category} ${row.product}`) && !/^setelan\b/i.test(row.product))
+      groups.set(row.product, [...(groups.get(row.product) || []), row.color])
+  if (!groups.size) return `READY SIZE ${size}: tidak ada jas ready size ${size} di KATALOG — tawarkan pre-order atau size lain yang ready.`
+  const list = [...groups.entries()].slice(0, 8).map(([product, colors]) => `${product} (${colors.slice(0, 5).join(', ')})`)
+  return `READY SIZE ${size} di KATALOG (sebut beberapa pilihan per model, bukan satu saja): ${list.join('; ')}.`
+}
 
 /** "sejuta", "1jt", "700k", "700rb", "1,5 juta" → rupiah. */
 export function budgetOf(text: string) {
@@ -347,10 +372,14 @@ export function shoppingHints(text: string, catalog: LeanCatalogRow[]) {
   const pool = priced.filter((row) =>
     wantsPants ? /pants|celana/i.test(`${row.category} ${row.product}`) : wantsSuit ? /setelan/i.test(`${row.category} ${row.product}`) : /suits|jas/i.test(String(row.category || ''))
   )
-  // Warna sekeluarga yang ada (ready dulu).
+  // Warna sekeluarga yang ada (ready dulu). Warna yang DITOLAK ("tanpa garis putih", "bukan hitam") tidak dihitung.
+  const wanted = now.replace(/\b(?:tanpa|bukan|selain|jangan)\s+(?:ada\s+)?(?:garis|list|les|aksen|kombinasi|warna)?\s*\w+/g, ' ')
+  const plain = /\b(?:tanpa\s+(?:garis|list|les)|polos)\b/.test(now)
   for (const [pattern, keys] of COLOR_FAMILY) {
-    if (!pattern.test(now)) continue
-    const hits = (pool.length ? pool : priced).filter((row) => keys.some((key) => fold(row.color).includes(key)))
+    if (!pattern.test(wanted)) continue
+    const hits = (pool.length ? pool : priced).filter(
+      (row) => keys.some((key) => fold(row.color).includes(key)) && !(plain && /\blist\b/i.test(row.product))
+    )
     if (!hits.length) continue
     const ready = hits.filter((row) => row.sizesReady)
     const names = [...new Set((ready.length ? ready : hits).map((row) => `${row.product} - ${row.color}${row.sizesReady ? ` (${row.sizesReady})` : ''}`))].slice(0, 8)
