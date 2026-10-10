@@ -291,7 +291,7 @@ export async function judgeFacts(settings?: LeanSettings) {
   const promoRule = renderPromoRule(parsePromoState(String((await readLeanState('promos').catch(() => '')) || '')))
   return [
     profile,
-    `${promoRule}\nHarga promo = harga katalog − potongan promo (dibulatkan); harga promo yang disebut AI BENAR, bukan karangan. Promo berlaku bersama aturan grosir: dipakai potongan yang lebih besar.`,
+    `${promoRule}\nHarga promo = harga katalog − potongan promo (dibulatkan). Menyebut harga KATALOG normal maupun harga promo sama-sama BENAR — AI tidak wajib menyebut promo kecuali pelanggan menanyakan promo/diskon; potongan promo dihitung otomatis di total. Promo dan grosir tidak digabung: total memakai potongan yang lebih besar.`,
     renderWholesaleRule(wholesaleDiscounts(wholesaleText)) || wholesaleText,
     renderPricePattern(pricePattern(digest.rows)),
     production,

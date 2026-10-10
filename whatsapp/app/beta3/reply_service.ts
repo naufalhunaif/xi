@@ -1336,7 +1336,8 @@ export async function createLeanReply(input: {
       '\n\nCATATAN SISTEM: pelanggan menyatakan SUDAH transfer. Balas "siap bos, kami cek dulu ya" (minta bukti transfernya bila belum dikirim); jangan bilang sudah diterima. tahap = bukti_dikirim.'
   if (understanding.hasShippingData && !form && !loose)
     systemNote +=
-      '\n\nCATATAN SISTEM: pelanggan sepertinya mengirim data pengiriman, tapi belum lengkap terbaca. Minta bagian yang kurang (nama, alamat lengkap, kecamatan, kota, no HP) dalam satu pesan.'
+      // v3.6.128: dulu AI meminta ulang kecamatan/kabupaten yang sudah ditulis tanpa label dan menahan order demi RT/RW.
+      '\n\nCATATAN SISTEM: pelanggan sepertinya mengirim data pengiriman. Cek SELURUH riwayat: yang dibutuhkan hanya nama penerima, alamat (jalan/desa), kecamatan, kab/kota, no HP ("pakai nomor ini" = no HP sudah ada). Nama tempat tanpa label ("… patimuan cilacap") sudah berisi kecamatan & kota. Nomor rumah/RT/RW dan kode pos TIDAK wajib. Bila semua sudah ada → isi field penerima (sistem mencatat order + ongkir); bila belum, tanyakan hanya yang belum ada dalam satu pesan singkat.'
   if (understanding.csReason && understanding.csReason !== 'tidak_perlu')
     systemNote += `\n\nCATATAN SISTEM: pesan ini kemungkinan perlu ditangani manusia (${understanding.csReason.replace(/_/g, ' ')}). Ikuti aturan serah_cs di skill.`
   if (understanding.agreed && pendingForJev?.status === 'pending')
@@ -2231,6 +2232,8 @@ const WHOLESALE_TOPIC = new RegExp(
     '\\bbanyak\\b.{0,30}\\b(?:kura?ng(?:in|i)?|murah(?:in)?|nego|harga khusus)\\b',
     '\\b(?:kura?ng(?:in|i)?|murah(?:in)?|nego)\\b.{0,30}\\bbanyak\\b',
     '\\b(?:[6-9]|\\d{2,})\\s*(?:pcs|stel|setel|set|potong|buah|orang|jas|setelan)\\b',
+    // v3.6.128: kata bilangan ("enam stel buat groomsmen", "sepuluh orang").
+    '\\b(?:enam|tujuh|delapan|sembilan|sepuluh|sebelas|belasan|puluhan|dua puluh|selusin)\\s*(?:pcs|stel|setel|set|potong|buah|orang|jas|setelan|groomsmen)\\b',
     '\\b(?:set|stel|setel|jas)\\s+(?:size\\s+)?s\\s*(?:-|–|sampai|sampe|s/?d|hingga|ke)\\s*(?:[2-5]?x+l|[2-5]xl)\\b',
   ].join('|'),
   'i'

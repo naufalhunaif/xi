@@ -42,7 +42,7 @@ test.group('Beta3 data penerima dari obrolan', () => {
 
   test('skema keluaran punya penerima (boleh null) dan parser membacanya', ({ assert }) => {
     assert.include(LEAN_OUTPUT_SCHEMA.required as readonly string[], 'penerima')
-    assert.include(LEAN_OUTPUT_SCHEMA.properties.penerima.anyOf[0].description, 'Kode pos TIDAK wajib')
+    assert.include(LEAN_OUTPUT_SCHEMA.properties.penerima.anyOf[0].description, 'RT/RW TIDAK wajib')
     const decision = parseLeanDecision(
       JSON.stringify({ pesan: ['siap bos'], foto: [], catatan: '', tahap: 'tunggu_cs', serah_cs: false, alasan: '', susulan: '', spesifikasi: 'Basic Suit - Black 2.0', referensi: [], bukti: [], pembayaran: null, order: null, penerima: recipient })
     )

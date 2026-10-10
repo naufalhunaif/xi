@@ -44,5 +44,5 @@ export function renderWholesaleRule(discounts: Record<string, number>) {
     .map(([key, word]) => `${word} ${discounts[key].toLocaleString('id-ID')}`)
     .join(', ')
   if (!list) return ''
-  return `DISKON GROSIR mulai ${WHOLESALE_MIN_JAS} jas (setelan dihitung jas; celana & rompi ikut dipotong bila jasnya sudah ${WHOLESALE_MIN_JAS}): potongan per pcs dari harga KATALOG — ${list}. Kurang dari ${WHOLESALE_MIN_JAS} jas tanpa potongan. Ditanya potongan → sebut besarnya per pcs. Total dengan potongan dihitung & dikirim sistem.`
+  return `DISKON GROSIR mulai ${WHOLESALE_MIN_JAS} jas (setelan dihitung jas; celana & rompi ikut dipotong bila jasnya sudah ${WHOLESALE_MIN_JAS}): potongan per pcs dari harga KATALOG — ${list}. Kurang dari ${WHOLESALE_MIN_JAS} jas tanpa potongan. Hitung jumlahnya dari kata bilangan ("enam stel") atau daftar size ("set S sampai 3XL" = S, M, L, XL, XXL, 3XL = 6 pcs): sudah ${WHOLESALE_MIN_JAS}+ → langsung bilang dapat potongan grosir dan besarnya per pcs, jangan tanya jumlah lagi. Ditanya potongan → sebut besarnya per pcs. Ada PROMO berlaku → total memakai potongan yang lebih besar (promo atau grosir, tidak digabung). Total dengan potongan dihitung & dikirim sistem.`
 }

@@ -130,7 +130,7 @@ export const LEAN_OUTPUT_SCHEMA = {
           type: 'object',
           additionalProperties: false,
           description:
-            'Isi bila BELUM ada form order tercatat dan pelanggan sudah memilih produk + size, lalu lewat obrolan SUDAH memberi nama penerima, alamat dengan kecamatan & kab/kota, dan no telp (atau minta "pakai nomor ini"). Sistem lalu mencatat order, mengecek ongkir, dan mengirim total — jangan minta pelanggan mengisi form lagi. Hanya dari ucapan pelanggan, jangan mengarang. Kode pos TIDAK wajib (kecamatan + kab/kota cukup): jangan menanyakan atau menebak kode pos. null bila data belum lengkap atau form sudah tercatat.',
+            'Isi bila BELUM ada form order tercatat dan pelanggan sudah memilih produk + size, lalu lewat obrolan SUDAH memberi nama penerima, alamat dengan kecamatan & kab/kota, dan no telp (atau minta "pakai nomor ini"). Sistem lalu mencatat order, mengecek ongkir, dan mengirim total — jangan minta pelanggan mengisi form lagi. Hanya dari ucapan pelanggan, jangan mengarang. Kode pos, nomor rumah, RT/RW TIDAK wajib (kecamatan + kab/kota cukup): jangan menanyakan, menahan order, atau menebak. Nama tempat tanpa label (\"jl melati sukamaju patimuan cilacap\") sudah berisi desa, kecamatan, kota. null bila data belum lengkap atau form sudah tercatat.',
           properties: {
             nama: { type: 'string', description: 'Nama penerima persis dari pelanggan.' },
             alamat: { type: 'string', description: 'Alamat seperti ditulis pelanggan (jalan, desa/kelurahan).' },

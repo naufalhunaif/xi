@@ -38,6 +38,8 @@ test.group('diskon grosir (v3.6.56 → v3.6.60)', () => {
       'Set S sampai 3xl',
       'jas S-3XL masing2 satu',
       'mau order 10 set',
+      'mau pesen enam stel buat groomsmen nikahan',
+      'butuh sepuluh orang seragam',
     ])
       assert.isTrue(talksWholesale(text), text)
     for (const text of [
@@ -49,6 +51,7 @@ test.group('diskon grosir (v3.6.56 → v3.6.60)', () => {
       'ready semua size?',
       'banyak warna ya',
       'size S ada?',
+      'pengiriman tujuh hari ya',
     ])
       assert.isFalse(talksWholesale(text), text)
   })
