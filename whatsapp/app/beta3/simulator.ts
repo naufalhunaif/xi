@@ -236,6 +236,9 @@ const JUDGE_SCHEMA = {
 }
 
 async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTurn[], facts: string) {
+  // v3.6.141 — estimasi chat asli dihitung dengan hari libur toko (sama dengan AI); dulu tanpa profil toko →
+  // tanggal siap kirim penilai berbeda dari AI (uji: 27 Mei–4 Jun vs 28 Mei–8 Jun).
+  const storeProfile = scenario.waktu ? String((await readLeanState('store_profile').catch(() => '')) || '') : ''
   const reply = await runLeanProvider(
     settings,
     {
@@ -247,7 +250,7 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
         'Data internal yang TIDAK ada di FAKTA maupun percakapan (progres produksi pesanan tertentu, status kirim tanpa resi, kapan pesanan tertentu jadi): AI yang bilang "saya cek dulu" dan menyerahkan ke CS itu BENAR, bukan masalah — yang salah adalah mengarang.',
         'Baris "(data alat untuk AI — …)" adalah hasil alat toko (ongkir, size, resi) yang dibaca AI: angka yang cocok dengan data itu BENAR, bukan karangan.',
         'Rasa manusia (nilai manusia): balasan harus terasa seperti CS manusia toko ini — santai, singkat, hangat, bahasa chat sehari-hari, menjawab dulu baru bertanya, tidak kaku, tidak bertele-tele, tidak memakai daftar/format bila cukup satu kalimat, tidak mengulang sapaan atau kalimat template. Bila ada "Jawaban CS manusia waktu itu", jadikan acuan gaya (isi harga/stok tetap ikut FAKTA saat ini). Rasa robotik ≤ 2 = masalah.',
-        `Waktu uji: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(scenario.waktu ? new Date(scenario.waktu) : new Date())} WIB${scenario.waktu ? ' (= waktu chat asli)' : ''}. Jawaban soal buka/tutup toko, hari ini/besok, dan tanggal dinilai terhadap waktu uji ini.${scenario.waktu && settings.production ? ` ESTIMASI PRODUKSI pada waktu chat: ${renderProductionEstimate(settings.production, new Date(scenario.waktu), '')}` : ''}`,
+        `Waktu uji: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(scenario.waktu ? new Date(scenario.waktu) : new Date())} WIB${scenario.waktu ? ' (= waktu chat asli)' : ''}. Jawaban soal buka/tutup toko, hari ini/besok, dan tanggal dinilai terhadap waktu uji ini.${scenario.waktu && settings.production ? ` ESTIMASI PRODUKSI pada waktu chat: ${renderProductionEstimate(settings.production, new Date(scenario.waktu), storeProfile)}` : ''}`,
         'lulus = true hanya bila tidak ada kesalahan fakta, foto cocok, maksud terjawab, dan rasa manusia ≥ 3. masalah: kalimat pendek bahasa Indonesia, sebut giliran & kutip bagian yang salah. Tanpa masalah → [].',
         `FAKTA TOKO:\n${facts}`,
       ].join('\n\n'),

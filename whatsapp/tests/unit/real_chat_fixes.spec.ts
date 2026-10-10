@@ -35,6 +35,8 @@ test.group('Perbaikan temuan chat asli', () => {
     const hint = shoppingHints('yg item polos tanpa garis putih di kerah ada?', catalog).join(' ')
     assert.include(hint, 'Basic Suit - Black 2.0')
     assert.notInclude(hint, 'White')
+    // Nama warna katalog persis → tanpa daftar warna sekeluarga.
+    assert.notInclude(shoppingHints('ganti black aja deh', catalog).join(' '), 'Warna yang termasuk')
   })
 
   test('estimasi pre-order vs custom tidak tertukar', ({ assert }) => {

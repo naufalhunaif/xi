@@ -2310,7 +2310,7 @@ export function productionRanges(production?: LeanSettings['production']) {
 
 /** Fakta dasar toko untuk pemeriksa & penilai (bukan prompt AI). */
 export const STORE_BASICS =
-  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer; bisa DP minimal 50% dari total, pelunasan setelah pesanan jadi.'
+  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp (CS mengirim format order untuk diisi: nama, alamat lengkap, kecamatan, no HP — atau data dikumpulkan lewat obrolan) atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer; bisa DP minimal 50% dari total, pelunasan setelah pesanan jadi.'
 
 const WEB_PLACE_SCHEMA = {
   type: 'object',

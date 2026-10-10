@@ -344,8 +344,8 @@ export function readySizeHint(text: string, history: LeanHistoryRow[], catalog: 
     if (row.price && has(row) && /suits|jas|setelan/i.test(`${row.category} ${row.product}`) && !/^setelan\b/i.test(row.product))
       groups.set(row.product, [...(groups.get(row.product) || []), row.color])
   if (!groups.size) return `READY SIZE ${size}: tidak ada jas ready size ${size} di KATALOG — tawarkan pre-order atau size lain yang ready.`
-  const list = [...groups.entries()].slice(0, 8).map(([product, colors]) => `${product} (${colors.slice(0, 5).join(', ')})`)
-  return `READY SIZE ${size} di KATALOG (sebut beberapa pilihan per model, bukan satu saja): ${list.join('; ')}.`
+  const list = [...groups.entries()].slice(0, 8).map(([product, colors]) => `${product} (${colors.slice(0, 10).join(', ')})`)
+  return `READY SIZE ${size} di KATALOG (sebut SEMUA model & warna ini, jangan dipotong): ${list.join('; ')}.`
 }
 
 /** "sejuta", "1jt", "700k", "700rb", "1,5 juta" → rupiah. */
@@ -376,7 +376,11 @@ export function shoppingHints(text: string, catalog: LeanCatalogRow[]) {
   const wanted = now.replace(/\b(?:tanpa|bukan|selain|jangan)\s+(?:ada\s+)?(?:garis|list|les|aksen|kombinasi|warna)?\s*\w+/g, ' ')
   const plain = /\b(?:tanpa\s+(?:garis|list|les)|polos)\b/.test(now)
   for (const [pattern, keys] of COLOR_FAMILY) {
-    if (!pattern.test(wanted)) continue
+    const word = wanted.match(pattern)?.[1]
+    if (!word) continue
+    // v3.6.141 — nama warna katalog persis ("maroon") bukan sebutan umum: tidak perlu daftar warna sekeluarga
+    // (uji: "ganti maroon" → AI ikut menawarkan Tuxedo & Premium maroon).
+    if (keys.includes(word)) break
     const hits = (pool.length ? pool : priced).filter(
       (row) => keys.some((key) => fold(row.color).includes(key)) && !(plain && /\blist\b/i.test(row.product))
     )
