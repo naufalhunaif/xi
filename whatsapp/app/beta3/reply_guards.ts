@@ -220,3 +220,56 @@ export function fixCodClaim(pesan: string[], customerText: string) {
   )
   return { pesan: changed ? out.filter(Boolean) : pesan, changed }
 }
+
+/**
+ * v3.6.132 — "yg kedua dr terakhir itu fotonya dong": urutan dari daftar terakhir yang dikirim toko dihitung
+ * kode (uji: AI salah hitung → foto Maroon padahal yang kedua dari terakhir Navy). Null bila tidak ada rujukan.
+ */
+const ORDINAL: Record<string, number> = { pertama: 1, satu: 1, kesatu: 1, kedua: 2, dua: 2, ketiga: 3, tiga: 3, keempat: 4, empat: 4, kelima: 5, lima: 5, keenam: 6, enam: 6 }
+export function listReference(text: string, rows: Array<{ direction: string; body?: string | null; current?: boolean }>) {
+  const ask = String(text || '').toLowerCase()
+  if (ask.length > 80 || !/\b(?:yang|yg|itu|no|nomor|urutan)\b/.test(ask)) return null
+  const fromEnd = /\b(?:dari|dr)\s+(?:yang\s+|yg\s+)?(?:belakang|terakhir|akhir)\b|\b(?:ke\w*|\d)\s+(?:terakhir|belakang)\b/.test(ask)
+  const last = /\b(?:yang|yg)\s+(?:paling\s+)?(?:terakhir|belakang)\b|\bpaling\s+(?:akhir|belakang|bawah)\b/.test(ask) && !fromEnd
+  const word = ask.match(/\b(pertama|kesatu|kedua|ketiga|keempat|kelima|keenam)\b/)?.[1] || ask.match(/\b(?:ke|ke-|no\.?|nomor|urutan)\s*(\d{1,2})\b/)?.[1]
+  const position = word ? ORDINAL[word] || Number(word) : last ? 1 : 0
+  if (!position) return null
+  const store = [...rows].reverse().find((row) => row.direction === 'out' && !row.current && (String(row.body || '').match(/,/g) || []).length >= 2)
+  if (!store) return null
+  const body = String(store.body || '').split(/\n/).sort((a, b) => (b.match(/,/g) || []).length - (a.match(/,/g) || []).length)[0]
+  const items = body
+    .split(/,|\s+(?:dan|sama|&)\s+/i)
+    .map((item, at) => (at === 0 ? item.replace(/^.*(?:\bada\b|:|\byaitu\b|\bwarnanya\b|\bpilihan(?:nya)?\b)\s*/i, '') : item))
+    .map((item) => item.replace(/\b(?:bos|kak|ya|juga)\b|[.?!]/gi, '').replace(/^\s*(?:dan|sama)\s+/i, '').trim())
+    .filter((item) => item && item.split(/\s+/).length <= 4)
+  if (items.length < 3) return null
+  const index = fromEnd || last ? items.length - position : position - 1
+  if (index < 0 || index >= items.length) return null
+  return { item: items[index], items }
+}
+
+/**
+ * v3.6.132 — Format order dari skill dikirim padahal pelanggan sudah memberi sebagian data lewat obrolan:
+ * baris yang sudah terjawab dibuang; Kode Pos tidak wajib (kecamatan + kota cukup) jadi tidak ditanyakan.
+ */
+export function trimOrderTemplate(pesan: string[], customerTexts: string[]) {
+  const said = customerTexts.join('\n')
+  const hasAddress = /\b(?:jl|jln|jalan|gg|gang|desa|dusun|dsn|kel|kec|kecamatan|kab|kabupaten|kota|perum|rt|rw)\b/i.test(said)
+  const hasPhone = /(?:\+?62|0)8[\d\s-]{7,13}\d|\b(?:pake|pakai|pke)\s+(?:nomor|no|nmr)\s+(?:ini|wa\s+ini)\b/i.test(said)
+  const hasName = /\b(?:nama|atas\s+nama|a\.?n\.?)\s*:?\s+[a-z]{2,}/i.test(said)
+  let changed = false
+  const out = pesan.map((bubble) => {
+    if (!/\bNama\s*(?:penerima\s*)?:/i.test(bubble) || !/\bAlamat[^:\n]*:/i.test(bubble)) return bubble
+    const drop = (line: string) =>
+      /^\s*Kode\s*Pos\s*:/i.test(line) ||
+      (hasAddress && /^\s*(?:Alamat[^:]*|Kecamatan|Kabupaten(?:\s*\/\s*Kota)?|Kota)\s*:\s*$/i.test(line)) ||
+      (hasPhone && /^\s*(?:No\.?\s*(?:telp|hp|wa)\w*|Nomor\s*\w*)\s*:\s*$/i.test(line)) ||
+      (hasName && /^\s*Nama[^:]*:\s*$/i.test(line))
+    const lines = bubble.split('\n')
+    const kept = lines.filter((line) => !drop(line))
+    if (kept.length === lines.length) return bubble
+    changed = true
+    return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+  })
+  return { pesan: out, changed }
+}

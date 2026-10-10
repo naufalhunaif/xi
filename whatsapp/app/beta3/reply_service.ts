@@ -66,7 +66,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, fixWeekEstimate, inventsProgress, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, fixWeekEstimate, inventsProgress, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -1342,6 +1342,12 @@ export async function createLeanReply(input: {
     systemNote += `\n\nCATATAN SISTEM: pesan ini kemungkinan perlu ditangani manusia (${understanding.csReason.replace(/_/g, ' ')}). Ikuti aturan serah_cs di skill.`
   if (understanding.agreed && pendingForJev?.status === 'pending')
     systemNote += '\n\nCATATAN SISTEM: pelanggan sudah menyetujui. Isi field order lengkap supaya total + rekening terkirim otomatis.'
+  // v3.6.132: "yang kedua dari terakhir" dihitung kode dari daftar terakhir toko (AI sering salah hitung).
+  const listRef = listReference(input.text, rows)
+  if (listRef) {
+    systemNote += `\n\nCATATAN SISTEM: rujukan urutan pelanggan = ${listRef.item} (dari daftar toko terakhir: ${listRef.items.join(', ')}). Pakai ${listRef.item}, termasuk untuk foto.`
+    onTrace?.({ key: 'beta3-list-ref', label: `Rujukan urutan · ${listRef.item}`, status: 'completed', detail: listRef })
+  }
   // v3.6.62 Hati CS: bacaan Jev (bentuk kalimat, rasa, momen) → petunjuk singkat untuk AI.
   const greeted = rows.some((row) => row.direction === 'out' && !row.current && GREETED.test(String(row.body || '')))
   const hati = heartNote(understanding.heart, greeted)
@@ -1663,6 +1669,12 @@ export async function createLeanReply(input: {
   }
   // Ongkir selalu tampil rapi (satu layanan per baris), model apa pun yang menulis.
   decision.pesan = tidyShippingBubbles(decision.pesan, toolNotes, style?.address || 'bos')
+  // v3.6.132: format order tanpa baris yang sudah dijawab pelanggan dan tanpa Kode Pos.
+  const template = trimOrderTemplate(decision.pesan, [...rows.filter((row) => row.direction === 'in').map((row) => String(row.body || '')), input.text])
+  if (template.changed) {
+    decision.pesan = template.pesan
+    onTrace?.({ key: 'beta3-form-trim', label: 'Format order dirapikan · data yang sudah ada & kode pos tidak ditanya', status: 'completed', detail: {} })
+  }
   // Satu jalur perapian (sama dengan tes ulasan chat): daftar, gaya CS, harga sesuai seri, pembuka.
   const polished = polishText(decision.pesan, {
     customerText: input.text,
