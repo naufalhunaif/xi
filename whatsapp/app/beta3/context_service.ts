@@ -315,7 +315,7 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
 /** v3.6.133 — kata warna sehari-hari → warna katalog yang termasuk (uji: "biru" tanpa Navy, "coklat" tanpa Choco). */
 const COLOR_FAMILY: Array<[RegExp, string[]]> = [
   [/\b(biru|blue|dongker|benhur)\b/, ['navy', 'blue', 'denim']],
-  [/\b(coklat|cokelat|cokat|brown|kopi|mocca|moka)\b/, ['brown', 'choco', 'coast', 'taupe', 'mahogany']],
+  [/\b(coklat|cokelat|cokat|brown|kopi|mocca|moka)\b/, ['brown', 'choco', 'mahogany']],
   [/\b(abu|abu2|abu abu|grey|gray)\b/, ['gray']],
   [/\b(hijau|ijo|green|army|olive|sage)\b/, ['army', 'green', 'sage', 'olive']],
   [/\b(merah|marun|maroon|burgundy|wine)\b/, ['maroon', 'burgundy', 'red']],
