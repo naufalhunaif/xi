@@ -81,7 +81,8 @@ export function fixWeekEstimate(pesan: string[], ranges: { preorder?: string; cu
   return { pesan: out, changed }
 }
 
-const CUSTOM_WORDS = /\b(?:custom|ukuran badan|ukur badan|\bxs\b|5xl|6xl|menyesuaikan badan)\b/i
+// v3.6.142 — detail khusus (panjang/model celana, ankle, request) juga custom (uji chat asli: ankle pants disebut 5-10).
+const CUSTOM_WORDS = /\b(?:custom|ukuran badan|ukur badan|xs|5xl|6xl|menyesuaikan badan|ankle|panjang khusus|model khusus|detail khusus|dipotong|dipendekin|dipanjangin)\b/i
 const PREORDER_WORDS = /\b(?:pre-?order|po|dibuatkan|dibuatin|belum ready|belum ada stok|stok (?:habis|kosong)|kosong)\b/i
 const DATE_RANGE = /(\d{1,2}\s+[A-Z][a-z]{2,8})\s*[-–]\s*(\d{1,2}\s+[A-Z][a-z]{2,8})/
 /**

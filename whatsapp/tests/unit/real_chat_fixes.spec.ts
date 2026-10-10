@@ -52,6 +52,8 @@ test.group('Perbaikan temuan chat asli', () => {
     const date = fixProductionKind(['Size XS bisa custom, 7-14 hari kerja, kalau dibayar hari ini siap kirim sekitar 27 Mei-4 Jun'], ranges, whens)
     assert.include(date.pesan[0], 'siap kirim sekitar 28 Mei-8 Jun')
     assert.isFalse(fixProductionKind(['Ready bos, bisa langsung kirim'], ranges, whens).changed)
+    const ankle = fixProductionKind(['Bisa dibuatkan bos, pengerjaannya 5-10 hari kerja'], ranges, whens, 'celananya model ankle ya kak')
+    assert.include(ankle.pesan[0], '7-14 hari kerja')
   })
 
   test('nomor celana dari angka lain di riwayat tidak dianggap diketahui', ({ assert }) => {
