@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import { recipientForm } from '#beta3/order_service'
-import { dropAiTotal, guardTotalPromise } from '#beta3/reply_service'
+import { dropAiTotal, dropDuplicateBubbles, guardTotalPromise } from '#beta3/reply_service'
 import { LEAN_OUTPUT_SCHEMA, parseLeanDecision } from '#beta3/prompt'
 
 // v3.6.124 — data penerima dikumpulkan lewat obrolan (bukan form) menjadi order. Data contoh fiktif.
@@ -75,5 +75,16 @@ test.group('Beta3 data penerima dari obrolan', () => {
     assert.isFalse(kept.changed)
     const mixed = dropAiTotal(['Siap bos, REG ya', 'Totalnya 460.050 bos'])
     assert.deepEqual(mixed.pesan, ['Siap bos, REG ya'])
+  })
+
+  test('blok ongkir kembar ("- REG" dan "REG") hanya dikirim sekali, versi lengkap dipakai', ({ assert }) => {
+    const out = dropDuplicateBubbles([
+      'Siap bos, pakai nomor ini ya',
+      'Ongkir ke Patimuan, Cilacap:\n- REG 9.000 (3-6 hari)\n- YES 11.000 (1 hari)',
+      'Ongkir ke Patimuan, Cilacap:\nREG 9.000 (3-6 hari)\nYES 11.000 (1 hari)\n\nMau pakai yang mana bos?',
+    ])
+    assert.lengthOf(out, 2)
+    assert.include(out[1], 'Mau pakai yang mana')
+    assert.deepEqual(dropDuplicateBubbles(['Siap bos', 'Mau pakai size apa bos?']), ['Siap bos', 'Mau pakai size apa bos?'])
   })
 })

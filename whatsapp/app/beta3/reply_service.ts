@@ -592,6 +592,26 @@ export function acceptedOffer(rows: LeanHistoryRow[]) {
  * ("biasanya pakai size apa bos?" dua kali berturut-turut). Bubble lain tetap;
  * kalau semua bubble adalah ulangan, balasan dibiarkan apa adanya.
  */
+/**
+ * v3.6.126 — Bubble yang isinya sama (setelah huruf/simbol disamakan) atau seluruhnya termuat di bubble lain
+ * dibuang; yang lebih lengkap dipakai, di posisi bubble pertama. Kasus 10 Okt: blok ongkir terkirim dua kali.
+ */
+export function dropDuplicateBubbles(pesan: string[]) {
+  const key = (bubble: string) => bubble.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const out: string[] = []
+  for (const bubble of pesan) {
+    const mine = key(bubble)
+    if (!mine) continue
+    const same = out.findIndex((kept) => {
+      const theirs = key(kept)
+      return theirs === mine || (Math.min(theirs.length, mine.length) >= 20 && (theirs.includes(mine) || mine.includes(theirs)))
+    })
+    if (same < 0) out.push(bubble)
+    else if (mine.length > key(out[same]).length) out[same] = bubble
+  }
+  return out
+}
+
 export function dropRepeatedQuestions(pesan: string[], rows: LeanHistoryRow[]) {
   const norm = (text: string) =>
     text
@@ -1497,11 +1517,13 @@ export async function createLeanReply(input: {
   // lalu balasan disusun ulang sekali dengan ongkir + total otomatis. Dulu: "data sudah lengkap, saya proses
   // totalnya" tanpa order → total tidak pernah dikirim.
   const chatOrderReply = async (recipient: LeanDecision['penerima']) => {
-    if (!recipient || input.simulate || input.chatOrder || form || orderId) return null
+    // Uji percakapan (jid @sim): order uji ikut dibuat dan dihapus sesudah uji, seperti form biasa.
+    const simChat = jid.endsWith('@sim')
+    if (!recipient || (input.simulate && !simChat) || input.chatOrder || form || orderId) return null
     const items = String(decision.spesifikasi || spec || '').trim()
     if (!items) return null
     const said = [...rows.filter((row) => row.direction === 'in').map((row) => String(row.body || '')), input.text].join('\n')
-    const waPhone = phoneFromJid(jid)
+    const waPhone = simChat ? '6281200000000' : phoneFromJid(jid)
     const built = recipientForm(recipient, said, waPhone ? `0${waPhone.replace(/^62/, '')}` : '')
     if (!built) {
       onTrace?.({ key: 'beta3-order', label: 'Data penerima dari obrolan belum lengkap · tidak dicatat', status: 'completed', detail: { penerima: recipient } })
@@ -1945,7 +1967,10 @@ export async function createLeanReply(input: {
         .filter((bubble) => bubble && !/\b(ini|berikut)\b[^.?!]*\btotal/i.test(bubble))
       if (!asks) {
         const address = style?.address || 'bos'
-        decision.pesan.push(block ? `${block}\n\nMau pakai yang mana ${address}?` : `Pengirimannya mau pakai yang mana ${address}?`)
+        // v3.6.126: tarif sudah tampil → cukup tambah pertanyaannya di bubble ongkir itu (dulu blok ongkir dikirim dua kali).
+        const at = shown ? decision.pesan.findIndex((bubble) => /\d{1,3}(?:\.\d{3})+/.test(bubble) && /(reg|yes|jtr|ongkir)/i.test(bubble)) : -1
+        if (at >= 0) decision.pesan[at] = `${decision.pesan[at]}\n\nMau pakai yang mana ${address}?`
+        else decision.pesan.push(block ? `${block}\n\nMau pakai yang mana ${address}?` : `Pengirimannya mau pakai yang mana ${address}?`)
       }
       if (!decision.pesan.length) decision.pesan.push(`Siap ${style?.address || 'bos'}, datanya sudah masuk ya`)
     }
@@ -2172,6 +2197,12 @@ export async function createLeanReply(input: {
     decision.alasan = 'Menanyakan pesanan yang tidak ada di data AI'
     photos = []
     onTrace?.({ key: 'beta3-order-unknown', label: 'Pesanan tidak ada di data AI → dicek CS (tidak bilang "belum tercatat")', status: 'completed', detail: {} })
+  }
+  // v3.6.126: bubble kembar (isi sama, beda format "- REG" / "REG") tidak dikirim dua kali.
+  const unique = dropDuplicateBubbles(decision.pesan)
+  if (unique.length !== decision.pesan.length) {
+    onTrace?.({ key: 'beta3-dup', label: 'Bubble kembar dibuang', status: 'completed', detail: { sebelum: decision.pesan, sesudah: unique } })
+    decision.pesan = unique
   }
   // v3.6.55: diserahkan ke CS tetap dibalas singkat — dulu pesan dibuang dan pelanggan didiamkan.
   if (ensureHandoffReply(decision)) {

@@ -278,5 +278,19 @@
     "maksud": "Pelanggan butuh jas untuk acara perpisahan, minta yang tidak terlalu mahal dan cepat. Benar: saran jas reguler 485.000 dengan size ready; jangan menjanjikan waktu tanpa data.",
     "giliran": ["buat perpisahan smk minggu depan, yg ga terlalu mahal ada yg ready ga"],
     "harap": { "serah_cs": false }
+  },
+  {
+    "id": "order-data-dicicil",
+    "judul": "Data pengiriman dicicil lewat obrolan",
+    "maksud": "Pelanggan memesan lewat obrolan dan memberi data pengiriman sedikit demi sedikit (alamat, nama, pakai nomor ini). Benar: setelah data lengkap ongkir REG/YES disebut SEKALI dan ditanya layanannya; setelah memilih REG, total + rekening terkirim otomatis. Tidak menanyakan atau mengarang kode pos, tidak minta isi form lagi, tidak ada pesan dobel.",
+    "giliran": ["basic hitam berapa kak", "size S jas aja", "kirim ke jl melati sukamaju patimuan cilacap", "nama budi", "pake nomor ini aja", "reg aja"],
+    "harap": { "serah_cs": false, "sebut": ["Total"], "tidak_sebut": ["kode ?pos", "isi (?:order )?format"] }
+  },
+  {
+    "id": "order-alamat-sekali",
+    "judul": "Alamat + nama + nomor sekaligus tanpa kode pos",
+    "maksud": "Pelanggan menulis alamat, nama dan nomor dalam satu pesan tanpa kode pos. Benar: ongkir disebut sekali, ditanya layanan, setelah memilih YES total + rekening terkirim. Tidak menanyakan kode pos, tidak dobel.",
+    "giliran": ["jas basic navy size M aja", "kirim ke desa sidamulya kec sidareja cilacap, atas nama rina, nomor 081200000003", "yes aja"],
+    "harap": { "serah_cs": false, "sebut": ["Total"], "tidak_sebut": ["kode ?pos"] }
   }
 ]
