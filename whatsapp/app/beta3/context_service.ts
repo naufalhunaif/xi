@@ -1,7 +1,7 @@
 // Pengumpul konteks: disusun KODE (bukan AI) sebelum model mana pun menjawab.
 // Hasilnya fakta ringkas yang sama untuk ChatGPT, Claude, maupun Gemini, sehingga
 // model ringan pun tidak perlu menebak produk, harga, atau data yang sudah diberikan.
-import { findCatalogVariant, rupiah, type LeanCatalogRow } from '#beta3/catalog_service'
+import { colorVariantsIn, findCatalogVariant, rupiah, type LeanCatalogRow } from '#beta3/catalog_service'
 import { extractBodyMeasure } from '#beta3/mcp'
 import type { LeanHistoryRow } from '#beta3/prompt'
 
@@ -357,6 +357,10 @@ export function shoppingHints(text: string, catalog: LeanCatalogRow[]) {
     hints.push(`Warna yang termasuk permintaan pelanggan di KATALOG (sebut semua pilihannya, bukan satu saja): ${names.join('; ')}.`)
     break
   }
+  // v3.6.136 — Tanya nuansa/varian satu warna → semua varian katalognya.
+  if (/\b(gelap|terang|cerah|muda|tua|warnanya|varian|beda|macam|jenis)\b/.test(now))
+    for (const group of colorVariantsIn(text, catalog))
+      hints.push(`Warna ${group.base} di KATALOG ada beberapa varian: ${group.text}. Jangan bilang cuma satu warna; sebut variannya dan tawarkan foto agar pelanggan bisa membandingkan gelap-terangnya.`)
   // Budget → pilihan per seri yang masuk.
   const budget = budgetOf(text)
   if (budget >= 100_000 && pool.length) {

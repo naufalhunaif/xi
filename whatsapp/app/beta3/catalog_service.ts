@@ -344,6 +344,42 @@ const fold = (text: string) =>
     .trim()
 
 /** Cari varian dari nama yang ditulis AI, misalnya "Tuxedo - Black" atau "tuxedo black". */
+/** v3.6.136 — Dasar warna tanpa seri/versi: "Signature Navy" / "Navy 2.0" → "navy". */
+export function colorBase(color: string) {
+  return String(color || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^signature\s+/, '')
+    .replace(/\s*\d+(?:\.\d+)?$/, '')
+    .trim()
+}
+
+/**
+ * v3.6.136 — Warna yang disebut di teks dan punya beberapa varian di katalog
+ * (uji chat nyata: AI bilang "navy cuma satu warna", padahal ada Navy, Navy 2.0, Signature Navy).
+ */
+export function colorVariantsIn(text: string, rows: LeanCatalogRow[]) {
+  const t = ` ${String(text || '').toLowerCase().replace(/[^a-z0-9.\s]/g, ' ')} `
+  const groups = new Map<string, Map<string, string[]>>()
+  for (const row of rows) {
+    if (row.active === false || !row.color) continue
+    const base = colorBase(row.color)
+    if (base.length < 3 || !new RegExp(`\\b${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(t)) continue
+    const colors = groups.get(base) || new Map<string, string[]>()
+    const products = colors.get(row.color) || []
+    products.push(String(row.product || '').replace(/^setelan\s+/i, ''))
+    colors.set(row.color, products)
+    groups.set(base, colors)
+  }
+  return [...groups.entries()]
+    .filter(([, colors]) => colors.size >= 2)
+    .map(([base, colors]) => ({
+      base,
+      text: [...colors.entries()].map(([color, products]) => `${color} (${[...new Set(products)].slice(0, 3).join(', ')})`).join('; '),
+    }))
+}
+
 export function findCatalogVariant(rows: LeanCatalogRow[], label: string) {
   const wanted = fold(label)
   if (!wanted) return undefined

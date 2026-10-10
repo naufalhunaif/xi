@@ -4,7 +4,7 @@
 // daftar kata; pemeriksaan pasti (foto yang tidak ada di katalog) tetap dilakukan kode.
 import { withPromoPrices, type ChatPromo } from '#beta3/promos'
 import { askJev, confident, jevOn, logDecision, maskPii, scoreLevel, type JevAnswer } from '#beta3/jev'
-import { findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
+import { colorVariantsIn, findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
 import { withoutNoPhotoClauses } from '#beta3/reply_polish'
 import type { LeanDecision, LeanHistoryRow } from '#beta3/prompt'
 import type { TokenUsage } from '#services/usage_service'
@@ -271,6 +271,17 @@ export function readyOfferIssues(pesan: string[], customerText: string, rows: Le
   return issues
 }
 
+/** v3.6.136 — Balasan mengklaim satu warna hanya satu varian, padahal katalog punya beberapa. */
+const ONE_SHADE = /\b(?:cuma|cuman|hanya|paling|cuman)\s+(?:ada\s+)?(?:satu|1)\s+(?:warna|varian|macam)\b|\bbukan pilihan\b[^.]{0,40}\b(?:muda|tua|gelap|terang)\b|\b(?:satu|1)\s+(?:warna|varian)\s+(?:saja|aja)\b/i
+export function colorVariantIssues(pesan: string[], customerText: string, rows: LeanCatalogRow[]): CheckIssue[] {
+  const reply = pesan.join('\n')
+  if (!ONE_SHADE.test(reply)) return []
+  return colorVariantsIn(`${customerText}\n${reply}`, rows).map((group) => ({
+    code: 'fakta_salah' as const,
+    detail: `${CHECK_LABEL.fakta_salah}: warna ${group.base} di KATALOG ada beberapa varian — ${group.text}. Jangan bilang cuma satu warna; sebut variannya dan tawarkan foto.`,
+  }))
+}
+
 export async function checkReply(input: {
   jid: string
   customerText: string
@@ -294,6 +305,7 @@ export async function checkReply(input: {
     ...colorPriceIssues(input.decision.pesan, withPromoPrices(input.rows, input.promos || [])),
     ...readyClaimIssues(input.decision.pesan, input.rows),
     ...readyOfferIssues(input.decision.pesan, input.customerText, input.rows),
+    ...colorVariantIssues(input.decision.pesan, input.customerText, input.rows),
     ...productPriceIssues(input.decision.pesan, withPromoPrices(input.rows, input.promos || [])),
     ...repeatIssues(input.decision.pesan, input.history)
   )
