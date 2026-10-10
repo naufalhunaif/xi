@@ -111,6 +111,8 @@ export function collectContext(input: {
     }
   }
 
+  lines.push(...shoppingHints(input.text, catalog))
+
   // Maksud pesan sekarang.
   const intents = INTENTS.filter(([pattern]) => pattern.test(` ${now} `)).map(([, name]) => name)
   if (intents.length) lines.push(`Pelanggan sekarang menanyakan: ${intents.join(', ')}.`)
@@ -308,4 +310,82 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
   return lines.length
     ? `PERBANDINGAN SIZE CHART (dihitung sistem dari ukuran badan pelanggan; ukuran jadi ±1-2 cm):\n- ${lines.join('\n- ')}\nPakai hasil ini; bila berbeda dengan Fit Advisor, sebutkan keduanya singkat dan utamakan ukuran badan yang diukur. Pelanggan sudah menyebut size biasanya dan Fit Advisor sama → pakai size itu; satu ukuran saja (mis. bahu) tidak cukup untuk menaikkan size.${caution}`
     : ''
+}
+
+/** v3.6.133 — kata warna sehari-hari → warna katalog yang termasuk (uji: "biru" tanpa Navy, "coklat" tanpa Choco). */
+const COLOR_FAMILY: Array<[RegExp, string[]]> = [
+  [/\b(biru|blue|dongker|benhur)\b/, ['navy', 'blue', 'denim']],
+  [/\b(coklat|cokelat|cokat|brown|kopi|mocca|moka)\b/, ['brown', 'choco', 'coast', 'taupe', 'mahogany']],
+  [/\b(abu|abu2|abu abu|grey|gray)\b/, ['gray']],
+  [/\b(hijau|ijo|green|army|olive|sage)\b/, ['army', 'green', 'sage', 'olive']],
+  [/\b(merah|marun|maroon|burgundy|wine)\b/, ['maroon', 'burgundy', 'red']],
+  [/\b(putih|white|broken white)\b/, ['white', 'putih']],
+  [/\b(krem|cream|beige|khaki)\b/, ['cream', 'khaki', 'beige']],
+]
+
+/** "sejuta", "1jt", "700k", "700rb", "1,5 juta" → rupiah. */
+export function budgetOf(text: string) {
+  const t = fold(text).replace(/(\d) (\d)/g, '$1.$2')
+  if (/\bsejuta(an)?\b/.test(t)) return 1_000_000
+  if (/\bsetengah juta\b/.test(t)) return 500_000
+  const m = String(text || '').toLowerCase().match(/(\d+(?:[.,]\d+)?)\s*(jt|juta|k|rb|ribu)\b/)
+  if (!m) return 0
+  const value = Number(m[1].replace(',', '.'))
+  return Math.round(value * (/^(jt|juta)$/.test(m[2]) ? 1_000_000 : 1_000))
+}
+
+/**
+ * v3.6.133 — Petunjuk kelengkapan dari KODE (uji: penilai menandai jawaban kurang lengkap): warna sekeluarga,
+ * pilihan sesuai budget per seri, harga ukuran besar, rasa aman pelanggan, dan produk yang tidak dijual.
+ */
+export function shoppingHints(text: string, catalog: LeanCatalogRow[]) {
+  const now = ` ${fold(text)} `
+  const hints: string[] = []
+  const priced = catalog.filter((row) => row.price)
+  const wantsSuit = /\b(setelan|stel|set|satu stel|suit|jas celana)\b/.test(now)
+  const wantsPants = /\b(celana|pants)\b/.test(now) && !wantsSuit
+  const pool = priced.filter((row) =>
+    wantsPants ? /pants|celana/i.test(`${row.category} ${row.product}`) : wantsSuit ? /setelan/i.test(`${row.category} ${row.product}`) : /suits|jas/i.test(String(row.category || ''))
+  )
+  // Warna sekeluarga yang ada (ready dulu).
+  for (const [pattern, keys] of COLOR_FAMILY) {
+    if (!pattern.test(now)) continue
+    const hits = (pool.length ? pool : priced).filter((row) => keys.some((key) => fold(row.color).includes(key)))
+    if (!hits.length) continue
+    const ready = hits.filter((row) => row.sizesReady)
+    const names = [...new Set((ready.length ? ready : hits).map((row) => `${row.product} - ${row.color}${row.sizesReady ? ` (${row.sizesReady})` : ''}`))].slice(0, 8)
+    hints.push(`Warna yang termasuk permintaan pelanggan di KATALOG (sebut semua pilihannya, bukan satu saja): ${names.join('; ')}.`)
+    break
+  }
+  // Budget → pilihan per seri yang masuk.
+  const budget = budgetOf(text)
+  if (budget >= 100_000 && pool.length) {
+    // Satu baris per harga (seri): produk sama bisa beda seri (reguler 705.000 / Signature 725.000).
+    const byPrice = new Map<number, string>()
+    for (const row of [...pool].sort((a, b) => Number(a.price) - Number(b.price))) {
+      const price = Number(row.price)
+      if (price > budget * 1.05 || byPrice.has(price)) continue
+      byPrice.set(price, `${row.product}${/^signature\b/i.test(row.color) ? ' Signature' : ''} ${rupiah(price)}`)
+    }
+    const options = [...byPrice.entries()].sort((a, b) => a[0] - b[0])
+    if (options.length) {
+      const series = options.map(([, text]) => text).slice(0, 6)
+      hints.push(`Budget pelanggan ±Rp${rupiah(budget)} — pilihan yang masuk dari tiap harga/seri: ${series.join('; ')}. Sebut beberapa pilihan (termurah sampai yang paling mendekati budget), jangan hanya yang termahal.`)
+    }
+  }
+  // Size besar → harga di kurung.
+  if (/\b(xxl|xxxl|3xl|4xl|2xl)\b/.test(now))
+    hints.push('Size XXL ke atas memakai harga ukuran besar (angka di kurung KATALOG, mis. "XXL-3XL 585.000") — sebut bila menyebut harga/total untuk size itu.')
+  // Takut tertipu → fakta toko.
+  if (/\b(takut|khawatir|ragu)\b.{0,30}\b(tipu|ketipu|ditipu|penipu\w*|scam|bohong)\b|\b(amanah|terpercaya|real|asli ga|aman ga|aman gak)\b/.test(now))
+    hints.push('Pelanggan khawatir tertipu: tenangkan dengan fakta toko — alamat toko fisik (lihat TOKO), boleh datang langsung, rekening atas nama pemilik toko, dan pesanan bisa dicek. Jangan klaim "resmi" tanpa data.')
+  // Produk yang tidak dijual → kategori yang ada.
+  if (/\b(batik|kebaya|gamis|sarung|sepatu|blangkon|kaos|hoodie|jaket|koko)\b/.test(now)) {
+    const categories = [...new Set(priced.map((row) => String(row.category || '')).filter(Boolean))]
+    const shirts = priced.filter((row) => /shirt|kemeja/i.test(`${row.category} ${row.product}`))
+    hints.push(
+      `Produk itu tidak dijual. Kategori yang ada: ${categories.join(', ')}.${shirts.length ? ` Ditanya kemeja → tawarkan ${[...new Set(shirts.map((row) => `${row.product} - ${row.color} ${rupiah(Number(row.price))}`))].slice(0, 4).join(', ')}.` : ''}`
+    )
+  }
+  return hints
 }
