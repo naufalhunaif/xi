@@ -280,15 +280,14 @@ export function recipientForm(
   const typedPhone = /^08\d{7,12}$/.test(digits) && said.includes(digits.slice(1)) ? digits : ''
   const phone = typedPhone || waPhone
   if (!phone) return null
-  const has = (part: string) => !part || squash(address).includes(squash(part))
-  const full = [
-    address,
-    has(district) ? '' : `Kec. ${district}`,
-    has(regency) ? '' : regency,
-    postal && !address.includes(postal) ? postal : '',
-  ]
-    .filter(Boolean)
-    .join(', ')
+  // Alamat rapi untuk paket: "jalan/desa, Kec. X, Kota, kode pos" (kecamatan selalu tertulis jelas).
+  const plain = (value: string) => squash(value.replace(/^(?:kec(?:amatan)?|kab(?:upaten)?|kota)\.?\s+/i, ''))
+  const segments = address.split(',').map((part) => part.trim()).filter(Boolean)
+  if (regency && segments.length > 1 && plain(segments[segments.length - 1]) === plain(regency)) segments.pop()
+  if (district && !segments.some((part) => plain(part) === plain(district))) segments.push(`Kec. ${district}`)
+  if (regency && !segments.some((part) => plain(part) === plain(regency))) segments.push(regency)
+  if (postal && !segments.some((part) => part.includes(postal))) segments.push(postal)
+  const full = segments.join(', ')
   return {
     form: { customerName: name, address: full, district, regency, postalCode: postal, phone, note: '' },
     fromWa: !typedPhone,

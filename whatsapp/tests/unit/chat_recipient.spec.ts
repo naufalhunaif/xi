@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import { recipientForm } from '#beta3/order_service'
-import { guardTotalPromise } from '#beta3/reply_service'
+import { dropAiTotal, guardTotalPromise } from '#beta3/reply_service'
 import { LEAN_OUTPUT_SCHEMA, parseLeanDecision } from '#beta3/prompt'
 
 // v3.6.124 — data penerima dikumpulkan lewat obrolan (bukan form) menjadi order. Data contoh fiktif.
@@ -18,8 +18,10 @@ test.group('Beta3 data penerima dari obrolan', () => {
     assert.isTrue(built!.fromWa)
     // Pelanggan bilang "belum tau" → kode pos dari AI tidak dipakai.
     assert.equal(built!.form.postalCode, '')
-    assert.include(built!.form.address, 'Kec. Patimuan')
-    assert.include(built!.form.address, 'Cilacap')
+    assert.equal(built!.form.address, 'Jl Melati, Sukamaju, Kec. Patimuan, Cilacap')
+    // Nama kecamatan yang juga nama jalan tetap ditulis sebagai kecamatan.
+    const street = recipientForm({ ...recipient, alamat: 'Jl Patimuan, Sukamaju, Cilacap' }, `${chat}\njl patimuan`, '081200000001')
+    assert.equal(street!.form.address, 'Jl Patimuan, Sukamaju, Kec. Patimuan, Cilacap')
   })
 
   test('nomor dan kode pos yang ditulis pelanggan dipakai', ({ assert }) => {
@@ -63,5 +65,15 @@ test.group('Beta3 data penerima dari obrolan', () => {
     const guarded = guardTotalPromise(['Siap bos, data pesanannya sudah lengkap ya, saya proses dulu totalnya'], { address: 'bos', hasAddress: true })
     assert.isTrue(guarded.changed)
     assert.notInclude(guarded.pesan.join(' '), 'proses dulu totalnya')
+  })
+
+  test('total otomatis terkirim → total tulisan AI dibuang (tidak dobel)', ({ assert }) => {
+    const dup = dropAiTotal(['Siap bos, totalnya 460.050\nJas Basic Suit - Black 2.0 promo 451.050\nOngkir REG 9.000'])
+    assert.isTrue(dup.changed)
+    assert.deepEqual(dup.pesan, ['Siap bos, ini totalnya ya'.replace('Siap', 'siap')])
+    const kept = dropAiTotal(['Siap bos, ini totalnya ya'])
+    assert.isFalse(kept.changed)
+    const mixed = dropAiTotal(['Siap bos, REG ya', 'Totalnya 460.050 bos'])
+    assert.deepEqual(mixed.pesan, ['Siap bos, REG ya'])
   })
 })

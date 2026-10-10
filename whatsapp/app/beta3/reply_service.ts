@@ -330,6 +330,29 @@ export function guardTotalPromise(
 }
 
 /**
+ * v3.6.125 — Total otomatis terkirim: rincian/total yang ditulis AI sendiri dibuang supaya total tidak dobel
+ * (chat 10 Okt: "Siap bos, totalnya 460.050 | Jas … 451.050 | Ongkir REG 9.000" lalu pesan total sistem).
+ */
+export function dropAiTotal(pesan: string[], address = 'bos') {
+  const money = /\d{1,3}(?:\.\d{3})+/
+  let changed = false
+  const kept = pesan
+    .map((bubble) => {
+      const lines = bubble.split('\n').filter((line) => {
+        const drop = money.test(line) && !/\?/.test(line)
+        if (drop) changed = true
+        return !drop
+      })
+      const head = lines.join('\n').replace(/[,\s]*\b(?:ini\s+|berikut\s+)?total\w*\s*$/i, '').trim()
+      if (head !== lines.join('\n').trim()) changed = true
+      return head
+    })
+    .filter((bubble) => bubble && !/^(?:siap|oke|ok|baik)\s*(?:bos|kak|gan|mas|mbak)?[\s,.!]*$/i.test(bubble))
+  if (!changed) return { pesan, changed: false }
+  return { pesan: kept.length ? kept : [`siap ${address}, ini totalnya ya`], changed: true }
+}
+
+/**
  * Varian yang dimaksud pelanggan menurut Jev, hanya untuk kasus ragu: warna di spesifikasi adalah
  * warna katalog yang tidak pernah difotokan, padahal produk itu sudah difotokan di chat.
  * null = Jev tidak dipakai/ragu → aturan foto terakhir (`fixCatalogColors`).
@@ -1898,6 +1921,11 @@ export async function createLeanReply(input: {
     } else if (verdict.ok) {
       autoTotal = verdict.total
       if (bulk) onTrace?.({ key: 'beta3-wholesale', label: `Total grosir · ${bulk}`, status: 'completed', detail: {} })
+      const single = dropAiTotal(decision.pesan, style?.address || 'bos')
+      if (single.changed) {
+        decision.pesan = single.pesan
+        onTrace?.({ key: 'beta3-total-dup', label: 'Total tulisan AI dibuang · total dikirim sistem (tidak dobel)', status: 'completed', detail: { pesan: single.pesan } })
+      }
     }
     await noteAutoTotalReason(totalOrderId, verdict.ok ? '' : verdict.reason)
     // Ongkir lebih dari satu dan pelanggan belum memilih: tanyakan, jangan dipilihkan.
