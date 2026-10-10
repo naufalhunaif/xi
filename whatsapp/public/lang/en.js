@@ -2127,4 +2127,13 @@ window.waLocales.en = {
   "Chat dengan pesanan berjalan": "Chats with an active order",
   "Menunggu / mengecek pembayaran": "Waiting for / checking payment",
   "Ditangani CS (AI diam)": "Handled by CS (AI silent)",
+  "{0} hari ini": "{0} today",
+  "{0} balasan hari ini": "{0} replies today",
+  "Menunggu pesan baru…": "Waiting for new messages…",
+  "Siaga · jalur terakhir {0}{1}": "Idle · last run {0}{1}",
+  "pemeriksaan balasan": "reply check",
+  "baca gambar": "image reading",
+  "cek akun": "account check",
+  "uji simulasi": "simulation test",
+  "model otomatis": "auto model",
 }

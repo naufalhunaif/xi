@@ -527,6 +527,8 @@ html[data-theme='dark'] .workspace-ui .wa-room-menu-item.wa-contact-delete-trigg
 .workspace-ui .orc-n .icon { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .workspace-ui .orc-n .label { fill: var(--text); font-size: 11.5px; font-weight: 600; }
 .workspace-ui .orc-n .sub { fill: var(--muted); font-size: 9.5px; }
+.workspace-ui .orc-n .model { fill: currentColor; font-size: 9px; font-weight: 600; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.workspace-ui .orc-n.k-check .model, .workspace-ui .orc-n.k-send .model { fill: var(--muted); }
 .workspace-ui .orc-n .port { fill: var(--wa-surface, #fff); stroke: color-mix(in srgb, var(--muted) 60%, transparent); stroke-width: 1.3; }
 .workspace-ui .orc-n.k-order .port.out, .workspace-ui .orc-n.k-pay .port.out, .workspace-ui .orc-n.k-cs .port.out { display: none; }
 .workspace-ui .orc-n.k-trigger .port.in { display: none; }
@@ -560,9 +562,22 @@ html[data-theme='dark'] .workspace-ui .wa-room-menu-item.wa-contact-delete-trigg
 .workspace-ui .wa-orchestra-legend { flex-wrap: wrap; row-gap: 4px; }
 .workspace-ui .wa-orchestra-hint { position: absolute; left: 8px; bottom: 6px; font-size: 9.5px; color: var(--muted); opacity: .75; pointer-events: none; display: none; }
 .workspace-ui .wa-orchestra.expanded .wa-orchestra-hint { display: block; }
+/* v3.6.122 — jalur data: eksekusi terakhir (hijau), titik data mengalir, pemicu "mendengarkan". */
+.workspace-ui .orc-e.s-done { stroke: var(--orc-run); stroke-width: 2.2; }
+.workspace-ui .orc-e.s-past { stroke: color-mix(in srgb, var(--orc-run) 45%, transparent); stroke-width: 1.8; }
+.workspace-ui .orc-n.on-path .box { stroke: color-mix(in srgb, var(--orc-run) 70%, var(--muted)); }
+.workspace-ui .orc-n.on-path.s-busy .box { stroke: currentColor; }
+.workspace-ui .orc-packet { fill: var(--orc-run); stroke: var(--wa-surface, #fff); stroke-width: 1.5; }
+.workspace-ui .orc-packet.p-chatgpt { fill: var(--orc-chatgpt); }
+.workspace-ui .orc-packet.p-claude { fill: var(--orc-claude); }
+.workspace-ui .orc-packet.p-gemini { fill: var(--orc-gemini); }
+.workspace-ui .orc-packet.p-jev { fill: var(--orc-jev); }
+.workspace-ui .orc-n .ring { fill: none; stroke: var(--orc-run); stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.workspace-ui .orc-n.listen .ring { animation: orc-listen 2.4s ease-out infinite; }
+@keyframes orc-listen { 0% { opacity: .55; transform: scale(.92); } 70%, 100% { opacity: 0; transform: scale(1.18); } }
 @keyframes orc-flow { to { stroke-dashoffset: -26; } }
 @keyframes orc-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .workspace-ui .orc-e.s-run, .workspace-ui .orc-n.s-busy .spin { animation: none; }
+  .workspace-ui .orc-e.s-run, .workspace-ui .orc-n.s-busy .spin, .workspace-ui .orc-n.listen .ring { animation: none; }
 }
 

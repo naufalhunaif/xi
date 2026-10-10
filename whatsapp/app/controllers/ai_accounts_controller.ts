@@ -22,8 +22,7 @@ import {
   readAiAccount,
   updateAiAccount,
   type AiAccount,
-  type AiProviderName,
-} from '#services/ai_accounts'
+  type AiProviderName, aiEventStats } from '#services/ai_accounts'
 import { isChatgptConnected, oauthState, startOAuthLogin } from '#services/codex_oauth_service'
 import {
   claudeOAuthState,
@@ -125,6 +124,25 @@ async function orchestraCustomers(now: number) {
   return customers
 }
 
+/** Model terakhir yang berhasil dipakai per penyedia (akun "otomatis" menampilkan model sebenarnya). Disimpan 60 dtk. */
+let modelCache: { at: number; key: string; data: Map<string, string> } | null = null
+async function lastModelByProvider() {
+  const key = workspaceScope().prefix
+  if (modelCache && modelCache.key === key && Date.now() - modelCache.at < 60_000) return modelCache.data
+  const rows = (await db
+    .from('whatsapp_ai_usage')
+    .where('status', 'completed')
+    .whereNotNull('model')
+    .where('created_at', '>=', new Date(Date.now() - 7 * 86_400_000))
+    .orderBy('id', 'desc')
+    .limit(300)
+    .select('provider', 'model')) as Array<{ provider: string; model: string }>
+  const data = new Map<string, string>()
+  for (const row of rows) if (!data.has(String(row.provider))) data.set(String(row.provider), String(row.model))
+  modelCache = { at: Date.now(), key, data }
+  return data
+}
+
 /** Waktu keputusan Jev terakhir (event akun 0). */
 async function lastJevEventAt() {
   const row = await db.from('whatsapp_ai_events').where('account_id', 0).orderBy('id', 'desc').first()
@@ -160,12 +178,18 @@ export default class AiAccountsController {
       aiSpreadMode(),
     ])
     const customers = await orchestraCustomers(now)
+    // v3.6.122: jumlah kerja hari ini (WIB) per simpul.
+    const dayStart = now - ((now + 7 * 3_600_000) % 86_400_000)
+    const stats = await aiEventStats(dayStart).catch(() => ({ replies: {}, total: 0, jev: 0, checks: 0 }))
+    // v3.6.122: model per simpul — model yang dipilih di akun, atau model terakhir yang benar-benar dipakai penyedia itu.
+    const usedModel = await lastModelByProvider().catch(() => new Map<string, string>())
     // Jev (pembantu keputusan) ikut tampil sebagai simpul bila kuncinya terpasang.
     const { readJevConfig, JEV_ACCOUNT_ID } = await import('#beta3/jev')
     const jev = await readJevConfig().catch(() => null)
     const jevLast = jev?.apiKey ? await lastJevEventAt().catch(() => 0) : 0
     return response.json({
       now,
+      stats,
       busy,
       events: jev?.apiKey ? events : events.filter((e) => e.accountId !== JEV_ACCOUNT_ID),
       spread,
@@ -179,9 +203,11 @@ export default class AiAccountsController {
           limitedUntil: a.limitedUntil > now ? a.limitedUntil : 0,
           lastUsedAt: a.lastUsedAt ? a.lastUsedAt.getTime() : 0,
           tokens5h: used.get(a.id) || 0,
+          model: a.model || usedModel.get(a.provider) || '',
+          modelAuto: !a.model,
         })),
         ...(jev?.apiKey
-          ? [{ id: JEV_ACCOUNT_ID, provider: 'jev', name: 'Jev', enabled: jev.enabled, limitedUntil: 0, lastUsedAt: jevLast, tokens5h: used.get(JEV_ACCOUNT_ID) || 0 }]
+          ? [{ id: JEV_ACCOUNT_ID, provider: 'jev', name: 'Jev', enabled: jev.enabled, limitedUntil: 0, lastUsedAt: jevLast, tokens5h: used.get(JEV_ACCOUNT_ID) || 0, model: jev.model || '', modelAuto: !jev.model }]
           : []),
       ],
     })

@@ -404,7 +404,7 @@ export const aiAccountRef = (account: AiAccount): AiAccountRef | null =>
   account.legacy ? null : { id: account.id, provider: account.provider }
 
 // ── Jejak kerja AI (untuk visual "orkestra" di Pengaturan) ─────────────────────────
-export type AiEventKind = 'start' | 'ok' | 'limited' | 'fail'
+export type AiEventKind = 'start' | 'ok' | 'limited' | 'fail' | 'cancel'
 let eventsReady = false
 async function ensureEvents() {
   if (eventsReady) return
@@ -475,6 +475,38 @@ export async function recentAiEvents(after = 0, limit = 40) {
     jid: String(row.jid || ''),
     at: new Date(row.created_at).getTime(),
   }))
+}
+
+/**
+ * v3.6.122 — hitungan kerja hari ini untuk Orkestra (seperti jumlah eksekusi n8n): balasan per akun, keputusan
+ * Jev, pemeriksaan balasan. Cek kesehatan akun (probe) dan uji simulasi tidak dihitung.
+ */
+export async function aiEventStats(sinceMs: number) {
+  await ensureEvents()
+  const rows = (await db
+    .from('whatsapp_ai_events')
+    .where('created_at', '>=', new Date(sinceMs))
+    .where('kind', 'ok')
+    .whereRaw("(phase IS NULL OR phase <> 'probe')")
+    .whereRaw("(jid IS NULL OR jid NOT LIKE '%@sim')")
+    .groupBy('account_id', 'phase')
+    .select('account_id', 'phase')
+    .count('* as n')) as Array<{ account_id: number; phase: string | null; n: number }>
+  const replies: Record<number, number> = {}
+  let total = 0
+  let jev = 0
+  let checks = 0
+  for (const row of rows) {
+    const id = Number(row.account_id)
+    const phase = String(row.phase || '')
+    const n = Number(row.n || 0)
+    if (/reply/.test(phase) && id) {
+      replies[id] = (replies[id] || 0) + n
+      total += n
+    } else if (/pahami/.test(phase)) jev += n
+    else if (/check|cek-balasan/.test(phase)) checks += n
+  }
+  return { replies, total, jev, checks }
 }
 
 /** Akun yang terakhir mengerjakan tiap pelanggan (untuk garis pelanggan → akun). */

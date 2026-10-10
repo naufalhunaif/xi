@@ -257,8 +257,12 @@ export async function runLeanProvider(
       await recordAiEvent(account.id, 'ok', phase, '', tokens, jid).catch(() => {})
       return result
     } catch (error) {
-      // Dibatalkan karena akun lain lebih dulu menjawab: bukan kegagalan akun ini.
-      if (signal?.aborted) throw error
+      // Dibatalkan karena akun lain lebih dulu menjawab: bukan kegagalan akun ini. v3.6.122: dicatat "cancel"
+      // supaya Orkestra tidak menampilkan akun ini terus "bekerja" sampai 3 menit.
+      if (signal?.aborted) {
+        await recordAiEvent(account.id, 'cancel', phase, 'akun lain lebih dulu menjawab', null, jid).catch(() => {})
+        throw error
+      }
       const detail = aiFailureDetail(error, {
         stage: 'provider',
         provider: account.provider === 'claude' ? 'claude' : 'chatgpt',

@@ -26,7 +26,19 @@
   const clock = (ms) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
   const ago = (ms) => (ms ? window.waTime?.ago(ms) || clock(ms) : t('belum pernah'))
   const phaseLabel = (phase) =>
-    /recap/.test(phase) ? t('rekap order') : /catalog|vision|ciri/.test(phase) ? t('baca katalog') : t('balasan chat')
+    /recap/.test(phase)
+      ? t('rekap order')
+      : /catalog|vision|ciri/.test(phase)
+        ? t('baca katalog')
+        : /check|cek/.test(phase)
+          ? t('pemeriksaan balasan')
+          : /image|gambar/.test(phase)
+            ? t('baca gambar')
+            : /probe/.test(phase)
+              ? t('cek akun')
+              : /judge|sim/.test(phase)
+                ? t('uji simulasi')
+                : t('balasan chat')
 
   // Ikon garis sederhana (24×24), digambar dengan stroke.
   const ICON = {
@@ -45,6 +57,7 @@
   // ── lapisan ──
   const viewport = make('g', {}, svg)
   const layerEdges = make('g', { class: 'orc-edges' }, viewport)
+  const layerPackets = make('g', { class: 'orc-packets' }, viewport)
   const layerNodes = make('g', { class: 'orc-nodes' }, viewport)
 
   let accounts = []
@@ -54,6 +67,10 @@
   let loaded = false
   let lastTrouble = null
   let horizontal = false
+  // v3.6.122 — jalur data: eksekusi terakhir (seperti hasil run n8n) + titik data yang mengalir saat AI bekerja.
+  let stats = { replies: {}, total: 0, jev: 0, checks: 0 }
+  const runs = new Map() // jid → { jid, jev, account, check, at }
+  let lastRun = null
   const nodes = new Map() // id → { el, shape, icon, label, sub, badge, x, y, kind, info }
   const edges = new Map() // key → { path, label, from, to }
   const flashes = new Map()
@@ -68,6 +85,7 @@
     let node = nodes.get(id)
     if (node) return node
     const el = make('g', { class: `orc-n k-${kind}`, tabindex: 0, role: 'img' }, layerNodes)
+    if (kind === 'trigger') make('path', { class: 'ring', d: roundedPath(SIZE + 10, SIZE + 10, HALF + 5, 15) }, el)
     const shape = make('path', { class: 'box', d: roundedPath(SIZE, SIZE, kind === 'trigger' ? HALF : 10, 10) }, el)
     const icon = make('path', { class: 'icon', d: ICON[kind] || ICON.ai, transform: 'translate(-12 -12)' }, el)
     const spin = make('circle', { class: 'spin', r: 6, cx: HALF - 3, cy: -HALF + 3 }, el)
@@ -78,7 +96,8 @@
     const outPort = make('circle', { class: 'port out', r: 4 }, el)
     const label = make('text', { class: 'label', 'text-anchor': 'middle' }, el)
     const sub = make('text', { class: 'sub', 'text-anchor': 'middle' }, el)
-    node = { id, kind, el, shape, icon, spin, badge, badgeText, inPort, outPort, label, sub, x: 0, y: 0, info: [] }
+    const model = make('text', { class: 'model', 'text-anchor': 'middle' }, el)
+    node = { id, kind, el, shape, icon, spin, badge, badgeText, inPort, outPort, label, sub, model, x: 0, y: 0, info: [] }
     el.addEventListener('mouseenter', () => showTip(node))
     el.addEventListener('focus', () => showTip(node))
     el.addEventListener('mouseleave', hideTip)
@@ -96,11 +115,23 @@
     for (const key of ['x', 'y', 'width', 'height']) node.inPort.setAttribute(key, port[key])
     node.outPort.setAttribute('cx', port.cx)
     node.outPort.setAttribute('cy', port.cy)
+    // v3.6.122: model di bawah nama (di dalam pil kecil), status di bawahnya.
     node.label.setAttribute('y', HALF + 16)
-    node.sub.setAttribute('y', HALF + 29)
+    node.model.setAttribute('y', HALF + 29)
+    node.sub.setAttribute('y', node.model.textContent ? HALF + 42 : HALF + 29)
   }
-  function setNode(node, { label, sub = '', state = 'idle', provider = '', count = '', info = [] }) {
-    node.el.setAttribute('class', `orc-n k-${node.kind} s-${state}${provider ? ` p-${provider}` : ''}${flashes.get(node.id) ? ` f-${flashes.get(node.id)}` : ''}`)
+  // Nama model dipendekkan: "claude-sonnet-4-5-20250929" → "sonnet-4-5", "models/gemini-2.5-flash" → "gemini-2.5-flash".
+  const shortModel = (value) =>
+    String(value || '')
+      .replace(/^models\//, '')
+      .replace(/^claude-/, '')
+      .replace(/-\d{8}$/, '')
+      .replace(/-latest$/, '')
+      .slice(0, 24)
+  function setNode(node, { label, sub = '', state = 'idle', provider = '', count = '', info = [], extra = '', model = '' }) {
+    node.model.textContent = model
+    node.sub.setAttribute('y', model ? HALF + 42 : HALF + 29)
+    node.el.setAttribute('class', `orc-n k-${node.kind} s-${state}${provider ? ` p-${provider}` : ''}${flashes.get(node.id) ? ` f-${flashes.get(node.id)}` : ''}${onPath(node.id) ? ' on-path' : ''}${extra ? ` ${extra}` : ''}`)
     node.label.textContent = label
     node.sub.textContent = sub
     node.badge.style.display = count === '' ? 'none' : ''
@@ -140,6 +171,26 @@
     edge.path.setAttribute('class', `orc-e s-${state}${provider ? ` p-${provider}` : ''}`)
   }
 
+  // ── jalur eksekusi terakhir ──
+  const recent = () => lastRun && Date.now() - lastRun.at < 15 * 60_000
+  function pathIds(run) {
+    if (!run) return []
+    const ids = ['trigger']
+    if (run.jev) ids.push('a0')
+    if (run.account !== undefined) ids.push(`a${run.account}`)
+    if (run.check || run.account !== undefined) ids.push('check')
+    if (run.sent) ids.push('send', ...run.outputs)
+    return ids
+  }
+  const onPath = (id) => pathIds(lastRun).includes(id)
+  const pathEdge = (from, to) => {
+    const ids = pathIds(lastRun)
+    const a = ids.indexOf(from)
+    const b = ids.indexOf(to)
+    return a >= 0 && b >= 0 && (b === a + 1 || (from === 'send' && b > a))
+  }
+  const today = (n) => (n ? t('{0} hari ini', n) : '')
+
   // ── tata letak & isi ──
   const JEV = (account) => account.provider === 'jev'
   function render() {
@@ -163,7 +214,12 @@
       sub: waiting ? t('{0} menunggu', waiting) : t('WhatsApp · Instagram'),
       state: waiting ? 'wait' : 'idle',
       count: waiting || '',
-      info: [t('Pesan pelanggan dari WhatsApp & Instagram'), waiting ? t('{0} chat belum dibalas', waiting) : t('Semua chat sudah dibalas')],
+      extra: anyBusy ? '' : 'listen',
+      info: [
+        t('Pesan pelanggan dari WhatsApp & Instagram'),
+        waiting ? t('{0} chat belum dibalas', waiting) : t('Semua chat sudah dibalas'),
+        anyBusy ? '' : t('Menunggu pesan baru…'),
+      ],
     })
     columns.push([trigger])
     let jevNode = null
@@ -171,10 +227,11 @@
       jevNode = nodeFor(`a${jev.id}`, 'jev')
       setNode(jevNode, {
         label: 'Jev',
-        sub: busy.has(jev.id) ? t('memahami…') : !jev.enabled ? t('mati') : t('pemahaman'),
+        sub: busy.has(jev.id) ? t('memahami…') : !jev.enabled ? t('mati') : today(stats.jev) || t('pemahaman'),
         state: !jev.enabled ? 'off' : busy.has(jev.id) ? 'busy' : 'idle',
         provider: 'jev',
-        info: [t('Membaca maksud pelanggan sebelum AI menjawab'), t('Terakhir {0}', ago(jev.lastUsedAt))],
+        model: shortModel(jev.model),
+        info: [t('Membaca maksud pelanggan sebelum AI menjawab'), jev.model ? t('Model {0}', jev.model) : '', t('Terakhir {0}', ago(jev.lastUsedAt))],
       })
       columns.push([jevNode])
     }
@@ -190,14 +247,18 @@
               ? t('jeda s/d {0}', clock(account.limitedUntil))
               : state === 'off'
                 ? t('mati')
-                : account.lastUsedAt
-                  ? ago(account.lastUsedAt)
-                  : t('siap'),
+                : stats.replies[account.id]
+                  ? t('{0} balasan hari ini', stats.replies[account.id])
+                  : account.lastUsedAt
+                    ? ago(account.lastUsedAt)
+                    : t('siap'),
         state,
         provider: account.provider,
         count: index + 1,
+        model: shortModel(account.model) || t('model otomatis'),
         info: [
           t('Urutan cadangan #{0}', index + 1),
+          account.model ? t('Model {0}', account.model) + (account.modelAuto ? ` (${t('otomatis')})` : '') : t('Model otomatis'),
           account.tokens5h ? t('{0} token dalam 5 jam', Number(account.tokens5h).toLocaleString('id-ID')) : '',
           t('Terakhir {0}', ago(account.lastUsedAt)),
         ],
@@ -210,7 +271,7 @@
     const check = nodeFor('check', 'check')
     setNode(check, {
       label: t('Pemeriksa'),
-      sub: anyBusy ? t('menunggu draf') : t('harga · fakta · foto'),
+      sub: anyBusy ? t('menunggu draf') : today(stats.checks) || t('harga · fakta · foto'),
       state: anyBusy ? 'wait' : 'idle',
       info: [t('Memeriksa balasan sebelum dikirim: harga, fakta katalog, foto, tidak mengulang')],
     })
@@ -218,9 +279,9 @@
     const send = nodeFor('send', 'send')
     setNode(send, {
       label: t('Kirim balasan'),
-      sub: lastReply ? ago(lastReply) : '',
+      sub: stats.total ? t('{0} balasan hari ini', stats.total) : lastReply ? ago(lastReply) : '',
       state: anyBusy ? 'wait' : 'idle',
-      info: [t('Balasan terkirim ke pelanggan'), t('Terakhir {0}', ago(lastReply))],
+      info: [t('Balasan terkirim ke pelanggan'), t('Terakhir {0}', ago(lastReply)), stats.total ? t('{0} balasan hari ini', stats.total) : ''],
     })
     columns.push([send])
     const outOrder = nodeFor('order', 'order')
@@ -232,8 +293,8 @@
     columns.push([outOrder, outPay, outCs])
 
     // Posisi: kolom berurutan, simpul dalam kolom ditengahkan.
-    const step = horizontal ? 150 : 112
-    const spread = horizontal ? 104 : 96
+    const step = horizontal ? 160 : 132
+    const spread = horizontal ? 128 : 124
     columns.forEach((column, c) => {
       column.forEach((node, i) => {
         const along = c * step
@@ -249,19 +310,22 @@
         nodes.delete(id)
       }
 
-    // Garis.
+    // Garis. Jalur eksekusi terakhir = hijau (≤15 mnt) / hijau pudar; yang sedang dilalui = bergerak.
     const entry = jevNode || trigger
-    if (jevNode) edgeState(edgeFor(trigger, jevNode), anyBusy ? 'run' : 'idle', 'jev')
+    const done = recent() ? 'done' : 'past'
+    const idleOr = (from, to, base = 'idle') => (pathEdge(from.id, to.id) ? done : base)
+    if (jevNode) edgeState(edgeFor(trigger, jevNode), anyBusy ? 'run' : idleOr(trigger, jevNode), 'jev')
     for (const node of accountNodes) {
       const run = node.state === 'busy'
-      edgeState(edgeFor(entry, node), run ? 'run' : node.state === 'idle' ? 'idle' : 'muted', run ? node.account.provider : '')
-      edgeState(edgeFor(node, check), run ? 'run' : node.state === 'idle' ? 'idle' : 'muted', run ? node.account.provider : '')
+      const base = node.state === 'idle' ? 'idle' : 'muted'
+      edgeState(edgeFor(entry, node), run ? 'run' : idleOr(entry, node, base), run ? node.account.provider : '')
+      edgeState(edgeFor(node, check), run ? 'run' : idleOr(node, check, base), run ? node.account.provider : '')
     }
     if (!accountNodes.length) edgeState(edgeFor(entry, check), 'idle')
-    edgeState(edgeFor(check, send), anyBusy ? 'run' : 'idle')
-    edgeState(edgeFor(send, outOrder, orders ? String(orders) : ''), 'idle')
-    edgeState(edgeFor(send, outPay, payments ? String(payments) : ''), 'idle')
-    edgeState(edgeFor(send, outCs, handover ? String(handover) : ''), 'idle')
+    edgeState(edgeFor(check, send), anyBusy ? 'run' : idleOr(check, send))
+    edgeState(edgeFor(send, outOrder, orders ? String(orders) : ''), idleOr(send, outOrder))
+    edgeState(edgeFor(send, outPay, payments ? String(payments) : ''), idleOr(send, outPay))
+    edgeState(edgeFor(send, outCs, handover ? String(handover) : ''), idleOr(send, outCs))
     for (const [key, edge] of edges)
       if (!edge.used) {
         edge.path.remove()
@@ -269,11 +333,14 @@
         edges.delete(key)
       }
 
+    const lastWho = lastRun ? customers.find((c) => c.jid === lastRun.jid)?.name : ''
     nowText.textContent = working.length
       ? t('Sedang bekerja: {0}', working.map((account) => account.name).join(', '))
-      : lastReply
-        ? t('Siaga · terakhir {0} ({1})', ago(lastReply), aiAccounts.find((a) => a.lastUsedAt === lastReply)?.name || '')
-        : t('Siaga')
+      : lastRun?.sent
+        ? t('Siaga · jalur terakhir {0}{1}', ago(lastRun.at), lastWho ? ` · ${lastWho}` : '')
+        : lastReply
+          ? t('Siaga · terakhir {0} ({1})', ago(lastReply), aiAccounts.find((a) => a.lastUsedAt === lastReply)?.name || '')
+          : t('Siaga')
     fit()
   }
 
@@ -286,7 +353,7 @@
       minX = Math.min(minX, node.x - HALF - 40)
       maxX = Math.max(maxX, node.x + HALF + 40)
       minY = Math.min(minY, node.y - HALF - 14)
-      maxY = Math.max(maxY, node.y + HALF + 38)
+      maxY = Math.max(maxY, node.y + HALF + 50)
     }
     return { minX, maxX, minY, maxY }
   }
@@ -419,7 +486,75 @@
       render()
     }, 2200)
   }
+  // Titik data mengalir di sepanjang garis (sekali jalan, lalu hilang). Antrean per poll supaya berurutan.
+  let packetDelay = 0
+  function packet(fromId, toId, provider = '') {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const delay = packetDelay
+    packetDelay += 380
+    setTimeout(() => {
+      const edge = edges.get(`${fromId}>${toId}`)
+      if (!edge || !shown()) return
+      const length = edge.path.getTotalLength()
+      const dot = make('circle', { class: `orc-packet${provider ? ` p-${provider}` : ''}`, r: 5 }, layerPackets)
+      const begin = performance.now()
+      const step = (now) => {
+        const k = Math.min(1, (now - begin) / 650)
+        const point = edge.path.getPointAtLength(length * (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2))
+        dot.setAttribute('cx', point.x.toFixed(1))
+        dot.setAttribute('cy', point.y.toFixed(1))
+        if (k < 1) requestAnimationFrame(step)
+        else dot.remove()
+      }
+      requestAnimationFrame(step)
+    }, delay)
+  }
+  const IGNORED = /^probe$|judge/
+  function track(event, live) {
+    if (IGNORED.test(event.phase || '') || event.kind === 'cancel') return
+    const key = event.jid || `x${event.accountId}`
+    const run = runs.get(key) || { jid: event.jid, outputs: [], at: event.at }
+    runs.set(key, run)
+    const provider = accounts.find((item) => item.id === event.accountId)?.provider || ''
+    const entry = run.jev ? 'a0' : 'trigger'
+    if (event.accountId === 0 && /pahami/.test(event.phase) && event.kind === 'ok') {
+      run.jev = true
+      if (live) packet('trigger', 'a0', 'jev')
+    } else if (event.accountId !== 0 && /reply/.test(event.phase)) {
+      if (event.kind === 'start' && live) packet(entry, `a${event.accountId}`, provider)
+      if (event.kind === 'ok') {
+        run.account = event.accountId
+        run.at = event.at
+        if (live) packet(`a${event.accountId}`, 'check', provider)
+        // Pemeriksa Jev/AI bisa tidak berjalan (balasan sederhana): dianggap terkirim sesudah balasan jadi.
+        finish(run, live, 1500)
+      }
+    } else if (/check|cek-balasan/.test(event.phase) && event.kind === 'ok') {
+      run.check = true
+      if (run.account !== undefined) finish(run, live, 0)
+    }
+  }
+  function finish(run, live, wait) {
+    clearTimeout(run.timer)
+    const close = () => {
+      if (run.sent) return
+      run.sent = true
+      const customer = customers.find((c) => c.jid === run.jid)
+      run.outputs = customer ? [customer.mode === 'cs' ? 'cs' : '', customer.payment ? 'pay' : '', customer.order ? 'order' : ''].filter(Boolean) : []
+      lastRun = run
+      if (live) {
+        packet('check', 'send')
+        for (const output of run.outputs) packet('send', output)
+        flash('send', 'ok')
+      } else render()
+    }
+    if (live) run.timer = setTimeout(close, wait)
+    else close()
+  }
+
   function handleEvent(event, live) {
+    track(event, live)
+    if (event.kind === 'cancel') return
     const account = accounts.find((item) => item.id === event.accountId)
     const name = account?.name || `#${event.accountId}`
     const who = customers.find((c) => c.jid === event.jid)?.name
@@ -437,11 +572,8 @@
     }
     if (event.kind === 'ok') {
       if (account?.provider === 'jev') return
-      addLog(who ? t('{0} membalas {1}', name, who) : t('{0} menyelesaikan {1}', name, phaseLabel(event.phase)), 'ok', event.at, event.jid || '')
-      if (live) {
-        flash(`a${event.accountId}`, 'ok')
-        flash('send', 'ok')
-      }
+      addLog(who && /reply/.test(event.phase) ? t('{0} membalas {1}', name, who) : t('{0} menyelesaikan {1}', name, phaseLabel(event.phase)), 'ok', event.at, event.jid || '')
+      if (live) flash(`a${event.accountId}`, 'ok')
       return
     }
     if (account?.provider !== 'jev') lastTrouble = { id: event.accountId, at: event.at, kind: event.kind }
@@ -483,6 +615,10 @@
           accounts = data.accounts || []
           busy = new Set(data.busy || [])
           customers = data.customers || customers
+          stats = data.stats || stats
+          packetDelay = 0
+          // Garis harus sudah ada sebelum titik data berjalan.
+          render()
           for (const event of data.events || []) {
             handleEvent(event, loaded)
             lastEventId = Math.max(lastEventId, event.id)
