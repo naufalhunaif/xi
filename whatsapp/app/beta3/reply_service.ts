@@ -1597,8 +1597,9 @@ export async function createLeanReply(input: {
     try {
       const revised = await runLeanProvider(
         settings,
-        { system: prompt.system, user: `${prompt.user}\n\n${revisionNote(decision, check.issues)}` },
-        input.imagePaths || [],
+        // v3.6.137 — prompt asli utuh + catatan pemeriksa terpisah: tulis ulang membaca prompt dari cache.
+        { system: prompt.system, user: prompt.user, tail: revisionNote(decision, check.issues) },
+        contextImage ? [contextImage] : input.imagePaths || [],
         'beta3-revise',
         undefined,
         { jid, tier: tierChoice.tier }

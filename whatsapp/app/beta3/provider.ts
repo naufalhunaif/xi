@@ -135,6 +135,14 @@ const blockedList = (value: string) => value.split(',').map((item) => item.trim(
 /** Kegagalan yang akan terulang di akun mana pun (isi/skema) → tidak perlu pindah akun. */
 const STOP_CODES = new Set(['AI_CONTEXT_LIMIT', 'AI_SCHEMA_INVALID', 'DATABASE_UNAVAILABLE'])
 
+/**
+ * v3.6.137 — `tail` = catatan tambahan (mis. catatan pemeriksa untuk tulis ulang). Claude menerimanya sebagai
+ * blok terpisah sehingga prompt asli tetap utuh dan terbaca dari cache (uji: 22,7rb token cache vs 12,6rb bila
+ * catatan digabung ke teks yang sama). Penyedia lain: digabung di akhir teks.
+ */
+export type LeanPrompt = { system: string; user: string; tail?: string }
+export const flatPrompt = (prompt: LeanPrompt) => (prompt.tail ? { system: prompt.system, user: `${prompt.user}\n\n${prompt.tail}` } : prompt)
+
 type ProviderOverride = (input: { prompt: { system: string; user: string }; phase: string }) => Promise<string>
 let override: ProviderOverride | null = null
 /** Untuk tes saja: jawaban AI tiruan (tanpa jaringan). null = penyedia sungguhan. */
@@ -148,14 +156,14 @@ export function setLeanProviderOverride(next: ProviderOverride | null) {
  */
 export async function runLeanProvider(
   settings: LeanProviderSettings,
-  prompt: { system: string; user: string },
+  prompt: LeanPrompt,
   imagePaths: string[] = [],
   phase = 'beta3-reply',
   schema: Record<string, unknown> = LEAN_OUTPUT_SCHEMA,
   meta: { jid?: string; providers?: AiProviderName[]; tier?: AutoTier } = {}
 ): Promise<LeanProviderResult> {
   if (override)
-    return { text: await override({ prompt, phase }), usage: null, durationMs: 1, provider: 'chatgpt', model: 'tiruan' }
+    return { text: await override({ prompt: flatPrompt(prompt), phase }), usage: null, durationMs: 1, provider: 'chatgpt', model: 'tiruan' }
   const jid = meta.jid || ''
   const all = await usableAiAccounts(Date.now(), phase).catch(() => null)
   // Tugas tertentu (kasus uji) hanya memakai penyedia tertentu bila ada yang siap.
@@ -418,7 +426,7 @@ async function runLeanOnce(
   settings: LeanProviderSettings,
   providerName: AiProviderName,
   account: { model?: string; apiKey?: string; auto?: boolean },
-  prompt: { system: string; user: string },
+  prompt: LeanPrompt,
   imagePaths: string[],
   phase: string,
   schema: Record<string, unknown>,
@@ -473,8 +481,8 @@ async function runLeanOnce(
       provider === 'claude'
         ? runClaudeLean({ ...tuned, webSearch: WEB_PHASES.has(phase) }, prompt, workingDirectory, schema, imagePaths, observe)
         : provider === 'gemini'
-          ? runGeminiLean(account.model || '', account.apiKey || '', prompt, schema, imagePaths, observe)
-          : runCodexLean(tuned, prompt, workingDirectory, schemaPath, imagePaths, observe)
+          ? runGeminiLean(account.model || '', account.apiKey || '', flatPrompt(prompt), schema, imagePaths, observe)
+          : runCodexLean(tuned, flatPrompt(prompt), workingDirectory, schemaPath, imagePaths, observe)
     )
     status = 'completed'
     return { text, usage, durationMs: Date.now() - started, provider, model: actual || model || 'bawaan' }
@@ -655,7 +663,7 @@ export function extractJsonObject(text: string) {
  */
 async function runClaudeLean(
   settings: LeanProviderSettings,
-  prompt: { system: string; user: string },
+  prompt: LeanPrompt,
   workingDirectory: string,
   outputSchema: Record<string, unknown>,
   imagePaths: string[],
@@ -666,6 +674,7 @@ async function runClaudeLean(
     {
       system: `${prompt.system}\n\nKELUARAN: balas HANYA satu objek JSON (tanpa teks lain, tanpa \`\`\`) yang sesuai skema ini:\n${JSON.stringify(outputSchema)}`,
       user: prompt.user,
+      tail: prompt.tail,
     },
     workingDirectory,
     null,
@@ -682,7 +691,7 @@ async function runClaudeLean(
 
 async function spawnClaude(
   settings: LeanProviderSettings,
-  prompt: { system: string; user: string },
+  prompt: LeanPrompt,
   workingDirectory: string,
   outputSchema: Record<string, unknown> | null,
   imagePaths: string[],
@@ -699,6 +708,7 @@ async function spawnClaude(
       '-p',
       '--output-format',
       'stream-json',
+      ...(prompt.tail ? ['--input-format', 'stream-json'] : []),
       '--verbose',
       // Skema sesuai pemanggil (balasan, rekap, dll.), bukan selalu skema balasan.
       ...(outputSchema ? ['--json-schema', JSON.stringify(outputSchema)] : []),
@@ -726,7 +736,11 @@ async function spawnClaude(
       stdio: ['pipe', 'pipe', 'pipe'],
     }
   )
-  return collect(child, 'claude', user, onEvent, (event) =>
+  // Catatan tambahan sebagai blok kedua: blok pertama sama persis dengan panggilan sebelumnya → terbaca dari cache.
+  const stdin = prompt.tail
+    ? `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: user }, { type: 'text', text: prompt.tail }] } })}\n`
+    : user
+  return collect(child, 'claude', stdin, onEvent, (event) =>
     event.type === 'result'
       ? event.structured_output
         ? JSON.stringify(event.structured_output)
