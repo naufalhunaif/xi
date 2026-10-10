@@ -7,8 +7,10 @@ import db from '#services/workspace_database'
 import { workspaceScope } from '#services/workspace_context'
 import { readSettings } from '#services/settings_service'
 import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
-import { ensureLeanTables } from '#beta3/tables'
+import { ensureLeanTables, readLeanState, writeLeanState } from '#beta3/tables'
 import { invalidateCatalogDigest } from '#beta3/catalog_service'
+
+const VISION_VERSION = '2'
 
 /**
  * Ciri model otomatis: AI melihat foto katalog SEKALI per foto dan menulis
@@ -21,7 +23,7 @@ const CIRI_SCHEMA = {
     ciri: {
       type: 'string',
       description:
-        'Maksimal 12 kata, bahasa Indonesia, tanpa nama produk: warna sebenarnya (putih/broken white/gading/cream/navy…), jenis kerah (shawl/peak/notch) dan warnanya (senada/hitam kontras), jumlah kancing, single/double breasted, detail mencolok lain. Kosong bila bukan foto pakaian.',
+        'Maksimal 16 kata, bahasa Indonesia, tanpa nama produk: warna sebenarnya (putih/broken white/gading/cream/navy…), jenis kerah (shawl/peak/notch) beserta warna DAN kilapnya (mis. "kerah peak satin hitam mengkilap", "kerah notch senada doff"), list/aksen satin di saku, jumlah kancing, single/double breasted, potongan (slim/regular) bila jelas terlihat, detail mencolok lain. Kosong bila bukan foto pakaian.',
     },
   },
   required: ['ciri'],
@@ -29,7 +31,7 @@ const CIRI_SCHEMA = {
 }
 
 const SYSTEM =
-  'Kamu mendeskripsikan foto produk jas/tuxedo untuk katalog CS. Jawab hanya JSON sesuai schema. Jangan menebak bahan atau harga.'
+  'Kamu mendeskripsikan foto produk jas/tuxedo untuk katalog CS. Jawab hanya JSON sesuai schema. Jangan menebak nama bahan atau harga; kilap/satin yang terlihat boleh disebut.'
 
 let running = new Set<string>()
 
@@ -39,6 +41,12 @@ export async function describeCatalogPhotos(limit = 12, log?: (line: string) => 
   running.add(scope)
   try {
     await ensureLeanTables()
+    // v3.6.135: deskripsi lama tidak menyebut kilap/satin kerah ("kerah peak senada" padahal foto Peak Suit
+    // jelas satin hitam mengkilap) → semua foto dideskripsikan ulang sekali dengan petunjuk baru.
+    if ((await readLeanState('catalog_vision_version').catch(() => '')) !== VISION_VERSION) {
+      await db.from('whatsapp_beta3_catalog').where('features', '').update({ features_ai_photo: null })
+      await writeLeanState('catalog_vision_version', VISION_VERSION)
+    }
     const rows = await db
       .from('whatsapp_beta3_catalog')
       .where('active', 1)
