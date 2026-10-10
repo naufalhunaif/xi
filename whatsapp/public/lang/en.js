@@ -2136,4 +2136,6 @@ window.waLocales.en = {
   "cek akun": "account check",
   "uji simulasi": "simulation test",
   "model otomatis": "auto model",
+  "{0} kali dipakai hari ini": "used {0} times today",
+  "Memeriksa balasan…": "Checking reply…",
 }

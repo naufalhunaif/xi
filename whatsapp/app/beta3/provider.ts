@@ -254,7 +254,8 @@ export async function runLeanProvider(
       await saveQuota()
       await markAiAccountUsed(account.id).catch(() => {})
       const tokens = result.usage ? result.usage.input + result.usage.output : null
-      await recordAiEvent(account.id, 'ok', phase, '', tokens, jid).catch(() => {})
+      // v3.6.123: model yang benar-benar menjawab ikut dicatat (Orkestra: jalur akun → model).
+      await recordAiEvent(account.id, 'ok', phase, result.model ? `model:${result.model}` : '', tokens, jid).catch(() => {})
       return result
     } catch (error) {
       // Dibatalkan karena akun lain lebih dulu menjawab: bukan kegagalan akun ini. v3.6.122: dicatat "cancel"

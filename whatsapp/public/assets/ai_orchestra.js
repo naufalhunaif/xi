@@ -50,6 +50,7 @@
     order: 'M6 8h12l-1 12H7zM9 8V7a3 3 0 0 1 6 0v1',
     pay: 'M3 6.5h18v11H3zM3 10.5h18M7 14.5h3',
     cs: 'M4.5 14v-2a7.5 7.5 0 0 1 15 0v2M4.5 13.5h3v5h-3zM16.5 13.5h3v5h-3z',
+    model: 'M7 7h10v10H7zM10 10h4v4h-4zM9.5 3.5V7M14.5 3.5V7M9.5 17v3.5M14.5 17v3.5M3.5 9.5H7M3.5 14.5H7M17 9.5h3.5M17 14.5h3.5',
   }
   const SIZE = 54
   const HALF = SIZE / 2
@@ -69,7 +70,20 @@
   let horizontal = false
   // v3.6.122 — jalur data: eksekusi terakhir (seperti hasil run n8n) + titik data yang mengalir saat AI bekerja.
   let stats = { replies: {}, total: 0, jev: 0, checks: 0 }
+  // v3.6.123: kolom model setelah akun (akun → model → pemeriksa).
+  let models = []
+  const cleanModel = (value) => String(value || '').replace(/\s*\(otomatis\)\s*$/, '').trim()
+  const modelId = (provider, model) => `m:${provider}:${cleanModel(model)}`
   const runs = new Map() // jid → { jid, jev, account, check, at }
+  // v3.6.123: langkah yang SEDANG berjalan (start tanpa selesai) → hanya garis langkah itu yang bergerak.
+  const open = new Map() // `${akun}|${fase}|${jid}` → event start
+  const stepKey = (event) => `${event.accountId}|${event.phase || ''}|${event.jid || ''}`
+  const REPLY_STEP = /reply|image|gambar|recap|catalog|vision/
+  const CHECK_STEP = /check|cek/
+  const openSteps = (pattern) => {
+    const cutoff = Date.now() - 180_000
+    return [...open.values()].filter((event) => event.at >= cutoff && busy.has(event.accountId) && pattern.test(event.phase || ''))
+  }
   let lastRun = null
   const nodes = new Map() // id → { el, shape, icon, label, sub, badge, x, y, kind, info }
   const edges = new Map() // key → { path, label, from, to }
@@ -178,6 +192,7 @@
     const ids = ['trigger']
     if (run.jev) ids.push('a0')
     if (run.account !== undefined) ids.push(`a${run.account}`)
+    if (run.model) ids.push(run.model)
     if (run.check || run.account !== undefined) ids.push('check')
     if (run.sent) ids.push('send', ...run.outputs)
     return ids
@@ -198,8 +213,10 @@
     for (const edge of edges.values()) edge.used = false
     const aiAccounts = accounts.filter((account) => !JEV(account))
     const jev = accounts.find(JEV)
-    const working = aiAccounts.filter((account) => busy.has(account.id))
-    const anyBusy = working.length > 0 || (jev && busy.has(jev.id))
+    const replying = new Set(openSteps(REPLY_STEP).map((event) => event.accountId))
+    const checking = openSteps(CHECK_STEP)
+    const working = aiAccounts.filter((account) => replying.has(account.id))
+    const anyBusy = working.length > 0 || checking.length > 0
     const waiting = customers.filter((c) => c.mode === 'ai' && c.unanswered > 0).length
     const orders = customers.filter((c) => c.order).length
     const payments = customers.filter((c) => c.payment).length
@@ -237,7 +254,7 @@
     }
     const accountNodes = aiAccounts.map((account, index) => {
       const node = nodeFor(`a${account.id}`, 'ai')
-      const state = !account.enabled ? 'off' : busy.has(account.id) ? 'busy' : account.limitedUntil ? 'paused' : 'idle'
+      const state = !account.enabled ? 'off' : replying.has(account.id) ? 'busy' : account.limitedUntil ? 'paused' : 'idle'
       setNode(node, {
         label: account.name,
         sub:
@@ -255,7 +272,6 @@
         state,
         provider: account.provider,
         count: index + 1,
-        model: shortModel(account.model) || t('model otomatis'),
         info: [
           t('Urutan cadangan #{0}', index + 1),
           account.model ? t('Model {0}', account.model) + (account.modelAuto ? ` (${t('otomatis')})` : '') : t('Model otomatis'),
@@ -268,11 +284,35 @@
       return node
     })
     if (accountNodes.length) columns.push(accountNodes)
+    // Model per penyedia (yang dipakai 7 hari terakhir); akun dihubungkan ke model penyedianya.
+    const providers = [...new Set(aiAccounts.map((account) => account.provider))]
+    const modelNodes = []
+    const modelsOf = new Map()
+    for (const provider of providers) {
+      const list = models.filter((item) => item.provider === provider)
+      const nodesForProvider = list.map((item, index) => {
+        const node = nodeFor(modelId(provider, item.model), 'model')
+        const state = 'idle'
+        setNode(node, {
+          label: shortModel(item.model),
+          sub: item.today ? t('{0} hari ini', item.today) : ago(item.last),
+          state,
+          provider,
+          info: [t('Model {0}', item.model), item.today ? t('{0} kali dipakai hari ini', item.today) : '', t('Terakhir {0}', ago(item.last))],
+        })
+        node.state = state
+        node.provider = provider
+        return node
+      })
+      modelsOf.set(provider, nodesForProvider)
+      modelNodes.push(...nodesForProvider)
+    }
+    if (modelNodes.length) columns.push(modelNodes)
     const check = nodeFor('check', 'check')
     setNode(check, {
       label: t('Pemeriksa'),
-      sub: anyBusy ? t('menunggu draf') : today(stats.checks) || t('harga · fakta · foto'),
-      state: anyBusy ? 'wait' : 'idle',
+      sub: checking.length ? t('memeriksa…') : today(stats.checks) || t('harga · fakta · foto'),
+      state: checking.length ? 'busy' : 'idle',
       info: [t('Memeriksa balasan sebelum dikirim: harga, fakta katalog, foto, tidak mengulang')],
     })
     columns.push([check])
@@ -280,7 +320,7 @@
     setNode(send, {
       label: t('Kirim balasan'),
       sub: stats.total ? t('{0} balasan hari ini', stats.total) : lastReply ? ago(lastReply) : '',
-      state: anyBusy ? 'wait' : 'idle',
+      state: 'idle',
       info: [t('Balasan terkirim ke pelanggan'), t('Terakhir {0}', ago(lastReply)), stats.total ? t('{0} balasan hari ini', stats.total) : ''],
     })
     columns.push([send])
@@ -314,15 +354,24 @@
     const entry = jevNode || trigger
     const done = recent() ? 'done' : 'past'
     const idleOr = (from, to, base = 'idle') => (pathEdge(from.id, to.id) ? done : base)
-    if (jevNode) edgeState(edgeFor(trigger, jevNode), anyBusy ? 'run' : idleOr(trigger, jevNode), 'jev')
+    if (jevNode) edgeState(edgeFor(trigger, jevNode), idleOr(trigger, jevNode), 'jev')
     for (const node of accountNodes) {
       const run = node.state === 'busy'
       const base = node.state === 'idle' ? 'idle' : 'muted'
-      edgeState(edgeFor(entry, node), run ? 'run' : idleOr(entry, node, base), run ? node.account.provider : '')
-      edgeState(edgeFor(node, check), run ? 'run' : idleOr(node, check, base), run ? node.account.provider : '')
+      const provider = node.account.provider
+      edgeState(edgeFor(entry, node), run ? 'run' : idleOr(entry, node, base), run ? provider : '')
+      const targets = modelsOf.get(provider) || []
+      if (!targets.length) edgeState(edgeFor(node, check), run ? 'run' : idleOr(node, check, base), run ? provider : '')
+      for (const model of targets) edgeState(edgeFor(node, model), idleOr(node, model, base === 'idle' ? 'idle' : 'muted'))
+    }
+    // Pemeriksa berjalan → garis model (jalur balasan yang sedang diperiksa) → pemeriksa bergerak.
+    const checkedModels = new Set(checking.map((event) => runs.get(event.jid || '')?.model).filter(Boolean))
+    for (const model of modelNodes) {
+      const live = checkedModels.has(model.id)
+      edgeState(edgeFor(model, check), live ? 'run' : idleOr(model, check), live ? model.provider : '')
     }
     if (!accountNodes.length) edgeState(edgeFor(entry, check), 'idle')
-    edgeState(edgeFor(check, send), anyBusy ? 'run' : idleOr(check, send))
+    edgeState(edgeFor(check, send), idleOr(check, send))
     edgeState(edgeFor(send, outOrder, orders ? String(orders) : ''), idleOr(send, outOrder))
     edgeState(edgeFor(send, outPay, payments ? String(payments) : ''), idleOr(send, outPay))
     edgeState(edgeFor(send, outCs, handover ? String(handover) : ''), idleOr(send, outCs))
@@ -336,6 +385,8 @@
     const lastWho = lastRun ? customers.find((c) => c.jid === lastRun.jid)?.name : ''
     nowText.textContent = working.length
       ? t('Sedang bekerja: {0}', working.map((account) => account.name).join(', '))
+      : checking.length
+        ? t('Memeriksa balasan…')
       : lastRun?.sent
         ? t('Siaga · jalur terakhir {0}{1}', ago(lastRun.at), lastWho ? ` · ${lastWho}` : '')
         : lastReply
@@ -525,13 +576,23 @@
       if (event.kind === 'ok') {
         run.account = event.accountId
         run.at = event.at
-        if (live) packet(`a${event.accountId}`, 'check', provider)
-        // Pemeriksa Jev/AI bisa tidak berjalan (balasan sederhana): dianggap terkirim sesudah balasan jadi.
-        finish(run, live, 1500)
+        const used = /^model:/.test(event.detail || '') ? modelId(provider, event.detail.slice(6)) : ''
+        run.model = used && nodes.has(used) ? used : ''
+        if (live && run.model) {
+          packet(`a${event.accountId}`, run.model, provider)
+          packet(run.model, 'check', provider)
+        } else if (live) packet(`a${event.accountId}`, 'check', provider)
+        // Pemeriksa bisa tidak berjalan (balasan sederhana): dianggap terkirim bila 4 dtk tidak ada pemeriksaan.
+        finish(run, live, 4000)
       }
-    } else if (/check|cek-balasan/.test(event.phase) && event.kind === 'ok') {
-      run.check = true
-      if (run.account !== undefined) finish(run, live, 0)
+    } else if (CHECK_STEP.test(event.phase || '')) {
+      if (event.kind === 'start') clearTimeout(run.timer)
+      else if (event.kind === 'ok') {
+        run.check = true
+        // Kirim baru setelah SEMUA pemeriksaan untuk chat ini selesai (Jev & pemeriksa AI bisa berjalan bersamaan).
+        const pending = [...open.values()].some((item) => (item.jid || '') === (event.jid || '') && CHECK_STEP.test(item.phase || ''))
+        if (run.account !== undefined && !pending) finish(run, live, 0)
+      }
     }
   }
   function finish(run, live, wait) {
@@ -546,13 +607,16 @@
         packet('check', 'send')
         for (const output of run.outputs) packet('send', output)
         flash('send', 'ok')
-      } else render()
+      }
+      render()
     }
     if (live) run.timer = setTimeout(close, wait)
     else close()
   }
 
   function handleEvent(event, live) {
+    if (event.kind === 'start') open.set(stepKey(event), event)
+    else open.delete(stepKey(event))
     track(event, live)
     if (event.kind === 'cancel') return
     const account = accounts.find((item) => item.id === event.accountId)
@@ -616,6 +680,7 @@
           busy = new Set(data.busy || [])
           customers = data.customers || customers
           stats = data.stats || stats
+          models = data.models || models
           packetDelay = 0
           // Garis harus sudah ada sebelum titik data berjalan.
           render()

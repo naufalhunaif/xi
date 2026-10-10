@@ -143,6 +143,42 @@ async function lastModelByProvider() {
   return data
 }
 
+/**
+ * v3.6.123 — daftar model per penyedia untuk Orkestra (kolom setelah akun): model yang dipakai 7 hari terakhir,
+ * jumlah dipakai hari ini, maksimal 4 per penyedia (terbaru dulu). Disimpan 30 dtk.
+ */
+let modelsCache: { at: number; key: string; data: Array<{ provider: string; model: string; today: number; last: number }> } | null = null
+const cleanModel = (value: unknown) => String(value || '').replace(/\s*\(otomatis\)\s*$/, '').trim()
+async function recentModels(dayStart: number) {
+  const key = workspaceScope().prefix
+  if (modelsCache && modelsCache.key === key && Date.now() - modelsCache.at < 30_000) return modelsCache.data
+  const rows = (await db
+    .from('whatsapp_ai_usage')
+    .where('created_at', '>=', new Date(Date.now() - 7 * 86_400_000))
+    .where('status', 'completed')
+    .whereIn('provider', ['chatgpt', 'claude', 'gemini'])
+    .whereNotNull('model')
+    .select('provider', 'model', 'created_at')
+    .orderBy('id', 'desc')
+    .limit(3000)) as Array<{ provider: string; model: string; created_at: Date }>
+  const map = new Map<string, { provider: string; model: string; today: number; last: number }>()
+  for (const row of rows) {
+    const model = cleanModel(row.model)
+    if (!model || model === 'bawaan' || model === 'bawaan akun') continue
+    const id = `${row.provider}|${model}`
+    const at = new Date(row.created_at).getTime()
+    const item = map.get(id) || { provider: String(row.provider), model, today: 0, last: at }
+    if (at >= dayStart) item.today++
+    item.last = Math.max(item.last, at)
+    map.set(id, item)
+  }
+  const data: Array<{ provider: string; model: string; today: number; last: number }> = []
+  for (const provider of ['claude', 'chatgpt', 'gemini'])
+    data.push(...[...map.values()].filter((item) => item.provider === provider).sort((a, b) => b.last - a.last).slice(0, 4))
+  modelsCache = { at: Date.now(), key, data }
+  return data
+}
+
 /** Waktu keputusan Jev terakhir (event akun 0). */
 async function lastJevEventAt() {
   const row = await db.from('whatsapp_ai_events').where('account_id', 0).orderBy('id', 'desc').first()
@@ -183,6 +219,7 @@ export default class AiAccountsController {
     const stats = await aiEventStats(dayStart).catch(() => ({ replies: {}, total: 0, jev: 0, checks: 0 }))
     // v3.6.122: model per simpul — model yang dipilih di akun, atau model terakhir yang benar-benar dipakai penyedia itu.
     const usedModel = await lastModelByProvider().catch(() => new Map<string, string>())
+    const models = await recentModels(dayStart).catch(() => [])
     // Jev (pembantu keputusan) ikut tampil sebagai simpul bila kuncinya terpasang.
     const { readJevConfig, JEV_ACCOUNT_ID } = await import('#beta3/jev')
     const jev = await readJevConfig().catch(() => null)
@@ -190,6 +227,7 @@ export default class AiAccountsController {
     return response.json({
       now,
       stats,
+      models,
       busy,
       events: jev?.apiKey ? events : events.filter((e) => e.accountId !== JEV_ACCOUNT_ID),
       spread,
