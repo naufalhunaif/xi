@@ -9,6 +9,8 @@ type Info = {
   question: (sub: string) => string
   /** Label pilihan jawaban (kunci jawaban → kata biasa). */
   labels?: Record<string, string>
+  /** v3.6.130: pilihan per sub-pertanyaan (cek_balasan, hati) — dulu semua pilihan tercampur. */
+  labelsFor?: (sub: string) => Record<string, string> | null
   /** Akibat bila jawaban dipakai. */
   effect: (answer: string, sub: string) => string
   /** Pesan siapa yang dinilai. */
@@ -90,6 +92,7 @@ const INFO: Record<string, Info> = {
   },
   kesulitan: {
     question: () => 'How hard is it to answer this message correctly? (1 simple · 2 normal · 3 complex)',
+    labelsFor: () => ({ 'tingkat 1': '1 · simple', 'tingkat 2': '2 · normal', 'tingkat 3': '3 · complex' }),
     effect: () => 'Used to pick the AI model: harder means more careful.',
   },
   sudah_tf: {
@@ -105,6 +108,7 @@ const INFO: Record<string, Info> = {
   },
   urgensi: {
     question: () => 'How urgent is this message? (1 normal … 5 complaint/angry)',
+    labelsFor: () => ({ 'tingkat 1': '1 · normal', 'tingkat 2': '2', 'tingkat 3': '3', 'tingkat 4': '4 · important', 'tingkat 5': '5 · complaint / angry' }),
     effect: () => 'A score of 4–5 marks the chat "Important" in the inbox.',
   },
   harga_konteks: {
@@ -129,6 +133,12 @@ const INFO: Record<string, Info> = {
       keberatan_harga: 'Finds it expensive', pamit: 'Leaving / not now',
       tidak_ada: 'No occasion', nikah: 'Wedding', wisuda: 'Graduation', kerja: 'New job / interview', acara_lain: 'Other event',
     },
+    labelsFor: (sub): Record<string, string> =>
+      sub === 'rasa'
+        ? { netral: 'Neutral', senang: 'Happy', ragu: 'Unsure / worried', buru_buru: 'In a hurry', kesal: 'Annoyed / disappointed', keberatan_harga: 'Finds it expensive', pamit: 'Leaving / not now' }
+        : sub === 'momen'
+          ? { tidak_ada: 'No occasion', nikah: 'Wedding', wisuda: 'Graduation', kerja: 'New job / interview', acara_lain: 'Other event' }
+          : { bertanya: 'Asking', meminta: 'Requesting', mengeluh: 'Complaining', basa_basi: 'Small talk', lain: 'Other' },
     effect: () => 'The AI gets a short "HATI" note so it answers the feeling first (hint only, no data changes).',
   },
   cek_balasan: {
@@ -139,11 +149,24 @@ const INFO: Record<string, Info> = {
           ? "How well does the AI reply answer what the customer means? (1 missed · 2 partly · 3 fully)"
           : sub === 'fakta'
             ? 'Do the prices, colors and ready sizes in the AI reply match the catalog?'
-            : 'Does the AI reply repeat a question or something already said?',
+            : sub === 'susulan'
+              ? 'Should this follow-up be sent if the customer stays quiet?'
+              : 'Does the AI reply repeat a question or something already said?',
     labels: {
       sesuai: 'Matches', kurang: 'Promised photos missing', lebih: 'Extra photos', beda: 'Different product/color',
       bertentangan: 'Contradicts the catalog', tidak_bisa_dinilai: 'Cannot be checked', ya: 'Yes', tidak: 'No',
+      kirim: 'Send it', jangan: "Don't send", kaku: 'Needed but sounds robotic',
     },
+    labelsFor: (sub): Record<string, string> =>
+      sub === 'foto'
+        ? { sesuai: 'Matches', kurang: 'Promised photos missing', lebih: 'Extra photos', beda: 'Different product/color' }
+        : sub === 'fakta'
+          ? { sesuai: 'Matches', bertentangan: 'Contradicts the catalog', tidak_bisa_dinilai: 'Cannot be checked' }
+          : sub === 'susulan'
+            ? { kirim: 'Send it', jangan: "Don't send", kaku: 'Needed but sounds robotic' }
+            : sub === 'jawab'
+              ? { 'tingkat 1': '1 · missed', 'tingkat 2': '2 · partly', 'tingkat 3': '3 · fully' }
+              : yesNo,
     source: 'toko',
     effect: () => 'Checked before sending. A confident problem makes the AI rewrite the reply once with the checker note.',
   },
@@ -303,7 +326,7 @@ export function explainDecision(row: Row) {
         : '',
     source_label: SOURCE_LABEL[info?.source || 'pelanggan'],
     /** Pilihan jawaban yang bisa dipilih CS saat menandai Salah (kunci → label). */
-    options: info?.labels ? info.labels : null,
+    options: info?.labelsFor?.(sub) || info?.labels || null,
     money: ['dana_masuk', 'bukti_transfer', 'total_toko', 'layanan'].includes(row.decision),
   }
 }

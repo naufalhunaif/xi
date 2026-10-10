@@ -264,6 +264,78 @@ export function answerText(answer: JevAnswer | undefined | null) {
 }
 
 /**
+ * v3.6.130 — Jev belajar dari penilaian CS (Settings → Jev accuracy): jawaban yang ditandai SALAH beserta
+ * jawaban benarnya ikut sebagai contoh di instruksi pertanyaan yang sama. Dulu penilaian hanya dihitung
+ * jadi persen akurasi; Jev tetap mengulang kesalahan yang sama.
+ */
+const CHECK_KEYS = new Set(['foto', 'jawab', 'fakta', 'ulang', 'susulan'])
+export function lessonTarget(key: string, phase = ''): { decision: string; sub: string } | null {
+  if (key.startsWith('topik_')) return { decision: 'topik', sub: key.slice(6) }
+  if (key.startsWith('hati_')) return { decision: 'hati', sub: key.slice(5) }
+  if (key === 'seri' || key === 'barang') return { decision: 'harga_konteks', sub: key }
+  if (CHECK_KEYS.has(key) && /^cek-/.test(phase)) return { decision: 'cek_balasan', sub: key }
+  if (key in JEV_DECISIONS) return { decision: key, sub: '' }
+  return null
+}
+
+type Lesson = { input: string; correct: string }
+const lessonCache = new Map<string, { at: number; lessons: Map<string, Lesson[]> }>()
+const LESSON_TTL_MS = 5 * 60_000
+/** Sub-pertanyaan yang memakai kolom detail sebagai kunci (topik_x, hati_x, cek_balasan foto/…). */
+const SUB_DECISIONS = new Set(['topik', 'hati', 'harga_konteks', 'cek_balasan'])
+
+async function loadLessons() {
+  const key = cacheKey()
+  const cached = lessonCache.get(key)
+  if (cached && Date.now() - cached.at < LESSON_TTL_MS) return cached.lessons
+  const lessons = new Map<string, Lesson[]>()
+  try {
+    await ensureDecisionTable()
+    const rows = (await db
+      .from('whatsapp_beta3_decisions')
+      .where('verdict', 'salah')
+      .whereNotNull('correct_answer')
+      .whereNotNull('input_text')
+      .where('created_at', '>=', new Date(Date.now() - 180 * 86_400_000))
+      .orderBy('id', 'desc')
+      .limit(600)
+      .select('decision', 'detail', 'input_text', 'correct_answer')) as Array<Record<string, any>>
+    for (const row of rows) {
+      const decision = String(row.decision)
+      const bucket = SUB_DECISIONS.has(decision) ? `${decision}:${String(row.detail || '')}` : decision
+      const list = lessons.get(bucket) || []
+      const input = String(row.input_text || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+      if (!input || list.length >= 5 || list.some((item) => item.input === input)) continue
+      list.push({ input, correct: String(row.correct_answer).slice(0, 40) })
+      lessons.set(bucket, list)
+    }
+  } catch {
+    /* Tanpa contoh: Jev tetap jalan seperti biasa. */
+  }
+  lessonCache.set(key, { at: Date.now(), lessons })
+  return lessons
+}
+
+/** Untuk tes dan setelah CS menilai: contoh dimuat ulang pada panggilan berikutnya. */
+export function resetJevLessons() {
+  lessonCache.clear()
+}
+
+/** Instruksi tiap pertanyaan + koreksi toko untuk pertanyaan yang sama (maks 5 contoh). */
+export function withLessons<Q extends JevQuestion>(key: string, question: Q, lessons: Map<string, Lesson[]>, phase = ''): Q {
+  const target = lessonTarget(key, phase)
+  if (!target) return question
+  const bucket = SUB_DECISIONS.has(target.decision) ? `${target.decision}:${target.sub}` : target.decision
+  const list = lessons.get(bucket)
+  if (!list?.length) return question
+  const lines = list.map((item) => `- "${item.input}" → ${item.correct}`)
+  return {
+    ...question,
+    instructions: `${question.instructions}\n\nKoreksi dari toko untuk pertanyaan ini (kasus serupa → jawaban yang sama${question.type === 'score' ? '; tingkat N = kriteria ke-N' : question.type === 'noul' ? '; ya = benar, tidak = salah' : ''}):\n${lines.join('\n')}`,
+  }
+}
+
+/**
  * Satu permintaan ke Jev (semua pertanyaan dinilai paralel atas state yang sama).
  * Mengembalikan null bila Jev mati, tanpa kunci, gagal, atau melewati batas waktu.
  */
@@ -277,6 +349,10 @@ export async function askJev<K extends string>(
   const config = await readJevConfig()
   if (!config.apiKey || !config.enabled) return null
   const started = Date.now()
+  const lessons = await loadLessons()
+  const taught = Object.fromEntries(
+    Object.entries(questions).map(([key, question]) => [key, withLessons(key, question as JevQuestion, lessons, phase)])
+  ) as Record<K, JevQuestion>
   const models = jevModelOrder(config.model, await readResolvedModel())
   let tried = models[0]
   try {
@@ -289,7 +365,7 @@ export async function askJev<K extends string>(
         response = await fetcher(JEV_URL, {
           method: 'POST',
           headers: { 'authorization': `Bearer ${config.apiKey}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ model: tried, state, questions }),
+          body: JSON.stringify({ model: tried, state, questions: taught }),
           signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
         })
       } catch (error) {
@@ -412,6 +488,8 @@ export async function logDecision(input: {
   input?: string
 }) {
   if (!input.answer) return
+  // v3.6.130: keputusan dari uji percakapan (jid @sim) tidak dicatat — tidak ada chat untuk dinilai CS.
+  if (String(input.jid || '').endsWith('@sim')) return
   try {
     await ensureDecisionTable()
     await db.table('whatsapp_beta3_decisions').insert({
@@ -475,7 +553,21 @@ export async function listDecisions(limit = 50, decision?: string) {
       .map(async (row) => {
         const source = decisionSource(String(row.decision))
         const fromStore = source === 'toko'
-        const at = new Date(row.created_at)
+        let at = new Date(row.created_at)
+        // v3.6.130: pemindai pengiriman menilai pesan lama → konteks diambil di sekitar pesan itu sendiri
+        // (dulu: pesan terakhir saat pemindaian, tidak nyambung dengan yang dinilai).
+        if (row.decision === 'kirim_sendiri' && row.detail) {
+          const original = await db
+            .from('whatsapp_messages')
+            .where('jid', row.jid)
+            .where('direction', 'out')
+            .where('body', 'like', `${String(row.detail).slice(0, 120).replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
+            .orderBy('id', 'desc')
+            .select('created_at')
+            .first()
+            .catch(() => null)
+          if (original?.created_at) at = new Date(original.created_at)
+        }
         // Keputusan atas pesan toko bisa dicatat sebelum pesan itu tersimpan (mis. janji total).
         const until = new Date(at.getTime() + (fromStore ? 120_000 : 5_000))
         const messages = (await db
@@ -534,6 +626,7 @@ export async function markDecision(id: number, verdict: 'benar' | 'salah' | '' ,
       wrong: verdict === 'salah',
       correct_answer: verdict === 'salah' && correct ? correct.slice(0, 80) : null,
     })
+  resetJevLessons()
 }
 
 /** Akurasi 30 hari per keputusan: jumlah keputusan, ditandai salah, persen benar. */

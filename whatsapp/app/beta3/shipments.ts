@@ -40,10 +40,23 @@ export function looksSelfDelivery(text: string) {
   return SELF_WORDS.test(body) && SELF_SENT.test(body) && !/\b(resi|awb|jne|j&t|jnt|sicepat|tiki|anteraja|ninja|lion|pos)\b/i.test(body)
 }
 
+/** v3.6.130: pesan yang sama tidak ditanyakan ulang ke Jev (pemindai bisa mengulang dari awal). */
+const selfDeliveryMemo = new Map<string, boolean>()
+
 export async function detectSelfDelivery(jid: string, text: string) {
   if (!looksSelfDelivery(text)) return false
+  const memoKey = `${jid}\n${text}`
+  const remembered = selfDeliveryMemo.get(memoKey)
+  if (remembered !== undefined) return remembered
   const verdict = await storeDeliversItself(jid, text).catch(() => undefined)
-  return verdict !== false
+  // Jev mati/gagal (undefined) → pola kata; Jev ragu (null) → bukan antar sendiri (dulu dianggap ya:
+  // "bisa cod di pertengahan" tercatat terkirim tanpa resi).
+  const result = verdict === undefined ? true : verdict === true
+  if (verdict !== undefined) {
+    if (selfDeliveryMemo.size > 5000) selfDeliveryMemo.clear()
+    selfDeliveryMemo.set(memoKey, result)
+  }
+  return result
 }
 
 async function accountNumbers() {

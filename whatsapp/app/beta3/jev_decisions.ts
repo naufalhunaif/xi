@@ -672,7 +672,8 @@ export async function storeDeliversItself(jid: string, storeMessage: string) {
   if (!answer) return undefined
   const sure = confident('kirim_sendiri', answer)
   await logDecision({ jid, decision: 'kirim_sendiri', answer, used: sure, detail: storeMessage.slice(0, 300), input: storeMessage })
-  return sure ? yes(answer) : undefined
+  // v3.6.130: Jev menjawab tapi ragu → null (bukan undefined), supaya tidak dianggap "diantar sendiri".
+  return sure ? yes(answer) : null
 }
 
 /**
