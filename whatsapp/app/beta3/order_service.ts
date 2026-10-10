@@ -123,6 +123,10 @@ export function parseLooseAddress(
   return { district, regency, postalCode: postal }
 }
 
+/** "atas nama Rina", "a.n. Rina", "nama penerima: Rina" di tengah alamat. */
+const INLINE_NAME = /\b(?:atas\s+nama|a\.\s?n\.?|nama(?:\s+penerima)?\s*:)\s*([a-z][a-z.' ]{1,40}?)\s*(?=,|\n|$|\b(?:no|nomor|hp|telp|wa)\b|(?:\+?62|0)8)/i
+const INLINE_NAME_PART = /\b(?:atas\s+nama|a\.\s?n\.?|nama(?:\s+penerima)?\s*:)\s*[a-z][a-z.' ]{1,40}?\s*(?=,|\n|$|\b(?:no|nomor|hp|telp|wa)\b|(?:\+?62|0)8)/gi
+
 export type TidyAddress = {
   name: string
   phone: string
@@ -183,7 +187,10 @@ export function tidyLooseAddress(
   const isName = (line: string) =>
     line.length <= 40 && !/\d/.test(line) && !/[,]/.test(line) &&
     !/\b(?:jl|jln|jalan|gg|gang|rt|rw|desa|dusun|kel|kec|kab|kota|perum|blok)\b/i.test(line)
-  const name = lines.length > 1 && isName(lines[0]) ? tidyWords(lines[0]) : ''
+  // v3.6.127: "…, atas nama rina, nomor 0812…" dalam satu baris → nama diambil dari "atas nama/a.n./nama".
+  const inlineName = text.match(INLINE_NAME)?.[1]?.trim() || ''
+  const nameLine = lines.length > 1 && isName(lines[0])
+  const name = nameLine ? tidyWords(lines[0]) : inlineName && isName(inlineName) ? tidyWords(inlineName) : ''
   const district = tidyWords(destination?.district || parsed.district || '')
   const cityRaw = destination?.city || ''
   const regency = parsed.regency
@@ -191,6 +198,9 @@ export function tidyLooseAddress(
     : tidyWords(cityRaw)
   const clean = (raw: string) =>
     raw
+      .replace(INLINE_NAME_PART, '')
+      .replace(/^\s*(?:(?:tolong\s+)?(?:di)?kirim(?:kan)?\s+ke|alamat(?:nya)?(?:\s+(?:kirim|pengiriman))?\s*:?)\s*/i, '')
+      .replace(/\b(?:nomor|no\.?)\s*(?:hp|telp|telepon|wa)?\b\.?:?\s*(?=(?:\+?62|0)8|$)/gi, '')
       .replace(/(?:\+?62|0)8[\d\s-]{7,16}/g, '')
       .replace(/(?<!\d)\d{5}(?!\d)/g, '')
       .replace(/\b(?:hp|telp|wa)\b\.?:?/gi, '')
@@ -202,7 +212,7 @@ export function tidyLooseAddress(
   const drop = new Set([placeKey(district), placeKey(regency), placeKey(cityRaw), placeKey(province)].filter(Boolean))
   const seen = new Set<string>()
   const street: string[] = []
-  const body = lines.filter((line, index) => !(index === 0 && name) && line.replace(/[\s-]/g, '') !== phoneMatch?.[0])
+  const body = lines.filter((line, index) => !(index === 0 && nameLine) && line.replace(/[\s-]/g, '') !== phoneMatch?.[0])
   // "… No 10 Kec. Serpong" → kecamatan/kota yang sudah ditulis di ekor dibuang dari jalan.
   const places = [placeKey(district), placeKey(regency), placeKey(cityRaw)]
     .filter(Boolean)
@@ -1288,7 +1298,7 @@ export function matchAutoTotal(
   let sum = 0
   const items: string[] = []
   const grouped: Array<{ group: string; qty: number }> = []
-  const priced: Array<{ row: { product: string; color: string; category?: string }; unit: number; qty: number }> = []
+  const priced: Array<{ row: { product: string; color: string; category?: string }; unit: number; qty: number; index: number }> = []
   const productNames = [...new Set(rows.map((row) => row.product))]
   for (const line of lines) {
     const text = norm(line)
@@ -1360,7 +1370,7 @@ export function matchAutoTotal(
     sum += unit * qty
     items.push(line)
     grouped.push({ group: wholesaleGroup(String(row.category || ''), row.product), qty })
-    priced.push({ row, unit, qty })
+    priced.push({ row, unit, qty, index: items.length - 1 })
   }
   if (!items.length) return { ok: false, reason: 'tidak ada produk katalog di rincian' }
   // v3.6.60: grosir mulai 6 jas (setelan dihitung jas) → potongan per pcs untuk jas/setelan/celana/rompi.
@@ -1381,6 +1391,18 @@ export function matchAutoTotal(
   if (draft.subtotal > 0 && sum !== draft.subtotal && net !== draft.subtotal)
     return { ok: false, reason: `subtotal AI ${draft.subtotal} ≠ katalog ${bulk.discount ? net : sum}` }
   if (sum <= 0 || net <= 0) return { ok: false, reason: 'harga katalog kosong' }
+  // v3.6.127: AI menulis harga sesudah promo di baris item ("… 451.050") lalu baris "Promo -33.950" →
+  // terlihat dipotong dua kali. Baris item selalu memakai harga katalog; potongan hanya di baris promo.
+  if (usePromo)
+    for (const line of priced) {
+      const best = bestPromo(promos, line.row, line.unit, sum)
+      if (!best) continue
+      for (const [after, before] of [
+        [(line.unit - best.cut) * line.qty, line.unit * line.qty],
+        [line.unit - best.cut, line.unit],
+      ])
+        items[line.index] = items[line.index].replace(new RegExp(`(?<![\\d.])${rupiah(after).replace(/\./g, '\\.')}(?![\\d.])`), rupiah(before))
+    }
   if (usePromo) for (const [name, value] of promoNames) items.push(`${/^promo\b/i.test(name) ? name : `Promo ${name}`} -${rupiah(value)}`)
   else if (bulk.discount) items.push(`Diskon grosir ${bulk.jas} jas -${rupiah(bulk.discount)}`)
   const key = (text: string) => text.toLowerCase().replace(/[^a-z]/g, '')

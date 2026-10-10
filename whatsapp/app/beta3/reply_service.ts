@@ -2621,7 +2621,40 @@ async function areaFromPostal(text: string, postal: string, mcp: LeanMcpConfig):
   return null
 }
 
+/**
+ * v3.6.127 — "kec sidareja cilacap" terbaca kecamatan "Sidareja Cilacap" (kota ikut) → tujuan tidak ketemu.
+ * Bila gagal dan kota kosong: kata terakhir (atau dua kata terakhir) dicoba sebagai kabupaten/kota.
+ */
+export function splitDistrictCity(address: { district: string; regency: string; postalCode: string }) {
+  const words = address.district.trim().split(/\s+/).filter(Boolean)
+  if (address.regency || words.length < 2) return []
+  return [1, 2]
+    .filter((take) => words.length - take >= 1)
+    .map((take) => ({ ...address, district: words.slice(0, -take).join(' '), regency: words.slice(-take).join(' ') }))
+}
+
 async function ratesForAddress(
+  address: { district: string; regency: string; postalCode: string },
+  lastResolved: DestinationArea | null,
+  mcp: LeanMcpConfig,
+  grams = DEFAULT_ITEM_GRAMS,
+  text = ''
+): Promise<ShippingRates | null> {
+  let failure: unknown = null
+  const first = await ratesForAddressOnce(address, lastResolved, mcp, grams, text).catch((error) => {
+    failure = error
+    return null
+  })
+  if (first?.prices?.length) return first
+  for (const split of splitDistrictCity(address)) {
+    const rates = await ratesForAddressOnce(split, lastResolved, mcp, grams, text).catch(() => null)
+    if (rates?.prices?.length) return rates
+  }
+  if (failure) throw failure
+  return first
+}
+
+async function ratesForAddressOnce(
   address: { district: string; regency: string; postalCode: string },
   lastResolved: DestinationArea | null,
   mcp: LeanMcpConfig,

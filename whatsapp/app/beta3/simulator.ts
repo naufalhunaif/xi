@@ -3,7 +3,7 @@
 // (createLeanReply + pemeriksa), tanpa mengirim apa pun ke WhatsApp. Tiap percakapan dinilai:
 // pemeriksaan pasti (harga di luar katalog, tidak membalas, serah CS tanpa perlu, kata wajib) dan
 // penilai AI yang membaca katalog lengkap. Data uji (jid "…@sim") dihapus sesudah tiap percakapan.
-import { activePromos, parsePromoState } from '#beta3/promos'
+import { activePromos, parsePromoState, promoCut, renderPromoRule, type ChatPromo } from '#beta3/promos'
 import app from '@adonisjs/core/services/app'
 import { ACK, isBusinessPitch, isOtherBot } from '#beta3/token_saver'
 import { imageNotes } from '#beta3/refs_service'
@@ -136,10 +136,25 @@ export async function loadScenarios(): Promise<SimScenario[]> {
 }
 
 /** Pemeriksaan pasti untuk satu percakapan (tanpa AI). */
+/**
+ * v3.6.127 — Pola harga di harapan skenario ("485\\.000") juga menerima harga promo yang sedang berlaku
+ * (485.000 − 7% = 451.050). Dulu skenario gagal "tidak menyebut 485.000" padahal AI benar menyebut harga promo.
+ */
+export function withPromoPattern(pattern: string, promos: ChatPromo[]) {
+  if (!promos.length) return pattern
+  return pattern.replace(/\d{1,3}(?:\\\.\d{3})+/g, (literal) => {
+    const value = Number(literal.replace(/\\\./g, ''))
+    const cuts = promos.map((promo) => value - promoCut(promo, value)).filter((price) => price > 0 && price !== value)
+    if (!cuts.length) return literal
+    return `(?:${[literal, ...cuts.map((price) => price.toLocaleString('id-ID').replace(/\./g, '\\.'))].join('|')})`
+  })
+}
+
 export function deterministicIssues(
   scenario: Pick<SimScenario, 'harap'>,
   turns: SimTurn[],
-  allowed: ReturnType<typeof allowedPrices>
+  allowed: ReturnType<typeof allowedPrices>,
+  promos: ChatPromo[] = []
 ) {
   const issues: string[] = []
   turns.forEach((turn, index) => {
@@ -157,7 +172,7 @@ export function deterministicIssues(
   if (harap.serah_cs === true && !handed) issues.push('Seharusnya diserahkan ke CS.')
   const text = turns.flatMap((turn) => [...turn.balasan, ...turn.foto, turn.total || '']).join('\n')
   for (const pattern of harap.sebut || [])
-    if (!new RegExp(pattern, 'i').test(text)) issues.push(`Balasan tidak menyebut: ${pattern}`)
+    if (!new RegExp(withPromoPattern(pattern, promos), 'i').test(text)) issues.push(`Balasan tidak menyebut: ${pattern}`)
   for (const pattern of harap.tidak_sebut || [])
     if (new RegExp(pattern, 'i').test(text)) issues.push(`Balasan menyebut yang dilarang: ${pattern}`)
   const photos = turns.reduce((total, turn) => total + turn.foto.length, 0)
@@ -271,8 +286,12 @@ export async function judgeFacts(settings?: LeanSettings) {
   // v3.6.86: hari libur toko ikut (sama dengan AI) — dulu penilai menghitung Sabtu libur → tanggal beda.
   const production = settings?.production ? renderProductionEstimate(settings.production, new Date(), profile) : ''
   const wholesaleText = String((await readLeanState('wholesale').catch(() => '')) || '')
+  // v3.6.127: promo website yang berlaku (sama dengan yang diberikan ke AI) — dulu penilai menganggap
+  // "promo 10.10 diskon 7%" karangan karena tidak ada di FAKTA.
+  const promoRule = renderPromoRule(parsePromoState(String((await readLeanState('promos').catch(() => '')) || '')))
   return [
     profile,
+    `${promoRule}\nHarga promo = harga katalog − potongan promo (dibulatkan); harga promo yang disebut AI BENAR, bukan karangan. Promo berlaku bersama aturan grosir: dipakai potongan yang lebih besar.`,
     renderWholesaleRule(wholesaleDiscounts(wholesaleText)) || wholesaleText,
     renderPricePattern(pricePattern(digest.rows)),
     production,
@@ -374,13 +393,21 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
     turn.fotoUrl = reply.photos.map((photo) => photo.url)
     turn.serah_cs = decision.serah_cs
     turn.alasan = decision.alasan
-    if (reply.autoTotal && !decision.serah_cs)
+    if (reply.autoTotal && !decision.serah_cs) {
       turn.total = renderTotalMessage({
         items: reply.autoTotal.items,
         subtotal: reply.autoTotal.subtotal,
         shippingService: reply.autoTotal.shippingService,
         shippingCost: reply.autoTotal.shippingCost,
       })
+      // v3.6.127: chat sungguhan mengirim rekening tepat setelah total — uji juga (dulu penilai: "rekening tidak terkirim").
+      const payment = renderPaymentMessage(
+        settings.paymentMethods
+          .filter((method) => method.enabled)
+          .map((method) => ({ bank: method.name, number: method.destination, holder: method.accountName || '' }))
+      )
+      if (payment) turn.total = `${turn.total}\n\n${payment}`
+    }
     // Riwayat berikutnya: urutan kirim sama dengan chat sungguhan (bubble 1 → foto → sisanya).
     const out = (body: string, isImage = false) =>
       state.rows.push({ direction: 'out', senderType: 'ai', body, mediaType: isImage ? 'image' : null, createdAt: new Date(at.getTime() + 20_000) })
@@ -461,6 +488,7 @@ export async function gradeScenario(
   {
     const digest = await catalogDigest()
     const wholesale = String((await readLeanState('wholesale').catch(() => '')) || '')
+    const promos = activePromos(parsePromoState(String((await readLeanState('promos').catch(() => '')) || '')))
     const allowed = allowedPrices(
       digest.rows,
       [
@@ -469,9 +497,9 @@ export async function gradeScenario(
         renderPricePattern(pricePattern(digest.rows)),
       ],
       wholesaleDiscounts(wholesale),
-      activePromos(parsePromoState(String((await readLeanState('promos').catch(() => '')) || '')))
+      promos
     )
-    const masalah = deterministicIssues(scenario, turns, allowed)
+    const masalah = deterministicIssues(scenario, turns, allowed, promos)
     let nilai: number | null = null
     let manusia: number | null = null
     let rasa = ''

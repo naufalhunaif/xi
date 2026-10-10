@@ -239,7 +239,9 @@ const NOT_A_PLACE = new Set(
     // Pilihan layanan ongkir ("reg aja", "yang yes") bukan nama tempat.
     'reg reguler regular yes jtr jne pakai pake yang ambil biasa murah cepat kilat ekonomi aja saja ' +
     // v3.6.91: "alamat masih sama" bukan nama tempat.
-    'alamat masih sama tadi kemarin kmrn dulu lama sebelumnya seperti kayak'
+    'alamat masih sama tadi kemarin kmrn dulu lama sebelumnya seperti kayak ' +
+    // v3.6.127: jawaban nama penerima ("nama budi", "atas nama rina", "an dedi") bukan nama tempat.
+    'nama atas an penerima'
   ).split(' ')
 )
 

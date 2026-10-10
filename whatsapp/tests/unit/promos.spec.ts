@@ -40,6 +40,14 @@ test.group('promo website untuk chat', () => {
     if (!result.ok) return
     assert.equal(result.subtotal, 485000 - 48500 + 220000)
     assert.include(result.items, 'Promo 10.10 -48.500')
+    // v3.6.127: AI menulis harga sesudah promo di baris item → baris item tetap harga katalog (tidak terlihat dipotong dua kali).
+    const afterPrice = matchAutoTotal({ rincian: 'Tuxedo - Black size S 436.500', subtotal: 436500, layanan: 'CTC' }, catalog, [{ service: 'CTC', price: 45000 }], ['reg'], [], undefined, {}, promos)
+    assert.isTrue(afterPrice.ok)
+    if (afterPrice.ok) {
+      assert.include(afterPrice.items, 'Tuxedo - Black size S 485.000')
+      assert.include(afterPrice.items, 'Promo 10.10 -48.500')
+      assert.equal(afterPrice.subtotal, 436500)
+    }
     // AI menulis subtotal sesudah promo → diterima.
     assert.isTrue(matchAutoTotal({ rincian: 'Tuxedo - Black size L', subtotal: 436500, layanan: 'CTC' }, catalog, [{ service: 'CTC', price: 45000 }], ['reg'], [], undefined, {}, promos).ok)
     // Min belanja tidak terpenuhi → tanpa promo.
@@ -62,5 +70,19 @@ test.group('promo website untuk chat', () => {
     assert.deepEqual(unknownPrices(['Tuxedo Black jadi 400.000 bos'], allowed), [400000])
     assert.lengthOf(productPriceIssues(['Tuxedo sekarang 436.500 bos'], withPromoPrices(catalog, promos)), 0)
     assert.isNull(bestPromo(promos, catalog[2], 220000))
+  })
+})
+
+test.group('Uji percakapan · harga promo', () => {
+  test('pola harga harapan juga menerima harga promo yang berlaku', async ({ assert }) => {
+    const { withPromoPattern } = await import('#beta3/simulator')
+    const promos = activePromos(
+      normalizePromos({ items: [{ name: 'Promo Uji', scope: 'all', discount_type: 'percentage', discount_value: 7, starts_at: '2000-01-01 00:00:00', ends_at: '2999-12-31 23:59:59' }] })
+    )
+    const pattern = withPromoPattern('500\\.000|725\\.000', promos)
+    assert.match('jadi 451.050 bos', new RegExp(withPromoPattern('485\\.000', promos)))
+    assert.match('setelan 674.250', new RegExp(pattern))
+    assert.match('harga 725.000', new RegExp(pattern))
+    assert.equal(withPromoPattern('485\\.000', []), '485\\.000')
   })
 })

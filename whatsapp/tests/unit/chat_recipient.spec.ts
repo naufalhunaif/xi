@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
-import { recipientForm } from '#beta3/order_service'
-import { dropAiTotal, dropDuplicateBubbles, guardTotalPromise } from '#beta3/reply_service'
+import { looseAddressForm, recipientForm } from '#beta3/order_service'
+import { dropAiTotal, dropDuplicateBubbles, guardTotalPromise, splitDistrictCity } from '#beta3/reply_service'
 import { LEAN_OUTPUT_SCHEMA, parseLeanDecision } from '#beta3/prompt'
 
 // v3.6.124 — data penerima dikumpulkan lewat obrolan (bukan form) menjadi order. Data contoh fiktif.
@@ -86,5 +86,18 @@ test.group('Beta3 data penerima dari obrolan', () => {
     assert.lengthOf(out, 2)
     assert.include(out[1], 'Mau pakai yang mana')
     assert.deepEqual(dropDuplicateBubbles(['Siap bos', 'Mau pakai size apa bos?']), ['Siap bos', 'Mau pakai size apa bos?'])
+  })
+
+  test('alamat satu baris dengan "atas nama" dan "nomor": nama terbaca, jalan bersih, kota dipisah saat cek ongkir', ({ assert }) => {
+    const form = looseAddressForm('kirim ke desa sidamulya kec sidareja cilacap, atas nama rina, nomor 081200000003', '', '')
+    assert.equal(form!.customerName, 'Rina')
+    assert.equal(form!.phone, '081200000003')
+    assert.equal(form!.address, 'Desa Sidamulya, Kec. Sidareja Cilacap')
+    assert.deepEqual(splitDistrictCity({ district: 'Sidareja Cilacap', regency: '', postalCode: '' })[0], { district: 'Sidareja', regency: 'Cilacap', postalCode: '' })
+    assert.lengthOf(splitDistrictCity({ district: 'Kroya', regency: '', postalCode: '' }), 0)
+    assert.lengthOf(splitDistrictCity({ district: 'Kebon Jeruk', regency: 'Jakarta Barat', postalCode: '' }), 0)
+    const an = looseAddressForm('alamat: jl mawar 3 rt 2 rw 4, kec kroya, kab cilacap 53282 a.n. Dedi 081299990000', '', '')
+    assert.equal(an!.customerName, 'Dedi')
+    assert.equal(an!.address, 'Jl. Mawar 3 RT 2 RW 4, Kec. Kroya, Kab. Cilacap, 53282')
   })
 })
