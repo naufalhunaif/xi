@@ -268,6 +268,14 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
       if (lower !== numeric) continue
       const sized = group.rows.filter((row) => row.values.has(part))
       if (!sized.length) continue
+      // v3.6.128: "pinggang 34" = NOMOR size celana (label 28–40), bukan 34 cm (dulu → "paling dekat 28").
+      const label = lower && value < 50 ? group.rows.find((row) => row.size === String(value)) : undefined
+      if (label) {
+        lines.push(
+          `${group.name}: pelanggan menyebut ${part} ${value} = nomor size celana ${value} (bukan cm; ukuran jadinya ${label.values.get(part) ?? '-'} cm). Pakai size ${value} langsung, cek ready-nya di KATALOG.`
+        )
+        continue
+      }
       // Ukuran jadi yang PALING DEKAT dengan ukuran badan; bila sama dekat, pilih yang lebih besar.
       const sorted = [...sized].sort((a, b) => a.values.get(part)! - b.values.get(part)!)
       const largest = sorted[sorted.length - 1].values.get(part)!

@@ -1,5 +1,5 @@
 import { test } from '@japa/runner'
-import { activePromos, normalizePromos, renderPromoRule, withPromoPrices, bestPromo } from '#beta3/promos'
+import { activePromos, normalizePromos, renderPromoRule, withPromoPrices, bestPromo, promoPriceTable } from '#beta3/promos'
 import { matchAutoTotal } from '#beta3/order_service'
 import { allowedPrices, unknownPrices } from '#beta3/quality_service'
 import { productPriceIssues } from '#beta3/reply_check'
@@ -84,5 +84,18 @@ test.group('Uji percakapan · harga promo', () => {
     assert.match('setelan 674.250', new RegExp(pattern))
     assert.match('harga 725.000', new RegExp(pattern))
     assert.equal(withPromoPattern('485\\.000', []), '485\\.000')
+  })
+})
+
+test.group('Harga promo siap pakai', () => {
+  test('daftar harga katalog → harga promo dihitung sistem (termasuk ukuran besar)', ({ assert }) => {
+    const promos = activePromos(normalizePromos(raw), during)
+    const rows = [{ ...row('Tuxedo', 'Black', 485000), note: 'XXL-3XL 585.000' }, row('Pants', 'Black', 220000, 'Pants')]
+    const table = promoPriceTable(promos, rows)
+    assert.include(table, '485.000 → 436.500')
+    assert.include(table, '585.000 → 526.500')
+    // Promo kategori Suits: celana tidak ikut.
+    assert.notInclude(table, '220.000')
+    assert.include(renderPromoRule(normalizePromos(raw), during, rows), '485.000 → 436.500')
   })
 })

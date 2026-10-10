@@ -134,7 +134,7 @@ test.group('pemeriksa balasan (Jev) sebelum kirim (v3.6.78)', (group) => {
 
   test('reply_service: aturan grosir selalu ikut; draf diperiksa lalu ditulis ulang sekali', async ({ assert }) => {
     const source = await readFile('app/beta3/reply_service.ts', 'utf8')
-    assert.include(source, 'const store = [storeProfile, wholesale, renderPromoRule(promoState, now)]')
+    assert.include(source, 'const store = [storeProfile, wholesale, renderPromoRule(promoState, now, digest.rows)]')
     assert.include(source, "'beta3-revise'")
     assert.include(source, 'revisionNote(decision, check.issues)')
   })
@@ -577,6 +577,17 @@ test.group('Beta3 · ukuran baju vs badan (v3.6.84)', () => {
     assert.notInclude(body, 'ukuran baju')
     const note = renderFitResult({ recommended_size: 'XS' }, { height: 154, weight: 45 }, 'jacket')
     assert.include(note, 'XS → S')
+  })
+
+  test('v3.6.128: "pinggang 34" = nomor size celana, bukan 34 cm', async ({ assert }) => {
+    const { compareWithSizeChart } = await import('#beta3/context_service')
+    const chart = 'Pants 28-40 (cm): 28 lingkar pinggang 72; 33 lingkar pinggang 86; 34 lingkar pinggang 89; 35 lingkar pinggang 91'
+    const inRow = (body: string) => ({ direction: 'in' as const, body, createdAt: new Date() })
+    const label = compareWithSizeChart([inRow('celana yg pinggang 34 warna coklat ready?')], chart)
+    assert.include(label, 'nomor size celana 34')
+    assert.notInclude(label, 'Paling dekat: 28')
+    const cm = compareWithSizeChart([inRow('lingkar pinggang 88 cm')], chart)
+    assert.include(cm, 'Paling dekat: 34')
   })
 })
 

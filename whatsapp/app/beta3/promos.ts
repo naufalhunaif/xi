@@ -106,8 +106,40 @@ const until = (stamp: string) => {
   return `${d} ${month} ${String(time || '').slice(0, 5)} WIB`.trim()
 }
 
+/**
+ * v3.6.128 — Daftar "harga katalog → harga promo" yang sudah dihitung (AI pernah salah hitung 7%: 450.450).
+ * Harga ukuran besar (XXL-3XL di catatan) ikut. Maks 16 harga terbanyak.
+ */
+export function promoPriceTable(
+  promos: ChatPromo[],
+  rows: Array<{ product: string; color: string; category?: string; price: number | null; note?: string }>
+) {
+  return promos
+    .map((promo) => {
+      const prices = new Map<number, number>()
+      for (const row of rows) {
+        if (!row.price || !promoApplies(promo, row)) continue
+        const big = Number(String(row.note || '').match(/XXL(?:-\d?X*L)?\s+([\d.]{5,})/i)?.[1]?.replace(/\./g, '') || 0)
+        for (const value of [Number(row.price), big]) if (value > 0) prices.set(value, (prices.get(value) || 0) + 1)
+      }
+      const list = [...prices.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 16)
+        .map(([price]) => price)
+        .sort((a, b) => a - b)
+        .map((price) => `${price.toLocaleString('id-ID')} → ${(price - promoCut(promo, price)).toLocaleString('id-ID')}`)
+      return list.length ? `Harga ${promo.name} (sudah dihitung, pakai angka ini, jangan menghitung sendiri): ${list.join('; ')}` : ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
 /** Bagian PROMO untuk prompt. Selalu ada: tanpa promo biasa = tidak ada promo lewat chat. */
-export function renderPromoRule(state: PromoState, now = new Date()) {
+export function renderPromoRule(
+  state: PromoState,
+  now = new Date(),
+  rows: Array<{ product: string; color: string; category?: string; price: number | null; note?: string }> = []
+) {
   const active = activePromos(state, now)
   const webOnly = state.webOnly.random + state.webOnly.vouchers > 0
   if (!active.length)
@@ -126,6 +158,7 @@ export function renderPromoRule(state: PromoState, now = new Date()) {
   return [
     'PROMO yang berlaku juga untuk pesanan lewat chat (harga promo = harga KATALOG dikurangi potongan; total otomatis sudah memotongnya). Selain ini tidak ada promo lewat chat:',
     ...lines,
+    promoPriceTable(active, rows),
     webOnly ? 'Promo acak/voucher lain hanya saat checkout di website.' : '',
   ]
     .filter(Boolean)

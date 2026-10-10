@@ -408,10 +408,12 @@ export function parseLeanDecision(text: string): LeanDecision {
     .map((item) => String(item || '').trim())
     .filter(Boolean)
     .slice(0, 2)
+  // v3.6.128: maks 10 seperti skema ("minta lihat semua → maks 10"); dulu dipotong 5 → "ini fotonya" tapi
+  // Navy & White tidak terkirim (uji semua-warna-tuxedo).
   const foto = (Array.isArray(raw.foto) ? raw.foto : [])
     .map((item) => String(item || '').trim())
     .filter(Boolean)
-    .slice(0, 5)
+    .slice(0, 10)
   const tahap = normalizeStage(raw.tahap)
   return {
     pesan,

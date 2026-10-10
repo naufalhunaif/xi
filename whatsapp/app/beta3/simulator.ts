@@ -288,7 +288,7 @@ export async function judgeFacts(settings?: LeanSettings) {
   const wholesaleText = String((await readLeanState('wholesale').catch(() => '')) || '')
   // v3.6.127: promo website yang berlaku (sama dengan yang diberikan ke AI) — dulu penilai menganggap
   // "promo 10.10 diskon 7%" karangan karena tidak ada di FAKTA.
-  const promoRule = renderPromoRule(parsePromoState(String((await readLeanState('promos').catch(() => '')) || '')))
+  const promoRule = renderPromoRule(parsePromoState(String((await readLeanState('promos').catch(() => '')) || '')), new Date(), digest.rows)
   return [
     profile,
     `${promoRule}\nHarga promo = harga katalog − potongan promo (dibulatkan). Menyebut harga KATALOG normal maupun harga promo sama-sama BENAR — AI tidak wajib menyebut promo kecuali pelanggan menanyakan promo/diskon; potongan promo dihitung otomatis di total. Promo dan grosir tidak digabung: total memakai potongan yang lebih besar.`,

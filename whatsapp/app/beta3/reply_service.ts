@@ -1358,7 +1358,7 @@ export async function createLeanReply(input: {
   // v3.6.120: promo biasa website yang berlaku SAAT INI (juga untuk pesanan chat); tidak ada = tidak ada promo.
   const promoState = parsePromoState(String((await readLeanState('promos').catch(() => '')) || ''))
   const promos = activePromos(promoState, now)
-  const store = [storeProfile, wholesale, renderPromoRule(promoState, now)]
+  const store = [storeProfile, wholesale, renderPromoRule(promoState, now, digest.rows)]
     .filter(Boolean)
     .join('\n')
   const policy = await readExchangePolicy()
