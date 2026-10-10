@@ -67,7 +67,9 @@ export function relevantFacts(rows: LeanCatalogRow[], texts: string[], limit = 8
     const colors = variants
       .map((row) => `${row.color}${row.photoUrl ? ' ✓' : ''}${row.sizesReady ? ` [${row.sizesReady}]` : ''}`)
       .join(', ')
-    return `${name} (${variants[0]?.category || ''}): ${prices.join('/')}${big.length ? ` (XXL+ ${big.join('/')})` : ''} | warna: ${colors}`.slice(0, 900)
+    // v3.6.139 — ciri model (admin/hasil baca foto) ikut: kerah satin Peak Suit dll. bukan karangan.
+    const traits = String(variants.map((row) => row.features || row.featuresAi || '').find(Boolean) || '').replace(/\s+/g, ' ').slice(0, 160)
+    return `${name} (${variants[0]?.category || ''}): ${prices.join('/')}${big.length ? ` (XXL+ ${big.join('/')})` : ''}${traits ? ` | ciri: ${traits}` : ''} | warna: ${colors}`.slice(0, 900)
   })
 }
 
@@ -423,6 +425,8 @@ const REVIEW_SCHEMA = {
   required: ['ok', 'masalah'],
 }
 
+const TOTAL_ASK = /\b(?:total|jumlah (?:bayar|pembayaran))\b/i
+
 /**
  * v3.6.79 — Pemeriksa AI (model biasa, prompt kecil) di samping Jev: uji 8 Okt menunjukkan Jev
  * menilai "sesuai" pada foto yang kurang dan salah tangkap "item" (= hitam). Hanya masalah jelas.
@@ -434,6 +438,7 @@ async function aiReview(settings: LeanProviderSettings, state: Record<string, un
       system: [
         'Kamu pemeriksa balasan CS toko jas SEBELUM dikirim ke pelanggan. Balas HANYA JSON sesuai skema.',
         'Periksa: (1) maksud pesan_pelanggan terjawab — pahami bahasa tidak baku, daerah, salah ketik, singkatan, dan sebutan warna (item/hitem/ireng = hitam, dongker = navy, marun = maroon, krem = cream, abu = gray, pth = putih); (2) foto_dikirim PERSIS sama dengan produk & warna yang disebut atau dijanjikan balasan — warna yang dijanjikan fotonya ("ini fotonya …") tapi tidak ada fotonya = foto_kurang (sekadar menyebut daftar warna tanpa menjanjikan foto tiap warna BUKAN foto_kurang), foto yang tidak disebut/diminta = foto_lebih, produk/warna berbeda = foto_beda; pelanggan minta semua warna tapi hanya sebagian padahal fakta_katalog punya foto (✓) lainnya = foto_kurang; (3) harga, warna, size ready, dan TOTAL gabungan (mis. jas + celana = harga setelan) sesuai fakta_katalog; angka ongkir harus dari data alat di fakta_katalog — tanpa data, menanyakan info yang kurang itu BENAR; (4) tidak menanyakan ulang yang sudah dijawab; data yang sudah diberi pelanggan (size, nomor celana, alamat) diakui dulu; (5) tidak mengarang = fakta_salah: alasan (mis. kenaikan harga), janji layanan (mis. dikabari saat diantar), klaim (terlaris), atau paket yang tidak ada di fakta_katalog (setelan hanya untuk produk berlabel Setelan); lama/tanggal pengerjaan beda dengan ESTIMASI PRODUKSI, atau bilang "belum ada fotonya" padahal fakta_katalog bertanda ✓ = fakta_salah; size yang disarankan beda dengan "Paling dekat" di PERBANDINGAN SIZE CHART = fakta_salah; menyatakan pesanan/data "belum tercatat" atau meminta ulang data yang ada di percakapan_sebelumnya = mengulang; pertanyaan yang jawabannya ada di data (bahan, lama jadi, alamat) malah dibalas pertanyaan balik = tidak_menjawab; pelanggan mau datang saat toko tutup (lihat Waktu sekarang & jam buka) tapi tidak diberi tahu = tidak_menjawab; (6) pesan bukan soal produk (keluhan website, tawaran kerja sama/jasa dari bisnis lain) dijawab dengan topik lain = tidak_menjawab; (7) keadaan_chat = hal yang SUDAH terjadi di chat (resi, pembayaran, harga yang sudah disebut, data pelanggan): balasan yang membantahnya = fakta_salah, yang menanyakannya ulang atau bilang "saya cek dulu" padahal sudah ada = mengulang.',
+        '(8) Total pembayaran (harga + ongkir) dan rekening dikirim SISTEM otomatis sesudah balasan — balasan yang tidak menyebut total BUKAN masalah. Ciri model di fakta_katalog ("ciri:") sah disebut.',
         'Laporkan hanya masalah yang JELAS. Bila balasan benar atau kamu ragu → ok=true, masalah=[]. penjelasan: satu kalimat bahasa Indonesia yang menyebut apa yang harus diubah.',
       ].join('\n'),
       user: JSON.stringify(state),
@@ -453,8 +458,39 @@ async function aiReview(settings: LeanProviderSettings, state: Record<string, un
     ? []
     : (parsed.masalah || [])
         .filter((item) => item.jenis && codes.has(item.jenis))
+        // v3.6.139 — total dikirim sistem sesudah balasan (uji: ±10 tulis ulang karena "belum menyebut total").
+        .filter((item) => !(item.jenis === 'tidak_menjawab' && TOTAL_ASK.test(String(item.penjelasan || ''))))
         .map((item) => ({ code: item.jenis as CheckIssue['code'], detail: `${CHECK_LABEL[item.jenis as CheckIssue['code']]}: ${String(item.penjelasan || '').slice(0, 300)}` }))
   return { issues, usage: reply.usage }
+}
+
+const ALL_COLORS = /\b(?:s(?:e)?mua|semuanya|all)\b/i
+const SEE_WORDS = /\b(?:warna|foto|liat|lihat|color)/i
+/**
+ * v3.6.139 — Pelanggan minta lihat SEMUA warna: semua varian berfoto dari produk yang dibahas ikut dikirim
+ * SEBELUM pemeriksa (uji 4 putaran: foto Signature Broken White FW selalu tertinggal → tulis ulang).
+ */
+export function allColorPhotos(customerText: string, foto: string[], rows: LeanCatalogRow[], max = 10) {
+  if (!ALL_COLORS.test(customerText) || !SEE_WORDS.test(customerText)) return []
+  const text = ` ${fold(customerText)} `
+  const products = new Set(foto.map((label) => findCatalogVariant(rows, label)?.product).filter((name): name is string => Boolean(name)))
+  if (!products.size)
+    for (const name of [...new Set(rows.map((row) => row.product))].sort((a, b) => b.length - a.length))
+      if (fold(name).length >= 4 && text.includes(` ${fold(name)}`)) {
+        products.add(name)
+        break
+      }
+  const labels = new Set(foto.map((label) => fold(label)))
+  const extra: string[] = []
+  for (const product of products)
+    for (const row of rows) {
+      if (row.product !== product || !row.photoUrl || row.active === false || /tidak tampil di web/i.test(row.note || '')) continue
+      const label = row.color ? `${row.product} - ${row.color}` : row.product
+      if (labels.has(fold(label)) || foto.length + extra.length >= max) continue
+      labels.add(fold(label))
+      extra.push(label)
+    }
+  return extra
 }
 
 /**

@@ -134,6 +134,53 @@ export function promoPriceTable(
     .join('\n')
 }
 
+/**
+ * v3.6.139 — Harga normal produk yang kena promo disebut tanpa harga promonya → harga promo ditambahkan
+ * sistem (pasti, dari katalog). Uji 5 putaran: ±30% catatan pemeriksa = "harga belum memakai promo" →
+ * tulis ulang ±12 dtk. Harga yang dipakai beberapa produk dengan hasil promo berbeda dilewati.
+ */
+export function mentionPromoPrices(
+  pesan: string[],
+  rows: Array<{ product: string; color: string; category?: string; price: number | null; note?: string; active?: boolean }>,
+  promos: ChatPromo[]
+) {
+  const usable = promos.filter((promo) => !(promo.minimumSpend > 0))
+  const added: number[] = []
+  if (!usable.length || !pesan.length) return { pesan, added }
+  const table = new Map<number, { promo: number; name: string } | null>()
+  for (const row of rows) {
+    if (!row.price || row.active === false) continue
+    const big = Number(String(row.note || '').match(/XXL(?:-\d?X*L)?\s+([\d.]{5,})/i)?.[1]?.replace(/\./g, '') || 0)
+    for (const value of [Number(row.price), big]) {
+      if (!(value > 0)) continue
+      const best = bestPromo(usable, row, value)
+      const next = best ? { promo: value - best.cut, name: String(best.promo.name || '').replace(/^promo\s+/i, '').trim() } : null
+      if (!table.has(value)) table.set(value, next)
+      else {
+        const current = table.get(value)
+        if (!current || !next || current.promo !== next.promo) table.set(value, null)
+      }
+    }
+  }
+  const money = (value: number) => value.toLocaleString('id-ID')
+  const joined = pesan.join('\n')
+  const out = pesan.map((bubble) => {
+    // Total/ongkir/grosir dihitung sistem sendiri.
+    if (/\b(?:total|subtotal|ongkir|grosir|dp)\b/i.test(bubble)) return bubble
+    return bubble.replace(/(?<![\d.])(?:Rp\.?\s?)?(\d{1,3}(?:\.\d{3})+)(?![\d.])/g, (match: string, num: string, offset: number) => {
+      const value = Number(num.replace(/\./g, ''))
+      const hit = table.get(value)
+      if (!hit || hit.promo === value || added.includes(value) || joined.includes(money(hit.promo))) return match
+      const before = bubble.slice(Math.max(0, offset - 16), offset)
+      const after = bubble.slice(offset + match.length, offset + match.length + 24)
+      if (/\b(?:selisih|beda|tambah|nambah|potongan|diskon|hemat|lebih)\b/i.test(before) || /promo|diskon|jadi|coret/i.test(after)) return match
+      added.push(value)
+      return `${match} (promo${hit.name ? ` ${hit.name}` : ''} jadi ${money(hit.promo)})`
+    })
+  })
+  return { pesan: out, added }
+}
+
 /** Bagian PROMO untuk prompt. Selalu ada: tanpa promo biasa = tidak ada promo lewat chat. */
 export function renderPromoRule(
   state: PromoState,
@@ -156,7 +203,7 @@ export function renderPromoRule(
     return `- ${promo.name}: ${cut} untuk ${target}${min}, sampai ${until(promo.endsAt)}`
   })
   return [
-    'PROMO yang berlaku juga untuk pesanan lewat chat (harga promo = harga KATALOG dikurangi potongan; total otomatis sudah memotongnya). Selain ini tidak ada promo lewat chat:',
+    'PROMO yang berlaku juga untuk pesanan lewat chat (harga promo = harga KATALOG dikurangi potongan; total otomatis sudah memotongnya; tiap menyebut harga produk yang kena promo, sebut juga harga promonya). Selain ini tidak ada promo lewat chat:',
     ...lines,
     promoPriceTable(active, rows),
     webOnly ? 'Promo acak/voucher lain hanya saat checkout di website.' : '',

@@ -1,5 +1,5 @@
 // Beta 3 — alur AI CS. Tabel whatsapp_beta3_*, state & skill sendiri.
-import { activePromos, parsePromoState, renderPromoRule } from '#beta3/promos'
+import { activePromos, mentionPromoPrices, parsePromoState, renderPromoRule } from '#beta3/promos'
 import db from '#services/workspace_database'
 import { phoneFromJid } from '#services/customer_identity_service'
 import { estimateTokens } from '#services/prompt_size_service'
@@ -95,7 +95,7 @@ import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { renderPaymentMessage } from '#beta3/order_service'
-import { alignPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, allColorPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
 import { renderChatState } from '#beta3/chat_state'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
@@ -1572,6 +1572,27 @@ export async function createLeanReply(input: {
   const viaChatOrder = await chatOrderReply(decision.penerima)
   if (viaChatOrder) return viaChatOrder
 
+  // v3.6.139 — Fakta pasti dipasang KODE sebelum pemeriksa (tebak duluan, yang diproses hanya selisihnya):
+  // harga promo di samping harga normal, dan semua foto warna bila pelanggan minta lihat semua warna.
+  const presetDraft = () => {
+    const promoFix = mentionPromoPrices(decision.pesan, digest.rows, promos)
+    if (promoFix.added.length) {
+      decision.pesan = promoFix.pesan
+      onTrace?.({
+        key: 'beta3-promo-price',
+        label: `Harga promo ditambahkan · ${promoFix.added.map((value) => value.toLocaleString('id-ID')).join(', ')}`,
+        status: 'completed',
+        detail: { pesan: decision.pesan },
+      })
+    }
+    const allPhotos = allColorPhotos(input.text, decision.foto || [], digest.rows)
+    if (allPhotos.length) {
+      decision.foto = [...(decision.foto || []), ...allPhotos]
+      onTrace?.({ key: 'beta3-photo-all', label: `Semua warna difoto · ${allPhotos.join(', ')}`, status: 'completed', detail: { ditambah: allPhotos } })
+    }
+  }
+  presetDraft()
+
   // v3.6.78 Pemeriksa balasan (Jev): draf dinilai sebelum kirim — foto sesuai ucapan, maksud terjawab,
   // fakta sesuai katalog, tidak mengulang. Ada masalah yakin → AI menulis ulang SEKALI dengan catatannya.
   const check = await checkReply({
@@ -1606,6 +1627,7 @@ export async function createLeanReply(input: {
       )
       const fixed = parseLeanDecision(revised.text)
       decision = fixed
+      presetDraft()
       result.usage = mergeUsage(result.usage, revised.usage)
       onTrace?.({ key: 'beta3-revise', label: 'Balasan ditulis ulang sesuai pemeriksa', status: 'completed', detail: { pesan: fixed.pesan, foto: fixed.foto } })
       // Tulisan ulang baru menyadari data penerima lengkap (mis. pemeriksa: "jangan minta isi form lagi").
