@@ -249,6 +249,52 @@ export function looseAddressForm(
   }
 }
 
+/**
+ * v3.6.124 — Data penerima yang dikumpulkan AI lewat obrolan ("Naufal", "pake nomor ini aja", alamat tanpa
+ * format form) → form order, supaya ongkir dicek dan total terkirim seperti form biasa. Kasus 10 Okt: AI bilang
+ * "data sudah lengkap, saya proses totalnya" tapi tidak ada order → total tidak pernah dikirim.
+ * Pengaman: nama dan kecamatan/kota harus memang ditulis pelanggan; kode pos hanya bila ditulis pelanggan.
+ */
+export function recipientForm(
+  recipient: { nama: string; alamat: string; kecamatan: string; kota: string; kode_pos: string; telp: string } | null | undefined,
+  customerText: string,
+  waPhone = ''
+): { form: ParsedOrderForm; fromWa: boolean } | null {
+  if (!recipient) return null
+  const squash = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const said = squash(customerText)
+  const saidWord = (value: string) => {
+    const word = squash(value.replace(/^(?:kec(?:amatan)?|kab(?:upaten)?|kota)\.?\s+/i, ''))
+    return word.length >= 3 && said.includes(word)
+  }
+  const name = recipient.nama.trim()
+  const address = recipient.alamat.trim()
+  const district = recipient.kecamatan.replace(/^kec(?:amatan)?\.?\s+/i, '').trim()
+  const regency = recipient.kota.trim()
+  const first = squash(name.split(/\s+/)[0] || '')
+  if (first.length < 2 || !said.includes(first)) return null
+  if (address.length < 6 || (!saidWord(district) && !saidWord(regency))) return null
+  if (!district && !regency) return null
+  const postal = /^\d{5}$/.test(recipient.kode_pos.trim()) && said.includes(recipient.kode_pos.trim()) ? recipient.kode_pos.trim() : ''
+  const digits = recipient.telp.replace(/[^\d+]/g, '').replace(/^\+?62/, '0')
+  const typedPhone = /^08\d{7,12}$/.test(digits) && said.includes(digits.slice(1)) ? digits : ''
+  const phone = typedPhone || waPhone
+  if (!phone) return null
+  const has = (part: string) => !part || squash(address).includes(squash(part))
+  const full = [
+    address,
+    has(district) ? '' : `Kec. ${district}`,
+    has(regency) ? '' : regency,
+    postal && !address.includes(postal) ? postal : '',
+  ]
+    .filter(Boolean)
+    .join(', ')
+  return {
+    form: { customerName: name, address: full, district, regency, postalCode: postal, phone, note: '' },
+    fromWa: !typedPhone,
+  }
+}
+
 export async function saveLeanOrder(input: {
   jid: string
   sourceMessageId?: string

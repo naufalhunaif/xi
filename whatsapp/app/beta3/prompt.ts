@@ -123,6 +123,30 @@ export const LEAN_OUTPUT_SCHEMA = {
       description:
         'Satu kalimat susulan yang MEMBANTU, bukan menagih. TIDAK dikirim sekarang; sistem mengirimnya hanya bila pelanggan diam (waktu mengikuti tahap, tidak di malam hari). Isi dengan bantuan konkret sesuai tahap: tawarkan foto warna/model lain, bantu size dari tinggi & berat, sebut estimasi jadi, atau ingatkan total/rekening dengan sopan. Goal = pembelian: selama belum order/bayar isi satu langkah berikutnya menuju order yang nyambung dengan produk/harga yang barusan dibahas. Jangan "jadi gimana bos?" atau mengulang pertanyaan pesan utama. Kosong hanya bila pelanggan bilang nanti/pikir-pikir dulu, pesanan selesai, atau diserahkan ke CS.',
     },
+    penerima: {
+      // v3.6.124: data pengiriman yang dikumpulkan lewat obrolan (bukan form) → sistem mencatat order + cek ongkir + total.
+      anyOf: [
+        {
+          type: 'object',
+          additionalProperties: false,
+          description:
+            'Isi bila BELUM ada form order tercatat dan pelanggan sudah memilih produk + size, lalu lewat obrolan SUDAH memberi nama penerima, alamat dengan kecamatan & kab/kota, dan no telp (atau minta "pakai nomor ini"). Sistem lalu mencatat order, mengecek ongkir, dan mengirim total — jangan minta pelanggan mengisi form lagi. Hanya dari ucapan pelanggan, jangan mengarang. Kode pos TIDAK wajib (kecamatan + kab/kota cukup): jangan menanyakan atau menebak kode pos. null bila data belum lengkap atau form sudah tercatat.',
+          properties: {
+            nama: { type: 'string', description: 'Nama penerima persis dari pelanggan.' },
+            alamat: { type: 'string', description: 'Alamat seperti ditulis pelanggan (jalan, desa/kelurahan).' },
+            kecamatan: { type: 'string' },
+            kota: { type: 'string', description: 'Kabupaten/kota.' },
+            kode_pos: { type: 'string', description: 'Hanya bila pelanggan menuliskannya; selain itu kosong.' },
+            telp: {
+              type: 'string',
+              description: 'No telp dari pelanggan; "nomor ini" bila pelanggan minta pakai nomor WhatsApp ini.',
+            },
+          },
+          required: ['nama', 'alamat', 'kecamatan', 'kota', 'kode_pos', 'telp'],
+        },
+        { type: 'null' },
+      ],
+    },
     order: {
       anyOf: [
         {
@@ -161,6 +185,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     'referensi',
     'bukti',
     'pembayaran',
+    'penerima',
     'order',
   ],
 } as const
@@ -177,8 +202,11 @@ export type LeanPaymentInfo = {
   dikonfirmasi: boolean
 }
 
+export type LeanRecipient = { nama: string; alamat: string; kecamatan: string; kota: string; kode_pos: string; telp: string }
+
 export type LeanDecision = {
   order?: LeanOrderDraft
+  penerima?: LeanRecipient
   pembayaran?: LeanPaymentInfo
   referensi?: LeanRefDraft[]
   bukti?: number[]
@@ -438,6 +466,19 @@ export function parseLeanDecision(text: string): LeanDecision {
       .map((value) => Math.round(Number(value) || 0))
       .filter((value) => value > 0)
       .slice(0, 10),
+    ...(raw.penerima && typeof raw.penerima === 'object'
+      ? {
+          penerima: Object.fromEntries(
+            (['nama', 'alamat', 'kecamatan', 'kota', 'kode_pos', 'telp'] as const).map((key) => [
+              key,
+              String((raw.penerima as Record<string, unknown>)[key] || '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, key === 'alamat' ? 300 : 80),
+            ])
+          ) as LeanRecipient,
+        }
+      : {}),
     ...(raw.order && typeof raw.order === 'object'
       ? {
           order: {

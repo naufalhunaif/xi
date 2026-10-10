@@ -27,6 +27,7 @@ import {
   reopenLeanOrderForChange,
   reopenUntotaledOrder,
   totalWasSent,
+  recipientForm,
   adoptCsTotal,
   type VerifiedAutoTotal,
 } from '#beta3/order_service'
@@ -302,7 +303,8 @@ export function guardTotalPromise(
   pesan: string[],
   options: { address: string; hasAddress: boolean; jev?: boolean; asked?: boolean }
 ) {
-  const promise = /\b(ini|berikut|saya kirim\w*|kami kirim\w*|menyusul)\b[^.?!\n]*\btotal\w*\b[^.?!\n]*/i
+  // v3.6.124: juga "saya proses dulu totalnya" / "saya hitungkan totalnya" (janji tanpa order tercatat).
+  const promise = /\b(ini|berikut|saya kirim\w*|kami kirim\w*|menyusul|saya proses\w*|saya hitung\w*)\b[^.?!\n]*\btotal\w*\b[^.?!\n]*/i
   const promiseAfter = /\btotal\w*\b[^.?!\n]*\b(saya kirim\w*|kami kirim\w*|menyusul|dikirim\w*)\b[^.?!\n]*/i
   const matched = pesan.some((bubble) => promise.test(bubble) || promiseAfter.test(bubble))
   // Jev yakin (true/false) menang atas pola kata.
@@ -617,6 +619,8 @@ export async function createLeanReply(input: {
   simulate?: boolean
   /** v3.6.111 Uji chat nyata: "sekarang" = waktu chat asli. */
   now?: Date
+  /** v3.6.124: giliran ulang setelah order dicatat dari data penerima di obrolan (tidak diulang lagi). */
+  chatOrder?: boolean
 }): Promise<LeanReply> {
   const { jid, settings, onTrace } = input
   const now = input.now || new Date()
@@ -1466,6 +1470,56 @@ export async function createLeanReply(input: {
     }
     onTrace?.({ key: 'beta3-tidy-text', label: 'Jawaban teks biasa dirapikan sistem', status: 'completed', detail: { bubbles } })
   }
+  // v3.6.124 — Data penerima lengkap dikumpulkan lewat obrolan (bukan form): dicatat sebagai order seperti form,
+  // lalu balasan disusun ulang sekali dengan ongkir + total otomatis. Dulu: "data sudah lengkap, saya proses
+  // totalnya" tanpa order → total tidak pernah dikirim.
+  const chatOrderReply = async (recipient: LeanDecision['penerima']) => {
+    if (!recipient || input.simulate || input.chatOrder || form || orderId) return null
+    const items = String(decision.spesifikasi || spec || '').trim()
+    if (!items) return null
+    const said = [...rows.filter((row) => row.direction === 'in').map((row) => String(row.body || '')), input.text].join('\n')
+    const waPhone = phoneFromJid(jid)
+    const built = recipientForm(recipient, said, waPhone ? `0${waPhone.replace(/^62/, '')}` : '')
+    if (!built) {
+      onTrace?.({ key: 'beta3-order', label: 'Data penerima dari obrolan belum lengkap · tidak dicatat', status: 'completed', detail: { penerima: recipient } })
+      return null
+    }
+    const latest = await latestLeanOrder(jid).catch(() => null)
+    if (latest && ['pending', 'awaiting_payment'].includes(String(latest.status)) && Date.now() - new Date(latest.created_at).getTime() < 7 * 24 * 60 * 60_000)
+      return null
+    const id = await saveLeanOrder({
+      jid,
+      sourceMessageId: input.messageIds[input.messageIds.length - 1],
+      form: built.form,
+      items,
+      spec: items,
+      chatNote: decision.catatan || chatNote,
+    })
+    if (!spec && decision.spesifikasi) await writeOrderSpec(jid, decision.spesifikasi).catch(() => null)
+    onTrace?.({
+      key: 'beta3-order',
+      label: `Data penerima lengkap dari obrolan · order #${id} dicatat · balasan disusun ulang dengan ongkir/total`,
+      status: 'completed',
+      detail: { orderId: id, form: built.form, draf: decision.pesan },
+    })
+    const next = await createLeanReply({
+      ...input,
+      chatOrder: true,
+      note: [
+        input.note,
+        'Data penerima sudah lengkap dari obrolan dan sudah dicatat sistem sebagai order — jangan minta pelanggan mengisi form atau mengulang data.' +
+          (built.fromWa ? ' No. telp penerima = nomor WhatsApp chat ini; jangan menanyakan nomor telp.' : '') +
+          (built.form.postalCode ? '' : ' Kode pos tidak diperlukan; jangan menanyakannya.'),
+      ]
+        .filter(Boolean)
+        .join(' '),
+    })
+    next.usage = mergeUsage(result.usage, next.usage)
+    return next
+  }
+  const viaChatOrder = await chatOrderReply(decision.penerima)
+  if (viaChatOrder) return viaChatOrder
+
   // v3.6.78 Pemeriksa balasan (Jev): draf dinilai sebelum kirim — foto sesuai ucapan, maksud terjawab,
   // fakta sesuai katalog, tidak mengulang. Ada masalah yakin → AI menulis ulang SEKALI dengan catatannya.
   const check = await checkReply({
@@ -1501,6 +1555,9 @@ export async function createLeanReply(input: {
       decision = fixed
       result.usage = mergeUsage(result.usage, revised.usage)
       onTrace?.({ key: 'beta3-revise', label: 'Balasan ditulis ulang sesuai pemeriksa', status: 'completed', detail: { pesan: fixed.pesan, foto: fixed.foto } })
+      // Tulisan ulang baru menyadari data penerima lengkap (mis. pemeriksa: "jangan minta isi form lagi").
+      const viaRevised = await chatOrderReply(fixed.penerima)
+      if (viaRevised) return viaRevised
     } catch (error) {
       onTrace?.({ key: 'beta3-revise', label: 'Tulis ulang gagal · draf awal dipakai', status: 'failed', detail: { error: error instanceof Error ? error.message : String(error) } })
     }
@@ -1921,16 +1978,16 @@ export async function createLeanReply(input: {
       jev: jevPromise,
       address: style?.address || 'bos',
       hasAddress: rows.some(
-        (row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos)\b/i.test(String(row.body || ''))
+        (row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos|jl|jln|jalan|gg|gang|desa|dusun|rt|rw)\b/i.test(String(row.body || ''))
       ),
       asked: rows.filter((row) => row.direction === 'out' && !row.current).slice(-3).some((row) => /data pengiriman|alamat lengkap/i.test(String(row.body || ''))),
     })
     if (guarded.changed) {
       // v3.6.82: kalimat yang dipotong pola sering patah ("rekeningnya nanti .", "DP-nya sekitar setengah
       // dari") — AI menulis ulang dulu dengan bahasa wajar; hasilnya dicek pola yang sama, gagal → potongan lama.
-      const hasAddress = rows.some((row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos)\b/i.test(String(row.body || '')))
+      const hasAddress = rows.some((row) => row.direction === 'in' && /\b(alamat|kecamatan|kec\.|kabupaten|kab\.|kode ?pos|jl|jln|jalan|gg|gang|desa|dusun|rt|rw)\b/i.test(String(row.body || '')))
       const asked = rows.filter((row) => row.direction === 'out' && !row.current).slice(-3).some((row) => /data pengiriman|alamat lengkap/i.test(String(row.body || '')))
-      const rewritten = await runLeanProvider(
+      const remade = await runLeanProvider(
         settings,
         {
           system: prompt.system,
@@ -1941,8 +1998,12 @@ export async function createLeanReply(input: {
         undefined,
         { jid, tier: tierChoice.tier }
       )
-        .then((made) => parseLeanDecision(made.text).pesan)
+        .then((made) => parseLeanDecision(made.text))
         .catch(() => null)
+      // v3.6.124: tulisan ulang menyadari data penerima sudah lengkap → order dicatat, total dikirim sistem.
+      const viaPromise = await chatOrderReply(remade?.penerima)
+      if (viaPromise) return viaPromise
+      const rewritten = remade?.pesan
       const clean =
         rewritten?.length &&
         !guardTotalPromise(rewritten, { address: style?.address || 'bos', hasAddress }).changed &&
