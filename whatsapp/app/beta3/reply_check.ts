@@ -5,6 +5,7 @@
 import { withPromoPrices, type ChatPromo } from '#beta3/promos'
 import { askJev, confident, jevOn, logDecision, maskPii, scoreLevel, type JevAnswer } from '#beta3/jev'
 import { findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
+import { withoutNoPhotoClauses } from '#beta3/reply_polish'
 import type { LeanDecision, LeanHistoryRow } from '#beta3/prompt'
 import type { TokenUsage } from '#services/usage_service'
 import { runLeanProvider, type LeanProviderSettings } from '#beta3/provider'
@@ -231,6 +232,45 @@ export function readyClaimIssues(pesan: string[], rows: LeanCatalogRow[]): Check
   return issues
 }
 
+/**
+ * v3.6.131 — Kebalikan readyClaimIssues: "jas ireng ukuran L isih ono?" → "Ada bos, size L ready … Basic Suit,
+ * Peak Suit, sama Tuxedo warna hitam" padahal Tuxedo Black tidak ready L. Satu warna + satu size dari pesan
+ * pelanggan/balasan; tiap produk yang ditawarkan di balasan dicek ke size ready varian warna itu.
+ */
+export function readyOfferIssues(pesan: string[], customerText: string, rows: LeanCatalogRow[]): CheckIssue[] {
+  const reply = pesan.join('\n')
+  if (!/\b(ready|ada|masih|tersedia|stok)\b/i.test(reply) || NOT_READY.test(reply)) return []
+  const base = (color: string) => fold(color).replace(/\s*\d+(?:\.\d+)?$/, '')
+  const norm = (value: string) => ` ${fold(value).replace(/[^a-z0-9.\s-]/g, ' ')} `
+  const both = norm(`${customerText}\n${reply}`)
+  const said = (text: string, color: string) =>
+    [color, ...(COLOR_ALIASES[color] || [])].some((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:nya)?\\b`).test(text))
+  const colors = [...new Set(rows.map((row) => base(row.color)).filter((color) => color.length >= 3))]
+  // "ireng" (Jawa) = hitam.
+  const named = colors.filter((color) => said(both, color) || (color === 'black' && /\b(ireng|item)\b/.test(both)))
+  const distinct = named.filter((color) => !named.some((other) => other !== color && other.includes(color)))
+  const sizes = [...new Set([...both.matchAll(/\b(?:size|ukuran|uk)\s+(xs|s|m|l|xl|xxl|[2-5]xl)\b/g)].map((match) => match[1].toUpperCase()))]
+  if (distinct.length !== 1 || sizes.length !== 1) return []
+  const size = sizes[0]
+  let text = norm(reply)
+  const issues: CheckIssue[] = []
+  const products = [...new Set(rows.map((row) => row.product))].sort((a, b) => b.length - a.length)
+  for (const product of products) {
+    const key = fold(product)
+    if (!text.includes(` ${key} `)) continue
+    text = text.split(` ${key} `).join(' ')
+    const variants = rows.filter((row) => row.product === product && base(row.color) === distinct[0] && row.active !== false)
+    if (!variants.length) continue
+    const ready = variants.some((row) => String(row.sizesReady || '').toUpperCase().split(/[\s,/]+/).includes(size))
+    if (!ready)
+      issues.push({
+        code: 'fakta_salah',
+        detail: `${CHECK_LABEL.fakta_salah}: ${variants.map((row) => `${row.product} - ${row.color}`).join(', ')} size ${size} TIDAK ready (ready: ${variants.map((row) => row.sizesReady || '-').join(' / ')}) — jangan ditawarkan sebagai ready; sebut hanya yang ready, yang lain pre-order.`,
+      })
+  }
+  return issues
+}
+
 export async function checkReply(input: {
   jid: string
   customerText: string
@@ -253,6 +293,7 @@ export async function checkReply(input: {
   issues.push(
     ...colorPriceIssues(input.decision.pesan, withPromoPrices(input.rows, input.promos || [])),
     ...readyClaimIssues(input.decision.pesan, input.rows),
+    ...readyOfferIssues(input.decision.pesan, input.customerText, input.rows),
     ...productPriceIssues(input.decision.pesan, withPromoPrices(input.rows, input.promos || [])),
     ...repeatIssues(input.decision.pesan, input.history)
   )
@@ -409,7 +450,9 @@ async function aiReview(settings: LeanProviderSettings, state: Record<string, un
  * dibuang (pasti, dari katalog). Tanpa warna yang disebut sama sekali → tidak diubah.
  */
 export function offColorPhotos(foto: string[], texts: string[], rows: LeanCatalogRow[]) {
-  const text = ` ${fold(texts.join(' ')).replace(/[^a-z0-9.\s-]/g, ' ')} `
+  // v3.6.131: pelanggan minta lihat SEMUA warna → foto tidak dibuang (dulu semua foto Tuxedo hilang).
+  if (/\b(?:s(?:e)?mua|semuanya|all)\b/i.test(texts[0] || '') && /\b(?:warna|foto|liat|lihat|color)/i.test(texts[0] || '')) return []
+  const text = ` ${fold(texts.map(withoutNoPhotoClauses).join(' ')).replace(/[^a-z0-9.\s-]/g, ' ')} `
   const said = (color: string) =>
     [color, ...(COLOR_ALIASES[color] || [])].some((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:nya)?\\b`).test(text))
   const colorOf = (label: string) => baseColor(findCatalogVariant(rows, label)?.color || label.split(' - ').slice(1).join(' - '))
@@ -441,7 +484,7 @@ const baseColor = (color: string) => fold(color).replace(/\s*\d+(?:\.\d+)?$/, ''
  * difoto dan disebut di balasan ikut dikirim bila punya foto (maks 10).
  */
 export function alignPhotos(pesan: string[], foto: string[], rows: LeanCatalogRow[], max = 10) {
-  const text = ` ${fold(pesan.join(' ')).replace(/[^a-z0-9.\s-]/g, ' ')} `
+  const text = ` ${fold(pesan.map(withoutNoPhotoClauses).join(' ')).replace(/[^a-z0-9.\s-]/g, ' ')} `
   const chosen = foto.map((label) => findCatalogVariant(rows, label)).filter((row): row is LeanCatalogRow => Boolean(row?.photoUrl))
   const labels = [...foto]
   const added: string[] = []

@@ -63,6 +63,19 @@ export function compactPhotoIntro(
 
 const PROMISES_PHOTO = /\b(foto|fotonya|gambar|gambarnya|contohnya)\b/i
 
+/**
+ * v3.6.131 — Kalimat "… belum ada fotonya" bukan janji foto: dibuang sebelum foto dilengkapi/diselaraskan
+ * (uji: "Basic Suit Signature Black belum ada fotonya" malah dikirimi foto Basic Suit Black 2.0, dan warna
+ * tanpa foto yang disebut membuat semua foto Tuxedo dibuang).
+ */
+const NO_PHOTO = /\b(?:belum|tidak|tdk|gak|ga|nggak|blm)\s+(?:ada\s+)?(?:foto|gambar)\w*|\btanpa\s+foto\b|\bbelum\s+difoto\b/i
+export function withoutNoPhotoClauses(text: string) {
+  return String(text || '')
+    .split(/(?<=[.!?\n])|,\s*(?=(?:kalau|kalo|tapi|untuk|yang)\b)/i)
+    .filter((part) => !NO_PHOTO.test(part))
+    .join(' ')
+}
+
 type PhotoRow = { product: string; color: string; photoUrl: string | null; active?: boolean }
 
 /**
@@ -71,7 +84,7 @@ type PhotoRow = { product: string; color: string; photoUrl: string | null; activ
  * disebut di balasan bila ada, selain itu varian pertama yang punya foto). Mengembalikan label tambahan.
  */
 export function completePhotos(pesan: string[], foto: string[], customerText: string, rows: PhotoRow[], max = 6) {
-  const text = pesan.join('\n')
+  const text = withoutNoPhotoClauses(pesan.join('\n'))
   if (!PROMISES_PHOTO.test(text) && !SEE_REQUEST.test(customerText)) return []
   const withPhoto = rows.filter((row) => row.photoUrl && row.active !== false)
   const names = [...new Set(withPhoto.map((row) => row.product))]
