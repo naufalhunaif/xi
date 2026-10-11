@@ -313,3 +313,33 @@ test.group('uji 100 chat v3.6.162', () => {
     assert.equal(priceEcho('ukuran 34', rows), '')
   })
 })
+
+// v3.6.167 — uji #58
+test.group('uji #58 (v3.6.167)', () => {
+  test('pelanggan menulis "celana pakai L" tanpa dibahas AI → diluruskan ke nomor', async ({ assert }) => {
+    const { fixPantsLetterSize } = await import('#beta3/reply_guards')
+    const out = fixPantsLetterSize(['Dada 106 bisa custom bos, harganya sama'], 'bos', '175 BB 74 dulu jas L. CELANA SAYA PAKE UKURAN L AJA mau order biru')
+    assert.isTrue(out.changed)
+    assert.match(out.pesan[out.pesan.length - 1], /nomor/i)
+    // Nomor celana sudah disebut pelanggan → tidak ditanya.
+    assert.isFalse(fixPantsLetterSize(['Siap bos'], 'bos', 'jas L, celana no 33 ya').changed)
+    // Balasan sudah membahas nomor celana → tidak ditambah.
+    assert.isFalse(fixPantsLetterSize(['Celananya pakai nomor berapa bos? (28-40)'], 'bos', 'celana saya L').changed)
+  })
+
+  test('alamat toko tanpa "Jl." tidak ditambah lagi', async ({ assert }) => {
+    const { ensureStoreAddress } = await import('#beta3/reply_guards')
+    const address = 'Jl. Patimuan - Kedungreja, Cinyawang, Patimuan, Cilacap 53264'
+    assert.isFalse(ensureStoreAddress(['Tokonya di Patimuan - Kedungreja, Cinyawang, Patimuan, Cilacap bos'], 'toko terdekat dari banjar?', address).changed)
+    assert.isTrue(ensureStoreAddress(['Tokonya di Cilacap bos'], 'toko terdekat dari banjar?', address).changed)
+  })
+
+  test('"lingkar celana 80" dan "LP/LD" dibaca sebagai ukuran badan', async ({ assert }) => {
+    const { compareWithSizeChart } = await import('#beta3/context_service')
+    const chart = 'Pants 28-40 (cm): 30 lingkar pinggang 78 panjang celana 100; 31 lingkar pinggang 81 panjang celana 100; 32 lingkar pinggang 83 panjang celana 102\nS-4XL (cm): M lingkar dada 98; L lingkar dada 100; XL lingkar dada 110'
+    const rows = (text: string) => [{ direction: 'in', body: text }] as never
+    assert.include(compareWithSizeChart(rows('Lingkar celana 80 Pak, tapi celana ini stretch'), chart), 'pinggang badan 80 cm')
+    assert.include(compareWithSizeChart(rows('LD 108 bisa?'), chart), 'dada badan 108 cm')
+    assert.include(compareWithSizeChart(rows('lp 84'), chart), 'pinggang badan 84 cm')
+  })
+})

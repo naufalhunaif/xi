@@ -1918,7 +1918,15 @@ export async function createLeanReply(input: {
   if ((understanding.asksAccount || asksAccountText(input.text)) && !decision.serah_cs && !received) {
     const methods = settings.paymentMethods.filter((method) => method.enabled)
     const payment = renderPaymentMessage(methods.map((method) => ({ bank: method.name, number: method.destination, holder: (method as { accountName?: string }).accountName || '' })))
-    if (payment && !decision.pesan.some((bubble) => methods.some((method) => bubble.includes(method.destination)))) {
+    // v3.6.167 (uji #58 real-12/real-80): rekening sudah pernah dikirim toko di chat ini dan pelanggan hanya bilang
+    // "nanti saya transfer / mau DP 350" (Jev menganggap minta rekening) → jangan kirim ulang; CS cukup "siap, ditunggu".
+    // Kalau pelanggan memang menanyakan nomornya ("no rek masih sama?"), tetap dikirim.
+    const sentBefore = methods.some((method) =>
+      rows.some((row) => row.direction === 'out' && !row.current && String(row.body || '').includes(method.destination))
+    )
+    if (sentBefore && !asksAccountText(input.text)) {
+      onTrace?.({ key: 'beta3-account', label: 'Rekening sudah pernah dikirim · tidak diulang', status: 'completed', detail: {} })
+    } else if (payment && !decision.pesan.some((bubble) => methods.some((method) => bubble.includes(method.destination)))) {
       // v3.6.159 — rekening dijawab dulu, pertanyaan lain (size/model) sesudahnya (uji 100: "pakai size apa?" lalu rekening).
       const rest = decision.pesan.filter((bubble) => !/rekening\w*\s+(?:nanti|menyusul|saya kirim)/i.test(bubble))
       const firstQuestion = rest.findIndex((bubble) => /\?/.test(bubble))
@@ -2403,7 +2411,7 @@ export async function createLeanReply(input: {
       decision.pesan = paid.pesan
       onTrace?.({ key: 'beta3-payment-claim', label: '"Pembayaran sudah masuk" tanpa data → dicek dulu', status: 'completed', detail: {} })
     }
-    const pantsLetter = fixPantsLetterSize(decision.pesan, style?.address || 'bos')
+    const pantsLetter = fixPantsLetterSize(decision.pesan, style?.address || 'bos', input.text)
     if (pantsLetter.changed) {
       decision.pesan = pantsLetter.pesan
       onTrace?.({ key: 'beta3-pants-letter', label: 'Celana tidak dicatat dengan size huruf → ditanya nomornya', status: 'completed', detail: {} })
@@ -2435,7 +2443,9 @@ export async function createLeanReply(input: {
       // dulu seluruh balasan diganti "saya cek dulu" sehingga janji datang tidak terjawab).
       const rest = keepNonProgress(input.text, decision.pesan, orderData)
       // v3.6.155 — salam pelanggan tetap dijawab (uji 100: "Assalamu'alaikum, pesanan sudah dikirim?" tanpa salam balik).
-      decision.pesan = answerSalam([`Saya cek dulu progres pesanannya ya ${style?.address || 'bos'}`, ...rest], input.text, style?.address || 'bos')
+      // v3.6.167 (uji #58 real-95): salam sudah dijawab lewat bubble pembuka cepat → jangan "Waalaikumsalam" dua kali.
+      const progress = [`Saya cek dulu progres pesanannya ya ${style?.address || 'bos'}`, ...rest]
+      decision.pesan = /^wa'?alaikum/i.test(early) ? progress : answerSalam(progress, input.text, style?.address || 'bos')
       decision.serah_cs = true
       decision.alasan = 'Menanyakan progres pesanan; data progres tidak ada'
       if (!rest.length) photos = []

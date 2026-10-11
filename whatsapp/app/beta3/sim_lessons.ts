@@ -8,7 +8,7 @@ export type SimLesson = { text: string; count: number; lastAt: string; contoh: s
 
 const STATE = 'sim_lessons'
 /** v3.6.166: 60 → 250 — pelajaran hasil tinjauan pemilik (±200 baris) harus muat; ke prompt tetap hanya yang nyambung. */
-export const MAX_LESSONS = 250
+export const MAX_LESSONS = 300
 /** Pelajaran yang ikut ke prompt (paling sering terjadi & terbaru). */
 export const PROMPT_LESSONS = 10
 

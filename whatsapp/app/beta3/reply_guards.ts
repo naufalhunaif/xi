@@ -120,7 +120,7 @@ const LETTER_PANTS = /\b(?:size|ukuran)\s+(XS|S|M|L|XL|XXL|[2-5]XL)\b[^.?!\n]{0,
  * v3.6.162 — Celana memakai nomor 28–40, bukan S/M/L (uji 100: "celananya size L sudah kami catat"). Kalimat yang
  * mencatat celana dengan huruf dibuang, diganti pertanyaan nomor; kalimat jas tetap.
  */
-export function fixPantsLetterSize(pesan: string[], address = 'bos') {
+export function fixPantsLetterSize(pesan: string[], address = 'bos', customerText = '') {
   let changed = false
   const out = pesan
     .map((bubble) =>
@@ -136,7 +136,14 @@ export function fixPantsLetterSize(pesan: string[], address = 'bos') {
         .trim()
     )
     .filter(Boolean)
-  if (!changed) return { pesan, changed }
+  // v3.6.167 (uji #58 real-14/22): PELANGGAN yang menulis "celana saya pakai L" dan balasan tidak membahas nomor
+  // celana sama sekali → luruskan + tanya nomornya (dulu diam saja, celana dicatat L).
+  const customerLetter = (PANTS_LETTER.test(customerText) || LETTER_PANTS.test(customerText)) && !/\b(2[6-9]|3\d|4[0-6])\b/.test(customerText)
+  const mentionsNumber = (list: string[]) => list.some((bubble) => /celana[^.?!\n]{0,40}\bno(?:mor|mer)?\b|\bno(?:mor|mer)?\b[^.?!\n]{0,40}celana|\b28\s*-\s*40\b/i.test(bubble))
+  if (!changed) {
+    if (customerLetter && !mentionsNumber(pesan)) return { pesan: [...pesan, `Celananya pakai nomor ya ${address} (28-40), biasanya pakai nomor berapa?`], changed: true }
+    return { pesan, changed }
+  }
   if (!out.some((bubble) => /celana[^?]*\?/i.test(bubble))) out.push(`Celananya pakai nomor berapa ${address}? Celana pakai nomor 28-40, bukan S/M/L`)
   return { pesan: out, changed }
 }
@@ -148,7 +155,15 @@ const LOCATION_ASK = /\b(lokasi|alamat(?:nya)?\s+(?:toko|dimana|di mana)|toko(?:
 export function ensureStoreAddress(pesan: string[], customerText: string, address: string, call = 'bos') {
   if (!address || !LOCATION_ASK.test(customerText || '')) return { pesan, changed: false }
   const street = address.split(',')[0].trim()
-  if (!street || pesan.some((bubble) => bubble.toLowerCase().includes(street.toLowerCase().slice(0, 12)))) return { pesan, changed: false }
+  // v3.6.167 (uji #58 real-84): AI menulis alamat tanpa "Jl." ("Patimuan - Kedungreja, Cinyawang, …") → sudah ada,
+  // jangan ditambah lagi. Dianggap ada bila ≥ 2 bagian alamat (dipisah koma, tanpa "Jl.") muncul di balasan.
+  const parts = address
+    .split(',')
+    .map((part) => part.replace(/^\s*(?:jl\.?|jalan)\s*/i, '').trim().toLowerCase())
+    .filter((part) => part.length >= 4)
+  const joined = pesan.join('\n').toLowerCase()
+  const present = parts.filter((part) => joined.includes(part)).length >= Math.min(2, parts.length)
+  if (!street || present || pesan.some((bubble) => bubble.toLowerCase().includes(street.toLowerCase().slice(0, 12)))) return { pesan, changed: false }
   return { pesan: [...pesan, `Tokonya di ${address} ${call}`], changed: true }
 }
 

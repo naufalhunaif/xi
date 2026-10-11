@@ -259,6 +259,19 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
         found = true
       }
     }
+    // v3.6.167 (uji #58 real-25): "lingkar celana 80" / "LP 80" = pinggang, "LD 108" = dada — dulu tidak terbaca,
+    // nomor celana dari chart dibuang sebagai tebakan lalu ditanya lagi.
+    for (const [alias, part] of [
+      [/lingkar\s+celana\D{0,6}(\d{2,3}(?:[.,]\d)?)/, 'pinggang'],
+      [/\blp\s*:?\s*(\d{2,3}(?:[.,]\d)?)\b/, 'pinggang'],
+      [/\bld\s*:?\s*(\d{2,3}(?:[.,]\d)?)\b/, 'dada'],
+    ] as Array<[RegExp, string]>) {
+      const hit = text.match(alias)
+      if (hit && !body.has(part)) {
+        body.set(part, Number(hit[1].replace(',', '.')))
+        found = true
+      }
+    }
     const bare = text.trim().match(/^(?:sekitar\s*|kurang lebih\s*)?(\d{2,3})(?:\s*(?:an|cm))?(?:\s*sih)?$/)
     if (!found && bare && asked) body.set(asked === 'pinggul' ? 'panggul' : asked, Number(bare[1]))
   }

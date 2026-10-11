@@ -343,6 +343,9 @@ export async function judgeFacts(settings?: LeanSettings) {
     ),
     // v3.6.85: size chart ikut fakta penilai (uji: saran size dari chart dianggap mengarang).
     ((chart) => (chart ? `SIZE CHART:\n${chart}` : ''))(String((await readLeanState('size_charts').catch(() => '')) || '')),
+    // v3.6.167 (uji #58 real-48): warna kain yang belum ada produknya (mis. Salmon) juga dilihat AI — tanpa ini penilai
+    // menganggapnya karangan.
+    String((await readLeanState('fabrics').catch(() => '')) || ''),
     digest.text,
   ]
     .filter(Boolean)
