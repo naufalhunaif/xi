@@ -73,6 +73,10 @@ export type SimTurn = {
   /** v3.6.147 — keterangan foto pelanggan / foto sebelumnya yang dirujuk (untuk penilai). */
   catatanGambar?: string
   fotoSebelum?: string
+  /** v3.6.158 — pembuka cepat yang terkirim lebih dulu (sebelum model selesai). */
+  pembuka?: string
+  /** v3.6.158 — teks pesan pelanggan yang dikutip tiap bubble (sejajar `balasan`). */
+  kutipan?: Array<string | null>
   /** URL foto yang dikirim AI (urut sama dengan `foto`). */
   fotoUrl?: string[]
   /** Data alat yang dipakai AI giliran ini (ongkir, size, resi, ukuran) — untuk penilai. */
@@ -164,7 +168,7 @@ export function deterministicIssues(
     const n = index + 1
     if (turn.error) issues.push(`Giliran ${n}: gagal diproses (${turn.error}).`)
     // Diam atas "oke 😁" bisa tepat (seperti CS manusia); biar penilai yang menilai.
-    else if (!turn.balasan.length && !turn.foto.length && !turn.serah_cs && !ACK.test(String(turn.pelanggan || '').trim()))
+    else if (!turn.balasan.length && !turn.pembuka && !turn.foto.length && !turn.serah_cs && !ACK.test(String(turn.pelanggan || '').trim()))
       issues.push(`Giliran ${n}: tidak membalas.`)
     const unknown = unknownPrices(turn.balasan, allowed)
     if (unknown.length) issues.push(`Giliran ${n}: harga ${unknown.map((value) => value.toLocaleString('id-ID')).join(', ')} tidak ada di katalog/ongkir.`)
@@ -208,9 +212,10 @@ export function transcript(turns: SimTurn[]) {
       `Pelanggan: ${turn.kutip ? `(membalas pesan: "${turn.kutip}") ` : ''}${turn.gambar ? `[mengirim foto${turn.catatanGambar ? `: ${turn.catatanGambar}` : ''}] ` : ''}${turn.fotoSebelum ? `(foto pelanggan sebelumnya yang dirujuk, juga dilihat AI: ${turn.fotoSebelum}) ` : ''}${turn.pelanggan}`,
       ...(turn.alat || []).map((data) => `(data alat untuk AI — ${data})`),
       // Urutan kirim sama dengan listener: bubble pertama → foto → bubble berikutnya.
-      ...turn.balasan.slice(0, 1).map((bubble) => `AI: ${bubble}`),
+      ...(turn.pembuka ? [`AI (pembuka cepat, terkirim lebih dulu): ${turn.pembuka}`] : []),
+      ...turn.balasan.slice(0, 1).map((bubble, index) => `AI: ${turn.kutipan?.[index] ? `(mengutip pesan pelanggan: "${turn.kutipan[index]}") ` : ''}${bubble}`),
       ...turn.foto.map((caption) => `AI: [foto] ${caption}`),
-      ...turn.balasan.slice(1).map((bubble) => `AI: ${bubble}`),
+      ...turn.balasan.slice(1).map((bubble, index) => `AI: ${turn.kutipan?.[index + 1] ? `(mengutip pesan pelanggan: "${turn.kutipan[index + 1]}") ` : ''}${bubble}`),
       ...(turn.total ? [`Sistem: ${turn.total}`] : []),
       ...(turn.susulan
         ? // v3.6.104: susulan yang dibatalkan pemeriksa tidak pernah terkirim → tidak ikut dinilai.
@@ -396,6 +401,16 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
       history: state.rows.map((row) => ({ ...row })),
       simulate: true,
       ...(contextFile ? { contextImagePath: contextFile, quotesImage: typeof message !== 'string' && Boolean(message?.kutipFoto) } : {}),
+      // v3.6.158 — pembuka cepat & kutipan seperti di chat sungguhan (pesan pelanggan beruntun = baris terpisah).
+      onEarly: async (bubble) => {
+        turn.pembuka = bubble
+        return true
+      },
+      turnMessages: text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line, index) => ({ id: `turn-${index + 1}`, text: line, image: index === 0 && Boolean(image) })),
       // v3.6.111: chat nyata diuji pada waktu aslinya (dulu "tanggal 13 Mei sudah lewat" karena diuji Oktober).
       ...(fixedNow ? { now: at } : {}),
       onTrace: (event) => {
@@ -414,6 +429,10 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
     })
     const { decision } = reply
     turn.balasan = bubblesToSend(decision)
+    if (reply.kutipan?.some(Boolean)) {
+      const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+      turn.kutipan = reply.kutipan.map((id) => (id ? lines[Number(id.replace('turn-', '')) - 1] || null : null))
+    }
     turn.foto = reply.photos.map((photo) => photo.caption)
     turn.fotoUrl = reply.photos.map((photo) => photo.url)
     turn.serah_cs = decision.serah_cs
@@ -436,6 +455,7 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
     // Riwayat berikutnya: urutan kirim sama dengan chat sungguhan (bubble 1 → foto → sisanya).
     const out = (body: string, isImage = false) =>
       state.rows.push({ direction: 'out', senderType: 'ai', body, mediaType: isImage ? 'image' : null, createdAt: new Date(at.getTime() + 20_000) })
+    if (turn.pembuka) out(turn.pembuka)
     const [first, ...rest] = turn.balasan
     if (first) out(first)
     for (const caption of turn.foto) out(caption, true)

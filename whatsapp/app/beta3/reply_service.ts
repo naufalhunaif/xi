@@ -72,6 +72,8 @@ import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
 import { lookupPlace, mapLink, parseAddress, type PlaceLookup } from '#beta3/place_lookup'
 import { fastAnswer, fastIntent, fastShipping, needsContext, pureShippingAsk } from '#beta3/fast_reply'
+import { dropOpenerRepeat, quickOpener } from '#beta3/quick_opener'
+import { assignQuotes, type TurnMessage } from '#beta3/reply_quotes'
 /** Tahap awal: jalur kilat untuk harga umum, lama pengerjaan, cara order. */
 const FAST_EARLY = ['', 'lain', 'selesai', 'tanya_model', 'tanya_size']
 // v3.6.106 — jalur kilat (tanya umum & ongkir tanpa AI) DIMATIKAN atas permintaan pemilik: hasil uji tidak lebih
@@ -124,6 +126,10 @@ export type LeanSettings = LeanProviderSettings & {
 
 export type LeanReply = {
   decision: LeanDecision
+  /** v3.6.158 — pembuka cepat yang sudah terkirim lewat `onEarly` (tidak ada di decision.pesan). */
+  early?: string
+  /** v3.6.158 — id pesan pelanggan yang dikutip tiap bubble (sejajar decision.pesan), null = tanpa kutipan. */
+  kutipan?: Array<string | null>
   photos: Array<{ caption: string; url: string }>
   promptTokens: number
   promptSections: Array<{ key: string; chars: number; tokens: number }>
@@ -679,6 +685,13 @@ export async function createLeanReply(input: {
   contextImagePath?: string
   /** v3.6.147 Uji: pesan ini mengutip foto pelanggan. */
   quotesImage?: boolean
+  /**
+   * v3.6.158 — Pembuka cepat: dipanggil begitu pesan dipahami dengan bubble bebas fakta ("Siap bos, tinggi 170
+   * berat 96 dicatat ya"). Pemanggil mengirimnya langsung; true = terkirim (tidak ikut lagi di `pesan`).
+   */
+  onEarly?: (bubble: string) => Promise<boolean>
+  /** v3.6.158 — pesan pelanggan di giliran ini (untuk kutipan per bubble); kosong = tanpa kutipan. */
+  turnMessages?: TurnMessage[]
   /** v3.6.124: giliran ulang setelah order dicatat dari data penerima di obrolan (tidak diulang lagi). */
   chatOrder?: boolean
 }): Promise<LeanReply> {
@@ -1362,6 +1375,24 @@ export async function createLeanReply(input: {
     systemNote +=
       // v3.6.128: dulu AI meminta ulang kecamatan/kabupaten yang sudah ditulis tanpa label dan menahan order demi RT/RW.
       '\n\nCATATAN SISTEM: pelanggan sepertinya mengirim data pengiriman. Cek SELURUH riwayat: yang dibutuhkan hanya nama penerima, alamat (jalan/desa), kecamatan, kab/kota, no HP ("pakai nomor ini" = no HP sudah ada). Nama tempat tanpa label ("… patimuan cilacap") sudah berisi kecamatan & kota. Nomor rumah/RT/RW dan kode pos TIDAK wajib. Bila semua sudah ada → isi field penerima (sistem mencatat order + ongkir); bila belum, tanyakan hanya yang belum ada dalam satu pesan singkat.'
+  // v3.6.158 — pembuka cepat dikirim sekarang (bebas fakta), model melanjutkan isinya tanpa mengulang.
+  let early = ''
+  if (input.onEarly && (!understanding.csReason || understanding.csReason === 'tidak_perlu')) {
+    const opener = quickOpener({
+      text: input.text,
+      address: style?.address || 'bos',
+      hasImage: Boolean(input.imagePaths?.length),
+      awaitingPayment: pendingForJev?.status === 'awaiting_payment',
+      paidClaim: Boolean(understanding.paidClaim),
+      formReceived: Boolean(form),
+      recentStore: rows.filter((row) => row.direction === 'out').map((row) => String(row.body || '')),
+    })
+    if (opener && (await input.onEarly(opener).catch(() => false))) {
+      early = opener
+      systemNote += `\n\nCATATAN SISTEM: bubble pembuka SUDAH TERKIRIM ke pelanggan: "${opener}". Lanjutkan isinya saja (jawaban/langkah berikut); jangan ulangi salam, "dicatat", atau kalimat pembuka itu.`
+      onTrace?.({ key: 'beta3-early', label: `Pembuka cepat terkirim · "${opener}"`, status: 'completed', detail: { pesan: opener } })
+    }
+  }
   if (understanding.csReason && understanding.csReason !== 'tidak_perlu')
     systemNote += `\n\nCATATAN SISTEM: pesan ini kemungkinan perlu ditangani manusia (${understanding.csReason.replace(/_/g, ' ')}). Ikuti aturan serah_cs di skill.`
   if (understanding.agreed && pendingForJev?.status === 'pending')
@@ -1593,7 +1624,10 @@ export async function createLeanReply(input: {
     const next = await createLeanReply({
       ...input,
       chatOrder: true,
+      // Pembuka cepat sudah terkirim di giliran ini (bila ada): jangan dikirim lagi, tapi jangan diulang juga.
+      onEarly: undefined,
       note: [
+        early ? `Bubble pembuka SUDAH TERKIRIM ke pelanggan: "${early}" — jangan diulang.` : '',
         input.note,
         'Data penerima sudah lengkap dari obrolan dan sudah dicatat sistem sebagai order — jangan minta pelanggan mengisi form atau mengulang data.' +
           (built.fromWa ? ' No. telp penerima = nomor WhatsApp chat ini; jangan menanyakan nomor telp.' : '') +
@@ -1603,6 +1637,10 @@ export async function createLeanReply(input: {
         .join(' '),
     })
     next.usage = mergeUsage(result.usage, next.usage)
+    if (early) {
+      next.early = early
+      next.decision.pesan = dropOpenerRepeat(next.decision.pesan, early)
+    }
     return next
   }
   const viaChatOrder = await chatOrderReply(decision.penerima)
@@ -2182,6 +2220,11 @@ export async function createLeanReply(input: {
       onTrace?.({ key: 'beta3-total', label: repeated.pesan.length ? 'Janji tunggu tidak diulang' : 'Diam · janji tunggu sudah dikirim', status: 'completed', detail: {} })
     }
   }
+  if (early) {
+    const before = decision.pesan.length
+    decision.pesan = dropOpenerRepeat(decision.pesan, early)
+    if (decision.pesan.length !== before) onTrace?.({ key: 'beta3-early-dedupe', label: 'Pembuka yang sudah terkirim tidak diulang', status: 'completed', detail: {} })
+  }
   // v3.6.157 — bubble panjang dipecah per konteks seperti CS asli (langkah terakhir sebelum kirim).
   if (decision.pesan.length) {
     const split = splitLongBubbles(decision.pesan)
@@ -2362,8 +2405,13 @@ export async function createLeanReply(input: {
   if (ensureHandoffReply(decision)) {
     onTrace?.({ key: 'beta3-handoff-reply', label: 'Serah CS · balasan singkat dari sistem (AI tidak menulis balasan)', status: 'completed', detail: {} })
   }
+  const kutipan = input.turnMessages?.length ? assignQuotes(bubblesToSend(decision), input.turnMessages) : undefined
+  if (kutipan?.some(Boolean))
+    onTrace?.({ key: 'beta3-quote', label: `Balasan mengutip pesan pelanggan · ${kutipan.filter(Boolean).length} bubble`, status: 'completed', detail: { kutipan } })
   return {
     decision,
+    ...(early ? { early } : {}),
+    ...(kutipan ? { kutipan } : {}),
     autoTotal,
     photos,
     promptTokens: prompt.size.tokens,

@@ -2246,6 +2246,8 @@ export default class WhatsappListen extends BaseCommand {
       keys: items.map((item) => item.message.key),
       imagePaths: imagesB3.map((image) => image.path),
       imageIds: imagesB3.map((image) => image.id),
+      // v3.6.158: pesan pelanggan per bubble (untuk balasan yang mengutip pesan yang dijawabnya).
+      turnMessages: items.map((item) => ({ id: item.id, text: item.text, image: item.media?.mediaType === 'image' })),
     })
     // v3.6.55: balasan batal karena pesan baru masuk → pesan giliran ini ikut ke giliran berikutnya
     // (dulu hilang: "Slim fit 57 size M?" tidak pernah dijawab).
@@ -2270,6 +2272,7 @@ export default class WhatsappListen extends BaseCommand {
       imagePaths: string[]
       imageIds?: string[]
       note?: string
+      turnMessages?: Array<{ id: string; text: string; image?: boolean }>
     }
   ): Promise<'cancelled' | void> {
     // Room Instagram (mis. coba ulang analisis): dikerjakan worker Instagram, bukan soket WhatsApp.
@@ -2297,28 +2300,17 @@ export default class WhatsappListen extends BaseCommand {
         messages: input.messageIds.map((id) => ({ id })),
       }).catch(() => undefined)
       await this.setActivity(jid, 'understanding')
-      const reply = await beta3.createLeanReply({
-        jid,
-        messageIds: input.messageIds,
-        text: input.text,
-        imagePaths: input.imagePaths,
-        imageIds: input.imageIds,
-        settings: {
-          ...settings,
-          aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
-        },
-        onTrace: trace?.emit,
-        note: input.note || (await this.handoffNote(jid)),
-      })
-      const { decision } = reply
-      if (!(await canSend())) {
-        await pauseGoalRun(run, 'Konteks, koneksi, atau status AI berubah.')
-        await trace?.finish('cancelled', { reason: 'Konteks berubah; balasan lama dibatalkan.' })
-        return 'cancelled'
-      }
-      if (!(await markGoalDelivery(run))) return
       let firstMessageId: string | undefined
-      const sendBubble = async (body: string, image?: { bytes: Buffer; url: string }) => {
+      let delivery: boolean | undefined
+      const ensureDelivery = async () => (delivery ??= await markGoalDelivery(run))
+      const quotedOf = (messageId?: string | null): WAMessage | undefined => {
+        const item = messageId ? input.turnMessages?.find((entry) => entry.id === messageId) : undefined
+        return item
+          ? { key: { id: item.id, remoteJid: jid, fromMe: false }, message: { conversation: item.text || (item.image ? 'Foto' : 'Pesan') } }
+          : undefined
+      }
+      const sendBubble = async (body: string, image?: { bytes: Buffer; url: string }, quoteId?: string | null) => {
+        const quoted = quotedOf(quoteId)
         return trackOutgoingMessage(jid, async (outgoingId) => {
           const sent = await sendPreparedReply(
             socket,
@@ -2330,7 +2322,7 @@ export default class WhatsappListen extends BaseCommand {
                 image
                   ? { image: image.bytes, caption: body, mimetype: 'image/jpeg' as const }
                   : { text: body },
-                { messageId: outgoingId }
+                { messageId: outgoingId, ...(quoted ? { quoted } : {}) }
               ),
             {
               canSend,
@@ -2361,7 +2353,7 @@ export default class WhatsappListen extends BaseCommand {
             media_name: null,
             media_size: image?.bytes.length || null,
             media_status: image ? 'ready' : null,
-            reply_to_message_id: null,
+            reply_to_message_id: quoted?.key.id || null,
             status: 'sent',
             created_at: new Date(),
           })
@@ -2373,6 +2365,36 @@ export default class WhatsappListen extends BaseCommand {
           return true
         })
       }
+      const reply = await beta3.createLeanReply({
+        jid,
+        messageIds: input.messageIds,
+        text: input.text,
+        imagePaths: input.imagePaths,
+        imageIds: input.imageIds,
+        settings: {
+          ...settings,
+          aiProvider: settings.aiProvider === 'claude' ? 'claude' : 'chatgpt',
+        },
+        onTrace: trace?.emit,
+        note: input.note || (await this.handoffNote(jid)),
+        turnMessages: input.turnMessages,
+        // v3.6.158 — pembuka cepat: bubble bebas fakta dikirim begitu pesan dipahami, model melanjutkan isinya.
+        onEarly: async (bubble) => {
+          if (!(await canSend()) || !(await ensureDelivery())) return false
+          const ok = await sendBubble(bubble)
+          if (ok) trace?.emit({ key: 'send-early', label: 'Pembuka cepat terkirim', status: 'completed' })
+          return ok
+        },
+      })
+      const { decision } = reply
+      if (!(await canSend())) {
+        if (!firstMessageId) {
+          await pauseGoalRun(run, 'Konteks, koneksi, atau status AI berubah.')
+          await trace?.finish('cancelled', { reason: 'Konteks berubah; balasan lama dibatalkan.' })
+          return 'cancelled'
+        }
+      }
+      if (!(await ensureDelivery())) return
       // Urutan seperti CS: jawaban pertama → foto → pertanyaan berikutnya.
       // v3.6.55: diserahkan ke CS tetap dikirim balasan singkatnya (dulu pelanggan didiamkan).
       const bubbles = beta3.bubblesToSend(decision)
@@ -2402,7 +2424,7 @@ export default class WhatsappListen extends BaseCommand {
       }
       if (!decision.serah_cs && !bubbles.length) await sendPhotos()
       for (const [index, body] of bubbles.entries()) {
-        if (aborted || !(await sendBubble(body))) {
+        if (aborted || !(await sendBubble(body, undefined, reply.kutipan?.[index]))) {
           aborted = true
           break
         }
