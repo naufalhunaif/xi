@@ -78,10 +78,45 @@ export async function removeLesson(index: number) {
 }
 
 /** Bagian prompt: pelajaran teratas (sering terjadi & terbaru). */
-export function renderLessons(lessons: SimLesson[], limit = PROMPT_LESSONS) {
-  const top = [...lessons].sort((a, b) => b.count - a.count || b.lastAt.localeCompare(a.lastAt)).slice(0, limit)
+export function renderLessons(lessons: SimLesson[], limit = PROMPT_LESSONS, customerText = '') {
+  const top = pickLessons(lessons, customerText, limit)
   if (!top.length) return ''
   return ['PELAJARAN DARI UJI (kesalahan AI sebelumnya — jangan diulang):', ...top.map((item, index) => `${index + 1}. ${item.text}`)].join('\n')
+}
+
+const LESSON_STOP = new Set(
+  'saat pelanggan jawab jangan yang dengan untuk bila kalau sebut jelas tanya tanpa lalu dulu juga atau dari ke di dan bos itu ini sudah belum ada tidak hanya langsung harus perlu bisa'.split(' ')
+)
+const lessonWords = (text: string) =>
+  new Set(
+    String(text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length >= 4 && !LESSON_STOP.has(word))
+  )
+/**
+ * v3.6.165 — Pelajaran yang ikut ke prompt: yang NYAMBUNG dengan pesan pelanggan (kata kunci sama) didahulukan,
+ * sisanya yang paling sering terjadi. Dulu hanya 10 teratas global, jadi pelajaran soal celana muncul saat ditanya
+ * ongkir.
+ */
+export function pickLessons(lessons: SimLesson[], customerText: string, limit = PROMPT_LESSONS) {
+  const words = lessonWords(customerText)
+  const scored = lessons.map((lesson) => {
+    const own = lessonWords(lesson.text)
+    const shared = [...own].filter((word) => words.has(word)).length
+    return { lesson, score: shared }
+  })
+  const related = scored
+    .filter((item) => item.score >= 1)
+    .sort((a, b) => b.score - a.score || b.lesson.count - a.lesson.count)
+    .slice(0, limit)
+    .map((item) => item.lesson)
+  const frequent = [...lessons]
+    .filter((lesson) => !related.includes(lesson))
+    .sort((a, b) => b.count - a.count || b.lastAt.localeCompare(a.lastAt))
+    .slice(0, Math.max(0, limit - related.length))
+  return [...related, ...frequent]
 }
 
 /**

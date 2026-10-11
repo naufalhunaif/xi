@@ -38,3 +38,18 @@ test.group('pelajaran dari uji', () => {
     for (const example of saved) await removeLeanExample(example.id!)
   })
 })
+
+test.group('pelajaran yang nyambung v3.6.165', () => {
+  test('pelajaran dipilih yang sekata dengan pesan pelanggan, sisanya yang paling sering', async ({ assert }) => {
+    const { pickLessons } = await import('#beta3/sim_lessons')
+    const now = new Date().toISOString()
+    const lessons = [
+      { text: 'Celana pakai nomor 28-40, bukan S/M/L; tanya nomornya', count: 1, lastAt: now, contoh: [] },
+      { text: 'Ditanya lokasi toko: sebut alamat lengkap', count: 5, lastAt: now, contoh: [] },
+      { text: 'Pelanggan minta rekening: kirim rekening dulu sebelum tanya size', count: 2, lastAt: now, contoh: [] },
+    ]
+    const picked = pickLessons(lessons, 'celana no 33 ada? rekening nya mana', 2)
+    assert.sameMembers(picked.map((item) => item.text.slice(0, 6)), ['Celana', 'Pelang'])
+    assert.equal(pickLessons(lessons, 'halo', 1)[0].count, 5)
+  })
+})

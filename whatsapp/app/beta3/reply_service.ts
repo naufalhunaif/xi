@@ -1539,7 +1539,7 @@ export async function createLeanReply(input: {
       ...examples.filter((example) => example.source === 'koreksi').slice(-12),
       ...pickExamples(examples.filter((example) => example.source === 'uji'), input.text, stage, 3).filter((example) => scoreExample(example, keywords(input.text), stage) >= 2),
     ],
-    lessons: renderLessons(await listLessons().catch(() => [])),
+    lessons: renderLessons(await listLessons().catch(() => []), undefined, input.text),
     styleGuide: style ? styleGuide(style) : '',
     rules: renderRules(rules),
     // v3.6.96: belum ada catatan order → ingatan dari chat ini (alamat form, size, tinggi/berat).
