@@ -1575,7 +1575,8 @@ test.group('v3.6.112 masalah berulang dari uji beban', () => {
   })
   test('foto sebelumnya ikut dilihat AI saat pesan merujuk "ini/foto"; aturan DP ikut ke AI', async ({ assert }) => {
     const source = await readFile('app/beta3/reply_service.ts', 'utf8')
-    assert.include(source, 'PHOTO_REF.test(input.text) ? await recentCustomerImage(jid, input.messageIds)')
+    assert.match(source, /refersPhoto = PHOTO_REF\.test\(input\.text\)/)
+      assert.match(source, /refersPhoto\s*\?\s*await recentCustomerImage\(jid, input\.messageIds\)/)
     assert.include(source, 'DP minimal 50% dari total, pelunasan setelah pesanan jadi')
   })
 })

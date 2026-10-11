@@ -131,3 +131,26 @@ test.group('uji chat hari ini v3.6.149', () => {
     assert.notInclude(note, 'TIDAK bisa dibuat')
   })
 })
+
+test.group('uji gambar chat asli v3.6.148', () => {
+  test('foto pelanggan yang dikutip ikut ke giliran uji', ({ assert }) => {
+    const at = new Date()
+    const rows = [
+      { jid: 'x@s.whatsapp.net', message_id: 'm1', direction: 'in', sender_type: null, body: '', media_type: 'image', media_url: '/media/a.jpg', created_at: at },
+      { jid: 'x@s.whatsapp.net', message_id: 'm2', reply_to_message_id: 'm1', direction: 'in', sender_type: null, body: 'yang ini ready L?', media_type: null, media_url: null, created_at: at },
+      { jid: 'x@s.whatsapp.net', message_id: 'm3', direction: 'out', sender_type: 'cs', body: 'Ready bos', media_type: null, media_url: null, created_at: at },
+    ]
+    const segments = realSegments(rows as any)
+    // Foto pertama + teks = satu giliran (foto dikirim pelanggan di giliran itu).
+    assert.equal(segments[0].gambar, '/media/a.jpg')
+    const later = realSegments([
+      rows[0],
+      { ...rows[2], message_id: 'm0' },
+      rows[1],
+      { ...rows[2], message_id: 'm4' },
+    ] as any)
+    const last = later[later.length - 1]
+    assert.equal(last.fotoSebelum, '/media/a.jpg')
+    assert.isTrue(last.kutipFoto)
+  })
+})

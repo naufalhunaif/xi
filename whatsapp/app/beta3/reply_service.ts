@@ -663,6 +663,10 @@ export async function createLeanReply(input: {
   simulate?: boolean
   /** v3.6.111 Uji chat nyata: "sekarang" = waktu chat asli. */
   now?: Date
+  /** v3.6.147 Uji chat nyata: foto pelanggan sebelumnya yang dikutip/dirujuk (di chat sungguhan dicari dari tabel pesan). */
+  contextImagePath?: string
+  /** v3.6.147 Uji: pesan ini mengutip foto pelanggan. */
+  quotesImage?: boolean
   /** v3.6.124: giliran ulang setelah order dicatat dari data penerima di obrolan (tidak diulang lagi). */
   chatOrder?: boolean
 }): Promise<LeanReply> {
@@ -1496,8 +1500,20 @@ export async function createLeanReply(input: {
   })
   // v3.6.112 — "yang ini / model seperti ini" merujuk foto yang dikirim pelanggan sebelumnya: foto itu ikut dilihat
   // AI (uji 88 chat: AI menanyakan ulang model/warna padahal pelanggan sudah kirim foto).
-  const contextImage =
-    !input.imagePaths?.length && !input.simulate && PHOTO_REF.test(input.text) ? await recentCustomerImage(jid, input.messageIds).catch(() => '') : ''
+  // v3.6.150 — pertanyaan singkat tepat sesudah pelanggan kirim foto ("Apakah ready?", "berapa?") juga merujuk foto itu.
+  const lastIn = rows.filter((row) => row.direction === 'in' && !(row as { current?: boolean }).current).slice(-1)[0]
+  const afterPhoto =
+    lastIn?.mediaType === 'image' && String(input.text || '').length <= 60 && /\b(ready|redi|ada|berapa|brp|harga|hrg|stok|stock|size|ukuran|warna)\b/i.test(input.text || '')
+  const refersPhoto = PHOTO_REF.test(input.text) || afterPhoto
+  const contextImage = input.imagePaths?.length
+    ? ''
+    : input.simulate
+      ? input.contextImagePath && (input.quotesImage || refersPhoto)
+        ? input.contextImagePath
+        : ''
+      : refersPhoto
+        ? await recentCustomerImage(jid, input.messageIds).catch(() => '')
+        : ''
   if (contextImage) {
     prompt.user += '\n\n(Lampiran gambar adalah FOTO yang dikirim pelanggan SEBELUMNYA dan dirujuk pesan ini — pakai untuk memahami produk/model yang dimaksud; jangan dimasukkan ke referensi/bukti, jangan menanyakan ulang modelnya.)'
     onTrace?.({ key: 'beta3-photo-context', label: 'Foto sebelumnya dari pelanggan ikut dilihat AI', status: 'completed', detail: {} })
@@ -2054,10 +2070,8 @@ export async function createLeanReply(input: {
       // total ditahan untuk dihitung (rincian/harga belum cocok katalog), bukan "mau jas saja?".
       const open = parts.filter((part) => !new RegExp(`\\b${part}`, 'i').test(String(spec || '')))
       const asked = decision.pesan.some((bubble) => /\?/.test(bubble) && open.some((part) => new RegExp(part, 'i').test(bubble)))
-      if (open.length && !asked)
-        decision.pesan.push(
-          `mau jas saja atau sekalian ${open.length > 1 ? 'celana dan rompinya' : `${open[0]}nya`} ${style?.address || 'bos'}? biar totalnya pas`
-        )
+      const partsAsk = `mau jas saja atau sekalian ${open.length > 1 ? 'celana dan rompinya' : `${open[0]}nya`} ${style?.address || 'bos'}? biar totalnya pas`
+      if (open.length && !asked && dropRepeatedTopics([partsAsk], rows, input.text).pesan.length) decision.pesan.push(partsAsk)
       if (!open.length && !decision.pesan.length)
         decision.pesan.push(`siap ${style?.address || 'bos'}, datanya sudah masuk ya, totalnya saya hitung dulu`)
     }
@@ -2066,8 +2080,10 @@ export async function createLeanReply(input: {
       decision.pesan = decision.pesan
         .map((bubble) => bubble.replace(/,?\s*(ini|berikut)\s+totalnya.*$/i, '').trim())
         .filter((bubble) => bubble && !/\b(ini|berikut)\b[^.?!]*\btotal/i.test(bubble))
-      if (!decision.pesan.some((bubble) => /celana/i.test(bubble) && /\?/.test(bubble)))
-        decision.pesan.push(`celana menyesuaikan kah atau pakai No. berapa ya ${style?.address || 'bos'}?`)
+      const pantsAsk = `celana menyesuaikan kah atau pakai No. berapa ya ${style?.address || 'bos'}?`
+      // v3.6.150 — sudah ditanyakan di pesan toko terakhir → tidak ditempel lagi tiap giliran (uji: 3× berturut).
+      if (!decision.pesan.some((bubble) => /celana/i.test(bubble) && /\?/.test(bubble)) && dropRepeatedTopics([pantsAsk], rows, input.text).pesan.length)
+        decision.pesan.push(pantsAsk)
     }
     // Total belum bisa dikirim: jangan menjanjikan "ini totalnya" yang tidak pernah datang.
     if (!verdict.ok && !decision.serah_cs) {

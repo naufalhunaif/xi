@@ -60,7 +60,7 @@ export type SimScenario = {
   }
 }
 
-export type SimMessage = { teks: string; gambar?: string; kutip?: string }
+export type SimMessage = { teks: string; gambar?: string; kutip?: string; /** v3.6.147 foto pelanggan sebelumnya (dikutip/dirujuk). */ fotoSebelum?: string; kutipFoto?: boolean; /** Keterangan foto untuk penilai. */ catatan?: string; catatanSebelum?: string }
 export const messageText = (item: string | SimMessage) => (typeof item === 'string' ? item : String(item?.teks || ''))
 export const messageImage = (item: string | SimMessage) => (typeof item === 'string' ? '' : String(item?.gambar || ''))
 
@@ -70,6 +70,9 @@ export type SimTurn = {
   kutip?: string
   /** Gambar yang dikirim pelanggan (URL foto). */
   gambar?: string
+  /** v3.6.147 — keterangan foto pelanggan / foto sebelumnya yang dirujuk (untuk penilai). */
+  catatanGambar?: string
+  fotoSebelum?: string
   /** URL foto yang dikirim AI (urut sama dengan `foto`). */
   fotoUrl?: string[]
   /** Data alat yang dipakai AI giliran ini (ongkir, size, resi, ukuran) — untuk penilai. */
@@ -202,7 +205,7 @@ export function priorContext(scenario: Pick<SimScenario, 'riwayat'>) {
 export function transcript(turns: SimTurn[]) {
   return turns
     .flatMap((turn) => [
-      `Pelanggan: ${turn.kutip ? `(membalas pesan: "${turn.kutip}") ` : ''}${turn.gambar ? '[mengirim foto] ' : ''}${turn.pelanggan}`,
+      `Pelanggan: ${turn.kutip ? `(membalas pesan: "${turn.kutip}") ` : ''}${turn.gambar ? `[mengirim foto${turn.catatanGambar ? `: ${turn.catatanGambar}` : ''}] ` : ''}${turn.fotoSebelum ? `(foto pelanggan sebelumnya yang dirujuk, juga dilihat AI: ${turn.fotoSebelum}) ` : ''}${turn.pelanggan}`,
       ...(turn.alat || []).map((data) => `(data alat untuk AI — ${data})`),
       // Urutan kirim sama dengan listener: bubble pertama → foto → bubble berikutnya.
       ...turn.balasan.slice(0, 1).map((bubble) => `AI: ${bubble}`),
@@ -358,6 +361,8 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
   const turn: SimTurn = { pelanggan: text, balasan: [], foto: [], fotoUrl: [], serah_cs: false, alasan: '', jejak, ms: 0 }
   let file = ''
   let keep = false
+  let contextFile = ''
+  let contextKeep = true
   try {
     const digest = await catalogDigest()
     if (image) {
@@ -366,9 +371,21 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
       keep = got.keep
       turn.gambar = got.url
     }
+    const earlierImage = typeof message === 'string' ? '' : String(message?.fotoSebelum || '')
+    if (earlierImage && !image) {
+      const got = await simImage(earlierImage, digest.rows).catch(() => null)
+      if (got) {
+        contextFile = got.path
+        contextKeep = got.keep
+      }
+    }
     for (const row of state.rows) row.current = false
     const kutip = typeof message === 'string' ? '' : String(message?.kutip || '')
     if (kutip) turn.kutip = kutip
+    if (typeof message !== 'string') {
+      if (image && message?.catatan) turn.catatanGambar = message.catatan
+      if (contextFile) turn.fotoSebelum = message?.catatanSebelum || 'isi foto tidak diketahui penilai'
+    }
     state.rows.push({ direction: 'in', senderType: 'customer', body: text, mediaType: image ? 'image' : null, createdAt: at, current: true, ...(kutip ? { replyTo: kutip } : {}) })
     const reply = await createLeanReply({
       jid: state.jid,
@@ -378,6 +395,7 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
       settings,
       history: state.rows.map((row) => ({ ...row })),
       simulate: true,
+      ...(contextFile ? { contextImagePath: contextFile, quotesImage: typeof message !== 'string' && Boolean(message?.kutipFoto) } : {}),
       // v3.6.111: chat nyata diuji pada waktu aslinya (dulu "tanggal 13 Mei sudah lewat" karena diuji Oktober).
       ...(fixedNow ? { now: at } : {}),
       onTrace: (event) => {
@@ -434,6 +452,7 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
     turn.error = error instanceof Error ? error.message.slice(0, 300) : String(error)
   } finally {
     if (file && !keep) await rm(file, { force: true }).catch(() => {})
+    if (contextFile && !contextKeep) await rm(contextFile, { force: true }).catch(() => {})
   }
   if (!turn.ms) turn.ms = Date.now() - began
   state.turns.push(turn)
@@ -671,7 +690,7 @@ function startOfTodayWib(now = Date.now()) {
 }
 
 type RealRow = { jid: string; message_id?: string | null; reply_to_message_id?: string | null; direction: string; sender_type: string | null; body: string | null; media_type: string | null; media_url: string | null; created_at: Date | string }
-type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number; kutip?: string; ai?: boolean }
+type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number; kutip?: string; ai?: boolean; fotoSebelum?: string; kutipFoto?: boolean }
 
 /** Potong chat menjadi giliran: pesan pelanggan beruntun → balasan CS manusia (cs/owner) sesudahnya. */
 export function realSegments(rows: RealRow[], includeAi = false) {
@@ -698,8 +717,25 @@ export function realSegments(rows: RealRow[], includeAi = false) {
     const kutip = quoted
       ? String(quoted.body || '').trim().slice(0, 160) || (quoted.media_type === 'image' ? captionOf(quoted) : '') || (quoted.media_type ? `[${quoted.media_type}]` : '')
       : ''
+    // v3.6.147 — foto pelanggan yang dikutip, atau foto pelanggan terakhir sebelum giliran ini (≤ 12 pesan),
+    // ikut dilihat AI seperti di chat sungguhan ("yang ini ready?").
+    const quotedImage = quoted && quoted.direction === 'in' && quoted.media_type === 'image' && quoted.media_url ? quoted.media_url : ''
+    const earlier = rows
+      .slice(Math.max(0, askedAt - 12), askedAt)
+      .reverse()
+      .find((row) => row.direction === 'in' && row.media_type === 'image' && row.media_url)?.media_url
+    const fotoSebelum = image ? '' : quotedImage || earlier || ''
     if ((texts.length || image) && answered.length)
-      segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered, mulai: askedAt, ...(kutip ? { kutip } : {}), ...(byAi ? { ai: true } : {}) })
+      segments.push({
+        teks: texts.join('\n').slice(0, 1500),
+        gambar: image || undefined,
+        jawaban: answered,
+        mulai: askedAt,
+        ...(kutip ? { kutip } : {}),
+        ...(byAi ? { ai: true } : {}),
+        ...(fotoSebelum ? { fotoSebelum } : {}),
+        ...(quotedImage && !image ? { kutipFoto: true } : {}),
+      })
     asked = []
     answered = []
     byAi = false
@@ -737,7 +773,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
   const rand = rng(seed)
   // v3.6.147 — today: chat sejak 00:00 WIB hari ini, termasuk yang dijawab AI (pembanding, bukan acuan).
   const since = today ? startOfTodayWib() : new Date(Date.now() - (images ? 365 : 180) * 86_400_000)
-  if (today) mix = 0
+  if (today || images) mix = 0
   const jids = (await db
     .from('whatsapp_messages')
     .select('jid')
@@ -767,7 +803,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
       (segment) =>
         (segment.teks.length >= 2 || segment.gambar) &&
         // v3.6.147 — uji gambar: hanya giliran yang pelanggannya mengirim/membalas foto (foto asli dari chat).
-        (!images || Boolean(segment.gambar) || /^\[(?:foto|image)/i.test(segment.kutip || '')) &&
+        (!images || Boolean(segment.gambar) || Boolean(segment.kutipFoto) || /^\[(?:foto|image)/i.test(segment.kutip || '')) &&
         (today
           ? new Date(rows[segment.mulai ?? 0]?.created_at || 0) >= since && !isOtherBot(segment.teks) && !isBusinessPitch(segment.teks)
           : !learned.has(foldText(segment.teks)))
@@ -803,8 +839,14 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
         // Giliran pertama digabung dengan pertanyaan pelanggan lain (dua maksud dalam satu pesan).
         if (turn === 0 && other && other.teks !== segment.teks) teks = `${teks}\n${roughen(rand, other.teks.replace(/\n+/g, ' '))}`
       }
-      return segment.gambar || segment.kutip
-        ? { teks, ...(segment.gambar ? { gambar: segment.gambar } : {}), ...(segment.kutip ? { kutip: segment.kutip } : {}) }
+      return segment.gambar || segment.kutip || segment.fotoSebelum
+        ? {
+            teks,
+            ...(segment.gambar ? { gambar: segment.gambar } : {}),
+            ...(segment.kutip ? { kutip: segment.kutip } : {}),
+            ...(segment.fotoSebelum ? { fotoSebelum: segment.fotoSebelum } : {}),
+            ...(segment.kutipFoto ? { kutipFoto: true } : {}),
+          }
         : teks
     })
     const reference = picked
@@ -816,7 +858,20 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
       .concat(combined && other ? [`Pertanyaan tambahan (digabung) — CS manusia waktu itu: ${other.jawaban.join(' / ')}`] : [])
     const before = chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 12), picked[0].mulai ?? 0)
     // Gambar di riwayat diberi keterangan seperti di sistem nyata (AI melihat isi gambar lama lewat catatan).
-    const notes = await imageNotes(chat.jid, before.filter((row) => row.message_id) as any[]).catch(() => new Map<string, string>())
+    // v3.6.147 — foto giliran ini & foto yang dirujuk juga diberi keterangan (untuk penilai, yang tidak melihat gambar).
+    const turnImages = new Set(picked.flatMap((segment) => [segment.gambar, segment.fotoSebelum]).filter(Boolean) as string[])
+    const imageRows = chat.rows.filter((row) => row.message_id && row.media_url && turnImages.has(row.media_url) && !before.includes(row))
+    const notes = await imageNotes(chat.jid, [...before, ...imageRows].filter((row) => row.message_id) as any[]).catch(() => new Map<string, string>())
+    const noteOf = (url?: string) => {
+      const row = url ? chat.rows.find((item) => item.media_url === url && item.message_id) : undefined
+      return row ? notes.get(String(row.message_id)) || '' : ''
+    }
+    for (const entry of giliran)
+      if (entry && typeof entry === 'object') {
+        const message = entry as SimMessage
+        if (message.gambar && noteOf(message.gambar)) message.catatan = noteOf(message.gambar)
+        if (message.fotoSebelum && noteOf(message.fotoSebelum)) message.catatanSebelum = noteOf(message.fotoSebelum)
+      }
     out.push({
       id: `real-${out.length + 1}-s${seed}`,
       waktu: new Date(chat.rows[picked[0].mulai ?? 0]?.created_at || Date.now()).toISOString(),
