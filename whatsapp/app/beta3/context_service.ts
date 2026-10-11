@@ -345,7 +345,7 @@ export function readySizeHint(text: string, history: LeanHistoryRow[], catalog: 
       groups.set(row.product, [...(groups.get(row.product) || []), row.color])
   if (!groups.size) return `READY SIZE ${size}: tidak ada jas ready size ${size} di KATALOG — tawarkan pre-order atau size lain yang ready.`
   const list = [...groups.entries()].slice(0, 8).map(([product, colors]) => `${product} (${colors.slice(0, 10).join(', ')})`)
-  return `READY SIZE ${size} di KATALOG (sebut SEMUA model & warna ini, jangan dipotong): ${list.join('; ')}.`
+  return `READY SIZE ${size} di KATALOG: ${list.join('; ')}. Jawab ringkas dalam kalimat (sebut modelnya + beberapa warna), tanpa daftar berpoin; tawarkan foto bila ingin lihat semua.`
 }
 
 /** "sejuta", "1jt", "700k", "700rb", "1,5 juta" → rupiah. */
@@ -387,7 +387,7 @@ export function shoppingHints(text: string, catalog: LeanCatalogRow[]) {
     if (!hits.length) continue
     const ready = hits.filter((row) => row.sizesReady)
     const names = [...new Set((ready.length ? ready : hits).map((row) => `${row.product} - ${row.color}${row.sizesReady ? ` (${row.sizesReady})` : ''}`))].slice(0, 8)
-    hints.push(`Warna yang termasuk permintaan pelanggan di KATALOG (sebut semua pilihannya, bukan satu saja): ${names.join('; ')}.`)
+    hints.push(`Warna yang termasuk permintaan pelanggan di KATALOG (sebut beberapa pilihan dalam satu kalimat, bukan satu saja dan bukan daftar panjang): ${names.join('; ')}.`)
     break
   }
   // v3.6.136 — Tanya nuansa/varian satu warna → semua varian katalognya.

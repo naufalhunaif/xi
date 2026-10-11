@@ -66,7 +66,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -1665,6 +1665,16 @@ export async function createLeanReply(input: {
     })
   }
   decision.pesan = dropRepeatedQuestions(decision.pesan, rows)
+  const topics = dropRepeatedTopics(decision.pesan, rows, input.text)
+  if (topics.changed) {
+    decision.pesan = topics.pesan
+    onTrace?.({ key: 'beta3-repeat-topic', label: 'Pertanyaan yang sudah ditanyakan tidak diulang', status: 'completed', detail: {} })
+  }
+  const oneAsk = singleQuestion(decision.pesan)
+  if (oneAsk.changed) {
+    decision.pesan = oneAsk.pesan
+    onTrace?.({ key: 'beta3-one-question', label: 'Satu pertanyaan per balasan', status: 'completed', detail: {} })
+  }
   const cod = fixCodClaim(decision.pesan, input.text)
   if (cod.changed) {
     decision.pesan = cod.pesan

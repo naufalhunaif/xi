@@ -95,7 +95,7 @@ export function styleGuide(profile: StyleProfile) {
     // kurang informatif (harga/detail hilang). Panjang mengikuti skill & contoh CS.
     '- Bahasa santai sehari-hari seperti contoh CS; tanpa format markdown (**tebal**, #judul, tabel).',
     '- Rapi seperti CS: rincian berangka (ongkir, rincian total, data pesanan, harga yang diminta per model) satu item per baris. Pilihan tanpa angka cukup satu kalimat ("mau A, B, atau C bos?"). Ditanya harga/price list umum → "mulai dari X" lalu tanya model.',
-    '- Jangan membuka dengan salam panjang atau menutup dengan kalimat basa-basi yang sama tiap kali.',
+    '- Singkat & tepat seperti contoh CS di riwayat: 1–2 bubble pendek, satu pertanyaan saja, jangan menanyakan lagi yang sudah ditanyakan; tanpa salam panjang atau basa-basi penutup.',
     '- Seperti CS terbaik: jawab pertanyaan terakhir langsung, singkat ("harga 485.000 bos"); jangan ditunda dengan pertanyaan lain. Jawab dari data (bahan, lama jadi, lokasi); tanya balik hanya bila jawabannya beda per model. Minta sharelok → kirim alamat lengkap toko. Ditanya warna lain → sebut 3–5 yang ready/terdekat, bukan semua.',
   ]
   return lines.filter(Boolean).join('\n')

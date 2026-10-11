@@ -370,3 +370,81 @@ export function capOversize(pesan: string[], customerText: string, maxSize: stri
   const lead = `Size paling besar ${maxSize} ${address}, ${size} belum bisa dibuatkan.`
   return { pesan: [lead, ...kept], changed: true }
 }
+
+const QUESTION_TOPICS: Array<[string, RegExp]> = [
+  ['model', /\bmodel\b|\b(?:jas|jasnya)\s+(?:saja|aja)\s+atau\b|sekalian\s+(?:dengan\s+|sama\s+)?celana|reguler\s+atau\s+premium|\bseri\s+(?:apa|yang)/i],
+  ['size', /\bsize(?:nya)?\s+(?:apa|berapa)|tinggi\s+(?:dan|&)\s+berat|\bbiasa(?:nya)?\s+pakai\s+size/i],
+  ['celana', /nomor\s+(?:celana\s+)?berapa|\bno\.?\s+berapa|lingkar\s+pinggang(?:nya)?\s+berapa/i],
+  ['kirim', /kirim(?:nya)?\s+ke\s*mana|pengiriman(?:nya)?\s+ke\s*mana|alamat(?:nya)?\s+(?:di\s*)?mana|kecamatan(?:nya)?\s+(?:dan|mana|apa)/i],
+  ['warna', /\bwarna(?:nya)?\s+(?:apa|yang\s+mana|mau\s+yang)/i],
+]
+const topicOf = (sentence: string) => QUESTION_TOPICS.find(([, pattern]) => pattern.test(sentence))?.[0] || ''
+
+/**
+ * v3.6.146 — Pertanyaan bertopik sama (model, size, nomor celana, tujuan kirim, warna) yang sudah ditanyakan di 4
+ * pesan toko terakhir tidak ditanyakan lagi dengan kalimat lain (chat 11 Okt: "mau model apa" ditanya 4× dalam
+ * 6 menit saat pelanggan masih mengirim ukuran → berputar). Jawaban pelanggan atas topik itu membuka lagi.
+ */
+const TOPIC_WORDS: Record<string, RegExp> = {
+  model: /\b(model|ganti|setelan|beskap|tuxedo|basic|peak|premium|reguler|signature)\b/i,
+  size: /\b(size|ukuran|tinggi|berat)\b/i,
+  celana: /\b(celana|pinggang|nomor)\b/i,
+  kirim: /\b(kirim|alamat|ongkir)\b/i,
+  warna: /\b(warna|ganti)\b/i,
+}
+export function dropRepeatedTopics(
+  pesan: string[],
+  history: Array<{ direction: string; body?: string | null; current?: boolean }>,
+  customerText = ''
+) {
+  const rows = history.filter((row) => !row.current && row.body)
+  // Pertanyaan toko di 4 pesan toko terakhir; topik yang sedang dibahas pelanggan sekarang tetap boleh ditanya.
+  const recent = new Set<string>()
+  for (const row of rows.filter((item) => item.direction === 'out').slice(-4))
+    for (const sentence of String(row.body || '').split(/(?<=[.!?])\s+|\n+/)) {
+      const topic = sentence.includes('?') ? topicOf(sentence) : ''
+      if (topic && !TOPIC_WORDS[topic]?.test(customerText)) recent.add(topic)
+    }
+  if (!recent.size) return { pesan, changed: false }
+  let changed = false
+  const out = pesan
+    .map((bubble) => {
+      const sentences = bubble.split(/(?<=[.!?])\s+/)
+      const kept = sentences.filter((sentence) => {
+        if (!sentence.includes('?')) return true
+        const topic = topicOf(sentence)
+        if (topic && recent.has(topic)) {
+          changed = true
+          return false
+        }
+        return true
+      })
+      return kept.join(' ').trim()
+    })
+    .filter(Boolean)
+  return { pesan: changed && out.length ? out : pesan, changed: changed && out.length > 0 }
+}
+
+/**
+ * v3.6.146 — Satu pertanyaan per balasan seperti CS (pemilik: "jawaban singkat dan tepat, tidak berulang").
+ * Pertanyaan pertama dipertahankan; pertanyaan berikutnya dibuang (kalimat lain tetap).
+ */
+export function singleQuestion(pesan: string[]) {
+  let seen = false
+  let changed = false
+  const out = pesan
+    .map((bubble) =>
+      bubble
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) => {
+          if (!/\?\s*$/.test(sentence.trim())) return true
+          if (!seen) return (seen = true)
+          changed = true
+          return false
+        })
+        .join(' ')
+        .trim()
+    )
+    .filter(Boolean)
+  return { pesan: changed && out.length ? out : pesan, changed: changed && out.length > 0 }
+}
