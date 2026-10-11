@@ -283,3 +283,49 @@ export function inlineShortLists(pesan: string[]) {
 function joinList(items: string[]) {
   return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')}, dan ${items[items.length - 1]}`
 }
+
+const WORDS = (text: string) => text.split(/\s+/).filter(Boolean).length
+/** Baris yang tidak boleh dipecah: format order, rincian harga/total, rekening, daftar. */
+const KEEP_WHOLE = /\n|nama\s*:|alamat|total\b|rekening|\brek\b|\d{1,3}\.\d{3}|^\s*[-•\d]/i
+/** Kalimat yang menyambung ke kalimat sebelumnya (tidak dipisah ke bubble baru). */
+const CONTINUES = /^(?:jadi|kalau|kalo|tapi|tetapi|karena|soalnya|biar|supaya|atau|dan|terus|lalu|nanti|untuk itu|makanya)\b/i
+
+/**
+ * v3.6.157 — Satu bubble panjang berisi beberapa konteks (catat data · hasil ukuran · langkah berikut) dipecah jadi
+ * beberapa bubble pendek seperti CS asli (pemilik: "jadi beberapa bagian, karena memuat konteks berbeda").
+ * Kalimat ≤ 15 kata, pecah di batas kalimat; kalimat penyambung ("tapi…", "jadi…") ikut kalimat sebelumnya bila
+ * gabungannya masih ≤ 22 kata. Maksimal 4 bubble; template/rincian tidak dipecah.
+ */
+export function splitLongBubbles(pesan: string[], maxWords = 15, maxBubbles = 4) {
+  const out: string[] = []
+  for (const bubble of pesan) {
+    const text = String(bubble || '').trim()
+    if (!text || KEEP_WHOLE.test(text) || WORDS(text) <= maxWords) {
+      out.push(text)
+      continue
+    }
+    const DOT = '\u2024'
+    const sentences = text
+      .replace(/(\d)\.(?=\d)/g, `$1${DOT}`)
+      .replace(/\b(no|mis|dll|dsb|tgl|rp)\./gi, `$1${DOT}`)
+      .split(/(?<=[.!?])\s+(?=\S)/)
+      .map((part) => part.split(DOT).join('.').trim())
+      .filter(Boolean)
+    if (sentences.length < 2) {
+      out.push(text)
+      continue
+    }
+    const parts: string[] = []
+    for (const sentence of sentences) {
+      const last = parts[parts.length - 1]
+      const join = last && (CONTINUES.test(sentence) || WORDS(last) + WORDS(sentence) <= Math.ceil(maxWords / 2)) && WORDS(last) + WORDS(sentence) <= maxWords + 7
+      if (join) parts[parts.length - 1] = `${last} ${sentence}`
+      else parts.push(sentence)
+    }
+    // Bubble hasil pecahan tanpa titik di ujung (gaya chat CS); yang utuh dibiarkan apa adanya.
+    out.push(...parts.map((part) => part.replace(/[.]+$/, '').trim()))
+  }
+  const trimmed = out.filter(Boolean)
+  if (trimmed.length > maxBubbles) trimmed.splice(maxBubbles - 1, trimmed.length - maxBubbles + 1, trimmed.slice(maxBubbles - 1).join('. '))
+  return { pesan: trimmed, changed: trimmed.length !== pesan.length || trimmed.some((bubble, index) => bubble !== String(pesan[index] || '').trim()) }
+}

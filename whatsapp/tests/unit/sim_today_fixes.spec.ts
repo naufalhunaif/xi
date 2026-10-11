@@ -219,3 +219,31 @@ test.group('uji 100 chat v3.6.155', () => {
     assert.equal(out.pesan[0], 'Tinggi dan berat badan berapa?')
   })
 })
+
+test.group('bubble per konteks v3.6.157', () => {
+  test('satu bubble panjang dipecah per konteks seperti CS', async ({ assert }) => {
+    const { splitLongBubbles } = await import('#beta3/reply_polish')
+    const out = splitLongBubbles([
+      'Siap bos, tinggi 170 dan berat 96 sudah saya catat. Kalau lihat ukuran badan, dada 120 paling dekat size 3XL (3XL dadanya 120 cm), tapi bahu 53 masih di atas chart jadi tetap dibuat custom sesuai ukuran bos ya.',
+    ])
+    assert.isTrue(out.changed)
+    assert.deepEqual(out.pesan, [
+      'Siap bos, tinggi 170 dan berat 96 sudah saya catat',
+      'Kalau lihat ukuran badan, dada 120 paling dekat size 3XL (3XL dadanya 120 cm), tapi bahu 53 masih di atas chart jadi tetap dibuat custom sesuai ukuran bos ya',
+    ])
+  })
+
+  test('bubble pendek, rincian harga, dan format order tidak dipecah', async ({ assert }) => {
+    const { splitLongBubbles } = await import('#beta3/reply_polish')
+    assert.isFalse(splitLongBubbles(['Iya bisa bos. Pakai size apa ya?']).changed)
+    const rincian = 'Jas 485.000 ongkir 80.000. Total 485.000 + 80.000 = 565.000 bos. Untuk pembayaran tf ke rek BRI 123 an Toko agar pesanan langsung kami proses ya bos.'
+    assert.isFalse(splitLongBubbles([rincian]).changed)
+    assert.isFalse(splitLongBubbles(['Bisa di bantu isi order formatnya bos\nNama :\nAlamat lengkap :']).changed)
+  })
+
+  test('kalimat penyambung tidak dipisah dari induknya; titik ribuan & "no." aman', async ({ assert }) => {
+    const { splitLongBubbles } = await import('#beta3/reply_polish')
+    const out = splitLongBubbles(['Untuk pinggang 107 cm paling dekat celana no. 40 bos, lingkar jadinya 106 cm. Jadi pakai no. 40 ya. Mau sekalian dengan jasnya atau celananya saja bos?'])
+    assert.deepEqual(out.pesan, ['Untuk pinggang 107 cm paling dekat celana no. 40 bos, lingkar jadinya 106 cm. Jadi pakai no. 40 ya', 'Mau sekalian dengan jasnya atau celananya saja bos?'])
+  })
+})

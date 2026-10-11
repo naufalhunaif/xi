@@ -78,7 +78,7 @@ const FAST_EARLY = ['', 'lain', 'selesai', 'tanya_model', 'tanya_size']
 // efektif; semua balasan kembali lewat AI (lebih lama tapi menimbang konteks). Kodenya disimpan untuk nanti.
 const FAST_LANE = false
 import { pricePattern, productPriceMap, photoPriceSet, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
-import { answerSalam, completePhotos, inlineShortLists, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
+import { answerSalam, completePhotos, splitLongBubbles, inlineShortLists, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -2180,6 +2180,14 @@ export async function createLeanReply(input: {
     if (repeated.changed) {
       decision.pesan = repeated.pesan
       onTrace?.({ key: 'beta3-total', label: repeated.pesan.length ? 'Janji tunggu tidak diulang' : 'Diam · janji tunggu sudah dikirim', status: 'completed', detail: {} })
+    }
+  }
+  // v3.6.157 — bubble panjang dipecah per konteks seperti CS asli (langkah terakhir sebelum kirim).
+  if (decision.pesan.length) {
+    const split = splitLongBubbles(decision.pesan)
+    if (split.changed) {
+      decision.pesan = split.pesan
+      onTrace?.({ key: 'beta3-split', label: `Balasan dipecah jadi ${split.pesan.length} bubble pendek`, status: 'completed', detail: { pesan: split.pesan } })
     }
   }
   // v3.6.43: susulan tidak menyebut total/DP/rekening sebelum total benar-benar dikirim.

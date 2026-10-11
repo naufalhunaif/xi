@@ -242,7 +242,7 @@ export function normalizeStyle(bubbles: string[], profile: StyleProfile, verbati
     if (!rest || /^(bos|kak|gan|sis|mas|mbak|min)[.!]?$/i.test(rest)) clean.splice(i, 1)
     else clean[i] = rest[0].toUpperCase() + rest.slice(1)
   }
-  // Maksimal 3 bubble; sisanya digabung ke bubble terakhir.
-  if (clean.length > 3) clean.splice(2, clean.length - 2, clean.slice(2).join('\n'))
+  // Maksimal 4 bubble (v3.6.157: CS asli memecah per konteks); sisanya digabung ke bubble terakhir.
+  if (clean.length > 4) clean.splice(3, clean.length - 3, clean.slice(3).join('\n'))
   return clean
 }
