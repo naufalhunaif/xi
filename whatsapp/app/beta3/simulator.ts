@@ -769,10 +769,10 @@ export function realSegments(rows: RealRow[], includeAi = false) {
  * dikombinasikan: kalimat diacak (singkatan, salah ketik, bahasa daerah) dan digabung dengan pertanyaan
  * pelanggan lain, supaya maksud yang sama diuji dalam bentuk yang lebih rumit.
  */
-export async function realScenarios(count: number, seed: number, mix = 0.5, today = false, images = false) {
+export async function realScenarios(count: number, seed: number, mix = 0.5, today = false, images = false, days = images ? 365 : 180): Promise<SimScenario[]> {
   const rand = rng(seed)
   // v3.6.147 — today: chat sejak 00:00 WIB hari ini, termasuk yang dijawab AI (pembanding, bukan acuan).
-  const since = today ? startOfTodayWib() : new Date(Date.now() - (images ? 365 : 180) * 86_400_000)
+  const since = today ? startOfTodayWib() : new Date(Date.now() - days * 86_400_000)
   if (today || images) mix = 0
   const jids = (await db
     .from('whatsapp_messages')
@@ -782,7 +782,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
     .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid').orWhere('jid', 'like', '%@ig'))
     .groupBy('jid')
     .orderByRaw('RAND(?)', [seed])
-    .limit(Math.min(4000, count * (images ? 60 : 15)))) as Array<{ jid: string }>
+    .limit(Math.min(8000, count * (images ? 60 : 15) * Math.max(1, days / 180)))) as Array<{ jid: string }>
   const pool: Array<{ jid: string; segments: RealSegment[]; rows: RealRow[] }> = []
   const foldText = (text: string) => maskPii(text).replace(/\n+/g, ' / ').toLowerCase().replace(/\s+/g, ' ').trim()
   const learned = new Set((await listLeanExamples()).flatMap((example) => [foldText(example.customerText), example.customerText.toLowerCase().replace(/\s+/g, ' ').trim()]))
@@ -894,6 +894,11 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
       ].join('\n'),
       giliran,
     })
+  }
+  // v3.6.153 — putaran 100: chat 180 hari kurang → rentang diperluas (set yang sudah cukup tetap sama).
+  if (!today && out.length < count && days < 720) {
+    const wider = await realScenarios(count, seed, mix, today, images, days * 2)
+    if (wider.length > out.length) return wider
   }
   return out
 }
