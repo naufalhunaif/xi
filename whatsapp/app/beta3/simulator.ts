@@ -732,7 +732,7 @@ export function realSegments(rows: RealRow[], includeAi = false) {
 export async function realScenarios(count: number, seed: number, mix = 0.5, today = false, images = false) {
   const rand = rng(seed)
   // v3.6.147 — today: chat sejak 00:00 WIB hari ini, termasuk yang dijawab AI (pembanding, bukan acuan).
-  const since = today ? startOfTodayWib() : new Date(Date.now() - 180 * 86_400_000)
+  const since = today ? startOfTodayWib() : new Date(Date.now() - (images ? 365 : 180) * 86_400_000)
   if (today) mix = 0
   const jids = (await db
     .from('whatsapp_messages')
@@ -748,7 +748,8 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
   const learned = new Set((await listLeanExamples()).flatMap((example) => [foldText(example.customerText), example.customerText.toLowerCase().replace(/\s+/g, ' ').trim()]))
   for (const { jid } of jids) {
     // v3.6.87: uji hanya memakai chat yang tidak dipelajari.
-    if (!today && !isHoldout(jid)) continue
+    // Uji gambar: semua chat (giliran bergambar jarang; contoh yang dipelajari hanya teks).
+    if (!today && !images && !isHoldout(jid)) continue
     const rows = (await db
       .from('whatsapp_messages')
       .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')

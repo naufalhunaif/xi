@@ -297,7 +297,8 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
         `${group.name}: ${part} badan ${value} cm → ${around.map((row) => `${row.size} = ${row.values.get(part)} cm`).join(', ')}. ` +
           (fit
             ? `Paling dekat: ${fit.size} (${fit.values.get(part)} cm, selisih ${Math.abs(Math.round((fit.values.get(part)! - value) * 10) / 10)} cm). Sebut nomor ini (toko memakai angka chart langsung); jangan naikkan nomor dengan alasan longgar/ngepress.`
-            : 'Lebih besar dari size terbesar: sarankan custom/tanya CS.')
+            : // v3.6.147 — di atas size terbesar tidak bisa dibuat, juga tidak lewat custom (aturan pemilik; chat 11 Okt: pinggang 120 cm dijanjikan custom).
+              `Lebih besar dari size terbesar (${sorted[sorted.length - 1].size} = ${largest} cm): TIDAK bisa dibuat, juga tidak lewat custom. Sampaikan jujur paling besar ${sorted[sorted.length - 1].size}, jangan janjikan custom.`)
       )
     }
   }

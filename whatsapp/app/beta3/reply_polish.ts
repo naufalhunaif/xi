@@ -127,13 +127,15 @@ export type PolishContext = {
   series: PriceSeries | null
   /** Nama produk katalog (huruf kecil) → harga sah (S–XL & besar). */
   productPrices?: Map<string, Set<number>>
+  /** Harga sah produk yang fotonya ikut dikirim. */
+  photoPrices?: Set<number>
 }
 
 /** Perapian teks (sebelum pemeriksa harga katalog). */
 export function polishText(pesan: string[], context: PolishContext) {
   let out = pesan.map(tidyLists)
   out = tidyReply(out, { address: context.address || 'bos', verbatim: context.verbatim || [] })
-  const priceFix = fixContextPrices(out, context.prices, context.series, context.productPrices)
+  const priceFix = fixContextPrices(out, context.prices, context.series, context.productPrices, context.photoPrices)
   out = dropWrongOpener(priceFix.pesan, context.customerText)
   out = answerSalam(out, context.customerText, context.address || 'bos')
   return { pesan: out, priceChanges: priceFix.changes }

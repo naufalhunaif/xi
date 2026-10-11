@@ -73,3 +73,33 @@ test.group('uji chat asli v3.6.146', () => {
     assert.deepEqual(today[0].jawaban, ['Ada bos'])
   })
 })
+
+test.group('uji chat hari ini v3.6.147', () => {
+  test('pinggang di atas size chart terbesar tidak dijanjikan custom', async ({ assert }) => {
+    const { capOversizeBody } = await import('#beta3/reply_guards')
+    const note =
+      'PERBANDINGAN SIZE CHART (dihitung sistem):\n- Pants 28-40: pinggang badan 120 cm → 39 = 103 cm, 40 = 106 cm. Lebih besar dari size terbesar (40 = 106 cm): TIDAK bisa dibuat, juga tidak lewat custom.'
+    const out = capOversizeBody(
+      ['Untuk celana, pinggang 120 cm di atas size terbesar kami (no 40 pinggangnya 106 cm), jadi dibuat custom sesuai ukuran bos ya.', 'Panjang celananya berapa cm bos?'],
+      note
+    )
+    assert.isTrue(out.changed)
+    assert.match(out.pesan[0], /pinggang 120 cm belum bisa dibuatkan bos, paling besar celana no 40/)
+    assert.notInclude(out.pesan.join(' '), 'custom sesuai')
+    // Tanpa janji custom: tidak diubah.
+    assert.isFalse(capOversizeBody(['Paling besar no 40 bos.'], note).changed)
+  })
+
+  test('harga produk yang fotonya ikut tidak diganti harga seri lain', async ({ assert }) => {
+    const { fixContextPrices } = await import('#beta3/price_pattern')
+    const pattern = {
+      series: {
+        reguler: { cells: { 'setelan:db': { price: 805000, big: 905000 }, 'setelan:standar': { price: 705000, big: 805000 } } },
+        premium: { cells: { 'setelan:db': { price: 955000, big: 1055000 }, 'setelan:standar': { price: 955000, big: 1055000 } } },
+      },
+    } as any
+    const text = ['itu model Double Breasted hitam kerah satin bos, untuk setelan ukuran besarnya 905.000, ini fotonya ya']
+    assert.lengthOf(fixContextPrices(text, pattern, 'premium').changes, 1)
+    assert.deepEqual(fixContextPrices(text, pattern, 'premium', undefined, new Set([805000, 905000])), { pesan: text, changes: [] })
+  })
+})

@@ -142,7 +142,9 @@ export function fixContextPrices(
   pattern: PricePattern,
   series: PriceSeries | null,
   /** Nama produk katalog (huruf kecil) → harga sah; "Basic Suit 485.000" tidak pernah diubah. */
-  productPrices?: Map<string, Set<number>>
+  productPrices?: Map<string, Set<number>>,
+  /** v3.6.147 — harga sah produk yang fotonya ikut dikirim (uji: foto Setelan Double Breasted reguler, 905.000 diganti premium). */
+  photoPrices?: Set<number>
 ) {
   const changes: Array<{ from: number; to: number; item: PriceItem }> = []
   if (!series || !pattern.series[series]) return { pesan, changes }
@@ -180,7 +182,7 @@ export function fixContextPrices(
         const lower = sentence.toLowerCase()
         return sentence.replace(PRICE, (raw) => {
           const value = Number(raw.replace(/\./g, ''))
-          if (value === cell.price || value === cell.big || !known.has(value)) return raw
+          if (value === cell.price || value === cell.big || !known.has(value) || photoPrices?.has(value)) return raw
           // Nama produk disebut dan angkanya memang harga produk itu → benar, biarkan.
           for (const [name, valid] of productPrices || [])
             if (valid.has(value) && lower.includes(name)) return raw
@@ -192,6 +194,21 @@ export function fixContextPrices(
       .join('')
   )
   return { pesan: fixed, changes }
+}
+
+/** Harga sah (S–XL & ukuran besar) produk pada caption foto "Produk - Warna". */
+export function photoPriceSet(rows: LeanCatalogRow[], captions: string[]) {
+  const set = new Set<number>()
+  const wanted = new Set(captions.map((caption) => caption.trim().toLowerCase()))
+  for (const row of rows) {
+    if (!row.price) continue
+    const caption = (row.color ? `${row.product} - ${row.color}` : row.product).trim().toLowerCase()
+    if (!wanted.has(caption)) continue
+    set.add(row.price)
+    const big = bigOf(row)
+    if (big) set.add(big)
+  }
+  return set
 }
 
 /** Nama produk katalog (huruf kecil, ≥ 4 huruf) → harga sah (S–XL & ukuran besar). */

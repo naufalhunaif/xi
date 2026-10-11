@@ -414,6 +414,30 @@ export function capOversize(pesan: string[], customerText: string, maxSize: stri
   return { pesan: [lead, ...kept], changed: true }
 }
 
+/**
+ * v3.6.147 — ukuran badan di atas size chart terbesar (catatan PERBANDINGAN SIZE CHART) tidak dijanjikan custom
+ * (chat 11 Okt: pinggang 120 cm, celana terbesar no 40 = 106 cm, AI bilang "jadi dibuat custom sesuai ukuran").
+ */
+export function capOversizeBody(pesan: string[], chartNote: string, address = 'bos') {
+  const over = [...String(chartNote || '').matchAll(/(\w+) badan (\d+(?:\.\d)?) cm[^\n]*?Lebih besar dari size terbesar \((\w+) = (\d+(?:\.\d)?) cm\)/g)]
+  if (!over.length) return { pesan, changed: false }
+  const promise = /\b(?:custom|dibuat(?:kan|in)?\s+(?:sesuai|khusus|ukuran)|bisa dibuat(?:kan|in)?|disesuaikan)\b/i
+  if (!pesan.some((bubble) => promise.test(bubble))) return { pesan, changed: false }
+  const kept = pesan
+    .map((bubble) =>
+      bubble
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) => !promise.test(sentence) && !/(?:di atas|melebihi|lebih besar dari)\s+(?:size|ukuran)\s+terbesar/i.test(sentence))
+        .join(' ')
+        .trim()
+    )
+    .filter((bubble) => bubble.length > 3)
+  const [, part, value, size, cm] = over[0]
+  const numeric = /^\d+$/.test(size)
+  const lead = `Untuk ${part} ${value} cm belum bisa dibuatkan ${address}, paling besar ${numeric ? `celana no ${size}` : `size ${size}`} (${part} ${cm} cm), di atas itu tidak bisa termasuk custom.`
+  return { pesan: [lead, ...kept], changed: true }
+}
+
 const QUESTION_TOPICS: Array<[string, RegExp]> = [
   ['model', /\bmodel\b|\b(?:jas|jasnya)\s+(?:saja|aja)\s+atau\b|sekalian\s+(?:dengan\s+|sama\s+)?celana|reguler\s+atau\s+premium|\bseri\s+(?:apa|yang)/i],
   ['size', /\bsize(?:nya)?\s+(?:apa|berapa)|tinggi\s+(?:dan|&)\s+berat|\bbiasa(?:nya)?\s+pakai\s+size/i],

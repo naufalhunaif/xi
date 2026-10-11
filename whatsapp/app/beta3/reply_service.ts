@@ -66,7 +66,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -77,7 +77,7 @@ const FAST_EARLY = ['', 'lain', 'selesai', 'tanya_model', 'tanya_size']
 // v3.6.106 — jalur kilat (tanya umum & ongkir tanpa AI) DIMATIKAN atas permintaan pemilik: hasil uji tidak lebih
 // efektif; semua balasan kembali lewat AI (lebih lama tapi menimbang konteks). Kodenya disimpan untuk nanti.
 const FAST_LANE = false
-import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
+import { pricePattern, productPriceMap, photoPriceSet, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
 import { completePhotos, inlineShortLists, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
@@ -1631,7 +1631,11 @@ export async function createLeanReply(input: {
         { jid, tier: tierChoice.tier, preferAccount: result.accountId }
       )
       const fixed = parseLeanDecision(revised.text)
-      decision = fixed
+      // v3.6.147 — tulis ulang kosong (pelanggan kirim foto/bertanya) → draf awal tetap dikirim, pelanggan
+      // tidak didiamkan (uji chat 11 Okt: bukti transfer dikirim, balasan "kami cek dulu" dibuang jadi kosong).
+      const silent = !fixed.pesan.length && !fixed.serah_cs && decision.pesan.length > 0 && (Boolean(input.imagePaths?.length) || /\?/.test(input.text || ''))
+      if (silent) onTrace?.({ key: 'beta3-revise-empty', label: 'Tulis ulang kosong · draf awal dipakai', status: 'completed', detail: {} })
+      else decision = fixed
       presetDraft()
       result.usage = mergeUsage(result.usage, revised.usage)
       onTrace?.({ key: 'beta3-revise', label: 'Balasan ditulis ulang sesuai pemeriksa', status: 'completed', detail: { pesan: fixed.pesan, foto: fixed.foto } })
@@ -1721,6 +1725,7 @@ export async function createLeanReply(input: {
     prices,
     series: priceSeries,
     productPrices: productPriceMap(digest.rows),
+    photoPrices: photoPriceSet(digest.rows, decision.foto || []),
   })
   decision.pesan = polished.pesan
   const priceFix = { changes: polished.priceChanges }
@@ -2239,6 +2244,11 @@ export async function createLeanReply(input: {
     if (over.changed) {
       decision.pesan = over.pesan
       onTrace?.({ key: 'beta3-oversize', label: 'Size di atas varian terbesar tidak disanggupi', status: 'completed', detail: { pesan: over.pesan } })
+    }
+    const body = capOversizeBody(decision.pesan, chartNote, style?.address || 'bos')
+    if (body.changed) {
+      decision.pesan = body.pesan
+      onTrace?.({ key: 'beta3-oversize-body', label: 'Ukuran badan di atas size chart terbesar tidak dijanjikan custom', status: 'completed', detail: { pesan: body.pesan } })
     }
     const adjust = dropVagueAdjust(decision.pesan)
     if (adjust.changed) {
