@@ -719,6 +719,13 @@ export function repeatsStoreMessage(susulan: string, history: LeanHistoryRow[]) 
     })
 }
 
+/** Klaim hasil pengecekan (pembayaran masuk, sudah dicek, sudah dikirim) — hanya CS yang tahu. */
+export function claimsCheckedResult(text: string) {
+  return /\b(?:sudah|udah|telah)\s+(?:kami\s+|saya\s+)?(?:cek|dicek|terima|diterima|masuk|konfirmasi|dikonfirmasi|terkonfirmasi|kirim|dikirim|terkirim)\b|\b(?:pembayaran|dana|transfer(?:an)?|uang)(?:nya)?\s+(?:sudah\s+|udah\s+)?(?:masuk|diterima|aman|terkonfirmasi)\b/i.test(
+    String(text || '')
+  )
+}
+
 export async function reviewNudge(input: {
   jid: string
   settings: LeanProviderSettings
@@ -728,6 +735,9 @@ export async function reviewNudge(input: {
 }): Promise<NudgeVerdict> {
   if (repeatsStoreMessage(input.susulan, input.history))
     return { kirim: false, teks: '', alasan: 'Susulan sama dengan pesan toko sebelumnya (tidak diulang).', oleh: 'tidak_dinilai' }
+  // v3.6.151 — susulan tidak boleh mengklaim hasil cek yang belum pernah ada (uji: "Sudah kami cek ya bos, pembayarannya masuk").
+  if (claimsCheckedResult(input.susulan))
+    return { kirim: false, teks: '', alasan: 'Susulan mengklaim hasil cek/pembayaran tanpa data.', oleh: 'tidak_dinilai' }
   const recent = input.history
     .filter((row) => row.body || row.mediaType)
     .slice(-8)

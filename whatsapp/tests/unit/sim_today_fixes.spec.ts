@@ -154,3 +154,13 @@ test.group('uji gambar chat asli v3.6.148', () => {
     assert.isTrue(last.kutipFoto)
   })
 })
+
+test.group('uji gambar chat asli v3.6.151', () => {
+  test('susulan yang mengklaim pembayaran masuk tidak dikirim', async ({ assert }) => {
+    const { claimsCheckedResult } = await import('#beta3/reply_check')
+    assert.isTrue(claimsCheckedResult('Sudah kami cek ya bos, pembayarannya masuk'))
+    assert.isTrue(claimsCheckedResult('Dananya sudah masuk bos'))
+    assert.isFalse(claimsCheckedResult('Kalau sudah siap, kirim nama penerima ya bos'))
+    assert.isFalse(claimsCheckedResult('Masih ada yang mau ditanyakan bos?'))
+  })
+})
