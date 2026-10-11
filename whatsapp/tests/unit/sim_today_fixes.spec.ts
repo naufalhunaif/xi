@@ -103,3 +103,31 @@ test.group('uji chat hari ini v3.6.147', () => {
     assert.deepEqual(fixContextPrices(text, pattern, 'premium', undefined, new Set([805000, 905000])), { pesan: text, changes: [] })
   })
 })
+
+test.group('uji chat hari ini v3.6.149', () => {
+  test('"okee kak" dibalas singkat', async ({ assert }) => {
+    const { socialClosing } = await import('#beta3/reply_service')
+    assert.equal(socialClosing('okee kak'), 'Siap bos 🙏')
+    assert.equal(socialClosing('okesiap kak'), 'Siap bos 🙏')
+    assert.equal(socialClosing('makasihh'), 'Sama-sama bos 🙏')
+    assert.equal(socialClosing('mohon maaf ya'), 'Santai aja bos 🙏')
+  })
+
+  test('batas size sudah dikatakan → tidak diulang tiap giliran', async ({ assert }) => {
+    const { capOversizeBody } = await import('#beta3/reply_guards')
+    const note = '- Pants 28-40: pinggang badan 120 cm → 40 = 106 cm. Lebih besar dari size terbesar (40 = 106 cm): TIDAK bisa dibuat.'
+    const out = capOversizeBody(['Siap bos, panjang celana 95 cm dicatat ya.', 'Celananya dibuat custom sesuai ukuran ya bos.'], note, 'bos', [
+      'Untuk pinggang 120 cm belum bisa dibuatkan bos, paling besar celana no 40 (pinggang 106 cm), di atas itu tidak bisa termasuk custom.',
+    ])
+    assert.deepEqual(out.pesan, ['Siap bos, panjang celana 95 cm dicatat ya.'])
+  })
+
+  test('bahu di atas angka chart yang hanya sampai XL tidak dianggap di luar size terbesar', async ({ assert }) => {
+    const { compareWithSizeChart } = await import('#beta3/context_service')
+    const chart = 'Jas (cm): S dada 94 bahu 39; M dada 98 bahu 42; L dada 100 bahu 44; XL dada 110 bahu 46; XXL dada 116; 3XL dada 120; 4XL dada 124'
+    const note = compareWithSizeChart([{ direction: 'in', body: 'lingkar dada 120cm, bahu 53 cm', createdAt: new Date() } as any], chart)
+    assert.include(note, 'Paling dekat: 3XL')
+    assert.include(note, 'bahu sampai XL')
+    assert.notInclude(note, 'TIDAK bisa dibuat')
+  })
+})

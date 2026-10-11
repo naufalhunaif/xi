@@ -95,7 +95,7 @@ import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { renderPaymentMessage } from '#beta3/order_service'
-import { alignPhotos, allColorPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, allColorPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, repeatsStoreMessage, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
 import { renderChatState } from '#beta3/chat_state'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
@@ -182,10 +182,11 @@ async function describeQuotedImage(item: { id: number; jid: string; direction: s
 
 /** v3.6.111 — kalimat penutup untuk pesan sosial (terima kasih, maaf, mengiyakan); kosong = biarkan. */
 export function socialClosing(text: string, address = 'bos') {
-  const value = String(text || '')
+  // v3.6.149 — huruf dipanjangkan ("okee", "siapp", "makasihh") tetap dikenali (uji chat 11 Okt: "okee kak" didiamkan).
+  const value = `${String(text || '')} ${String(text || '').replace(/([a-z])\1+/gi, '$1')}`
   const thanks = /\b(makasih|makasi|terima\s*kasih|terimakasih|trims|tq|thanks|thank\s*you|thx|nuwun|suwun)\b/i.test(value)
   const sorry = /\b(maaf|mohon\s+maaf|sorry|ngapunten)\b/i.test(value)
-  const agree = /\b(iya|iyaa|ya|betul|bener|benar|ok|oke|okey|okay|siap|baik|sip|mantap)\b/i.test(value)
+  const agree = /\b(iya|iyaa|ya|betul|bener|benar|ok|oke|okey|okay|siap|baik|sip|mantap|ok[e]?siap|ok[e]?sip|okeh|okai)\b/i.test(value)
   if (thanks && sorry) return `Sama-sama ${address}, santai aja 🙏`
   if (thanks) return `Sama-sama ${address} 🙏`
   if (sorry) return `Santai aja ${address} 🙏`
@@ -1655,6 +1656,18 @@ export async function createLeanReply(input: {
       onTrace?.({ key: 'beta3-closing', label: 'Balasan penutup singkat (tidak didiamkan)', status: 'completed', detail: { pesan: closing } })
     }
   }
+  // v3.6.149 — pelanggan cuma mengiyakan ("Ok..") → balasan tidak membeo pesan toko sebelumnya (uji chat 11 Okt).
+  if (decision.pesan.length && !decision.serah_cs && !/\?/.test(input.text || '') && String(input.text || '').trim().length <= 25 && !input.imagePaths?.length) {
+    const closing = socialClosing(input.text, style?.address || 'bos')
+    if (closing) {
+      const recentOut = rows.filter((row) => row.direction === 'out' && !(row as { current?: boolean }).current).slice(-4)
+      const fresh = decision.pesan.filter((bubble) => !repeatsStoreMessage(bubble, recentOut))
+      if (fresh.length !== decision.pesan.length) {
+        decision.pesan = fresh.length ? fresh : [closing]
+        onTrace?.({ key: 'beta3-ack-echo', label: 'Balasan atas "ok" tidak mengulang pesan toko', status: 'completed', detail: { pesan: decision.pesan } })
+      }
+    }
+  }
   // Warna di spesifikasi & balasan = warna KATALOG yang ditunjukkan di chat (foto Choco tidak ditulis "Brown").
   const jevColor = await jevVariantFix(jid, decision.spesifikasi, digest.rows, rows).catch(() => null)
   const colorFix = jevColor || fixCatalogColors(decision.spesifikasi, digest.rows, rows)
@@ -2245,7 +2258,12 @@ export async function createLeanReply(input: {
       decision.pesan = over.pesan
       onTrace?.({ key: 'beta3-oversize', label: 'Size di atas varian terbesar tidak disanggupi', status: 'completed', detail: { pesan: over.pesan } })
     }
-    const body = capOversizeBody(decision.pesan, chartNote, style?.address || 'bos')
+    const body = capOversizeBody(
+      decision.pesan,
+      chartNote,
+      style?.address || 'bos',
+      rows.filter((row) => row.direction === 'out').map((row) => String(row.body || ''))
+    )
     if (body.changed) {
       decision.pesan = body.pesan
       onTrace?.({ key: 'beta3-oversize-body', label: 'Ukuran badan di atas size chart terbesar tidak dijanjikan custom', status: 'completed', detail: { pesan: body.pesan } })

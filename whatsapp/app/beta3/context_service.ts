@@ -283,6 +283,12 @@ export function compareWithSizeChart(rows: LeanHistoryRow[], chartText: string) 
       // Ukuran jadi yang PALING DEKAT dengan ukuran badan; bila sama dekat, pilih yang lebih besar.
       const sorted = [...sized].sort((a, b) => a.values.get(part)! - b.values.get(part)!)
       const largest = sorted[sorted.length - 1].values.get(part)!
+      // v3.6.149 — ukuran ini tidak tercatat untuk size besar (mis. bahu hanya S–XL): di atas angka terakhir bukan berarti
+      // di luar size terbesar (uji: bahu 53 cm dibilang tidak bisa padahal dada 120 = 3XL). Tidak dipakai menentukan size.
+      if (value > largest + 2 && sorted[sorted.length - 1] !== group.rows[group.rows.length - 1]) {
+        lines.push(`${group.name}: ${part} badan ${value} cm — chart hanya mencatat ${part} sampai ${sorted[sorted.length - 1].size} (${largest} cm); tentukan size dari ukuran lain (dada/pinggang) atau tinggi & berat.`)
+        continue
+      }
       const fit =
         value > largest + 2
           ? undefined

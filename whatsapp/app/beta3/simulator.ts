@@ -302,6 +302,10 @@ export async function judgeFacts(settings?: LeanSettings) {
     'CARA TOKO MENENTUKAN SIZE: dari tinggi & berat badan (alat Fit Advisor) atau ukuran badan dibanding size chart; CS biasa menanyakan tinggi dan berat badan.',
     STORE_BASICS,
     'KEBIJAKAN: pembayaran transfer; COD/bayar di tempat, rekber, Shopee, Tokopedia tidak tersedia. Pengiriman JNE (REG/YES; kargo JTR min 8 kg).',
+    // v3.6.149 — jawaban CS manusia untuk nego satuan (contoh CS: "Maaf bos sudah harga pas"); grosir/promo tetap berlaku.
+    'NEGO HARGA satuan: harga pas (tidak bisa nego) — jawaban CS toko. Potongan hanya grosir/promo yang tertulis.',
+    // v3.6.149 — ukuran badan menyesuaikan size chart = custom; size chart S–4XL yang pas = size biasa (pre-order bila kosong).
+    'UKUR BADAN DI TOKO lalu dibuatkan sesuai ukuran = custom (7-14 hari kerja). Bila cukup pakai size chart, boleh juga size biasa.',
     renderExchangePolicy((await readExchangePolicy().catch(() => ({ text: '' }))).text),
     // v3.6.86: rekening resmi toko (dulu dinilai "tidak ada di FAKTA").
     ((text) => (text ? `PEMBAYARAN RESMI (dikirim sistem bila diminta): ${text}` : ''))(

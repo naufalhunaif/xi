@@ -418,10 +418,10 @@ export function capOversize(pesan: string[], customerText: string, maxSize: stri
  * v3.6.147 — ukuran badan di atas size chart terbesar (catatan PERBANDINGAN SIZE CHART) tidak dijanjikan custom
  * (chat 11 Okt: pinggang 120 cm, celana terbesar no 40 = 106 cm, AI bilang "jadi dibuat custom sesuai ukuran").
  */
-export function capOversizeBody(pesan: string[], chartNote: string, address = 'bos') {
+export function capOversizeBody(pesan: string[], chartNote: string, address = 'bos', recentStore: string[] = []) {
   const over = [...String(chartNote || '').matchAll(/(\w+) badan (\d+(?:\.\d)?) cm[^\n]*?Lebih besar dari size terbesar \((\w+) = (\d+(?:\.\d)?) cm\)/g)]
   if (!over.length) return { pesan, changed: false }
-  const promise = /\b(?:custom|dibuat(?:kan|in)?\s+(?:sesuai|khusus|ukuran)|bisa dibuat(?:kan|in)?|disesuaikan)\b/i
+  const promise = /\b(?:custom|dibuat(?:kan|in)?\s+(?:sesuai|khusus|ukuran)|bisa dibuat(?:kan|in)?|disesuaikan|pas\s+sesuai\s+(?:badan|ukuran)|ukuran\s+(?:dari\s+)?tukang\s+jahit\s+(?:tetap\s+)?dipakai)\b/i
   if (!pesan.some((bubble) => promise.test(bubble))) return { pesan, changed: false }
   const kept = pesan
     .map((bubble) =>
@@ -433,6 +433,10 @@ export function capOversizeBody(pesan: string[], chartNote: string, address = 'b
     )
     .filter((bubble) => bubble.length > 3)
   const [, part, value, size, cm] = over[0]
+  // v3.6.149 — sudah dikatakan (di balasan ini atau 4 pesan toko terakhir) → tidak diulang (uji: tiap giliran diulang).
+  const said = /paling besar|belum bisa dibuat|tidak bisa dibuat|di atas itu tidak bisa/i
+  if (kept.some((bubble) => said.test(bubble)) || recentStore.slice(-4).some((text) => said.test(text)))
+    return { pesan: kept.length ? kept : pesan, changed: kept.length !== pesan.length }
   const numeric = /^\d+$/.test(size)
   const lead = `Untuk ${part} ${value} cm belum bisa dibuatkan ${address}, paling besar ${numeric ? `celana no ${size}` : `size ${size}`} (${part} ${cm} cm), di atas itu tidak bisa termasuk custom.`
   return { pesan: [lead, ...kept], changed: true }
