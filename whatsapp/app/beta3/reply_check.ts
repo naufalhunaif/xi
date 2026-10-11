@@ -577,7 +577,7 @@ export const FIX_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    pesan: { type: 'array', items: { type: 'string' }, description: 'Bubble WhatsApp yang sudah diperbaiki, urut. Biasanya 1, maksimal 2.' },
+    pesan: { type: 'array', items: { type: 'string' }, description: 'Bubble WhatsApp yang sudah diperbaiki, urut. Biasanya 1, maksimal 2. Sependek CS asli (umumnya ≤ 15 kata).' },
     foto: { type: 'array', items: { type: 'string' }, description: 'Nama varian persis dari FAKTA (Produk - Warna, bertanda ✓) yang fotonya dikirim; kosong bila tidak ada.' },
   },
   required: ['pesan', 'foto'],

@@ -85,6 +85,34 @@ export function dropVagueAdjust(pesan: string[]) {
   return { pesan: changed ? out : pesan, changed }
 }
 
+const PAYMENT_CLAIM = /(?<!bukti\s)(?<!bukti\s\w{0,12}\s)\b(?:pembayaran|dana|transfer(?:an)?|uang|dp|pelunasan)(?:nya)?\s+(?:sudah|udah|telah)\s+(?:masuk|kami\s+terima|diterima|terkonfirmasi|kami\s+konfirmasi|dikonfirmasi|aman)\b|\b(?:sudah|udah)\s+(?:kami\s+)?(?:terkonfirmasi|konfirmasi)\s+(?:pembayaran|dana|transfer)/i
+/**
+ * v3.6.154 — "pembayarannya sudah masuk" tanpa data pembayaran terkonfirmasi = karangan (uji 100 chat). Diganti
+ * "pembayarannya kami cek dulu" (seperti CS: bukti diterima, dicek dulu).
+ */
+export function dropPaymentClaim(pesan: string[], orderData: string, address = 'bos') {
+  if (/\b(lunas|dibayar|paid|terkonfirmasi|pembayaran diterima|status\W+(?:proses|produksi|dikirim))\b/i.test(orderData)) return { pesan, changed: false }
+  if (!pesan.some((bubble) => PAYMENT_CLAIM.test(bubble))) return { pesan, changed: false }
+  const out = pesan
+    .map((bubble) =>
+      bubble
+        .split(/(?<=[.!?])\s+/)
+        .map((sentence) =>
+          PAYMENT_CLAIM.test(sentence)
+            ? sentence
+                .split(/,\s*|\s+dan\s+/)
+                .filter((part) => !PAYMENT_CLAIM.test(part))
+                .join(', ')
+            : sentence
+        )
+        .filter((sentence) => sentence && sentence.trim().length > 2)
+        .join(' ')
+        .trim()
+    )
+    .filter((bubble) => bubble.length > 2)
+  return { pesan: [`Pembayarannya kami cek dulu ya ${address}`, ...out], changed: true }
+}
+
 /** v3.6.147 — kalimat balasan yang tidak mengarang progres (maksud lain pelanggan) tetap dikirim. */
 export function keepNonProgress(customerText: string, pesan: string[], known: string) {
   return pesan

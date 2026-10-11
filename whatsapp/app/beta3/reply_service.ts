@@ -66,7 +66,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -192,6 +192,18 @@ export function socialClosing(text: string, address = 'bos') {
   if (sorry) return `Santai aja ${address} 🙏`
   if (agree) return `Siap ${address} 🙏`
   return ''
+}
+
+/** v3.6.154 — pesan hanya berisi iya/ok/siap/makasih (+ sapaan/emoji), tanpa keputusan atau info lain. */
+export function pureAck(text: string) {
+  const words = String(text || '')
+    .toLowerCase()
+    .replace(/([a-z])\1+/g, '$1')
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+  const ACK = new Set(['ok', 'oke', 'okey', 'okay', 'okeh', 'okesiap', 'siap', 'sip', 'iya', 'ya', 'yap', 'baik', 'mantap', 'noted', 'makasih', 'makasi', 'terima', 'kasih', 'terimakasih', 'trims', 'tq', 'thanks', 'thx', 'sama', 'sama', 'deh', 'dong', 'ya', 'kak', 'ka', 'bos', 'boss', 'min', 'mas', 'mbak', 'gan', 'bro', 'pak', 'bu', 'sis', 'nggih', 'injih', 'oh', 'o', 'sudah', 'udah', 'aja'])
+  return words.length > 0 && words.length <= 5 && words.every((word) => ACK.has(word))
 }
 
 /** Pesan merujuk sesuatu yang sudah dikirim ("yang ini", "model seperti ini", "foto tadi"). */
@@ -859,7 +871,9 @@ export async function createLeanReply(input: {
           key: 'beta3-fit',
           label: `Fit advisor · ${cached.split(':')[1]?.trim().split('.')[0] || ''}`,
           status: 'completed',
-          detail: { measure },
+          // v3.6.154 — catatan lengkap (jas & nomor celana) ikut ke penilai uji; dulu penilai hanya melihat size jas
+          // dan menyebut "celana no 37" (hasil Fit Advisor celana) sebagai karangan.
+          detail: { measure, catatan: cached },
         })
       }
     } catch (error) {
@@ -1673,11 +1687,14 @@ export async function createLeanReply(input: {
     }
   }
   // v3.6.149 — pelanggan cuma mengiyakan ("Ok..") → balasan tidak membeo pesan toko sebelumnya (uji chat 11 Okt).
-  if (decision.pesan.length && !decision.serah_cs && !/\?/.test(input.text || '') && String(input.text || '').trim().length <= 25 && !input.imagePaths?.length) {
+  // v3.6.154 — hanya untuk "ok/siap/iya" murni; "Iya stelan", "Oke aku mau" = jawaban/keputusan (uji 100: dibalas "Siap bos" saja).
+  if (decision.pesan.length && !decision.serah_cs && pureAck(input.text) && !input.imagePaths?.length) {
     const closing = socialClosing(input.text, style?.address || 'bos')
     if (closing) {
       const recentOut = rows.filter((row) => row.direction === 'out' && !(row as { current?: boolean }).current).slice(-4)
-      const fresh = decision.pesan.filter((bubble) => !repeatsStoreMessage(bubble, recentOut))
+      // Format order, rincian/total, rekening, ongkir tidak pernah dibuang di sini.
+      const template = (bubble: string) => /nama\s*:|alamat|total|rekening|rek\b|ongkir|\d{1,3}\.\d{3}/i.test(bubble)
+      const fresh = decision.pesan.filter((bubble) => template(bubble) || !repeatsStoreMessage(bubble, recentOut))
       if (fresh.length !== decision.pesan.length) {
         decision.pesan = fresh.length ? fresh : [closing]
         onTrace?.({ key: 'beta3-ack-echo', label: 'Balasan atas "ok" tidak mengulang pesan toko', status: 'completed', detail: { pesan: decision.pesan } })
@@ -2283,6 +2300,11 @@ export async function createLeanReply(input: {
     if (body.changed) {
       decision.pesan = body.pesan
       onTrace?.({ key: 'beta3-oversize-body', label: 'Ukuran badan di atas size chart terbesar tidak dijanjikan custom', status: 'completed', detail: { pesan: body.pesan } })
+    }
+    const paid = dropPaymentClaim(decision.pesan, [activeOrder, chatNote].join('\n'), style?.address || 'bos')
+    if (paid.changed) {
+      decision.pesan = paid.pesan
+      onTrace?.({ key: 'beta3-payment-claim', label: '"Pembayaran sudah masuk" tanpa data → dicek dulu', status: 'completed', detail: {} })
     }
     const adjust = dropVagueAdjust(decision.pesan)
     if (adjust.changed) {

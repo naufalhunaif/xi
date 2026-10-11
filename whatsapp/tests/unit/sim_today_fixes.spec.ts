@@ -188,3 +188,25 @@ test.group('ritme CS asli v3.6.152', () => {
     assert.include(guide, 'hanya 20% balasan bertanya')
   })
 })
+
+test.group('uji 100 chat v3.6.154', () => {
+  test('"Iya stelan" / "Oke aku mau" bukan sekadar ok', async ({ assert }) => {
+    const { pureAck } = await import('#beta3/reply_service')
+    assert.isTrue(pureAck('Ok..'))
+    assert.isTrue(pureAck('okee kak'))
+    assert.isTrue(pureAck('Siap makasih bos 🙏'))
+    assert.isFalse(pureAck('Iya stelan'))
+    assert.isFalse(pureAck('Oke aku mau kak'))
+  })
+
+  test('"pembayarannya sudah masuk" tanpa data → dicek dulu', async ({ assert }) => {
+    const { dropPaymentClaim } = await import('#beta3/reply_guards')
+    const out = dropPaymentClaim(['Bisa bos, pembayarannya sudah masuk dan pengerjaan beskap sekitar 5-10 hari kerja.'], '')
+    assert.isTrue(out.changed)
+    assert.equal(out.pesan[0], 'Pembayarannya kami cek dulu ya bos')
+    assert.notInclude(out.pesan.join(' '), 'sudah masuk')
+    assert.include(out.pesan[1], '5-10 hari kerja')
+    assert.isFalse(dropPaymentClaim(['Pembayarannya sudah masuk bos'], 'status: lunas').changed)
+    assert.isFalse(dropPaymentClaim(['Bukti transfernya sudah kami terima, kami cek dulu ya'], '').changed)
+  })
+})
