@@ -164,3 +164,27 @@ test.group('uji gambar chat asli v3.6.151', () => {
     assert.isFalse(claimsCheckedResult('Masih ada yang mau ditanyakan bos?'))
   })
 })
+
+test.group('ritme CS asli v3.6.152', () => {
+  test('ritme dihitung dari giliran CS manusia; template & giliran AI tidak dihitung', async ({ assert }) => {
+    const { csRhythm, styleGuide } = await import('#beta3/style_service')
+    const rows: any[] = []
+    for (let i = 0; i < 40; i++) {
+      const jid = `${i}@s.whatsapp.net`
+      rows.push({ jid, direction: 'in', sender_type: null, body: 'ready L kak?' })
+      rows.push({ jid, direction: 'out', sender_type: 'cs', body: i % 5 === 0 ? 'Oke siap bos, pakai size apa ya?' : 'Iya bisa bos' })
+      rows.push({ jid, direction: 'in', sender_type: null, body: 'oke' })
+      rows.push({ jid, direction: 'out', sender_type: 'cs', body: 'Bisa di bantu isi order formatnya bos\nNama :' })
+      rows.push({ jid, direction: 'in', sender_type: null, body: 'harga?' })
+      rows.push({ jid, direction: 'out', sender_type: 'ai', body: 'Harganya mulai 485.000 bos, mau model apa dan size berapa ya?' })
+    }
+    const rhythm = csRhythm(rows)!
+    assert.equal(rhythm.turns, 40)
+    assert.equal(rhythm.words, 3)
+    assert.equal(rhythm.questionRate, 20)
+    assert.equal(rhythm.openers[0], 'iya bisa')
+    const guide = styleGuide({ address: 'bos', emoji: false, length: 40, samples: 40, rhythm })
+    assert.include(guide, 'biasanya 3 kata')
+    assert.include(guide, 'hanya 20% balasan bertanya')
+  })
+})

@@ -568,7 +568,7 @@ export function revisionNote(decision: Pick<LeanDecision, 'pesan' | 'foto'>, iss
     ...issues.map((issue) => `- ${issue.detail}`),
     `DRAF pesan: ${JSON.stringify(decision.pesan)}`,
     `DRAF foto: ${JSON.stringify(decision.foto)}`,
-    'Tulis ulang keputusan LENGKAP (format JSON yang sama) yang sudah memperbaiki masalah di atas. Isi foto harus persis produk/warna yang kamu sebut atau janjikan (nama varian dari KATALOG yang punya foto); kalau tidak ada fotonya, jangan janjikan foto. Jawab maksud pelanggan, angka harus dari KATALOG/POLA HARGA/data alat. JANGAN mengarang angka: data belum ada (mis. tujuan ongkir tidak ditemukan) → tanyakan info yang kurang.',
+    'Tulis ulang keputusan LENGKAP (format JSON yang sama) yang sudah memperbaiki masalah di atas. Isi foto harus persis produk/warna yang kamu sebut atau janjikan (nama varian dari KATALOG yang punya foto); kalau tidak ada fotonya, jangan janjikan foto. Jawab maksud pelanggan, angka harus dari KATALOG/POLA HARGA/data alat. JANGAN mengarang angka: data belum ada (mis. tujuan ongkir tidak ditemukan) → tanyakan info yang kurang. Tetap singkat seperti CS asli: perbaiki yang salah tanpa menambah penjelasan atau pertanyaan baru.',
   ].join('\n')
 }
 

@@ -12,6 +12,77 @@ export type StyleProfile = {
   /** Panjang umum satu bubble (median huruf). */
   length: number
   samples: number
+  /** v3.6.152 — ritme balasan CS manusia dari riwayat chat (per giliran: kata, pertanyaan, pembuka khas). */
+  rhythm?: CsRhythm | null
+}
+
+export type CsRhythm = { turns: number; words: number; wordsP75: number; questionRate: number; openers: string[] }
+
+type RhythmRow = { jid: string; direction: string; sender_type: string | null; body: string | null }
+/** Balasan sistem/template (format order, rincian total, rekening, salam otomatis) tidak dihitung. */
+const TEMPLATE = /^(?:nama\s*:|bisa di ?bantu isi order|format|total|rincian|rekening|no\.?\s*rek|untuk pembayaran tf|terima kasih telah menghubungi|maaf atas keterlambatan)/i
+
+/**
+ * v3.6.152 — Pelajari ritme CS manusia: satu giliran = pesan CS berturut sesudah pesan pelanggan. Dari riwayat nyata
+ * (500 chat): CS rata-rata 8 kata per giliran, 75% ≤ 14 kata, hanya 20% bertanya; AI dulu 16 kata & 42% bertanya.
+ */
+export function csRhythm(rows: RhythmRow[]): CsRhythm | null {
+  const byJid = new Map<string, RhythmRow[]>()
+  for (const row of rows) {
+    const list = byJid.get(row.jid) || []
+    list.push(row)
+    byJid.set(row.jid, list)
+  }
+  const turns: string[][] = []
+  for (const list of byJid.values()) {
+    let turn: string[] | null = null
+    let skip = false
+    let human = true
+    const flush = () => {
+      if (turn?.length && !skip && human) turns.push(turn)
+    }
+    for (const row of list) {
+      if (row.direction === 'in') {
+        flush()
+        turn = []
+        skip = false
+        human = true
+        continue
+      }
+      if (!turn || !row.body) continue
+      if (!['cs', 'owner'].includes(String(row.sender_type || ''))) {
+        human = false
+        continue
+      }
+      const body = String(row.body).trim()
+      if (TEMPLATE.test(body) || body.length > 400) skip = true
+      turn.push(body)
+    }
+    flush()
+  }
+  if (turns.length < 30) return null
+  const words = turns.map((turn) => turn.join(' ').split(/\s+/).filter(Boolean).length).sort((a, b) => a - b)
+  const openers = new Map<string, number>()
+  for (const turn of turns) {
+    const head = turn[0]
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .join(' ')
+    if (head.split(' ').length === 2 && !/^(halo|pagi|siang|sore|malam|jas|untuk|pesanan|proses)\b/.test(head)) openers.set(head, (openers.get(head) || 0) + 1)
+  }
+  return {
+    turns: turns.length,
+    words: words[Math.floor(words.length / 2)],
+    wordsP75: words[Math.floor(words.length * 0.75)],
+    questionRate: Math.round((100 * turns.filter((turn) => /\?/.test(turn.join(' '))).length) / turns.length),
+    openers: [...openers.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([text]) => text),
+  }
 }
 
 const ADDRESS_WORDS = ['bos', 'kak', 'kakak', 'gan', 'sis', 'bro', 'mas', 'mbak', 'om', 'min', 'bu', 'ibu', 'pak', 'bapak']
@@ -43,7 +114,17 @@ export async function storeStyle(examples: LeanExample[] = []): Promise<StylePro
   const total = [...counts.values()].reduce((a, b) => a + b, 0)
   const [top, topCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [null, 0]
   const lengths = texts.map((text) => text.length).sort((a, b) => a - b)
+  const recent = (await db
+    .from('whatsapp_messages')
+    .whereNot('jid', 'like', '%@g.us')
+    .where('created_at', '>', new Date(Date.now() - 365 * 86_400_000))
+    .orderBy('id', 'desc')
+    .limit(12_000)
+    .select('jid', 'direction', 'sender_type', 'body')
+    .catch(() => [])) as RhythmRow[]
+  const rhythm = csRhythm(recent.reverse())
   const profile: StyleProfile = {
+    rhythm,
     address: top && topCount >= 5 && topCount / total >= 0.6 ? top : null,
     emoji: texts.length ? texts.filter((text) => EMOJI.test(text)).length / texts.length >= 0.15 : true,
     length: lengths.length ? lengths[Math.floor(lengths.length / 2)] : 80,
@@ -96,6 +177,9 @@ export function styleGuide(profile: StyleProfile) {
     '- Bahasa santai sehari-hari seperti contoh CS; tanpa format markdown (**tebal**, #judul, tabel).',
     '- Rapi seperti CS: rincian berangka (ongkir, rincian total, data pesanan, harga yang diminta per model) satu item per baris. Pilihan tanpa angka cukup satu kalimat ("mau A, B, atau C bos?"). Ditanya harga/price list umum → "mulai dari X" lalu tanya model.',
     '- Singkat & tepat seperti contoh CS di riwayat: 1–2 bubble pendek, satu pertanyaan saja, jangan menanyakan lagi yang sudah ditanyakan; tanpa salam panjang atau basa-basi penutup.',
+    profile.rhythm
+      ? `- Ritme CS asli (${profile.rhythm.turns} balasan): biasanya ${profile.rhythm.words} kata, 75% ≤ ${profile.rhythm.wordsP75} kata; hanya ${profile.rhythm.questionRate}% balasan bertanya. Jawab langsung sependek itu ("iya bisa bos", "ready bos", "tambahan 100rb bos"); bertanya balik hanya bila langkah berikutnya butuh. Pembuka khas: ${profile.rhythm.openers.map((text) => `"${text}"`).join(', ')}.`
+      : '',
     '- Seperti CS terbaik: jawab pertanyaan terakhir langsung, singkat ("harga 485.000 bos"); jangan ditunda dengan pertanyaan lain. Jawab dari data (bahan, lama jadi, lokasi); tanya balik hanya bila jawabannya beda per model. Minta sharelok → kirim alamat lengkap toko. Ditanya warna lain → sebut 3–5 yang ready/terdekat, bukan semua.',
   ]
   return lines.filter(Boolean).join('\n')
