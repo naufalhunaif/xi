@@ -3,7 +3,7 @@ const COLORS = [
   ['broken white', ['broken white', 'bw'], ['putih gading', 'ivory', 'off white']],
   ['putih gading', ['putih gading', 'ivory'], ['broken white', 'bw', 'off white']],
   ['off white', ['off white', 'offwhite'], ['broken white', 'bw', 'ivory']],
-  ['navy', ['navy blue', 'biru navy', 'biru dongker', 'navy', 'dongker', 'nevi', 'biru tua'], []],
+  ['navy', ['navy blue', 'biru navy', 'biru dongker', 'navy', 'dongker', 'nevi', 'nevy', 'biru tua'], []],
   ['royal blue', ['royal blue', 'biru royal'], []],
   ['sage', ['sage green', 'hijau sage', 'sage'], []],
   ['army', ['army green', 'hijau army', 'army'], ['olive']],
@@ -16,7 +16,8 @@ const COLORS = [
   ['cokelat', ['cokelat', 'coklat', 'brown'], ['choco']],
   ['choco', ['choco', 'chocolate'], ['cokelat']],
   // v3.6.79: sebutan sehari-hari (uji: "item polos" tidak dikenali → baris Black terpotong dari katalog).
-  ['hitam', ['black', 'hitam', 'item', 'hitem', 'ireng', 'hideung'], []],
+  // v3.6.143: salah ketik/daerah yang muncul di uji ("irng", "itam").
+  ['hitam', ['black', 'hitam', 'item', 'hitem', 'ireng', 'irng', 'itam', 'hideung', 'hiteum'], []],
   ['putih', ['white', 'putih', 'pth', 'bodas'], []],
   ['merah', ['red', 'merah'], []],
   ['blue ice', ['blue ice', 'baby blue', 'biru muda', 'biru es'], ['biru']],

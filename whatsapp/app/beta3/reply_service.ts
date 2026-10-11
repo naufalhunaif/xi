@@ -2197,7 +2197,8 @@ export async function createLeanReply(input: {
     const known = [
       ...aboutPants(input.text),
       ...rows.filter((row) => row.direction === 'in' || row.senderType === 'cs' || row.senderType === 'owner').flatMap((row) => aboutPants(String(row.body || ''))),
-      ...toolNotes.flatMap((note) => note.split('\n')).filter((line) => /celana|pants|pinggang/i.test(line)),
+      // v3.6.143: persentase Fit Advisor ("L 37%") bukan nomor celana.
+      ...toolNotes.flatMap((note) => note.split('\n')).filter((line) => /celana|pants|pinggang/i.test(line)).map((line) => line.replace(/\d+\s*%/g, ' ')),
     ].join('\n')
     const pants = dropGuessedPantsNumber(decision.pesan, known, style?.address || 'bos')
     if (pants.changed) {

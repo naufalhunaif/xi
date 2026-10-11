@@ -243,6 +243,11 @@ export function fuzzyColorWords(text: string) {
   return [...out]
 }
 
+const PRODUCT_TYPOS: Record<string, string> = {
+  besik: 'basic', basik: 'basic', besic: 'basic', basick: 'basic', bsc: 'basic',
+  tuksedo: 'tuxedo', tuxsedo: 'tuxedo', tuxido: 'tuxedo', tuksido: 'tuxedo', tuxedo: 'tuxedo', tukxedo: 'tuxedo', tuxedho: 'tuxedo',
+  pik: 'peak', piek: 'peak',
+}
 const GENERIC = new Set(['setelan', 'jas', 'premium', 'signature', 'se', 'double', 'breasted', 'set', 'new', 'the', 'and'])
 const fold = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 const colorKeys = (value: string) => {
@@ -275,8 +280,13 @@ export function focusCatalog(
   ].join('\n')
   const words = new Set(fold(context).split(' '))
   // Sebutan pelanggan → nama di katalog.
-  for (const [said, catalog] of [['celana', 'pants'], ['rompi', 'vest'], ['beskap', 'bescap'], ['jas', 'suit'], ['kemeja', 'shirt'], ['dasi', 'tie']] as const)
+  for (const [said, catalog] of [['celana', 'pants'], ['rompi', 'vest'], ['beskap', 'bescap'], ['bescap', 'beskap'], ['jas', 'suit'], ['kemeja', 'shirt'], ['dasi', 'tie']] as const)
     if ([...words].some((word) => word.startsWith(said))) words.add(catalog)
+  // v3.6.143 — salah ketik nama model (uji: "besik suit" → katalog 2 varian → AI bilang denim belum ada).
+  for (const word of [...words]) {
+    const model = PRODUCT_TYPOS[word]
+    if (model) words.add(model)
+  }
   // Seri yang dibahas (premium/signature): semua barangnya ikut (jas, celana, setelan, rompi).
   const series = new Set(
     (['premium', 'signature'] as const).filter((name) => [...words].some((word) => word.startsWith(name)))
