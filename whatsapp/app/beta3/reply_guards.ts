@@ -321,3 +321,52 @@ export function trimOrderTemplate(pesan: string[], customerTexts: string[]) {
   })
   return { pesan: out, changed }
 }
+
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL']
+const sizeName = (raw: string) => {
+  const value = raw.toUpperCase().replace(/\s+/g, '')
+  const xs = value.match(/^(X+)L$/)
+  if (xs && xs[1].length >= 2) return xs[1].length === 2 ? 'XXL' : `${xs[1].length}XL`
+  return value === '2XL' ? 'XXL' : value
+}
+const OVER_SIZE = /\b([2-9])\s*x\s*l\b|\b(x{2,8}l)\b/gi
+
+/** Size terbesar yang ada di varian katalog (sizesAll/sizesReady), mis. 4XL. */
+export function maxCatalogSize(rows: Array<{ sizesAll?: string; sizesReady?: string; active?: boolean }>) {
+  let best = -1
+  for (const row of rows) {
+    if (row.active === false) continue
+    for (const token of `${row.sizesAll || ''} ${row.sizesReady || ''}`.split(/[\s,/]+/)) {
+      const index = SIZE_ORDER.indexOf(sizeName(token))
+      if (index > best) best = index
+    }
+  }
+  return best >= 0 ? SIZE_ORDER[best] : ''
+}
+
+/**
+ * v3.6.145 — Size di atas varian terbesar (mis. 5XL saat varian sampai 4XL) tidak bisa dibuat (chat 11 Okt: AI
+ * bilang "5XL bisa dibuatkan", CS meralat "paling besar hanya 4XL"). Kalimat yang menyanggupi size itu dibuang,
+ * diganti jawaban pasti.
+ */
+export function capOversize(pesan: string[], customerText: string, maxSize: string, address = 'bos') {
+  const maxIndex = SIZE_ORDER.indexOf(maxSize)
+  if (maxIndex < 0) return { pesan, changed: false }
+  const asked = [...String(customerText || '').matchAll(OVER_SIZE)]
+    .map((match) => sizeName(match[1] ? `${match[1]}XL` : match[2]))
+    .filter((size) => SIZE_ORDER.indexOf(size) > maxIndex)
+  if (!asked.length) return { pesan, changed: false }
+  const size = asked[0]
+  const mentions = (text: string) => [...text.matchAll(OVER_SIZE)].some((match) => sizeName(match[1] ? `${match[1]}XL` : match[2]) === size)
+  const kept = pesan
+    .map((bubble) =>
+      bubble
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) => !mentions(sentence))
+        .join(' ')
+        .trim()
+    )
+    .filter(Boolean)
+  const lead = `Size paling besar ${maxSize} ${address}, ${size} belum bisa dibuatkan.`
+  return { pesan: [lead, ...kept], changed: true }
+}

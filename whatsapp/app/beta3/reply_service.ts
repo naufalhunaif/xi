@@ -66,7 +66,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, fixCodClaim, fixProductionKind, fixWeekEstimate, inventsProgress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -2225,6 +2225,11 @@ export async function createLeanReply(input: {
       decision.pesan = week.pesan
       onTrace?.({ key: 'beta3-estimate', label: 'Estimasi "1 minggu" diganti estimasi resmi', status: 'completed', detail: {} })
     }
+    const over = capOversize(decision.pesan, input.text, maxCatalogSize(digest.rows), style?.address || 'bos')
+    if (over.changed) {
+      decision.pesan = over.pesan
+      onTrace?.({ key: 'beta3-oversize', label: 'Size di atas varian terbesar tidak disanggupi', status: 'completed', detail: { pesan: over.pesan } })
+    }
     const kind = fixProductionKind(decision.pesan, productionRanges(settings.production), productionWhens(productionText), input.text)
     if (kind.changed) {
       decision.pesan = kind.pesan
@@ -2316,7 +2321,7 @@ export function productionRanges(production?: LeanSettings['production']) {
 
 /** Fakta dasar toko untuk pemeriksa & penilai (bukan prompt AI). */
 export const STORE_BASICS =
-  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp (CS mengirim format order untuk diisi: nama, alamat lengkap, kecamatan, no HP — atau data dikumpulkan lewat obrolan) atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer; bisa DP minimal 50% dari total, pelunasan setelah pesanan jadi.'
+  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp (CS mengirim format order untuk diisi: nama, alamat lengkap, kecamatan, no HP — atau data dikumpulkan lewat obrolan) atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer; bisa DP minimal 50% dari total, pelunasan setelah pesanan jadi. Size di atas varian terbesar katalog (mis. 5XL bila varian sampai 4XL) tidak bisa dibuat, juga tidak lewat custom.'
 
 const WEB_PLACE_SCHEMA = {
   type: 'object',

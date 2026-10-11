@@ -292,5 +292,12 @@
     "maksud": "Pelanggan menulis alamat, nama dan nomor dalam satu pesan tanpa kode pos. Benar: ongkir disebut sekali, ditanya layanan, setelah memilih YES total + rekening terkirim. Tidak menanyakan kode pos, tidak dobel.",
     "giliran": ["jas basic navy size M aja", "kirim ke desa sidamulya kec sidareja cilacap, atas nama rina, nomor 081200000003", "yes aja"],
     "harap": { "serah_cs": false, "sebut": ["Total"], "tidak_sebut": ["kode ?pos"] }
+  },
+  {
+    "id": "size-5xl",
+    "judul": "Minta size di atas varian terbesar (chat 11 Okt)",
+    "maksud": "Pelanggan minta size 5XL dan harganya. Varian terbesar 4XL. Benar: bilang size paling besar 4XL, 5XL tidak bisa dibuatkan; boleh tawarkan 4XL (lingkar dada dari size chart) dengan harga ukuran besar. Salah: menyanggupi 5XL / bilang bisa dibuatkan custom.",
+    "giliran": ["Adalah size 5xl ??brp harga ?"],
+    "harap": { "serah_cs": false, "sebut": ["4XL|4xl"], "tidak_sebut": ["5XL bisa", "bisa dibuatkan 5XL"] }
   }
 ]
