@@ -5,7 +5,8 @@ import { phoneFromJid } from '#services/customer_identity_service'
 import { estimateTokens } from '#services/prompt_size_service'
 import type { TraceSink } from '#services/trace_service'
 import { catalogDigest, findCatalogVariant, renderCatalogDigest, type LeanCatalogRow } from '#beta3/catalog_service'
-import { listLeanExamples, pickExamples, seedLeanExamples } from '#beta3/examples_service'
+import { keywords, listLeanExamples, pickExamples, scoreExample, seedLeanExamples } from '#beta3/examples_service'
+import { listLessons, renderLessons } from '#beta3/sim_lessons'
 import { memoryFromChat, readCustomerNote, readOrderSpec, writeOrderSpec } from '#beta3/customer_service'
 import {
   parseOrderForm,
@@ -1513,8 +1514,13 @@ export async function createLeanReply(input: {
         : '',
     catalog: catalogText,
     // Koreksi pemilik selalu ikut (12 terbaru); contoh lain dipilih yang paling mirip.
-    examples: pickExamples(examples.filter((example) => example.source !== 'koreksi'), input.text, stage),
-    corrections: examples.filter((example) => example.source === 'koreksi').slice(-12),
+    examples: pickExamples(examples.filter((example) => !['koreksi', 'uji'].includes(String(example.source || ''))), input.text, stage),
+    // v3.6.161 — koreksi uji hanya yang mirip pertanyaan sekarang (maks 3), supaya prompt tidak membengkak.
+    corrections: [
+      ...examples.filter((example) => example.source === 'koreksi').slice(-12),
+      ...pickExamples(examples.filter((example) => example.source === 'uji'), input.text, stage, 3).filter((example) => scoreExample(example, keywords(input.text), stage) >= 2),
+    ],
+    lessons: renderLessons(await listLessons().catch(() => [])),
     styleGuide: style ? styleGuide(style) : '',
     rules: renderRules(rules),
     // v3.6.96: belum ada catatan order → ingatan dari chat ini (alamat form, size, tinggi/berat).

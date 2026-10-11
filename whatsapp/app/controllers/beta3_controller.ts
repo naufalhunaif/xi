@@ -215,6 +215,19 @@ export default class Beta3Controller {
     return response.noContent()
   }
 
+  /** v3.6.161 — pelajaran dari uji + jumlah contoh "Koreksi uji". */
+  async lessons({ response }: HttpContext) {
+    const { listLessons, PROMPT_LESSONS } = await import('#beta3/sim_lessons')
+    const lessons = await listLessons()
+    const corrections = (await listLeanExamples()).filter((example) => example.source === 'uji')
+    return response.json({ lessons, diPrompt: PROMPT_LESSONS, koreksiUji: corrections.length, koreksi: corrections.slice(-50).reverse() })
+  }
+
+  async removeLesson({ params, response }: HttpContext) {
+    const { removeLesson } = await import('#beta3/sim_lessons')
+    return (await removeLesson(Number(params.index))) ? response.noContent() : response.notFound({ error: 'Pelajaran tidak ditemukan.' })
+  }
+
   async orders({ request, response }: HttpContext) {
     // Order lunas lama: cek nominal bukti transfer di latar (DP terdeteksi pada muat berikutnya).
     void recheckPaidOrders().catch(() => {})

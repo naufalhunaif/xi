@@ -14,6 +14,7 @@ import db from '#services/workspace_database'
 import { ownsWorkspaceMedia, workspaceScope } from '#services/workspace_context'
 import { maskPii } from '#beta3/jev'
 import { ensureLeanTables, readLeanState, writeBeta3ChatNote, writeLeanState } from '#beta3/tables'
+import { addLesson, saveSimCorrection } from '#beta3/sim_lessons'
 import { aiSlotStats, memoryLow, resetAiSlotStats } from '#beta3/ai_slots'
 import { catalogDigest, findCatalogVariant } from '#beta3/catalog_service'
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
@@ -107,6 +108,9 @@ export type SimResult = {
   aturan?: string
   /** Chat nyata: contoh jawaban CS asli yang ditambahkan supaya AI belajar. */
   dipelajari?: number
+  /** v3.6.161 — koreksi penilai (jawaban yang seharusnya) & pelajaran umum; disimpan untuk chat berikutnya. */
+  koreksi?: string
+  pelajaran?: string
   masalah: string[]
   giliran: SimTurn[]
 }
@@ -239,8 +243,18 @@ const JUDGE_SCHEMA = {
     aturan: { type: 'string', description: 'Bila bertentangan: satu kalimat aturan toko umum dari jawaban CS (mis. "Toko tidak membuat jas anak-anak"). Kosong bila tidak ada.' },
     lulus: { type: 'boolean' },
     masalah: { type: 'array', items: { type: 'string' } },
+    // v3.6.161 — koreksi & pelajaran: dipakai AI pada chat berikutnya supaya kesalahan tidak diulang.
+    koreksi: {
+      type: 'string',
+      description:
+        'Bila lulus=false: balasan yang SEHARUSNYA dikirim AI di giliran yang salah — gaya CS toko (singkat, "bos"), angka dari FAKTA/data alat/CS manusia, 1–2 bubble dipisah " / ". Kosong bila lulus.',
+    },
+    pelajaran: {
+      type: 'string',
+      description: 'Bila lulus=false: satu kalimat pelajaran UMUM (≤ 20 kata) yang berlaku untuk situasi serupa, bentuk "Saat …, jawab/jangan …". Kosong bila lulus.',
+    },
   },
-  required: ['nilai', 'manusia', 'rasa', 'bertentangan_cs', 'aturan', 'lulus', 'masalah'],
+  required: ['nilai', 'manusia', 'rasa', 'bertentangan_cs', 'aturan', 'lulus', 'masalah', 'koreksi', 'pelajaran'],
 }
 
 async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTurn[], facts: string) {
@@ -277,6 +291,8 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
     aturan?: string
     lulus?: boolean
     masalah?: string[]
+    koreksi?: string
+    pelajaran?: string
   }
   const human = Math.max(1, Math.min(5, Math.round(Number(parsed.manusia) || 3)))
   return {
@@ -287,6 +303,8 @@ async function judge(settings: LeanSettings, scenario: SimScenario, turns: SimTu
     aturan: String(parsed.aturan || '').trim().slice(0, 300),
     lulus: parsed.lulus === true && human >= 3 && parsed.bertentangan_cs !== true,
     masalah: (parsed.masalah || []).map(String).filter(Boolean).slice(0, 8),
+    koreksi: String(parsed.koreksi || '').trim().slice(0, 400),
+    pelajaran: String(parsed.pelajaran || '').trim().slice(0, 220),
   }
 }
 
@@ -551,6 +569,8 @@ export async function gradeScenario(
     let rasa = ''
     let aturan = ''
     let dipelajari = 0
+    let koreksi = ''
+    let pelajaran = ''
     let judged = true
     if (options.judge !== false && !turns.some((turn) => turn.error)) {
       try {
@@ -564,13 +584,34 @@ export async function gradeScenario(
         }
         judged = verdict.lulus
         masalah.push(...verdict.masalah.map((item) => `Penilai: ${item}`))
+        // v3.6.161 — gagal → koreksi jadi contoh "Koreksi uji", pelajaran umum dirangkum ke prompt.
+        if (!verdict.lulus) {
+          koreksi = verdict.koreksi
+          pelajaran = verdict.pelajaran
+          const customerText = maskPii(messageText(scenario.giliran[0] ?? '')).trim()
+          if (koreksi) await saveSimCorrection({ customerText, correct: koreksi, lesson: pelajaran, scenarioId: scenario.id }).catch(() => false)
+          if (pelajaran) await addLesson(pelajaran, scenario.id).catch(() => null)
+        }
       } catch (error) {
         masalah.push(`Penilai gagal: ${error instanceof Error ? error.message.slice(0, 160) : String(error)}`)
         judged = false
       }
     }
     const hard = masalah.filter((item) => !item.startsWith('Penilai'))
-    return { id: scenario.id, judul: scenario.judul, lulus: !hard.length && judged, nilai, manusia, rasa, aturan, dipelajari, masalah, giliran: turns }
+    return {
+      id: scenario.id,
+      judul: scenario.judul,
+      lulus: !hard.length && judged,
+      nilai,
+      manusia,
+      rasa,
+      aturan,
+      dipelajari,
+      ...(koreksi ? { koreksi } : {}),
+      ...(pelajaran ? { pelajaran } : {}),
+      masalah,
+      giliran: turns,
+    }
   }
 }
 

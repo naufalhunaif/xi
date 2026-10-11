@@ -204,7 +204,7 @@ async function runOne(test: Record<string, any>, settings: LeanSettings, options
     catalog: digest.text,
     // Contoh dari koreksi kasus ini sendiri tidak dipakai, supaya uji tetap jujur.
     examples: pickExamples(
-      examples.filter((example) => example.source !== 'koreksi'),
+      examples.filter((example) => !['koreksi', 'uji'].includes(String(example.source || ''))),
       text
     ),
     corrections: examples

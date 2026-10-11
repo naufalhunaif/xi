@@ -295,6 +295,8 @@ export function buildLeanPrompt(input: {
   context?: string
   rules?: string
   corrections?: LeanExample[]
+  /** v3.6.161 — pelajaran dari uji (teks siap tempel). */
+  lessons?: string
   policy?: string
   activeOrder?: string
   /** v3.6.101 — keadaan chat (ringkasan pasti dari seluruh percakapan). */
@@ -314,6 +316,7 @@ export function buildLeanPrompt(input: {
     ['sizechart', input.sizeCharts || ''],
     ['bahan', input.fabrics || ''],
     ['koreksi', renderCorrections(input.corrections || [])],
+    ['pelajaran', input.lessons || ''],
     ['contoh', renderExamples(input.examples)],
     ['gaya', input.styleGuide || ''],
     [
@@ -372,13 +375,17 @@ export function buildLeanPrompt(input: {
 /** Koreksi pemilik: selalu ikut (terbaru), bukan dipilih berdasarkan kata kunci. */
 export function renderCorrections(corrections: LeanExample[]) {
   if (!corrections.length) return ''
+  const line = (item: LeanExample, index: number) =>
+    `${index + 1}. Pelanggan: ${item.customerText.replace(/\n/g, ' / ')}\n   Seharusnya: ${item.csText.replace(/\n/g, '\n   ')}`
+  const owner = corrections.filter((item) => item.source !== 'uji')
+  // v3.6.161 — koreksi dari uji (penilai): jawaban yang seharusnya pada pertanyaan serupa.
+  const tested = corrections.filter((item) => item.source === 'uji')
   return [
-    'KOREKSI DARI PEMILIK (jawaban AI sebelumnya salah; pada situasi serupa jawab seperti ini — mengalahkan contoh lain):',
-    ...corrections.map(
-      (item, index) =>
-        `${index + 1}. Pelanggan: ${item.customerText.replace(/\n/g, ' / ')}\n   Seharusnya: ${item.csText.replace(/\n/g, '\n   ')}`
-    ),
-  ].join('\n')
+    owner.length ? ['KOREKSI DARI PEMILIK (jawaban AI sebelumnya salah; pada situasi serupa jawab seperti ini — mengalahkan contoh lain):', ...owner.map(line)].join('\n') : '',
+    tested.length ? ['KOREKSI DARI UJI (AI pernah salah pada pertanyaan serupa; jawab seperti ini):', ...tested.map(line)].join('\n') : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 /**
