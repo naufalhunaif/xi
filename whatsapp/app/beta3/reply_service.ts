@@ -78,7 +78,7 @@ const FAST_EARLY = ['', 'lain', 'selesai', 'tanya_model', 'tanya_size']
 // efektif; semua balasan kembali lewat AI (lebih lama tapi menimbang konteks). Kodenya disimpan untuk nanti.
 const FAST_LANE = false
 import { pricePattern, productPriceMap, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
-import { completePhotos, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
+import { completePhotos, inlineShortLists, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -2186,6 +2186,11 @@ export async function createLeanReply(input: {
   }
   // Urutan seperti CS: jawaban → foto → pertanyaan (pertanyaan di ujung bubble dipisah).
   if (!decision.serah_cs) decision.pesan = polishWithPhotos(decision.pesan, photos, input.text, style?.address || 'bos')
+  const inlined = inlineShortLists(decision.pesan)
+  if (inlined.changed) {
+    decision.pesan = inlined.pesan
+    onTrace?.({ key: 'beta3-inline-list', label: 'Daftar pendek dijadikan kalimat', status: 'completed', detail: {} })
+  }
   // v3.6.86 — nomor celana tidak ditebak dari TB/BB.
   if (!decision.serah_cs) {
     // v3.6.111: angka di hasil alat yang bukan soal celana (mis. Fit Advisor jas, LD 37 cm) tidak dihitung

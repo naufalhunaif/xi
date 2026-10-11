@@ -500,6 +500,8 @@ export function allColorPhotos(customerText: string, foto: string[], rows: LeanC
 export function offColorPhotos(foto: string[], texts: string[], rows: LeanCatalogRow[]) {
   // v3.6.131: pelanggan minta lihat SEMUA warna → foto tidak dibuang (dulu semua foto Tuxedo hilang).
   if (/\b(?:s(?:e)?mua|semuanya|all)\b/i.test(texts[0] || '') && /\b(?:warna|foto|liat|lihat|color)/i.test(texts[0] || '')) return []
+  // v3.6.144: balasan singkat "semua"/"semuanya" atas daftar yang baru dikirim = semua yang di daftar.
+  if (/^\s*(?:s(?:e)?mua(?:nya)?|all|semua aja|semuanya aja)\s*[.!?]*\s*$/i.test(texts[0] || '')) return []
   const text = ` ${fold(texts.map(withoutNoPhotoClauses).join(' ')).replace(/[^a-z0-9.\s-]/g, ' ')} `
   const said = (color: string) =>
     [color, ...(COLOR_ALIASES[color] || [])].some((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:nya)?\\b`).test(text))
@@ -522,8 +524,9 @@ const COLOR_ALIASES: Record<string, string[]> = {
   navy: ['navy', 'dongker'],
   maroon: ['maroon', 'marun'],
   cream: ['cream', 'krem'],
-  brown: ['brown'],
-  choco: ['choco'],
+  // v3.6.144: "coklat" = Brown & Choco (chat 11 Okt: foto Choco dibuang saat pelanggan minta semua yang coklat).
+  brown: ['brown', 'coklat', 'cokelat'],
+  choco: ['choco', 'coklat', 'cokelat'],
 }
 const baseColor = (color: string) => fold(color).replace(/\s*\d+(?:\.\d+)?$/, '')
 
@@ -697,6 +700,25 @@ const NUDGE_SCHEMA = {
  * manusia, bukan bot/menagih? AI menilai + menulis ulang bila kaku; Jev ikut menilai (yakin "jangan" →
  * tidak dikirim). Gagal menilai → dikirim apa adanya (perilaku lama).
  */
+const contentWords = (text: string) =>
+  new Set(fold(text).replace(/[^a-z0-9\s]/g, ' ').split(' ').filter((word) => word.length >= 4 && !['kalau', 'saya', 'bantu', 'yang', 'sudah', 'nanti', 'bisa'].includes(word)))
+/**
+ * v3.6.144 — Susulan yang isinya sama dengan pesan toko sebelumnya tidak dikirim (chat 11 Okt: "saya bantu cek
+ * size dari tinggi & berat" dikirim 2–3 kali berturut-turut → terasa bot/berputar).
+ */
+export function repeatsStoreMessage(susulan: string, history: LeanHistoryRow[]) {
+  const mine = contentWords(susulan)
+  if (mine.size < 3) return false
+  return history
+    .filter((row) => row.direction === 'out' && row.body)
+    .slice(-10)
+    .some((row) => {
+      const other = contentWords(String(row.body))
+      const shared = [...mine].filter((word) => other.has(word)).length
+      return shared / Math.min(mine.size, Math.max(other.size, 1)) >= 0.6
+    })
+}
+
 export async function reviewNudge(input: {
   jid: string
   settings: LeanProviderSettings
@@ -704,6 +726,8 @@ export async function reviewNudge(input: {
   history: LeanHistoryRow[]
   address?: string
 }): Promise<NudgeVerdict> {
+  if (repeatsStoreMessage(input.susulan, input.history))
+    return { kirim: false, teks: '', alasan: 'Susulan sama dengan pesan toko sebelumnya (tidak diulang).', oleh: 'tidak_dinilai' }
   const recent = input.history
     .filter((row) => row.body || row.mediaType)
     .slice(-8)

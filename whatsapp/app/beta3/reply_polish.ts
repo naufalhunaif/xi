@@ -242,3 +242,38 @@ export function polishWithPhotos(
   if (!ordered.length && photos.length && pesan.length) ordered = [`Ini fotonya ${address}`]
   return compactPhotoIntro(ordered, photos, customerText, address)
 }
+
+/**
+ * v3.6.144 — Daftar berpoin pendek (2–6 baris "- …") jadi satu kalimat seperti CS di WhatsApp (chat 11 Okt &
+ * penilai: daftar bullet terasa bot). Daftar yang lebih panjang dibiarkan.
+ */
+export function inlineShortLists(pesan: string[]) {
+  let changed = false
+  const out = pesan.map((bubble) => {
+    const lines = bubble.split('\n')
+    const items = lines.filter((line) => /^\s*[-•*]\s+\S/.test(line))
+    // Juga "… : - a - b - c" dalam satu baris.
+    const inline = !items.length ? bubble.match(/^([^\n]*?:)\s*((?:-\s+[^-\n]+){2,6})$/) : null
+    if (inline) {
+      const parts = inline[2].split(/\s+-\s+|^-\s+/).map((part) => part.trim()).filter(Boolean)
+      if (parts.length < 2 || parts.length > 6) return bubble
+      changed = true
+      return `${inline[1]} ${joinList(parts)}`
+    }
+    if (items.length < 2 || items.length > 6) return bubble
+    const first = lines.findIndex((line) => /^\s*[-•*]\s+\S/.test(line))
+    const last = lines.length - 1 - [...lines].reverse().findIndex((line) => /^\s*[-•*]\s+\S/.test(line))
+    // Hanya daftar yang berurutan (tanpa teks di sela-selanya).
+    if (last - first + 1 !== items.length) return bubble
+    const head = lines.slice(0, first).join(' ').trim()
+    const tail = lines.slice(last + 1).join(' ').trim()
+    const list = joinList(items.map((line) => line.replace(/^\s*[-•*]\s+/, '').replace(/[.;,]\s*$/, '').trim()))
+    changed = true
+    return [head ? `${head}${/[:,]$/.test(head) ? '' : ':'} ${list}` : list, tail].filter(Boolean).join(' ').replace(/:\s*:/g, ':')
+  })
+  return { pesan: changed ? out : pesan, changed }
+}
+
+function joinList(items: string[]) {
+  return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')}, dan ${items[items.length - 1]}`
+}
