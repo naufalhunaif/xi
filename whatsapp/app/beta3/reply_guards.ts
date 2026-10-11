@@ -63,7 +63,8 @@ export function inventsProgress(customerText: string, pesan: string[], known: st
   })
 }
 
-const VAGUE_ADJUST = /,?\s*(?:dan\s+)?(?:biasanya\s+|nanti\s+)?(?:masih\s+)?bisa\s+(?:di)?(?:sesuaikan|sesuain|atur)\s+(?:lagi\s+)?(?:ukuran|size)(?:nya)?(?:\s+(?:biar|supaya|agar)\s+(?:lebih\s+)?pas)?/i
+// v3.6.155: juga "Bisa disesuaikan bos, biar gak kekecilan" (tanpa kata ukuran).
+const VAGUE_ADJUST = /,?\s*(?:dan\s+)?(?:biasanya\s+|nanti\s+)?(?:masih\s+)?bisa\s+(?:di)?(?:sesuaikan|sesuain|atur)(?:\s+(?:lagi\s+)?(?:ukuran|size)(?:nya)?)?(?:\s+(?:bos|kak|pak|bu))?(?:,?\s+(?:biar|supaya|agar)\s+(?:lebih\s+)?(?:pas|gak\s+kekecilan|tidak\s+kekecilan|nggak\s+kekecilan|gak\s+kebesaran))?/i
 /**
  * v3.6.147 — "biasanya bisa disesuaikan ukurannya biar pas" tanpa menyebut custom = janji kosong (uji chat asli:
  * pelanggan tanya "masih aman pakai M?"). Size ready tidak diubah; menyesuaikan badan = custom.

@@ -78,7 +78,7 @@ const FAST_EARLY = ['', 'lain', 'selesai', 'tanya_model', 'tanya_size']
 // efektif; semua balasan kembali lewat AI (lebih lama tapi menimbang konteks). Kodenya disimpan untuk nanti.
 const FAST_LANE = false
 import { pricePattern, productPriceMap, photoPriceSet, renderPricePattern, seriesMentioned, type PriceSeries } from '#beta3/price_pattern'
-import { completePhotos, inlineShortLists, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
+import { answerSalam, completePhotos, inlineShortLists, pointToSentPhotos, polishText, polishWithPhotos, skipSentPhotos } from '#beta3/reply_polish'
 import { allowedPrices, listRules, renderRules, unknownPrices } from '#beta3/quality_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { fixCatalogColors, swapColorWords } from '#beta3/color_fix'
@@ -2327,7 +2327,8 @@ export async function createLeanReply(input: {
       // v3.6.147 — maksud lain di pesan yang sama tetap dijawab (uji: tanya progres + janji datang besok,
       // dulu seluruh balasan diganti "saya cek dulu" sehingga janji datang tidak terjawab).
       const rest = keepNonProgress(input.text, decision.pesan, orderData)
-      decision.pesan = [`Saya cek dulu progres pesanannya ya ${style?.address || 'bos'}`, ...rest]
+      // v3.6.155 — salam pelanggan tetap dijawab (uji 100: "Assalamu'alaikum, pesanan sudah dikirim?" tanpa salam balik).
+      decision.pesan = answerSalam([`Saya cek dulu progres pesanannya ya ${style?.address || 'bos'}`, ...rest], input.text, style?.address || 'bos')
       decision.serah_cs = true
       decision.alasan = 'Menanyakan progres pesanan; data progres tidak ada'
       if (!rest.length) photos = []

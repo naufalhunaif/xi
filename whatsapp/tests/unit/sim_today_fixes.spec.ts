@@ -210,3 +210,12 @@ test.group('uji 100 chat v3.6.154', () => {
     assert.isFalse(dropPaymentClaim(['Bukti transfernya sudah kami terima, kami cek dulu ya'], '').changed)
   })
 })
+
+test.group('uji 100 chat v3.6.155', () => {
+  test('"Bisa disesuaikan bos, biar gak kekecilan" dibuang', async ({ assert }) => {
+    const { dropVagueAdjust } = await import('#beta3/reply_guards')
+    const out = dropVagueAdjust(['Bisa disesuaikan bos, biar gak kekecilan. Tinggi dan berat badan berapa?'])
+    assert.isTrue(out.changed)
+    assert.equal(out.pesan[0], 'Tinggi dan berat badan berapa?')
+  })
+})
