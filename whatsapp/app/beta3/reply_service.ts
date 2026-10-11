@@ -67,12 +67,12 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, fixPantsLetterSize, ensureStoreAddress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
 import { lookupPlace, mapLink, parseAddress, type PlaceLookup } from '#beta3/place_lookup'
-import { fastAnswer, fastIntent, fastShipping, needsContext, pureShippingAsk } from '#beta3/fast_reply'
+import { fastAnswer, fastIntent, fastShipping, needsContext, pureShippingAsk, storeParts } from '#beta3/fast_reply'
 import { dropOpenerRepeat, quickOpener } from '#beta3/quick_opener'
 import { assignQuotes, type TurnMessage } from '#beta3/reply_quotes'
 /** Tahap awal: jalur kilat untuk harga umum, lama pengerjaan, cara order. */
@@ -198,6 +198,21 @@ export function socialClosing(text: string, address = 'bos') {
   if (thanks) return `Sama-sama ${address} 🙏`
   if (sorry) return `Santai aja ${address} 🙏`
   if (agree) return `Siap ${address} 🙏`
+  return ''
+}
+
+/** v3.6.162 — pesan hanya angka harga yang baru disebut toko ("450" setelah "harga 450.000") → teks harga toko, atau ''. */
+export function priceEcho(text: string, rows: Array<{ direction: string; body?: string | null; current?: boolean }>) {
+  const bare = String(text || '').trim().match(/^(?:rp\.?\s*)?(\d{3}(?:[.,]\d{3})?|\d{1,3}\s*(?:rb|ribu|k))\s*\??$/i)
+  if (!bare) return ''
+  const digits = bare[1].replace(/[.,\s]|rb|ribu|k/gi, '')
+  const base = digits.length >= 6 ? digits.slice(0, -3) : digits
+  const recentStore = rows.filter((row) => row.direction === 'out' && !row.current).slice(-4).map((row) => String(row.body || ''))
+  for (const body of recentStore.reverse()) {
+    const prices = body.match(/\b\d{3}\.\d{3}\b/g) || []
+    const hit = prices.find((price) => price.startsWith(`${base}.`))
+    if (hit) return hit
+  }
   return ''
 }
 
@@ -1394,6 +1409,10 @@ export async function createLeanReply(input: {
       onTrace?.({ key: 'beta3-early', label: `Pembuka cepat terkirim · "${opener}"`, status: 'completed', detail: { pesan: opener } })
     }
   }
+  // v3.6.162 — pesan cuma angka ("450", "500rb") yang baru disebut toko sebagai harga = konfirmasi, bukan pertanyaan (uji 100).
+  const echo = priceEcho(input.text, rows)
+  if (echo)
+    systemNote += `\n\nCATATAN SISTEM: pelanggan hanya mengulang angka "${echo}" yang baru disebut toko (harga). Itu konfirmasi/pertanyaan "benar segitu?": jawab "iya ${style?.address || 'bos'}, ${echo}" singkat lalu lanjut langkah berikut; jangan tanya maksudnya.`
   if (understanding.csReason && understanding.csReason !== 'tidak_perlu')
     systemNote += `\n\nCATATAN SISTEM: pesan ini kemungkinan perlu ditangani manusia (${understanding.csReason.replace(/_/g, ' ')}). Ikuti aturan serah_cs di skill.`
   if (understanding.agreed && pendingForJev?.status === 'pending')
@@ -1895,7 +1914,8 @@ export async function createLeanReply(input: {
   // v3.6.83: pelanggan minta rekening (Jev) → rekening RESMI dari Pengaturan ditambahkan apa adanya
   // (uji chat nyata: AI menjawab "rekeningnya nanti" lalu menawarkan model lagi).
   // v3.6.89: pola kata pasti ikut (Jev bisa mati / ragu): "kirim ke rek mana", "no rek nya", "transfer kemana".
-  if ((understanding.asksAccount || asksAccountText(input.text)) && !decision.serah_cs) {
+  const received = /\b(sudah|udah|telah)\s+(?:saya\s+|kami\s+)?(?:terima|diterima|sampai|nyampe|nyampai|dapat)\b/i.test(input.text) && !/\b(rek|rekening|transfer|tf|bayar|kurang)\b/i.test(input.text)
+  if ((understanding.asksAccount || asksAccountText(input.text)) && !decision.serah_cs && !received) {
     const methods = settings.paymentMethods.filter((method) => method.enabled)
     const payment = renderPaymentMessage(methods.map((method) => ({ bank: method.name, number: method.destination, holder: (method as { accountName?: string }).accountName || '' })))
     if (payment && !decision.pesan.some((bubble) => methods.some((method) => bubble.includes(method.destination)))) {
@@ -2367,6 +2387,16 @@ export async function createLeanReply(input: {
     if (paid.changed) {
       decision.pesan = paid.pesan
       onTrace?.({ key: 'beta3-payment-claim', label: '"Pembayaran sudah masuk" tanpa data → dicek dulu', status: 'completed', detail: {} })
+    }
+    const pantsLetter = fixPantsLetterSize(decision.pesan, style?.address || 'bos')
+    if (pantsLetter.changed) {
+      decision.pesan = pantsLetter.pesan
+      onTrace?.({ key: 'beta3-pants-letter', label: 'Celana tidak dicatat dengan size huruf → ditanya nomornya', status: 'completed', detail: {} })
+    }
+    const located = ensureStoreAddress(decision.pesan, input.text, storeParts(String(storeProfile || '')).address, style?.address || 'bos')
+    if (located.changed) {
+      decision.pesan = located.pesan
+      onTrace?.({ key: 'beta3-address', label: 'Alamat toko disebut lengkap', status: 'completed', detail: {} })
     }
     const adjust = dropVagueAdjust(decision.pesan)
     if (adjust.changed) {

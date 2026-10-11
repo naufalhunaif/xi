@@ -283,3 +283,33 @@ test.group('pertanyaan gabungan nyambung v3.6.160', () => {
     assert.isUndefined(relatedSegment(() => 0.5, 'halo', [{ teks: 'paket sudah sampai bos, makasih' }]))
   })
 })
+
+test.group('uji 100 chat v3.6.162', () => {
+  test('celana dengan size huruf → ditanya nomornya; jas tetap', async ({ assert }) => {
+    const { fixPantsLetterSize } = await import('#beta3/reply_guards')
+    const out = fixPantsLetterSize(['Siap bos, jas, celana, rompi size L dicatat.', 'Untuk vest adeknya saya tanyakan dulu ya bos'])
+    assert.isTrue(out.changed)
+    assert.deepEqual(out.pesan, ['Untuk vest adeknya saya tanyakan dulu ya bos', 'Celananya pakai nomor berapa bos? Celana pakai nomor 28-40, bukan S/M/L'])
+    assert.isFalse(fixPantsLetterSize(['Jas size L ready bos, celana no 32 juga ready']).changed)
+    assert.isFalse(fixPantsLetterSize(['Jasnya size L ya bos']).changed)
+  })
+
+  test('ditanya lokasi/cabang → alamat lengkap ikut', async ({ assert }) => {
+    const { ensureStoreAddress } = await import('#beta3/reply_guards')
+    const address = 'Jl. Patimuan - Kedungreja, Cinyawang, Patimuan, Cilacap, Jawa Tengah 53264'
+    const out = ensureStoreAddress(['Toko di Cilacap bos, pesan bisa lewat chat'], 'toko terdekat dari Banjar ada?', address)
+    assert.isTrue(out.changed)
+    assert.include(out.pesan[1], 'Jl. Patimuan')
+    assert.isFalse(ensureStoreAddress([`Tokonya di ${address} bos`], 'lokasi dimana?', address).changed)
+    assert.isFalse(ensureStoreAddress(['Harganya 485.000 bos'], 'harga berapa?', address).changed)
+  })
+
+  test('"450" sesudah toko sebut 450.000 = konfirmasi harga', async ({ assert }) => {
+    const { priceEcho } = await import('#beta3/reply_service')
+    const rows = [{ direction: 'out', body: 'Harga 450.000 bos' }, { direction: 'in', body: '450', current: true }]
+    assert.equal(priceEcho('450', rows), '450.000')
+    assert.equal(priceEcho('500rb', [{ direction: 'out', body: 'Basic Suit Signature 500.000 bos' }]), '500.000')
+    assert.equal(priceEcho('450', [{ direction: 'out', body: 'Harga 485.000 bos' }]), '')
+    assert.equal(priceEcho('ukuran 34', rows), '')
+  })
+})

@@ -114,6 +114,44 @@ export function dropPaymentClaim(pesan: string[], orderData: string, address = '
   return { pesan: [`Pembayarannya kami cek dulu ya ${address}`, ...out], changed: true }
 }
 
+const PANTS_LETTER = /\b(celana|pants)(?:nya)?\b[^.?!\n]{0,40}?\b(?:size|ukuran|uk)?\s*(XS|S|M|L|XL|XXL|[2-5]XL)\b(?![\s-]*\d)/i
+const LETTER_PANTS = /\b(?:size|ukuran)\s+(XS|S|M|L|XL|XXL|[2-5]XL)\b[^.?!\n]{0,25}?\b(celana|pants)\b/i
+/**
+ * v3.6.162 — Celana memakai nomor 28–40, bukan S/M/L (uji 100: "celananya size L sudah kami catat"). Kalimat yang
+ * mencatat celana dengan huruf dibuang, diganti pertanyaan nomor; kalimat jas tetap.
+ */
+export function fixPantsLetterSize(pesan: string[], address = 'bos') {
+  let changed = false
+  const out = pesan
+    .map((bubble) =>
+      bubble
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) => {
+          // "jas, celana, rompi size L dicatat" / "celananya size L" → buang; "jas size L" saja → tetap.
+          const hit = (PANTS_LETTER.test(sentence) || LETTER_PANTS.test(sentence)) && !/\bno(?:mor|mer)?\.?\s*\d{2}\b/i.test(sentence)
+          if (hit) changed = true
+          return !hit
+        })
+        .join(' ')
+        .trim()
+    )
+    .filter(Boolean)
+  if (!changed) return { pesan, changed }
+  if (!out.some((bubble) => /celana[^?]*\?/i.test(bubble))) out.push(`Celananya pakai nomor berapa ${address}? Celana pakai nomor 28-40, bukan S/M/L`)
+  return { pesan: out, changed }
+}
+
+const LOCATION_ASK = /\b(lokasi|alamat(?:nya)?\s+(?:toko|dimana|di mana)|toko(?:nya)?\s+(?:di\s*mana|dimana|terdekat|ada\s+di)|cabang|share\s*lo[ck]|sharelok|offline\s*store|store(?:nya)?\s+(?:di\s*mana|dimana|ada)|outlet|gallery)\b/i
+/**
+ * v3.6.162 — Ditanya lokasi/toko terdekat/cabang → alamat lengkap toko ikut disebut (uji 100: "Toko di Cilacap" saja).
+ */
+export function ensureStoreAddress(pesan: string[], customerText: string, address: string, call = 'bos') {
+  if (!address || !LOCATION_ASK.test(customerText || '')) return { pesan, changed: false }
+  const street = address.split(',')[0].trim()
+  if (!street || pesan.some((bubble) => bubble.toLowerCase().includes(street.toLowerCase().slice(0, 12)))) return { pesan, changed: false }
+  return { pesan: [...pesan, `Tokonya di ${address} ${call}`], changed: true }
+}
+
 /** v3.6.147 — kalimat balasan yang tidak mengarang progres (maksud lain pelanggan) tetap dikirim. */
 export function keepNonProgress(customerText: string, pesan: string[], known: string) {
   return pesan
