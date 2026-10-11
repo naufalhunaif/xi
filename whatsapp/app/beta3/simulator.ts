@@ -703,6 +703,46 @@ export async function learnFromRealChat(asal: Array<{ teks: string; jawaban: str
 
 /* ---------------- Skenario dari chat nyata (v3.6.80) ---------------- */
 
+const PRODUCT_WORDS = /\b(jas|blazer|suit|setelan|stelan|celana|pants|beskap|bescap|tuxedo|vest|rompi|kemeja|shirt|jaket|batik)\b/g
+const TOPIC_WORDS: Array<[string, RegExp]> = [
+  ['harga', /\b(harga|hrg|brp|berapa|brapa|piro|total|diskon|promo|nego|budget)\b/i],
+  ['ukuran', /\b(size|ukuran|ukrn|tinggi|berat|tb|bb|xs|s|m|l|xl|xxl|[2-5]xl|lingkar|dada|pinggang|bahu)\b/i],
+  ['warna', /\b(warna|wrn|hitam|item|navy|dongker|putih|cream|krem|maroon|marun|abu|grey|gray|coklat|choco|brown|biru|hijau|army|gold)\b/i],
+  ['custom', /\b(custom|kancing|kerah|model|detail|bordir|request|ankle|slim)\b/i],
+  ['kirim', /\b(ongkir|kirim|alamat|resi|jne|ekspedisi|sampai|paket)\b/i],
+  ['bayar', /\b(bayar|tf|transfer|rekening|rek|dp|lunas|pembayaran|cod)\b/i],
+  ['waktu', /\b(kapan|lama|hari|tgl|tanggal|jadi|selesai|proses|pre ?order|po|ready|stok)\b/i],
+  ['foto', /\b(foto|gambar|pic|contoh|realpic|lihat|liat)\b/i],
+]
+const topicsOf = (text: string) => new Set(TOPIC_WORDS.filter(([, pattern]) => pattern.test(text)).map(([name]) => name))
+const productsOf = (text: string) => new Set((text.toLowerCase().match(PRODUCT_WORDS) || []).map((word) => word.replace(/^(stelan)$/, 'setelan').replace(/^(blazer|suit)$/, 'jas').replace(/^(pants)$/, 'celana').replace(/^(bescap)$/, 'beskap').replace(/^(rompi)$/, 'vest').replace(/^(shirt)$/, 'kemeja')))
+
+/**
+ * v3.6.160 — Pertanyaan tambahan yang nyambung: produk sama (bobot 2) atau topik sama (bobot 1), diutamakan yang
+ * menambah sisi baru (topik berbeda) seperti pelanggan sungguhan ("harga?" lalu "ongkir ke X?"). Tanpa yang
+ * cocok → tidak digabung.
+ */
+export function relatedSegment<T extends { teks: string }>(rand: () => number, context: string, candidates: T[]): T | undefined {
+  const products = productsOf(context)
+  const topics = topicsOf(context)
+  const scored = candidates
+    .map((candidate) => {
+      const text = candidate.teks
+      if (text.length < 8 || text.length > 220) return { candidate, score: 0 }
+      const sharedProducts = [...productsOf(text)].filter((word) => products.has(word)).length
+      const own = topicsOf(text)
+      const sharedTopics = [...own].filter((topic) => topics.has(topic)).length
+      const fresh = [...own].filter((topic) => !topics.has(topic)).length
+      const score = sharedProducts * 2 + sharedTopics + (sharedProducts || sharedTopics ? Math.min(fresh, 1) * 0.5 : 0)
+      return { candidate, score }
+    })
+    .filter((item) => item.score >= 1)
+    .sort((a, b) => b.score - a.score)
+  if (!scored.length) return undefined
+  const top = scored.slice(0, 5)
+  return top[Math.floor(rand() * top.length)].candidate
+}
+
 /** 00:00 WIB hari ini. */
 function startOfTodayWib(now = Date.now()) {
   const wib = 7 * 3600_000
@@ -848,7 +888,10 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
   for (const [index, chat, start] of turns) {
     if (out.length >= count) break
     const picked = chat.segments.slice(start, start + 2)
-    const other = pool[(index + 1 + Math.floor(rand() * (pool.length - 1 || 1))) % pool.length]?.segments[0]
+    // v3.6.160 — pertanyaan tambahan dipilih yang NYAMBUNG dengan pembahasan (produk/topik sama; pemilik: "bukan
+    // benar-benar random, seperti otak bekerja"), bukan pertanyaan acak dari pelanggan lain.
+    const context = [picked[0].teks, ...chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 6), picked[0].mulai ?? 0).map((row) => String(row.body || ''))].join(' ')
+    const other = relatedSegment(rand, context, pool.filter((_, at) => at !== index).flatMap((item) => item.segments.slice(0, 3)))
     // Tawaran bisnis / bot lain tidak digabung dengan pertanyaan pelanggan (tidak terjadi di chat nyata).
     const odd = (text = '') => isBusinessPitch(text) || isOtherBot(text) || text.length > 300
     const combined = rand() < mix && !odd(picked[0]?.teks) && !odd(other?.teks)

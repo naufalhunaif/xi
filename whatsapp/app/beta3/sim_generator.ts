@@ -58,7 +58,7 @@ const sayColor = (rand: Rand, color: string) => pick(rand, COLOR_WORDS[colorKey(
 const sayProduct = (rand: Rand, product: string) => pick(rand, PRODUCT_WORDS[product.toLowerCase()] || [product.toLowerCase()])
 
 const GREET = ['min', 'kak', 'ka', 'bang', 'gan', 'mas', 'teh', 'bos', 'sis', 'admin', 'p', 'halo', 'misi', 'assalamualaikum']
-const TAIL = ['', '', 'dong', 'ya', 'kah', 'nih', 'cuy', 'gan', '🙏', '😁', '??', '?', 'bos', 'min', 'kak']
+const TAIL = ['', '', '', 'dong', 'ya', 'kah', 'nih', 'gan', '🙏', '😁', '?', 'bos', 'min', 'kak']
 const HOW_MUCH = ['brp', 'berapa', 'brapa', 'piro', 'sabaraha', 'brp an', 'berapa rupanya', 'brpa', 'hrgnya', 'pira']
 const IS_THERE = ['ada', 'ad', 'ono', 'aya', 'ade', 'ready', 'redi', 'msh ada', 'masih ono']
 const NUMBER_WORDS: Record<number, string[]> = {
@@ -116,19 +116,20 @@ const CODE_MIX: Array<[RegExp, string[]]> = [
 /** Acak cara bicara: sapaan, singkatan, salah ketik, campur bahasa, huruf dipanjangkan, emoji. */
 export function roughen(rand: Rand, text: string) {
   let out = text
-  for (const [pattern, options] of CODE_MIX) if (chance(rand, 0.25)) out = out.replace(pattern, () => pick(rand, options))
-  for (const [pattern, options] of ABBREVIATE) if (chance(rand, 0.6)) out = out.replace(pattern, () => pick(rand, options))
+  // v3.6.160 — lebih seperti pelanggan sungguhan: singkatan & salah ketik sewajarnya, sapaan/campur bahasa lebih jarang.
+  for (const [pattern, options] of CODE_MIX) if (chance(rand, 0.12)) out = out.replace(pattern, () => pick(rand, options))
+  for (const [pattern, options] of ABBREVIATE) if (chance(rand, 0.5)) out = out.replace(pattern, () => pick(rand, options))
   out = out
     .split(' ')
-    .map((word) => (chance(rand, 0.12) ? typo(rand, word) : word))
+    .map((word) => (chance(rand, 0.07) ? typo(rand, word) : word))
     .join(' ')
-  if (chance(rand, 0.45)) out = `${pick(rand, GREET)}${chance(rand, 0.5) ? ',' : ''} ${out}`
+  if (chance(rand, 0.25)) out = `${pick(rand, GREET)}${chance(rand, 0.5) ? ',' : ''} ${out}`
   const tail = pick(rand, TAIL)
   if (tail) out = `${out} ${tail}`
   // Huruf dipanjangkan ("brpppp", "dongg") dan emoji di tengah.
   if (chance(rand, 0.2)) out = out.replace(/\b(\w*?)([aiueopg])\b/, (_, head, letter) => `${head}${letter.repeat(2 + Math.floor(rand() * 3))}`)
   if (chance(rand, 0.15)) out = `${out} ${pick(rand, ['😅', '🙏🙏', '👍', '🤔', '😭', 'wkwk', 'hehe'])}`
-  if (chance(rand, 0.08)) out = out.toUpperCase()
+  if (chance(rand, 0.03)) out = out.toUpperCase()
   if (chance(rand, 0.3)) out = out.replace(/[?.!,]/g, '')
   return out.replace(/\s+/g, ' ').trim()
 }

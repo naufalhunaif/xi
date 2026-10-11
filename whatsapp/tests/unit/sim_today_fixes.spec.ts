@@ -265,3 +265,21 @@ test.group('uji 100 chat v3.6.159', () => {
     assert.deepEqual(fixContextPrices(text, pattern, 'premium', productPrices), { pesan: text, changes: [] })
   })
 })
+
+test.group('pertanyaan gabungan nyambung v3.6.160', () => {
+  test('pertanyaan tambahan dipilih yang seproduk/setopik, bukan acak', async ({ assert }) => {
+    const { relatedSegment } = await import('#beta3/simulator')
+    const candidates = [
+      { teks: 'paket sudah sampai bos, makasih' },
+      { teks: 'celana no 33 ada? warna hitam' },
+      { teks: 'ongkir ke bandung berapa kalau jas 1?' },
+      { teks: 'bisa bayar pakai cod?' },
+    ]
+    const pickedTexts = new Set<string>()
+    for (let i = 0; i < 20; i++) pickedTexts.add(relatedSegment(() => i / 20, 'jas hitam size L ada? harganya berapa', candidates)?.teks || '')
+    assert.isTrue(pickedTexts.has('ongkir ke bandung berapa kalau jas 1?') || pickedTexts.has('celana no 33 ada? warna hitam'))
+    assert.isFalse(pickedTexts.has('paket sudah sampai bos, makasih'))
+    assert.isFalse(pickedTexts.has('bisa bayar pakai cod?'))
+    assert.isUndefined(relatedSegment(() => 0.5, 'halo', [{ teks: 'paket sudah sampai bos, makasih' }]))
+  })
+})
