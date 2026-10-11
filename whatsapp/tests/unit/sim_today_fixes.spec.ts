@@ -343,3 +343,28 @@ test.group('uji #58 (v3.6.167)', () => {
     assert.include(compareWithSizeChart(rows('lp 84'), chart), 'pinggang badan 84 cm')
   })
 })
+
+// v3.6.168 — pertanyaan gabungan harus masuk akal: hanya pertanyaan yang berdiri sendiri yang digabung.
+test.group('uji gabungan masuk akal (v3.6.168)', () => {
+  test('standaloneQuestion: ack/rujukan konteks ditolak, pertanyaan utuh diterima', async ({ assert }) => {
+    const { standaloneQuestion } = await import('#beta3/simulator')
+    for (const text of [
+      'Kalau army jadi berapa?',
+      'Siapp terimakasih Untuk pelunasan apakah tidak ada tambahan biaya ongkir?',
+      'Iya',
+      'Oh Putih ya',
+      'yaudah kak itu cancel aja yg vest buat adek',
+      'Masih aman brarti yah pake M',
+      'pesanan saya sudah dikirim?',
+      'ok',
+    ])
+      assert.isFalse(standaloneQuestion(text), text)
+    for (const text of [
+      'PAGI KA MAU TANYA JAS HITAM STELAN BERAPA? KALO TOKONYA DIMANA?',
+      'Celana yg ukuran 36 warna cream ready?',
+      'ongkir ke bandung berapa ya mas',
+      'ada jas burgundy ukuran XL?',
+    ])
+      assert.isTrue(standaloneQuestion(text), text)
+  })
+})

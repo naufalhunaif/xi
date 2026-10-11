@@ -30,7 +30,7 @@ import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { STORE_BASICS, bubblesToSend, createLeanReply, productionRanges, type LeanSettings } from '#beta3/reply_service'
 import { fastAnswer, fastIntent, type FastIntent } from '#beta3/fast_reply'
 import { renderProductionEstimate, type LeanHistoryRow } from '#beta3/prompt'
-import { generateScenarios, rng, roughen } from '#beta3/sim_generator'
+import { generateScenarios, rng } from '#beta3/sim_generator'
 
 export type SimScenario = {
   id: string
@@ -787,6 +787,23 @@ export function relatedSegment<T extends { teks: string }>(rand: () => number, c
   return top[Math.floor(rand() * top.length)].candidate
 }
 
+const ACK_START = /^(?:siap+|oke+|ok|okey|iya+|iy|ya+|yaudah|ya udah|baik|terima\s*kasih|makasih|mksh|thanks|thx|sudah|udah|udh|sdh|masih|nanti|boleh|sip+|ini|itu|yg|yang|oh+|oke siap|siap bos|betul|bener|sama)\b/i
+const CONTEXT_REF =
+  /\b(?:tadi|td|kemarin|kmrn|kemaren|barusan|yg itu|itu aja|yang itu|yg tadi|masih sama|sudah|udah|udh|sdh|jadi berapa|jd brp|jadi brp|jadi berapaan|lanjut|cancel|batal|pesanan (?:saya|sy|ku)|orderan|resi|paket(?:nya)?|transfer|tf|trf|pelunasan|dp|bukti|kalau (?:\w+ )?jadi|yg ini|yang ini|ini (?:aja|saja)|sama (?:yg|yang))\b/i
+/**
+ * v3.6.168 — Pertanyaan yang berdiri sendiri (bisa dipahami tanpa riwayat chatnya): bukan jawaban/ack
+ * ("iya", "siap", "sudah"), tidak merujuk hal di chat itu ("yang tadi", "jadi berapa", "pesanan saya"), dan
+ * menyebut produk/topik. Hanya pertanyaan seperti ini yang boleh digabung dari chat lain — dulu potongan
+ * tengah percakapan lain ikut digabung ("Kalau army jadi berapa?") sehingga pertanyaan gabungannya tidak masuk akal.
+ */
+export function standaloneQuestion(text: string) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim()
+  if (clean.length < 12 || clean.length > 200) return false
+  if (ACK_START.test(clean) || CONTEXT_REF.test(clean)) return false
+  if (/^\[/.test(clean)) return false
+  return productsOf(clean).size > 0 || topicsOf(clean).size > 0
+}
+
 /** 00:00 WIB hari ini. */
 function startOfTodayWib(now = Date.now()) {
   const wib = 7 * 3600_000
@@ -935,17 +952,31 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
     // v3.6.160 — pertanyaan tambahan dipilih yang NYAMBUNG dengan pembahasan (produk/topik sama; pemilik: "bukan
     // benar-benar random, seperti otak bekerja"), bukan pertanyaan acak dari pelanggan lain.
     const context = [picked[0].teks, ...chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 6), picked[0].mulai ?? 0).map((row) => String(row.body || ''))].join(' ')
-    const other = relatedSegment(rand, context, pool.filter((_, at) => at !== index).flatMap((item) => item.segments.slice(0, 3)))
     // Tawaran bisnis / bot lain tidak digabung dengan pertanyaan pelanggan (tidak terjadi di chat nyata).
     const odd = (text = '') => isBusinessPitch(text) || isOtherBot(text) || text.length > 300
-    const combined = rand() < mix && !odd(picked[0]?.teks) && !odd(other?.teks)
+    // v3.6.168 — gabungan yang masuk akal (pemilik: "pertanyaan gabungan tidak masuk akal, kombinasinya tidak sesuai"):
+    // (a) pertanyaan BERIKUTNYA dari chat yang sama yang berdiri sendiri (tidak bergantung jawaban CS) dilebur ke
+    //     giliran pertama — dua maksud dalam satu pesan, seperti pelanggan yang menulis sekaligus; atau
+    // (b) pertanyaan PEMBUKA chat lain yang berdiri sendiri dan nyambung produk/topiknya.
+    // Teks tidak diacak lagi (roughen) — chat asli sudah apa adanya; dulu "halo, Oh Putih ya mas bos".
+    const wantCombined = rand() < mix && !odd(picked[0]?.teks) && !picked[0]?.gambar
+    const sameChat = wantCombined && picked[1] && !picked[1].gambar && !picked[1].kutip && !picked[1].ai && standaloneQuestion(picked[1].teks) ? picked[1] : undefined
+    const other = wantCombined && !sameChat
+      ? relatedSegment(
+          rand,
+          context,
+          pool
+            .filter((_, at) => at !== index)
+            .map((item) => item.segments[0])
+            .filter((segment): segment is RealSegment => Boolean(segment) && !segment.gambar && !segment.kutip && !segment.ai && !odd(segment.teks) && standaloneQuestion(segment.teks))
+        )
+      : undefined
+    const combined = Boolean(sameChat || (other && other.teks !== picked[0].teks))
+    if (sameChat) picked.splice(1, 1)
     const giliran = picked.map((segment, turn) => {
       let teks = segment.teks
-      if (combined) {
-        teks = roughen(rand, teks.replace(/\n+/g, ' '))
-        // Giliran pertama digabung dengan pertanyaan pelanggan lain (dua maksud dalam satu pesan).
-        if (turn === 0 && other && other.teks !== segment.teks) teks = `${teks}\n${roughen(rand, other.teks.replace(/\n+/g, ' '))}`
-      }
+      // Giliran pertama digabung dengan pertanyaan lain (dua maksud dalam satu pesan).
+      if (combined && turn === 0) teks = `${teks}\n${(sameChat || other)!.teks}`
       return segment.gambar || segment.kutip || segment.fotoSebelum
         ? {
             teks,
@@ -962,7 +993,11 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
           ? `Giliran ${turn + 1} — balasan AI toko waktu itu (BUKAN acuan kebenaran, hanya pembanding; nilai menurut FAKTA): ${segment.jawaban.join(' / ')}`
           : `Giliran ${turn + 1} — CS manusia waktu itu: ${segment.jawaban.join(' / ')}`
       )
-      .concat(combined && other ? [`Pertanyaan tambahan (digabung) — CS manusia waktu itu: ${other.jawaban.join(' / ')}`] : [])
+      .concat(
+        combined && (sameChat || other)
+          ? [`Pertanyaan tambahan (digabung ke giliran 1, ${sameChat ? 'pesan pelanggan berikutnya di chat yang sama' : 'dari chat lain yang serupa'}) — CS manusia waktu itu: ${(sameChat || other)!.jawaban.join(' / ')}`]
+          : []
+      )
     const before = chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 12), picked[0].mulai ?? 0)
     // Gambar di riwayat diberi keterangan seperti di sistem nyata (AI melihat isi gambar lama lewat catatan).
     // v3.6.147 — foto giliran ini & foto yang dirujuk juga diberi keterangan (untuk penilai, yang tidak melihat gambar).
