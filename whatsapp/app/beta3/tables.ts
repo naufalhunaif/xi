@@ -146,9 +146,11 @@ export const LEAN_TABLE_STATEMENTS = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS whatsapp_beta3_state (
     name VARCHAR(64) NOT NULL PRIMARY KEY,
-    value TEXT NULL,
+    value MEDIUMTEXT NULL,
     updated_at DATETIME NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // v3.6.166: daftar pelajaran uji (ratusan baris) tidak muat di TEXT 64 KB.
+  `ALTER TABLE whatsapp_beta3_state MODIFY value MEDIUMTEXT NULL`,
   // v3.6.50: rekap chat CS dulu menandai "menunggu bayar" walau total belum pernah dikirim. Order
   // seperti itu dikembalikan ke pending (tanpa total & tanpa dana masuk) supaya totalnya dihitung.
   `UPDATE whatsapp_beta3_orders SET status = 'pending'

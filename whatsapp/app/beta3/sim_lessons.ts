@@ -7,24 +7,32 @@ import { addLeanExample, listLeanExamples } from '#beta3/examples_service'
 export type SimLesson = { text: string; count: number; lastAt: string; contoh: string[] }
 
 const STATE = 'sim_lessons'
-export const MAX_LESSONS = 60
+/** v3.6.166: 60 → 250 — pelajaran hasil tinjauan pemilik (±200 baris) harus muat; ke prompt tetap hanya yang nyambung. */
+export const MAX_LESSONS = 250
 /** Pelajaran yang ikut ke prompt (paling sering terjadi & terbaru). */
 export const PROMPT_LESSONS = 10
 
-const words = (text: string) =>
+const LESSON_STOP = new Set(
+  'saat pelanggan jawab jangan yang dengan untuk bila kalau sebut jelas tanya tanpa lalu dulu juga atau dari ke di dan bos itu ini sudah belum ada tidak hanya langsung harus perlu bisa'.split(' ')
+)
+const lessonWords = (text: string) =>
   new Set(
     String(text || '')
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, ' ')
       .split(/\s+/)
-      .filter((word) => word.length >= 4)
+      .filter((word) => word.length >= 4 && !LESSON_STOP.has(word))
   )
+/**
+ * v3.6.166 — mirip = Jaccard kata inti ≥ 0.5. Dulu "kata sama / himpunan terkecil ≥ 0.6" menggabungkan pelajaran
+ * pendek yang beda topik (mis. "lama pengerjaan…" dengan "toko terdekat…") karena kata umum seperti "jawab/sebut".
+ */
 const similar = (a: string, b: string) => {
-  const x = words(a)
-  const y = words(b)
+  const x = lessonWords(a)
+  const y = lessonWords(b)
   if (!x.size || !y.size) return false
   const shared = [...x].filter((word) => y.has(word)).length
-  return shared / Math.min(x.size, y.size) >= 0.6
+  return shared / (x.size + y.size - shared) >= 0.5
 }
 
 export async function listLessons(): Promise<SimLesson[]> {
@@ -84,17 +92,6 @@ export function renderLessons(lessons: SimLesson[], limit = PROMPT_LESSONS, cust
   return ['PELAJARAN DARI UJI (kesalahan AI sebelumnya — jangan diulang):', ...top.map((item, index) => `${index + 1}. ${item.text}`)].join('\n')
 }
 
-const LESSON_STOP = new Set(
-  'saat pelanggan jawab jangan yang dengan untuk bila kalau sebut jelas tanya tanpa lalu dulu juga atau dari ke di dan bos itu ini sudah belum ada tidak hanya langsung harus perlu bisa'.split(' ')
-)
-const lessonWords = (text: string) =>
-  new Set(
-    String(text || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter((word) => word.length >= 4 && !LESSON_STOP.has(word))
-  )
 /**
  * v3.6.165 — Pelajaran yang ikut ke prompt: yang NYAMBUNG dengan pesan pelanggan (kata kunci sama) didahulukan,
  * sisanya yang paling sering terjadi. Dulu hanya 10 teratas global, jadi pelajaran soal celana muncul saat ditanya
