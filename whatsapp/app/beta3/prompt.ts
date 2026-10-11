@@ -32,7 +32,7 @@ export const LEAN_OUTPUT_SCHEMA = {
       type: 'array',
       items: { type: 'string' },
       description:
-        'Bubble WhatsApp yang dikirim ke pelanggan, urut. Biasanya 1, maksimal 2. Sependek CS asli: umumnya ≤ 15 kata total (rincian harga/ongkir/format boleh lebih), jawab dulu, tanpa penjelasan tambahan. Kosong = tidak membalas.',
+        'Bubble WhatsApp yang dikirim ke pelanggan, urut. Biasanya 1, maksimal 2. Sependek CS asli: umumnya ≤ 15 kata (rincian harga/ongkir/format boleh lebih), jawab dulu, tanpa penjelasan tambahan. Ditanya 2–3 hal → jawab SEMUA, masing-masing sesingkat itu; ya/tidak → jawab ya/tidak dulu ("iya aman bos"). Kosong = tidak membalas.',
     },
     foto: {
       type: 'array',
