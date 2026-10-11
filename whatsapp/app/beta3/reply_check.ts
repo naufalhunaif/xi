@@ -3,7 +3,7 @@
 // Ada masalah → AI menulis ulang sekali dengan catatan pemeriksa. Penilaian memakai MAKSUD (Jev), bukan
 // daftar kata; pemeriksaan pasti (foto yang tidak ada di katalog) tetap dilakukan kode.
 import { withPromoPrices, type ChatPromo } from '#beta3/promos'
-import { askJev, confident, jevOn, logDecision, maskPii, scoreLevel, type JevAnswer } from '#beta3/jev'
+import { askJev, confident, jevOn, logDecision, maskPii, scoreLevel, type JevAnswer, type JevQuestion } from '#beta3/jev'
 import { colorVariantsIn, findCatalogVariant, type LeanCatalogRow } from '#beta3/catalog_service'
 import { withoutNoPhotoClauses } from '#beta3/reply_polish'
 import type { LeanDecision, LeanHistoryRow } from '#beta3/prompt'
@@ -790,4 +790,130 @@ export async function reviewNudge(input: {
   if (ai?.keputusan === 'ubah' && ai.susulan?.trim())
     return { kirim: true, teks: ai.susulan.trim().slice(0, 400), alasan: String(ai.alasan || '').slice(0, 300), oleh: 'ai' }
   return { kirim: true, teks: input.susulan, alasan: String(ai?.alasan || ''), oleh: ai ? 'ai' : jevAnswer ? 'jev' : 'tidak_dinilai' }
+}
+
+/* ---------------- v3.6.164 — Tinjauan per bagian balasan (Jev) ---------------- */
+
+/** Kalimat basa-basi yang tidak pernah perlu (0 token). */
+const WEAK_SENTENCE =
+  /^(?:semoga (?:membantu|bermanfaat)|jangan ragu|silakan (?:hubungi|tanya) (?:kami|lagi)|kami siap membantu|terima kasih (?:sudah|telah) menghubungi|ada (?:lagi )?yang bisa (?:saya|kami) bantu|kalau ada pertanyaan (?:lain )?(?:silakan|bisa)|ditunggu (?:ya )?kabarnya lagi)\b[^.!?]*[.!?]?$/i
+/** Potongan kalimat lemah yang dibuang dari dalam kalimat. */
+const WEAK_TAILS = [
+  /,?\s*(?:agar|supaya|biar) pesanan(?:nya)? (?:bisa )?(?:langsung |segera )?(?:kami |di)?proses\b/i,
+  /,?\s*(?:kalau|jika) (?:ada|butuh) (?:bantuan|pertanyaan) (?:lain|lagi)[^.!?]*/i,
+  /,?\s*(?:tambahan|biaya) detail(?:nya)? nanti (?:saya|kami) kabari(?: harganya)?/i,
+  /,?\s*tergantung (?:model|size|ukuran)(?:nya)?(?: ya)?(?: bos| kak)?$/i,
+]
+const KEEP_WHOLE_PART = /\n|nama\s*:|rekening|\brek\b|^\s*[-•]/i
+/** Pecah kalimat tanpa memotong "no. 32", "485.000", "mis.". */
+function sentencesOf(bubble: string) {
+  const DOT = '\u2024'
+  return bubble
+    .replace(/(\d)\.(?=\d)/g, `$1${DOT}`)
+    .replace(/\b(no|mis|dll|dsb|tgl|rp)\./gi, `$1${DOT}`)
+    .split(/(?<=[.!?])\s+(?=\S)/)
+    .map((part) => part.split(DOT).join('.').trim())
+    .filter(Boolean)
+}
+
+export type PartVerdict = { teks: string; tujuan: 'perlu' | 'lemah' | 'ulang'; yakin: number }
+
+/** Tanpa token: buang kalimat basa-basi & ekor kalimat lemah. */
+export function stripWeakParts(pesan: string[]) {
+  const dibuang: PartVerdict[] = []
+  const out = pesan
+    .map((bubble) => {
+      if (KEEP_WHOLE_PART.test(bubble)) return bubble
+      const kept = sentencesOf(bubble)
+        .filter((sentence) => {
+          if (WEAK_SENTENCE.test(sentence.trim())) {
+            dibuang.push({ teks: sentence, tujuan: 'lemah', yakin: 1 })
+            return false
+          }
+          return true
+        })
+        .map((sentence) => {
+          let text = sentence
+          for (const tail of WEAK_TAILS) {
+            const hit = text.match(tail)
+            if (hit && text.replace(tail, '').replace(/\s+/g, ' ').trim().length > 8) {
+              dibuang.push({ teks: hit[0].trim(), tujuan: 'lemah', yakin: 1 })
+              text = text.replace(tail, '')
+            }
+          }
+          return text.replace(/\s+([.,!?])/g, '$1').replace(/\s{2,}/g, ' ').trim()
+        })
+      return kept.join(' ').trim()
+    })
+    .filter(Boolean)
+  return { pesan: out, dibuang }
+}
+
+/**
+ * Tiap kalimat balasan ditinjau Jev: perlu (menjawab / langkah berikut / fakta yang dibutuhkan), lemah (basa-basi,
+ * kata ragu tanpa isi), atau ulang (sudah dikatakan). Bagian lemah/ulang yang Jev yakin dibuang; tiap keputusan
+ * dicatat untuk dinilai pemilik. Template (format order, rincian, rekening) tidak disentuh. Pemilik: "bagian
+ * jawaban mana yang perlu, tujuannya apa; tujuan atau kata yang lemah tidak diikutkan".
+ */
+export async function reviewReplyParts(input: {
+  jid: string
+  customerText: string
+  history: LeanHistoryRow[]
+  pesan: string[]
+}): Promise<{ pesan: string[]; dibuang: PartVerdict[]; jev: boolean }> {
+  const stripped = stripWeakParts(input.pesan)
+  const cleaned = stripped.pesan
+  const dibuang = stripped.dibuang
+  const sentences: Array<{ bubble: number; teks: string }> = []
+  cleaned.forEach((bubble, index) => {
+    if (KEEP_WHOLE_PART.test(bubble)) return
+    for (const sentence of sentencesOf(bubble).filter((part) => part.length > 2)) sentences.push({ bubble: index, teks: sentence })
+  })
+  if (sentences.length < 2 || !(await jevOn('bagian'))) return { pesan: cleaned, dibuang, jev: false }
+  const recent = recentLines(input.history)
+  const state = {
+    pesan_pelanggan: maskPii(input.customerText).slice(0, 1200),
+    percakapan_sebelumnya: recent,
+    balasan: cleaned.map((bubble) => maskPii(bubble).slice(0, 900)),
+    bagian: sentences.map((item, index) => `${index + 1}. ${maskPii(item.teks).slice(0, 300)}`),
+  }
+  const questions: Record<string, JevQuestion> = {}
+  for (const [index, item] of sentences.slice(0, 8).entries())
+    questions[`bagian_${index + 1}`] = {
+      type: 'choice',
+      instructions: `Bagian ${index + 1} dari balasan: "${maskPii(item.teks).slice(0, 300)}". Apa tujuan bagian ini bagi pelanggan? Nilai hanya bagian ini, dalam konteks pesan_pelanggan dan bagian lain.`,
+      criteria: {
+        perlu: 'Menjawab pertanyaan/maksud pelanggan, memberi fakta yang dibutuhkan (harga, stok, ukuran, alamat, estimasi), atau langkah berikut yang jelas (tanya data yang kurang, format order, rekening)',
+        lemah: 'Basa-basi, penegasan kosong, atau kalimat ragu tanpa isi (mis. "tergantung", "biasanya bisa", "nanti dikabari") yang tidak menambah informasi; kalau dihapus balasan tetap lengkap',
+        ulang: 'Mengulang isi yang sudah ada di bagian lain balasan ini atau sudah disampaikan toko di percakapan_sebelumnya',
+      },
+    }
+  const answers = await askJev('cek-bagian', state, questions, { timeoutMs: 3000, jid: input.jid })
+  if (!answers) return { pesan: cleaned, dibuang, jev: false }
+  const drop = new Set<number>()
+  const logged = `Pelanggan: ${state.pesan_pelanggan}\nBalasan: ${state.balasan.join(' / ')}`
+  for (const [key, answer] of Object.entries(answers)) {
+    const index = Number(key.replace('bagian_', '')) - 1
+    const item = sentences[index]
+    if (!item || !answer || answer.type !== 'choice') continue
+    const sure = confident('bagian', answer)
+    await logDecision({ jid: input.jid, decision: 'bagian', answer, used: sure && answer.choice !== 'perlu', detail: key, input: `${logged}\nBagian: ${item.teks}` })
+    if (sure && answer.choice !== 'perlu') {
+      drop.add(index)
+      dibuang.push({ teks: item.teks, tujuan: answer.choice === 'ulang' ? 'ulang' : 'lemah', yakin: answer.confidence })
+    }
+  }
+  // Minimal satu bagian "perlu" tetap ada; kalau semua dibuang, balasan dibiarkan.
+  if (!drop.size || sentences.every((_, index) => drop.has(index))) return { pesan: cleaned, dibuang, jev: true }
+  const pesan = cleaned
+    .map((bubble, bubbleIndex) => {
+      if (KEEP_WHOLE_PART.test(bubble)) return bubble
+      return sentences
+        .filter((item, index) => item.bubble === bubbleIndex && !drop.has(index))
+        .map((item) => item.teks)
+        .join(' ')
+        .trim()
+    })
+    .filter(Boolean)
+  return { pesan, dibuang, jev: true }
 }

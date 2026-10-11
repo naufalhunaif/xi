@@ -59,6 +59,16 @@ export async function addLesson(text: string, contoh = '') {
   return hit || list[list.length - 1]
 }
 
+/** v3.6.163 — pemilik membenarkan teks pelajaran. */
+export async function updateLesson(index: number, text: string) {
+  const list = await listLessons()
+  const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 220)
+  if (index < 0 || index >= list.length || clean.split(' ').length < 3) return false
+  list[index].text = clean
+  await saveLessons(list)
+  return true
+}
+
 export async function removeLesson(index: number) {
   const list = await listLessons()
   if (index < 0 || index >= list.length) return false

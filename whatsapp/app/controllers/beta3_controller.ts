@@ -8,6 +8,7 @@ import {
   listLeanExamples,
   removeLeanExample,
   seedLeanExamples,
+  updateLeanExample,
 } from '#beta3/examples_service'
 import {
   sendLeanTotal,
@@ -202,7 +203,8 @@ export default class Beta3Controller {
         customerText: String(body.customerText || ''),
         csText: String(body.csText || ''),
         tags: String(body.tags || ''),
-        source: 'manual',
+        // v3.6.163 — koreksi uji ditulis pemilik/tinjauan: sumber 'uji' (tampil di KOREKSI DARI UJI bila mirip).
+        source: body.source === 'uji' ? 'uji' : 'manual',
       })
       return response.json({ id })
     } catch (error) {
@@ -221,6 +223,28 @@ export default class Beta3Controller {
     const lessons = await listLessons()
     const corrections = (await listLeanExamples()).filter((example) => example.source === 'uji')
     return response.json({ lessons, diPrompt: PROMPT_LESSONS, koreksiUji: corrections.length, koreksi: corrections.slice(-50).reverse() })
+  }
+
+  /** v3.6.163 — tambah pelajaran hasil tinjauan pemilik (riwayat uji lama). */
+  async addLesson({ request, response }: HttpContext) {
+    const { addLesson } = await import('#beta3/sim_lessons')
+    const lesson = await addLesson(String(request.input('text') || ''), String(request.input('contoh') || ''))
+    return lesson ? response.json({ lesson }) : response.badRequest({ error: 'Teks pelajaran terlalu pendek.' })
+  }
+
+  async updateLesson({ params, request, response }: HttpContext) {
+    const { updateLesson } = await import('#beta3/sim_lessons')
+    return (await updateLesson(Number(params.index), String(request.input('text') || ''))) ? response.noContent() : response.badRequest({ error: 'Pelajaran tidak ditemukan atau teks terlalu pendek.' })
+  }
+
+  async updateExample({ params, request, response }: HttpContext) {
+    const body = request.body() as Record<string, unknown>
+    const ok = await updateLeanExample(Number(params.id), {
+      ...(body.situation !== undefined ? { situation: String(body.situation) } : {}),
+      ...(body.csText !== undefined ? { csText: String(body.csText) } : {}),
+      ...(body.customerText !== undefined ? { customerText: String(body.customerText) } : {}),
+    })
+    return ok ? response.noContent() : response.badRequest({ error: 'Contoh tidak ditemukan.' })
   }
 
   async removeLesson({ params, response }: HttpContext) {

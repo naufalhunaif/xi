@@ -98,7 +98,7 @@ import { collectContext, compareWithSizeChart, measureFromHistory } from '#beta3
 import { digestPrompt, skillForPrompt } from '#beta3/skill_digest'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { renderPaymentMessage } from '#beta3/order_service'
-import { alignPhotos, allColorPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, repeatsStoreMessage, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
+import { alignPhotos, allColorPhotos, CHECK_LABEL, offColorPhotos, checkReply, mergeUsage, reviewNudge, reviewReplyParts, repeatsStoreMessage, revisionNote, stripUnknownLinks, type CheckIssue } from '#beta3/reply_check'
 import { renderChatState } from '#beta3/chat_state'
 import { GREETED, calmForFeeling, dropRepeatedGreeting, dropRepeatedSentences, heartLabel, heartNote, notedInsteadOfAnswer } from '#beta3/hati'
 
@@ -2255,6 +2255,21 @@ export async function createLeanReply(input: {
     const before = decision.pesan.length
     decision.pesan = dropOpenerRepeat(decision.pesan, early)
     if (decision.pesan.length !== before) onTrace?.({ key: 'beta3-early-dedupe', label: 'Pembuka yang sudah terkirim tidak diulang', status: 'completed', detail: {} })
+  }
+  // v3.6.164 — tinjauan per bagian (Jev): tiap kalimat dinilai tujuannya; bagian lemah/ulang tidak diikutkan.
+  if (decision.pesan.length && !decision.serah_cs) {
+    const parts = await reviewReplyParts({ jid, customerText: input.text, history: rows, pesan: decision.pesan }).catch(() => null)
+    if (parts) {
+      if (parts.dibuang.length) {
+        decision.pesan = parts.pesan
+        onTrace?.({
+          key: 'beta3-parts',
+          label: `Bagian lemah dibuang · ${parts.dibuang.map((item) => `"${item.teks.slice(0, 40)}" (${item.tujuan})`).join(', ')}`,
+          status: 'completed',
+          detail: { dibuang: parts.dibuang, pesan: parts.pesan },
+        })
+      } else if (parts.jev) onTrace?.({ key: 'beta3-parts', label: 'Tiap bagian balasan perlu (Jev)', status: 'completed', detail: {} })
+    }
   }
   // v3.6.157 — bubble panjang dipecah per konteks seperti CS asli (langkah terakhir sebelum kirim).
   if (decision.pesan.length) {

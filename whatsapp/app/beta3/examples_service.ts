@@ -122,6 +122,18 @@ export async function addLeanExample(example: LeanExample) {
   return Number(id)
 }
 
+/** v3.6.163 — koreksi jawaban/situasi contoh (pemilik membenarkan koreksi uji). */
+export async function updateLeanExample(id: number, patch: { situation?: string; csText?: string; customerText?: string }) {
+  await ensureLeanTables()
+  const data: Record<string, string> = {}
+  if (patch.situation !== undefined) data.situation = String(patch.situation).trim().slice(0, 255)
+  if (patch.csText !== undefined) data.cs_text = String(patch.csText).trim().slice(0, 2000)
+  if (patch.customerText !== undefined) data.customer_text = String(patch.customerText).trim().slice(0, 2000)
+  if (!Object.keys(data).length) return false
+  const changed = await db.from('whatsapp_beta3_examples').where('id', id).update(data)
+  return Number(changed) > 0
+}
+
 export async function removeLeanExample(id: number) {
   await ensureLeanTables()
   await db.from('whatsapp_beta3_examples').where('id', id).update({ active: 0 })

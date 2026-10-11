@@ -170,6 +170,12 @@ const INFO: Record<string, Info> = {
     source: 'toko',
     effect: () => 'Checked before sending. A confident problem makes the AI rewrite the reply once with the checker note.',
   },
+  bagian: {
+    question: () => 'What is this part of the reply for? Needed (answers / next step / needed fact), weak (filler, vague wording) or repeated?',
+    labels: { perlu: 'Needed', lemah: 'Weak · dropped', ulang: 'Repeated · dropped' },
+    source: 'toko',
+    effect: () => 'Parts judged weak or repeated with confidence are left out of the reply before sending.',
+  },
   minta_rekening: {
     question: () => 'Is the customer asking for the bank account number?',
     labels: yesNo,

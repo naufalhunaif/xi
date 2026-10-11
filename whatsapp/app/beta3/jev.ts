@@ -72,6 +72,7 @@ export const JEV_DECISIONS = {
   hati: 'Maksud, rasa & momen pelanggan (Hati CS)',
   cek_balasan: 'Pemeriksa balasan sebelum kirim (foto, maksud, fakta)',
   minta_rekening: 'Pelanggan meminta nomor rekening',
+  bagian: 'Tinjauan per bagian balasan (perlu / lemah / ulang)',
 } as const
 export type JevDecision = keyof typeof JEV_DECISIONS
 
@@ -103,6 +104,7 @@ export const JEV_THRESHOLD: Record<JevDecision, number> = {
   hati: 0.8,
   cek_balasan: 0.75,
   minta_rekening: 0.85,
+  bagian: 0.8,
 }
 
 export type JevNoul = {
@@ -282,7 +284,7 @@ type Lesson = { input: string; correct: string }
 const lessonCache = new Map<string, { at: number; lessons: Map<string, Lesson[]> }>()
 const LESSON_TTL_MS = 5 * 60_000
 /** Sub-pertanyaan yang memakai kolom detail sebagai kunci (topik_x, hati_x, cek_balasan foto/…). */
-const SUB_DECISIONS = new Set(['topik', 'hati', 'harga_konteks', 'cek_balasan'])
+const SUB_DECISIONS = new Set(['topik', 'hati', 'harga_konteks', 'cek_balasan', 'bagian'])
 
 async function loadLessons() {
   const key = cacheKey()

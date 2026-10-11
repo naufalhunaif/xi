@@ -55,6 +55,9 @@ router
     // v3.6.161 — pelajaran dari uji (dirangkum ke prompt) untuk dievaluasi/dihapus pemilik.
     router.get('/api/beta3/lessons', [Beta3Controller, 'lessons'])
     router.delete('/api/beta3/lessons/:index', [Beta3Controller, 'removeLesson'])
+    router.put('/api/beta3/lessons/:index', [Beta3Controller, 'updateLesson'])
+    router.post('/api/beta3/lessons', [Beta3Controller, 'addLesson'])
+    router.put('/api/beta3/examples/:id', [Beta3Controller, 'updateExample'])
     router.get('/api/beta3/orders', [Beta3Controller, 'orders'])
     router.post('/api/beta3/orders/:id/approve', [Beta3Controller, 'approveOrder'])
     router.post('/api/beta3/orders/:id/paid', [Beta3Controller, 'paidOrder'])
