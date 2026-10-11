@@ -247,3 +247,21 @@ test.group('bubble per konteks v3.6.157', () => {
     assert.deepEqual(out.pesan, ['Untuk pinggang 107 cm paling dekat celana no. 40 bos, lingkar jadinya 106 cm. Jadi pakai no. 40 ya', 'Mau sekalian dengan jasnya atau celananya saja bos?'])
   })
 })
+
+test.group('uji 100 chat v3.6.159', () => {
+  test('"Basic Suit Army, setelannya 705.000" tidak diganti harga premium', async ({ assert }) => {
+    const { fixContextPrices } = await import('#beta3/price_pattern')
+    const pattern = {
+      series: {
+        reguler: { cells: { 'setelan:standar': { price: 705000, big: 805000 }, 'jas:standar': { price: 485000, big: 585000 } } },
+        premium: { cells: { 'setelan:standar': { price: 955000, big: 1055000 }, 'jas:standar': { price: 685000, big: 785000 } } },
+      },
+    } as any
+    const productPrices = new Map([
+      ['basic suit', new Set([485000, 585000])],
+      ['setelan basic suit', new Set([705000, 805000])],
+    ])
+    const text = ['Yang paling bawah Basic Suit Army, setelannya 705.000 bos']
+    assert.deepEqual(fixContextPrices(text, pattern, 'premium', productPrices), { pesan: text, changes: [] })
+  })
+})

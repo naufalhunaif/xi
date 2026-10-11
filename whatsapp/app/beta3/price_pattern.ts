@@ -184,8 +184,12 @@ export function fixContextPrices(
           const value = Number(raw.replace(/\./g, ''))
           if (value === cell.price || value === cell.big || !known.has(value) || photoPrices?.has(value)) return raw
           // Nama produk disebut dan angkanya memang harga produk itu → benar, biarkan.
-          for (const [name, valid] of productPrices || [])
-            if (valid.has(value) && lower.includes(name)) return raw
+          for (const [name, valid] of productPrices || []) {
+            if (!valid.has(value)) continue
+            if (lower.includes(name)) return raw
+            // v3.6.159: "Basic Suit Army, setelannya 705.000" = harga produk "Setelan Basic Suit" (nama dasar disebut + kata setelan).
+            if (name.startsWith('setelan ') && lower.includes(name.slice(8)) && /\b(?:setelan|stelan|set)\w*/.test(lower)) return raw
+          }
           const to = big && cell.big ? cell.big : cell.price
           changes.push({ from: value, to, item })
           return money(to)

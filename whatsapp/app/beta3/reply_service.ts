@@ -1428,7 +1428,9 @@ export async function createLeanReply(input: {
   const prices = pricePattern(digest.rows)
   const priceText = renderPricePattern(prices)
   // Seri dari teks chat lebih dipercaya; tebakan Jev dipakai bila teks tidak menyebut seri.
-  const textSeries = seriesMentioned([...rows.slice(-6).map((row) => String(row.body || '')), input.text])
+  // v3.6.159 — seri dari kata PELANGGAN saja; daftar harga toko ("… Premium 955.000") bukan pilihan seri (uji 100:
+  // Basic Suit Army reguler "dibetulkan" ke harga premium karena toko menyebut premium di giliran sebelumnya).
+  const textSeries = seriesMentioned([...rows.slice(-8).filter((row) => row.direction === 'in').map((row) => String(row.body || '')), input.text])
   const priceSeries: PriceSeries | null = textSeries || understanding.series || null
   const seriesAgree = !understanding.series || !textSeries || understanding.series === textSeries
   let priceNote = ''
@@ -1891,7 +1893,10 @@ export async function createLeanReply(input: {
     const methods = settings.paymentMethods.filter((method) => method.enabled)
     const payment = renderPaymentMessage(methods.map((method) => ({ bank: method.name, number: method.destination, holder: (method as { accountName?: string }).accountName || '' })))
     if (payment && !decision.pesan.some((bubble) => methods.some((method) => bubble.includes(method.destination)))) {
-      decision.pesan = [...decision.pesan.filter((bubble) => !/rekening\w*\s+(?:nanti|menyusul|saya kirim)/i.test(bubble)), payment]
+      // v3.6.159 — rekening dijawab dulu, pertanyaan lain (size/model) sesudahnya (uji 100: "pakai size apa?" lalu rekening).
+      const rest = decision.pesan.filter((bubble) => !/rekening\w*\s+(?:nanti|menyusul|saya kirim)/i.test(bubble))
+      const firstQuestion = rest.findIndex((bubble) => /\?/.test(bubble))
+      decision.pesan = firstQuestion >= 0 ? [...rest.slice(0, firstQuestion), payment, ...rest.slice(firstQuestion)] : [...rest, payment]
       onTrace?.({ key: 'beta3-account', label: 'Pelanggan minta rekening · rekening resmi ditambahkan', status: 'completed', detail: {} })
     }
   }
