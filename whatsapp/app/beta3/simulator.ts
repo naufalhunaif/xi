@@ -660,14 +660,21 @@ export async function learnFromRealChat(asal: Array<{ teks: string; jawaban: str
 
 /* ---------------- Skenario dari chat nyata (v3.6.80) ---------------- */
 
+/** 00:00 WIB hari ini. */
+function startOfTodayWib(now = Date.now()) {
+  const wib = 7 * 3600_000
+  return new Date(Math.floor((now + wib) / 86_400_000) * 86_400_000 - wib)
+}
+
 type RealRow = { jid: string; message_id?: string | null; reply_to_message_id?: string | null; direction: string; sender_type: string | null; body: string | null; media_type: string | null; media_url: string | null; created_at: Date | string }
-type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number; kutip?: string }
+type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number; kutip?: string; ai?: boolean }
 
 /** Potong chat menjadi giliran: pesan pelanggan beruntun → balasan CS manusia (cs/owner) sesudahnya. */
-export function realSegments(rows: RealRow[]) {
+export function realSegments(rows: RealRow[], includeAi = false) {
   const segments: RealSegment[] = []
   let asked: RealRow[] = []
   let answered: string[] = []
+  let byAi = false
   let askedAt = 0
   const flush = () => {
     const texts = asked.map((row) => String(row.body || '').trim()).filter(Boolean)
@@ -688,9 +695,10 @@ export function realSegments(rows: RealRow[]) {
       ? String(quoted.body || '').trim().slice(0, 160) || (quoted.media_type === 'image' ? captionOf(quoted) : '') || (quoted.media_type ? `[${quoted.media_type}]` : '')
       : ''
     if ((texts.length || image) && answered.length)
-      segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered, mulai: askedAt, ...(kutip ? { kutip } : {}) })
+      segments.push({ teks: texts.join('\n').slice(0, 1500), gambar: image || undefined, jawaban: answered, mulai: askedAt, ...(kutip ? { kutip } : {}), ...(byAi ? { ai: true } : {}) })
     asked = []
     answered = []
+    byAi = false
   }
   for (const [index, row] of rows.entries()) {
     if (row.direction === 'in') {
@@ -701,6 +709,12 @@ export function realSegments(rows: RealRow[]) {
     } else if (asked.length && ['cs', 'owner'].includes(String(row.sender_type || '')) && row.body) {
       answered.push(String(row.body).slice(0, 600))
     } else if (asked.length && row.sender_type === 'ai') {
+      if (includeAi && row.body) {
+        // v3.6.147 — uji chat hari ini: balasan AI waktu itu ikut sebagai pembanding (bukan kebenaran).
+        answered.push(String(row.body).slice(0, 600))
+        byAi = true
+        continue
+      }
       // Dijawab AI (bukan manusia): tidak dipakai sebagai acuan.
       asked = []
       answered = []
@@ -715,34 +729,44 @@ export function realSegments(rows: RealRow[]) {
  * dikombinasikan: kalimat diacak (singkatan, salah ketik, bahasa daerah) dan digabung dengan pertanyaan
  * pelanggan lain, supaya maksud yang sama diuji dalam bentuk yang lebih rumit.
  */
-export async function realScenarios(count: number, seed: number, mix = 0.5) {
+export async function realScenarios(count: number, seed: number, mix = 0.5, today = false, images = false) {
   const rand = rng(seed)
-  const since = new Date(Date.now() - 180 * 86_400_000)
+  // v3.6.147 — today: chat sejak 00:00 WIB hari ini, termasuk yang dijawab AI (pembanding, bukan acuan).
+  const since = today ? startOfTodayWib() : new Date(Date.now() - 180 * 86_400_000)
+  if (today) mix = 0
   const jids = (await db
     .from('whatsapp_messages')
     .select('jid')
     .where('created_at', '>', since)
-    .whereIn('sender_type', ['cs', 'owner'])
+    .whereIn('sender_type', today ? ['cs', 'owner', 'ai'] : ['cs', 'owner'])
     .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid').orWhere('jid', 'like', '%@ig'))
     .groupBy('jid')
     .orderByRaw('RAND(?)', [seed])
-    .limit(Math.min(2000, count * 15))) as Array<{ jid: string }>
+    .limit(Math.min(4000, count * (images ? 60 : 15)))) as Array<{ jid: string }>
   const pool: Array<{ jid: string; segments: RealSegment[]; rows: RealRow[] }> = []
   const foldText = (text: string) => maskPii(text).replace(/\n+/g, ' / ').toLowerCase().replace(/\s+/g, ' ').trim()
   const learned = new Set((await listLeanExamples()).flatMap((example) => [foldText(example.customerText), example.customerText.toLowerCase().replace(/\s+/g, ' ').trim()]))
   for (const { jid } of jids) {
     // v3.6.87: uji hanya memakai chat yang tidak dipelajari.
-    if (!isHoldout(jid)) continue
+    if (!today && !isHoldout(jid)) continue
     const rows = (await db
       .from('whatsapp_messages')
       .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
       .where('jid', jid)
-      .where('created_at', '>', since)
+      .where('created_at', '>', today ? new Date(since.getTime() - 3 * 86_400_000) : since)
       .orderBy('created_at', 'asc')
       .orderBy('id', 'asc')
       .limit(120)) as RealRow[]
     // Pertanyaan yang sudah jadi contoh (dipelajari dari uji sebelumnya) tidak diuji lagi.
-    const segments = realSegments(rows).filter((segment) => (segment.teks.length >= 2 || segment.gambar) && !learned.has(foldText(segment.teks)))
+    const segments = realSegments(rows, today).filter(
+      (segment) =>
+        (segment.teks.length >= 2 || segment.gambar) &&
+        // v3.6.147 — uji gambar: hanya giliran yang pelanggannya mengirim/membalas foto (foto asli dari chat).
+        (!images || Boolean(segment.gambar) || /^\[(?:foto|image)/i.test(segment.kutip || '')) &&
+        (today
+          ? new Date(rows[segment.mulai ?? 0]?.created_at || 0) >= since && !isOtherBot(segment.teks) && !isBusinessPitch(segment.teks)
+          : !learned.has(foldText(segment.teks)))
+    )
     if (segments.length) pool.push({ jid, segments, rows })
     if (pool.length >= count * 2) break
   }
@@ -779,7 +803,11 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
         : teks
     })
     const reference = picked
-      .map((segment, turn) => `Giliran ${turn + 1} — CS manusia waktu itu: ${segment.jawaban.join(' / ')}`)
+      .map((segment, turn) =>
+        segment.ai
+          ? `Giliran ${turn + 1} — balasan AI toko waktu itu (BUKAN acuan kebenaran, hanya pembanding; nilai menurut FAKTA): ${segment.jawaban.join(' / ')}`
+          : `Giliran ${turn + 1} — CS manusia waktu itu: ${segment.jawaban.join(' / ')}`
+      )
       .concat(combined && other ? [`Pertanyaan tambahan (digabung) — CS manusia waktu itu: ${other.jawaban.join(' / ')}`] : [])
     const before = chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 12), picked[0].mulai ?? 0)
     // Gambar di riwayat diberi keterangan seperti di sistem nyata (AI melihat isi gambar lama lewat catatan).
@@ -788,7 +816,8 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
       id: `real-${out.length + 1}-s${seed}`,
       waktu: new Date(chat.rows[picked[0].mulai ?? 0]?.created_at || Date.now()).toISOString(),
       kanal: chat.jid.endsWith('@ig') ? ('ig' as const) : ('wa' as const),
-      asal: picked.map((segment) => ({ teks: segment.teks, jawaban: segment.jawaban })),
+      // Hanya jawaban CS manusia yang boleh dipelajari.
+      asal: picked.filter((segment) => !segment.ai).map((segment) => ({ teks: segment.teks, jawaban: segment.jawaban })),
       riwayat: before
         .filter((row) => row.body || row.media_type === 'image')
         .map((row) => ({
@@ -797,7 +826,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5) {
           gambar: row.media_type === 'image',
           ...(row.message_id && notes.get(String(row.message_id)) ? { catatan: notes.get(String(row.message_id)) } : {}),
         })),
-      judul: `${combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'}${chat.jid.endsWith('@ig') ? ' IG' : ''} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
+      judul: `${images ? '[gambar] ' : ''}${today ? 'Chat hari ini' : combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'}${chat.jid.endsWith('@ig') ? ' IG' : ''} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
       maksud: [
         'Pertanyaan dari chat nyata toko. Jawab semua maksudnya dengan benar menurut FAKTA saat ini, dengan rasa bahasa CS manusia.',
         'Acuan (harga/stok bisa sudah berubah — FAKTA saat ini yang berlaku):',
@@ -879,7 +908,7 @@ export async function startSimRun(
     judge?: boolean
     label?: string
     generate?: { count: number; seed?: number }
-    real?: { count: number; seed?: number; mix?: number }
+    real?: { count: number; seed?: number; mix?: number; today?: boolean; images?: boolean }
     parallel?: number
     /** Pemilik mengizinkan memakai kuota sampai 95% (pelanggan ditangani CS). */
     ownerQuota?: boolean
@@ -899,7 +928,7 @@ export async function startSimRun(
     ? generateScenarios((await catalogDigest()).rows, Math.min(500, Math.max(1, input.generate.count)), input.generate.seed)
     : []
   const real = input.real?.count
-    ? await realScenarios(Math.min(300, Math.max(1, input.real.count)), input.real.seed ?? Math.floor(Math.random() * 1_000_000), input.real.mix ?? 0.5)
+    ? await realScenarios(Math.min(300, Math.max(1, input.real.count)), input.real.seed ?? Math.floor(Math.random() * 1_000_000), input.real.mix ?? 0.5, input.real.today === true, input.real.images === true)
     : []
   const picked = [
     ...(input.ids?.length ? all.filter((item) => input.ids!.includes(item.id)) : input.custom?.length || generated.length || real.length ? [] : all),

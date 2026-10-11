@@ -17,6 +17,31 @@ const norm = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim()
 
+// v3.6.147 — "abu gelap" = Dark Gray (uji chat asli: Dark Gray diganti Black 2.0 karena foto Black terakhir).
+const MODIFIERS: Record<string, string[]> = { dark: ['gelap', 'tua'], light: ['muda', 'terang'], bright: ['terang', 'cerah'], soft: ['muda', 'lembut'] }
+/** Kelompok warna dasar (tanpa dark/light/2.0): "Dark Gray" → kelompok gray. */
+function familyOf(color: string) {
+  const base = norm(color)
+    .replace(/\b\d+(\.\d+)?\b/g, '')
+    .replace(new RegExp(`\\b(${Object.keys(MODIFIERS).join('|')})\\b`, 'g'), '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return COLOR_GROUPS.find((names) => names.includes(base)) || (base ? [base] : [])
+}
+/** Sebutan Indonesia untuk warna bermodifier: "Dark Gray" → "abu gelap", "abu-abu tua", … */
+function localNames(color: string) {
+  const mod = Object.keys(MODIFIERS).find((key) => new RegExp(`\\b${key}\\b`).test(norm(color)))
+  if (!mod) return []
+  return familyOf(color).flatMap((base) => MODIFIERS[mod].flatMap((word) => [`${base} ${word}`, `${word} ${base}`]))
+}
+function chatMentions(chat: Array<{ direction: string; body?: string | null }>, words: string[]) {
+  const text = ` ${chat
+    .filter((row) => row.direction === 'in')
+    .map((row) => norm(String(row.body || '')))
+    .join(' ')} `
+  return words.some((word) => new RegExp(`(^|[^a-z])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`).test(text))
+}
+
 /**
  * Pelanggan menyebut warna ini di pesannya: namanya, atau sebutan sekelompok yang tidak
  * juga berarti warna lain produk itu ("hitam" = Black; "coklat" ambigu bila ada Brown & Choco).
@@ -32,7 +57,7 @@ function customerNamed(
       .filter((other) => norm(other) !== norm(color))
       .flatMap((other) => [norm(other), ...groupOf(other)])
   )
-  const words = [norm(color), ...groupOf(color).filter((word) => !taken.has(word))]
+  const words = [norm(color), ...groupOf(color).filter((word) => !taken.has(word)), ...localNames(color)]
   const text = ` ${chat
     .filter((row) => row.direction === 'in')
     .map((row) => norm(String(row.body || '')))
@@ -89,7 +114,12 @@ export function fixCatalogColors(
       if (
         shown.length &&
         !shown.some((known) => norm(known) === norm(color)) &&
-        !customerNamed(chat, color, colors)
+        !customerNamed(chat, color, colors) &&
+        // Beda kelompok warna (abu → hitam) tidak ditukar bila pelanggan menyebut kelompok warna aslinya.
+        !(
+          familyOf(color).join() !== familyOf(shown[shown.length - 1]).join() &&
+          chatMentions(chat, familyOf(color))
+        )
       )
         color = shown[shown.length - 1]
       if (color === match[3]) return line

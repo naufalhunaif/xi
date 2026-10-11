@@ -66,7 +66,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -2240,6 +2240,11 @@ export async function createLeanReply(input: {
       decision.pesan = over.pesan
       onTrace?.({ key: 'beta3-oversize', label: 'Size di atas varian terbesar tidak disanggupi', status: 'completed', detail: { pesan: over.pesan } })
     }
+    const adjust = dropVagueAdjust(decision.pesan)
+    if (adjust.changed) {
+      decision.pesan = adjust.pesan
+      onTrace?.({ key: 'beta3-vague-adjust', label: '"Bisa disesuaikan ukurannya" tanpa custom dibuang', status: 'completed', detail: {} })
+    }
     const kind = fixProductionKind(decision.pesan, productionRanges(settings.production), productionWhens(productionText), input.text)
     if (kind.changed) {
       decision.pesan = kind.pesan
@@ -2253,10 +2258,13 @@ export async function createLeanReply(input: {
     // Progres pesanan lama: tanpa data, jangan menyebut waktu/status karangan → dicek CS.
     const orderData = [known, chatNote, activeOrder ? JSON.stringify(activeOrder) : ''].join('\n')
     if (!toolNotes.some((note) => /resi|awb|paket|tracking|lacak/i.test(note)) && inventsProgress(input.text, decision.pesan, orderData)) {
-      decision.pesan = [`Saya cek dulu progres pesanannya ya ${style?.address || 'bos'}`]
+      // v3.6.147 — maksud lain di pesan yang sama tetap dijawab (uji: tanya progres + janji datang besok,
+      // dulu seluruh balasan diganti "saya cek dulu" sehingga janji datang tidak terjawab).
+      const rest = keepNonProgress(input.text, decision.pesan, orderData)
+      decision.pesan = [`Saya cek dulu progres pesanannya ya ${style?.address || 'bos'}`, ...rest]
       decision.serah_cs = true
       decision.alasan = 'Menanyakan progres pesanan; data progres tidak ada'
-      photos = []
+      if (!rest.length) photos = []
       onTrace?.({ key: 'beta3-progress-unknown', label: 'Progres pesanan tidak ada di data → dicek CS', status: 'completed', detail: {} })
     }
   }

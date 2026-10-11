@@ -169,10 +169,14 @@ const PHOTO_OFFER =
  * v3.6.58 — foto sudah ikut dikirim, jadi tawaran "Mau lihat modelnya bos?" dibuang (kasus Nofita:
  * foto terkirim lalu ditanya "mau lihat?", pelanggan jawab "Boleh" → foto yang sama dikirim lagi).
  */
+// v3.6.147 — "Mau lihat yang mana bos, atau sekalian saya kirim fotonya?" sesudah foto terkirim.
+const PHOTO_OFFER_SEND = /[^.!?\n]*\b(?:sekalian|saya|aku|kami|tak|ta)\s+(?:kirim\w*|tunjuk\w*|share\w*)\s+(?:foto|gambar)\w*[^.!?\n]*\?/gi
 export function dropPhotoOffers(pesan: string[], photoCount: number) {
   if (!photoCount) return pesan
+  const strip = (bubble: string, pattern: RegExp) =>
+    bubble.match(pattern) ? bubble.replace(pattern, '').replace(/^[\s,.!]+/, '').replace(/[ \t]{2,}/g, ' ').trim() : bubble
   const kept = pesan
-    .map((bubble) => (bubble.match(PHOTO_OFFER) ? bubble.replace(PHOTO_OFFER, '').replace(/^[\s,.!]+/, '').replace(/[ \t]{2,}/g, ' ').trim() : bubble))
+    .map((bubble) => strip(strip(bubble, PHOTO_OFFER), PHOTO_OFFER_SEND))
     .filter(Boolean)
   return kept
 }

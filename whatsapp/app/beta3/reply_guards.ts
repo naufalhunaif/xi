@@ -63,6 +63,47 @@ export function inventsProgress(customerText: string, pesan: string[], known: st
   })
 }
 
+const VAGUE_ADJUST = /,?\s*(?:dan\s+)?(?:biasanya\s+|nanti\s+)?(?:masih\s+)?bisa\s+(?:di)?(?:sesuaikan|sesuain|atur)\s+(?:lagi\s+)?(?:ukuran|size)(?:nya)?(?:\s+(?:biar|supaya|agar)\s+(?:lebih\s+)?pas)?/i
+/**
+ * v3.6.147 — "biasanya bisa disesuaikan ukurannya biar pas" tanpa menyebut custom = janji kosong (uji chat asli:
+ * pelanggan tanya "masih aman pakai M?"). Size ready tidak diubah; menyesuaikan badan = custom.
+ */
+export function dropVagueAdjust(pesan: string[]) {
+  let changed = false
+  const out = pesan
+    .map((bubble) => {
+      if (/\bcustom|ukur(?:an)? badan|jahit/i.test(bubble) || !VAGUE_ADJUST.test(bubble)) return bubble
+      changed = true
+      return bubble
+        .replace(VAGUE_ADJUST, '')
+        .replace(/\s+([.,!?])/g, '$1')
+        .replace(/,\s*([.!?])/g, '$1')
+        .replace(/^[\s,.]+/, '')
+        .trim()
+    })
+    .filter((bubble) => bubble.length > 2)
+  return { pesan: changed ? out : pesan, changed }
+}
+
+/** v3.6.147 — kalimat balasan yang tidak mengarang progres (maksud lain pelanggan) tetap dikirim. */
+export function keepNonProgress(customerText: string, pesan: string[], known: string) {
+  return pesan
+    .map((bubble) =>
+      bubble
+        .split(/(?<=[.!?])\s+/)
+        .filter(
+          (sentence) =>
+            sentence.trim() &&
+            // Kalimat soal pesanan/progres dibuang (sudah diganti "saya cek dulu"); kalimat lain tetap.
+            !(/\b(?:progres\w*|pesanan\w*|orderan\w*|paket\w*|dikirim|terkirim|kirim\w*|resi|jadi|selesai|proses\w*|diproses|produksi|dijahit)\b/i.test(sentence) &&
+              (inventsProgress(customerText, [sentence], known) || /\b(?:sudah|udah|belum|blm|masih|lagi|sedang)\b/i.test(sentence)))
+        )
+        .join(' ')
+        .trim()
+    )
+    .filter((bubble) => bubble.length > 3 && !/^(?:siap|oke|ok|baik)\b[\s,]*(?:bos|kak|pak|bu)?[\s.!]*$/i.test(bubble))
+}
+
 /**
  * v3.6.90 — "kurang lebih 1 minggu" dari contoh lama diganti estimasi resmi toko (ESTIMASI PRODUKSI).
  * `ranges`: {preorder: '5-10 hari kerja', custom: '7-14 hari kerja'}.
@@ -84,7 +125,9 @@ export function fixWeekEstimate(pesan: string[], ranges: { preorder?: string; cu
 // v3.6.142 — detail khusus (panjang/model celana, ankle, request) juga custom (uji chat asli: ankle pants disebut 5-10).
 const CUSTOM_WORDS = /\b(?:custom|ukuran badan|ukur badan|xs|5xl|6xl|menyesuaikan badan|ankle|panjang khusus|model khusus|detail khusus|dipotong|dipendekin|dipanjangin)\b/i
 const PREORDER_WORDS = /\b(?:pre-?order|po|dibuatkan|dibuatin|belum ready|belum ada stok|stok (?:habis|kosong)|kosong)\b/i
-const DATE_RANGE = /(\d{1,2}\s+[A-Z][a-z]{2,8})\s*[-–]\s*(\d{1,2}\s+[A-Z][a-z]{2,8})/
+// v3.6.147: juga "23-29 Apr" (bulan sekali di akhir) — dulu tanggal pre-order tetap tertulis di estimasi custom.
+const MONTH = '(?:Jan|Feb|Mar|Apr|Mei|May|Jun|Jul|Agu|Agt|Aug|Sep|Okt|Oct|Nov|Des|Dec)[a-z]*'
+const DATE_RANGE = new RegExp(`(\\d{1,2}(?:\\s+${MONTH})?)\\s*(?:[-–]|s\\.?d\\.?|sampai)\\s*(\\d{1,2}\\s+${MONTH})`, 'i')
 /**
  * v3.6.140 — Estimasi pre-order vs custom tidak tertukar (uji chat asli: beskap ready size, pre-order, disebut
  * 7-14 hari = estimasi custom; XS disebut 5-10). Rentang & tanggal "siap kirim" diganti angka resmi sesuai jenis.
