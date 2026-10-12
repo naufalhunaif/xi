@@ -398,9 +398,10 @@ test.group('beta3 · prompt dan keluaran', () => {
 
   test('keluaran JSON diparse dan dibatasi', ({ assert }) => {
     const decision = parseLeanDecision(
-      'teks pengantar {"pesan":["Siap bos","Mau size apa?","ketiga"],"foto":["Tuxedo - Black"],"catatan":"produk: Tuxedo\\ntahap: tanya_size","tahap":"tanya_size","serah_cs":false,"alasan":"ok","susulan":"jadi lanjut bos?"}'
+      'teks pengantar {"pesan":["Siap bos","Mau size apa?","ketiga","keempat"],"foto":["Tuxedo - Black"],"catatan":"produk: Tuxedo\\ntahap: tanya_size","tahap":"tanya_size","serah_cs":false,"alasan":"ok","susulan":"jadi lanjut bos?"}'
     )
-    assert.lengthOf(decision.pesan, 2)
+    // v3.7.0: maks 3 bubble per maksud (dulu 2).
+    assert.lengthOf(decision.pesan, 3)
     assert.equal(decision.tahap, 'tanya_size')
     assert.isFalse(decision.serah_cs)
     assert.equal(decision.susulan, 'jadi lanjut bos?')

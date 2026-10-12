@@ -67,7 +67,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, asksCall, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, fixPantsLetterSize, ensureStoreAddress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, asksCall, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, fixPantsLetterSize, ensureStoreAddress, productionWhens, keepCustomInChat, hasCustomDetail, customHandoffReply, mentionsWaiting, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -1533,7 +1533,14 @@ export async function createLeanReply(input: {
         : '',
     catalog: catalogText,
     // Koreksi pemilik selalu ikut (12 terbaru); contoh lain dipilih yang paling mirip.
-    examples: pickExamples(examples.filter((example) => !['koreksi', 'uji'].includes(String(example.source || ''))), input.text, stage),
+    // v3.7.0 — contoh CS asli dipilih juga dari situasinya (3 pesan sebelumnya), bukan hanya kata di pesan terakhir.
+    examples: pickExamples(
+      examples.filter((example) => !['koreksi', 'uji'].includes(String(example.source || ''))),
+      input.text,
+      stage,
+      8,
+      rows.filter((row) => !row.current && row.body).slice(-3).map((row) => String(row.body)).join('\n')
+    ),
     // v3.6.161 — koreksi uji hanya yang mirip pertanyaan sekarang (maks 3), supaya prompt tidak membengkak.
     corrections: [
       ...examples.filter((example) => example.source === 'koreksi').slice(-12),
@@ -1863,6 +1870,17 @@ export async function createLeanReply(input: {
       detail: { alasan: decision.alasan },
     })
     decision.alasan = ''
+  }
+  // v3.7.0 — detail custom sudah masuk (Jev "custom"; Jev mati → pola kata): dicatat AI lalu diserahkan ke toko
+  // untuk harga/produksi (pemilik 13 Okt). Total tidak dikirim otomatis (verifyAutoTotal).
+  const customDetail = understanding.csReason ? understanding.csReason === 'custom' : hasCustomDetail(input.text)
+  if (!decision.serah_cs && !custom && customDetail) {
+    decision.serah_cs = true
+    decision.alasan = `Custom: ${String(input.text || '').replace(/\s+/g, ' ').trim().slice(0, 140)}`
+    decision.tahap = 'tunggu_cs'
+    decision.susulan = ''
+    if (!mentionsWaiting(decision.pesan)) decision.pesan = [...decision.pesan, customHandoffReply(`${jid}:${input.text}`, style?.address || 'bos')]
+    onTrace?.({ key: 'beta3-custom', label: 'Detail custom masuk → dicatat, diserahkan ke toko untuk harga', status: 'completed', detail: { alasan: decision.alasan } })
   }
   // Pelanggan menunda / membatalkan (Jev): tidak ada susulan; batal → order yang belum dibayar ditutup.
   if (understanding.follow === 'tunda' || understanding.follow === 'batal') decision.susulan = ''

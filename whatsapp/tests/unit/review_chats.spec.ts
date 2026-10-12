@@ -2,10 +2,10 @@
 // (reply_polish, quick reply, penjaga custom, tahap & susulan). Setiap ulasan baru → tambah kasus
 // di sini, supaya perbaikan yang saling bersinggungan tidak merusak ulasan sebelumnya.
 import { test } from '@japa/runner'
-import { completePhotos, polishText, polishWithPhotos } from '#beta3/reply_polish'
+import { completePhotos, polishText, polishWithPhotos, splitLongBubbles } from '#beta3/reply_polish'
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
-import { keepCustomInChat, CUSTOM_REPLY, dropRepeatedWait } from '#beta3/reply_guards'
+import { keepCustomInChat, CUSTOM_REPLY, dropRepeatedWait, hasCustomDetail, customHandoffReply, CUSTOM_HANDOFF_REPLIES, CUSTOM_SPEC } from '#beta3/reply_guards'
 import { partsMissingFromItems, orderPartsOf, parseCsTotalMessage, matchAutoTotal, serviceLabel } from '#beta3/order_service'
 import { looksSelfDelivery, detectAwb } from '#beta3/shipments'
 import { normalizeStage, type LeanDecision } from '#beta3/prompt'
@@ -288,5 +288,51 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
     assert.equal(serviceLabel('CTC'), 'REG')
     assert.equal(serviceLabel('CTCYES'), 'YES')
     assert.equal(serviceLabel('REG'), 'REG')
+  })
+
+  // 13 Okt (pemilik): bubble dipisah per maksud, bukan per 15 kata — "model yang ini ya bos" | "untuk kombinasi …".
+  test('13 Okt: bubble per maksud — jawaban dan pertanyaan dipisah, kalimat penyambung tetap satu', ({ assert }) => {
+    assert.deepEqual(splitLongBubbles(['Model yang ini ya bos, untuk kombinasi kerah hitam atau mau warna apa ya?']).pesan, [
+      'Model yang ini ya bos',
+      'Untuk kombinasi kerah hitam atau mau warna apa ya?',
+    ])
+    assert.deepEqual(splitLongBubbles(['Ready bos. Mau size apa?']).pesan, ['Ready bos', 'Mau size apa?'])
+    // "bos" kedua sudah dibuang perapian sebelumnya → tetap dipisah di "…ya, …?".
+    assert.deepEqual(splitLongBubbles(['Model yang ini ya, untuk kombinasi kerah hitam atau mau warna apa ya?']).pesan, [
+      'Model yang ini ya',
+      'Untuk kombinasi kerah hitam atau mau warna apa ya?',
+    ])
+    // Satu maksud tidak dipecah walau lebih dari 15 kata.
+    const one = 'Bahannya wool blend bos, adem dipakai seharian dan tidak gampang kusut walaupun dipakai acara outdoor'
+    assert.isFalse(splitLongBubbles([one]).changed)
+    // Maksimal 3 bubble.
+    assert.lengthOf(splitLongBubbles(['Siap bos.', 'Ready semua.', 'Mau warna apa?', 'Mau size apa?']).pesan, 3)
+  })
+
+  // 13 Okt (pemilik): custom diserahkan ke CS setelah detail custom masuk; "bisa custom?" polos tetap dijawab AI.
+  test('13 Okt: detail custom → serah CS; "bisa custom?" polos dijawab; tinggi/berat bukan custom', ({ assert }) => {
+    for (const text of [
+      'kerahnya diganti hitam ya',
+      'mau custom kancingnya warna gold',
+      'modelnya kayak gambar ini bos',
+      'mau custom sesuai ukuran badan, lingkar dada 112 pinggang 98',
+      'panjang celana 98 cm ya',
+      'celananya model ankle',
+    ])
+      assert.isTrue(hasCustomDetail(text), text)
+    // Lingkar badan tanpa minta custom = tanya size (uji live 13 Okt: AI menjawab "rekomendasi XL, celana no 37").
+    for (const text of ['bisa custom ga kak?', 'Mau custkm bisa', 'tinggi 170 cm berat 70', 'Kancing 1 ..ya', 'kerahnya bisa diganti?', 'jas hitam ada?', 'lingkar dada 112, pinggang 98'])
+      assert.isFalse(hasCustomDetail(text), text)
+    // Model sudah serah CS untuk detail custom → dibiarkan (dulu dibatalkan).
+    const handoff = { serah_cs: true, alasan: 'Custom kerah', pesan: ['siap bos, dicatat ya'] }
+    assert.isNull(keepCustomInChat(handoff, 'mau custom kerahnya diganti hitam'))
+    // "bisa custom?" polos tetap dijawab AI.
+    assert.deepEqual(keepCustomInChat({ ...handoff, pesan: [] }, 'bisa custom ga kak?'), { pesan: CUSTOM_REPLY })
+    // Kalimat serah custom bervariasi, bicara sebagai CS sendiri (tanpa "CS kami").
+    assert.include(CUSTOM_HANDOFF_REPLIES, customHandoffReply('628@s.whatsapp.net:kerah hitam'))
+    for (const reply of CUSTOM_HANDOFF_REPLIES) assert.notMatch(reply, /\bcs\b|admin/i)
+    // Spesifikasi custom → total tidak dikirim otomatis; ukuran disesuaikan dari TB/BB tetap otomatis.
+    assert.isTrue(CUSTOM_SPEC.test('Basic Suit - Black\nDetail custom: kerah hitam'))
+    assert.isFalse(CUSTOM_SPEC.test('Basic Suit - Black\nUkuran disesuaikan produksi (TB 170, BB 69)'))
   })
 })

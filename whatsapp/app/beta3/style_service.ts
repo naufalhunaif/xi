@@ -20,7 +20,7 @@ export type CsRhythm = { turns: number; words: number; wordsP75: number; questio
 
 type RhythmRow = { jid: string; direction: string; sender_type: string | null; body: string | null }
 /** Balasan sistem/template (format order, rincian total, rekening, salam otomatis) tidak dihitung. */
-const TEMPLATE = /^(?:nama\s*:|bisa di ?bantu isi order|format|total|rincian|rekening|no\.?\s*rek|untuk pembayaran tf|terima kasih telah menghubungi|maaf atas keterlambatan)/i
+export const REPLY_TEMPLATE = /^(?:nama\s*:|bisa di ?bantu isi order|format|total|rincian|rekening|no\.?\s*rek|untuk pembayaran tf|terima kasih telah menghubungi|maaf atas keterlambatan)/i
 
 /**
  * v3.6.152 — Pelajari ritme CS manusia: satu giliran = pesan CS berturut sesudah pesan pelanggan. Dari riwayat nyata
@@ -55,7 +55,7 @@ export function csRhythm(rows: RhythmRow[]): CsRhythm | null {
         continue
       }
       const body = String(row.body).trim()
-      if (TEMPLATE.test(body) || body.length > 400) skip = true
+      if (REPLY_TEMPLATE.test(body) || body.length > 400) skip = true
       turn.push(body)
     }
     flush()
@@ -176,7 +176,7 @@ export function styleGuide(profile: StyleProfile) {
     // kurang informatif (harga/detail hilang). Panjang mengikuti skill & contoh CS.
     '- Bahasa santai sehari-hari seperti contoh CS; tanpa format markdown (**tebal**, #judul, tabel).',
     '- Rapi seperti CS: rincian berangka (ongkir, rincian total, data pesanan, harga yang diminta per model) satu item per baris. Pilihan tanpa angka cukup satu kalimat ("mau A, B, atau C bos?"). Ditanya harga/price list umum → "mulai dari X" lalu tanya model.',
-    '- Singkat & tepat seperti contoh CS di riwayat: 1–2 bubble pendek, satu pertanyaan saja, jangan menanyakan lagi yang sudah ditanyakan; tanpa salam panjang atau basa-basi penutup.',
+    '- Singkat & tepat seperti contoh CS di riwayat: 1 bubble per maksud, maks 3; satu pertanyaan saja, jangan menanyakan lagi yang sudah ditanyakan; tanpa salam panjang atau basa-basi penutup.',
     profile.rhythm
       ? `- Ritme CS asli (${profile.rhythm.turns} balasan): biasanya ${profile.rhythm.words} kata, 75% ≤ ${profile.rhythm.wordsP75} kata; hanya ${profile.rhythm.questionRate}% balasan bertanya. Jawab langsung sependek itu ("iya bisa bos", "ready bos", "tambahan 100rb bos"); bertanya balik hanya bila langkah berikutnya butuh. Pembuka khas: ${profile.rhythm.openers.map((text) => `"${text}"`).join(', ')}.`
       : '',
@@ -242,7 +242,7 @@ export function normalizeStyle(bubbles: string[], profile: StyleProfile, verbati
     if (!rest || /^(bos|kak|gan|sis|mas|mbak|min)[.!]?$/i.test(rest)) clean.splice(i, 1)
     else clean[i] = rest[0].toUpperCase() + rest.slice(1)
   }
-  // Maksimal 4 bubble (v3.6.157: CS asli memecah per konteks); sisanya digabung ke bubble terakhir.
-  if (clean.length > 4) clean.splice(3, clean.length - 3, clean.slice(3).join('\n'))
+  // Maksimal 3 bubble per maksud (v3.7.0, pemilik 13 Okt); sisanya digabung ke bubble terakhir.
+  if (clean.length > 3) clean.splice(2, clean.length - 2, clean.slice(2).join('\n'))
   return clean
 }

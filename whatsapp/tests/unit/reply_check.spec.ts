@@ -1487,7 +1487,8 @@ test.group('v3.6.109 antrian AI & uji beban', () => {
   })
   test('simulator & pembelajaran memakai chat Instagram juga; paralel sampai 25', async ({ assert }) => {
     const source = await readFile('app/beta3/simulator.ts', 'utf8')
-    assert.equal(source.split(".orWhere('jid', 'like', '%@ig')").length - 1, 3)
+    // v3.7.0: + belajar otomatis dari balasan CS baru (learnNewCsReplies) juga memakai chat Instagram.
+    assert.equal(source.split(".orWhere('jid', 'like', '%@ig')").length - 1, 4)
     assert.include(source, 'Math.min(25, Math.max(1, input.parallel || 1))')
   })
 })

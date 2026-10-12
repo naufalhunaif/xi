@@ -187,6 +187,8 @@ export default class WhatsappListen extends BaseCommand {
   private catalogSyncTimer?: NodeJS.Timeout
   private recapTimer?: NodeJS.Timeout
   private recapRunning = false
+  private learnTimer?: NodeJS.Timeout
+  private learnRunning = false
   private aiProbeTimer?: NodeJS.Timeout
   private aiProbeRunning = false
   private goalSweepRunning = false
@@ -265,6 +267,7 @@ export default class WhatsappListen extends BaseCommand {
       if (this.mediaRetryTimer) clearInterval(this.mediaRetryTimer)
       if (this.catalogSyncTimer) clearInterval(this.catalogSyncTimer)
       if (this.recapTimer) clearInterval(this.recapTimer)
+      if (this.learnTimer) clearInterval(this.learnTimer)
       if (this.aiProbeTimer) clearInterval(this.aiProbeTimer)
       if (this.igTimer) clearInterval(this.igTimer)
       for (const pending of this.pendingTurns.values()) clearTimeout(pending.timer)
@@ -3065,6 +3068,28 @@ export default class WhatsappListen extends BaseCommand {
           }
         })
       }, 60_000)
+    }
+    if (!this.learnTimer && this.primary) {
+      // v3.7.0: AI belajar dari balasan CS manusia yang baru (web & HP) tiap 30 menit — contoh dipilih
+      // per situasi saat membalas. Auto-reply/template tidak dipelajari.
+      const learn = () => {
+        const scope = this.timerScope()
+        if (!scope || this.learnRunning) return
+        this.learnRunning = true
+        void inWorkspace(scope, async () => {
+          try {
+            const { learnNewCsReplies } = await import('#beta3/simulator')
+            const result = await learnNewCsReplies()
+            if (result.added) this.logger.info(`Belajar dari CS: ${result.added} contoh baru dari ${result.chats} chat`)
+          } catch (error) {
+            this.logger.error(`Belajar dari CS: ${error instanceof Error ? error.message : String(error)}`)
+          } finally {
+            this.learnRunning = false
+          }
+        })
+      }
+      setTimeout(learn, 2 * 60_000).unref?.()
+      this.learnTimer = setInterval(learn, 30 * 60_000)
     }
     if (!this.aiProbeTimer && this.primary) {
       // v3.6.57: cek kesehatan akun AI yang lama diam (satu akun tiap 5 menit) supaya akun yang

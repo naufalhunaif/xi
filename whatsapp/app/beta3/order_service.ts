@@ -16,6 +16,7 @@ import { wholesaleDiscount, wholesaleGroup } from '#beta3/wholesale'
 import { attachRefsToOrder, proofTotalSince } from '#beta3/refs_service'
 import { addProductionDays, closedDaysFromStore } from '#beta3/prompt'
 import { readProductionPolicy } from '#services/production_service'
+import { CUSTOM_SPEC } from '#beta3/reply_guards'
 import { readBeta3ChatNote, readLeanState, writeLeanState } from '#beta3/tables'
 
 /**
@@ -1497,6 +1498,8 @@ export async function verifyAutoTotal(
   const options = order.shipping_options ? JSON.parse(String(order.shipping_options)) : null
   if (!options?.prices?.length) return { ok: false, reason: 'tarif ongkir belum ada di order' }
   if (pantsNumberMissing(String(spec ?? order.spec ?? ''), draft.rincian)) return { ok: false, reason: 'nomor celana belum diketahui' }
+  // v3.7.0 — custom: biaya tambahan ditentukan toko, total tidak dikirim otomatis dengan harga katalog.
+  if (CUSTOM_SPEC.test(String(spec ?? order.spec ?? ''))) return { ok: false, reason: 'custom — total dihitung toko' }
   const result = matchAutoTotal(draft, catalog, options.prices, hints, statedPrices, chosenService, wholesale, promos)
   if (!result.ok) return result
   // v3.6.41: bagian (celana/rompi) dicek pada baris yang BERHARGA, bukan seluruh rincian —

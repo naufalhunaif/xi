@@ -235,7 +235,9 @@ test.group('bubble per konteks v3.6.157', () => {
 
   test('bubble pendek, rincian harga, dan format order tidak dipecah', async ({ assert }) => {
     const { splitLongBubbles } = await import('#beta3/reply_polish')
-    assert.isFalse(splitLongBubbles(['Iya bisa bos. Pakai size apa ya?']).changed)
+    // v3.7.0: jawaban lalu pertanyaan = dua maksud → dua bubble (pemilik 13 Okt).
+    assert.deepEqual(splitLongBubbles(['Iya bisa bos. Pakai size apa ya?']).pesan, ['Iya bisa bos', 'Pakai size apa ya?'])
+    assert.isFalse(splitLongBubbles(['Iya bisa bos, ready semua size']).changed)
     const rincian = 'Jas 485.000 ongkir 80.000. Total 485.000 + 80.000 = 565.000 bos. Untuk pembayaran tf ke rek BRI 123 an Toko agar pesanan langsung kami proses ya bos.'
     assert.isFalse(splitLongBubbles([rincian]).changed)
     assert.isFalse(splitLongBubbles(['Bisa di bantu isi order formatnya bos\nNama :\nAlamat lengkap :']).changed)

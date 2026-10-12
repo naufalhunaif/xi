@@ -10,9 +10,47 @@ export const CUSTOM_REPLY = [
   'Bisa bos, kirim aja contoh model atau detail yang mau diubah, sama tinggi dan berat badannya ya, nanti saya bantu sesuaikan',
 ]
 
+const PART = '(?:kerah|krah|saku|kantong|kantung|kancing|list|lis|lapel|kelepak|bordir|bordiran|sulam|belahan|furing|lining|lengan|resleting)'
+const CHANGE = '(?:ganti|diganti|ubah|diubah|tambah|ditambah|tambahin|tanpa|hilangkan|dihilangkan|dibuat|dibikin|bikin|request|minta|pakai|pake|warna)'
 /**
- * Custom (ukuran atau detail model) tidak diserahkan ke CS — skill: "Detail custom tidak ditolak
- * dan tidak perlu diserahkan". Model kadang tetap serah_cs untuk "mau custom bisa?" tanpa detail.
+ * v3.7.0 — detail custom yang sudah disebut pelanggan (pemilik 13 Okt: custom diserahkan ke CS setelah detailnya
+ * masuk; "bisa custom?" polos tetap dijawab AI). Penyesuaian dari tinggi & berat bukan detail custom.
+ */
+const CUSTOM_DETAIL = [
+  new RegExp(`\\b${PART}\\w*\\b[^.?!\\n]{0,40}\\b${CHANGE}\\b|\\b${CHANGE}\\b[^.?!\\n]{0,40}\\b${PART}\\w*\\b`, 'i'),
+  /\b(?:sesuai|seperti|kayak|kaya|mirip)\s+(?:di\s+)?(?:gambar|foto|contoh|referensi)\b|\bmodel(?:nya)?\s+(?:kayak|seperti|sesuai)\b/i,
+  /\bpanjang\s+(?:jas|lengan|celana|badan)\b[^\n]{0,12}\d{2,3}/i,
+  /\b(?:ukuran badan|ukur badan|ankle|panjang khusus|model khusus|dipotong|dipendekin|dipanjangin|5xl|6xl|7xl)\b/i,
+]
+/** Ukuran badan (lingkar dada/pinggang dalam cm) = custom hanya bila pelanggan memang minta custom; tanpa itu = tanya size. */
+const BODY_SIZE = /\b(?:lingkar|lebar)\s+(?:dada|pinggang|pinggul|bahu|perut|paha|lengan|leher)\b[^\n]{0,12}\d{2,3}|(?<!\b(?:tinggi|tb|tinggi badan|tingginya)\s*:?\s*)\b\d{2,3}(?:[.,]\d)?\s*cm\b/i
+/** Pelanggan sudah menyebut detail custom (bagian model diubah, model dari gambar, panjang khusus, atau ukuran badan + custom). */
+export function hasCustomDetail(text: string) {
+  const value = String(text || '')
+  if (CUSTOM.test(value) && BODY_SIZE.test(value)) return true
+  // "kerahnya bisa diganti?" tanpa kata custom = masih bertanya bisa/tidak → dijawab dulu, belum diserahkan.
+  if (!CUSTOM.test(value) && /\?\s*$/.test(value.trim()) && !CUSTOM_DETAIL.slice(1).some((pattern) => pattern.test(value))) return false
+  return CUSTOM_DETAIL.some((pattern) => pattern.test(value))
+}
+/** Spesifikasi order berisi custom → total tidak dikirim otomatis (biaya tambahan custom ditentukan toko). */
+export const CUSTOM_SPEC = /custom|sesuai gambar|seperti gambar|ukuran badan|ukuran sesuai/i
+/** Kalimat AI saat detail custom diserahkan ke toko — beberapa variasi supaya tidak terasa template. */
+export const CUSTOM_HANDOFF_REPLIES = [
+  'Untuk detail customnya saya hitungkan dulu harganya ya bos, nanti saya kabari di sini',
+  'Detail customnya saya cek dulu ke produksi ya bos, nanti harganya saya kabari',
+  'Saya tanyakan dulu ke produksi untuk detail customnya ya bos, nanti saya kabari harganya',
+]
+export function customHandoffReply(seed: string, address = 'bos') {
+  let hash = 0
+  for (const char of String(seed || '')) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return CUSTOM_HANDOFF_REPLIES[hash % CUSTOM_HANDOFF_REPLIES.length].replace(/\bbos\b/, address)
+}
+/** Balasan sudah menyebut akan dicek/dikabari (tidak perlu ditambah kalimat serah custom). */
+export const mentionsWaiting = (pesan: string[]) => pesan.some((bubble) => WAITING.test(bubble) || /\bkabar(?:i|in)\b/i.test(bubble))
+
+/**
+ * Custom tanpa detail ("mau custom bisa?") tidak diserahkan ke CS — dijawab bisa + tanya custom apa.
+ * Detail custom yang sudah disebut pelanggan (v3.7.0) → serah CS dibiarkan.
  * Mengembalikan balasan pengganti bila handoff dibatalkan, null bila handoff dibiarkan.
  */
 export function keepCustomInChat(
@@ -23,6 +61,7 @@ export function keepCustomInChat(
   // v3.6.86: hanya bila PELANGGAN yang menanyakan custom (dulu alasan AI ikut dicek → balasan custom
   // muncul untuk tawaran bisnis "solusi AI custom" dan pertanyaan pelunasan).
   if (!CUSTOM.test(customerText) || String(customerText || '').length > 120) return null
+  if (hasCustomDetail(customerText)) return null
   // Ada pertanyaan lain di pesan yang sama (mis. "orderan saya blm dikirim?") → biar CS yang jawab semuanya.
   const parts = String(customerText).split(/\n+|\?+/).map((part) => part.trim()).filter((part) => part.length > 3)
   if (parts.some((part) => !CUSTOM.test(part) && !/^(?:(?:bisa|bs|boleh|ya|kak|ka|min|bos|gan|cuy|dong|kah)[\s!.,]*)+$/i.test(part))) return null

@@ -563,3 +563,19 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 6. Alamat toko tidak lagi dipecah jadi daftar; pertanyaan order tidak ditagih ulang sesudah selingan; batas tunggu balasan chat 75 dtk.
 7. Tes: `tests/unit/random_questions.spec.ts`. Bank uji: `docs/uji-acak-bank.md`.
 
+## #27 · 13 Okt 2026 · pemilik: balasan terasa robot, custom tidak dilempar ke CS (diterapkan v3.7.0)
+
+**Keluhan pemilik:** banyak balasan tidak seperti manusia (risiko pelanggan tidak jadi beli); custom tidak diserahkan ke CS; skor uji paling tinggi 4/5; AI seharusnya belajar dari balasan CS sebelumnya.
+
+**Keputusan pemilik**
+1. Custom diserahkan ke CS **setelah detail custom masuk**; "bisa custom?" polos tetap dijawab AI (pelajaran #7 tetap berlaku untuk pertanyaan polos — dulu meluas sampai detail custom pun tidak pernah diserahkan dan total terkirim otomatis dengan harga katalog).
+2. Bubble dipisah per **maksud/konteks**, bukan per 15 kata. Contoh pemilik:
+   - "model yang ini ya bos"
+   - "untuk kombinasi kerah hitam atau mau warna apa ya"
+3. AI belajar dari balasan CS sebelumnya (termasuk balasan dari HP); auto-reply / quick reply WA Business disaring dulu.
+
+**Perubahan (v3.7.0)**
+1. Detail custom (bagian model diubah, model sesuai gambar, panjang khusus, atau minta custom sesuai ukuran badan) → dicatat, lalu serah CS: "untuk detail customnya saya hitungkan dulu harganya ya bos" (3 variasi). Jev punya pilihan serah CS `custom`. Spesifikasi custom → total otomatis ditahan.
+2. Bubble per maksud: pertanyaan sesudah jawaban jadi bubble sendiri; maks 3 bubble (dulu parser memotong ke 2 sehingga bubble ketiga hilang).
+3. Belajar dari CS: balasan CS manusia baru (web & HP) dipelajari otomatis tiap 30 menit beserta percakapan sebelumnya; auto-reply, template/quick reply, salinan AI tidak. Contoh dipilih per situasi dan ditampilkan utuh per bubble (dulu dipotong 220 huruf).
+4. Tes: `tests/unit/review_chats.spec.ts` (13 Okt), `tests/unit/cs_learning.spec.ts`.

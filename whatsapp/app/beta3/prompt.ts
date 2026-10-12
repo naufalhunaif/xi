@@ -32,7 +32,7 @@ export const LEAN_OUTPUT_SCHEMA = {
       type: 'array',
       items: { type: 'string' },
       description:
-        'Bubble WhatsApp yang dikirim ke pelanggan, urut. Seperti CS asli: tiap bubble SATU konteks dan ≤ 15 kata (mis. "Siap bos, tinggi 170 berat 96 dicatat" | "Dada 120 paling dekat 3XL" | "Bahu 53 di atas chart, jadi dibuat custom ya bos"); 1–3 bubble, rincian harga/ongkir/format boleh lebih panjang. Jawab dulu, tanpa penjelasan tambahan. Ditanya 2–3 hal → jawab SEMUA, masing-masing sesingkat itu; ya/tidak → jawab ya/tidak dulu ("iya aman bos"). Kosong = tidak membalas.',
+        'Bubble WhatsApp ke pelanggan, urut. Seperti CS asli dipisah per MAKSUD, bukan jumlah kata: 1 bubble = 1 hal (jawaban · info · pertanyaan/langkah), mis. "model yang ini ya bos" | "untuk kombinasi kerah hitam atau mau warna apa ya". Biasanya 1–2, maks 3, pendek; rincian harga/ongkir/format boleh panjang. Jawab dulu tanpa penjelasan tambahan. Ditanya 2–3 hal → jawab SEMUA; ya/tidak → ya/tidak dulu ("iya aman bos"). Kosong = tidak membalas.',
     },
     foto: {
       type: 'array',
@@ -49,7 +49,7 @@ export const LEAN_OUTPUT_SCHEMA = {
     serah_cs: {
       type: 'boolean',
       description:
-        'true hanya untuk keputusan bisnis di luar wewenang (komplain, refund, tawaran kerja sama dari bisnis lain, hal yang skill sebut serah CS). Diskon/potongan: jawab sendiri dari DISKON GROSIR (di bawah syarat = harga normal), bukan serah CS. Saat true, pesan TETAP diisi satu kalimat singkat untuk pelanggan sesuai topiknya — pelanggan tidak boleh didiamkan.',
+        'true hanya untuk keputusan bisnis di luar wewenang (komplain, refund, tawaran kerja sama dari bisnis lain, detail custom dari pelanggan, hal yang skill sebut serah CS). Diskon/potongan: jawab sendiri dari DISKON GROSIR (di bawah syarat = harga normal), bukan serah CS. Saat true, pesan TETAP diisi satu kalimat singkat untuk pelanggan sesuai topiknya — pelanggan tidak boleh didiamkan.',
     },
     alasan: { type: 'string', description: 'Satu kalimat alasan keputusan untuk audit CS.' },
     spesifikasi: {
@@ -349,9 +349,9 @@ export function buildLeanPrompt(input: {
     ],
     [
       'keluaran',
-      'Custom (gambar/model/ukuran dari pelanggan): catat semua detail di spesifikasi, tandai gambar di referensi (bagian: kerah, badan, saku, dst; seluruh model = "model"). Custom bukan alasan serah_cs: catat, jawab pertanyaannya dulu (mis. panjang celana) lalu "siap bos, dicatat ya"; jangan menyebut biaya sendiri (biaya tambahan dikabari saat total). Warna/bahan tidak ada → tawarkan yang ada; serah_cs hanya bila tetap diminta. Ukuran badan custom tetap dibandingkan dengan size chart. Menyesuaikan ukuran badan = custom, jangan sekadar "bisa disesuaikan".\n' +
+      'Custom (gambar/model/ukuran dari pelanggan): catat semua detail di spesifikasi, tandai gambar di referensi (bagian: kerah, badan, saku, dst; seluruh model = "model"). Detail custom sudah disebut → catat, jawab pertanyaannya dulu, lalu serah_cs (harga custom dihitung toko; jangan sebut biaya/total sendiri). Warna/bahan tidak ada → tawarkan yang ada; serah_cs hanya bila tetap diminta. Ukuran badan custom tetap dibandingkan dengan size chart. Menyesuaikan ukuran badan = custom, jangan sekadar "bisa disesuaikan".\n' +
         'Inisiatif (maks satu, SETELAH pertanyaan dijawab): foto bila model/warna belum dilihat pelanggan; tawarkan celana/setelan saat memilih jas; tanya tinggi & berat bila size belum jelas; form order bila model & size jelas. Tidak saat komplain/minta CS.\n' +
-        'Pengiriman hanya via JNE (REG/YES); ekspedisi lain tidak tersedia. Kargo JNE (JTR) minimal 8 kg.\n' +
+        // v3.7.0: aturan JNE/JTR 8 kg sudah ada di bagian ONGKIR (mcp.ts) saat ongkir dibahas; tidak diulang di sini.
         'PESAN PELANGGAN SEKARANG bisa beberapa pesan berurutan: jawab SEMUA pertanyaannya, tiap jawaban satu bubble pendek.\n' +
         'Gambar CS "contoh dari toko: Produk - Warna" = produk yang ditawarkan; disetujui → itulah produk pesanan (nama & harga KATALOG); sebutan warna pelanggan di luar KATALOG hanya keterangan di spesifikasi.\n' +
         'Sebutan warna: item/ireng = hitam, dongker = navy, marun = maroon, krem = cream. Foto = persis warna yang disebut.\n' +
@@ -416,7 +416,8 @@ export function parseLeanDecision(text: string): LeanDecision {
   )
     .map((item) => String(item || '').trim())
     .filter(Boolean)
-    .slice(0, 2)
+    // v3.7.0 — maks 3 bubble per maksud (pemilik 13 Okt); dulu 2 → bubble ketiga (sering pertanyaannya) hilang.
+    .slice(0, 3)
   // v3.6.128: maks 10 seperti skema ("minta lihat semua → maks 10"); dulu dipotong 5 → "ini fotonya" tapi
   // Navy & White tidak terkirim (uji semua-warna-tuxedo).
   const foto = (Array.isArray(raw.foto) ? raw.foto : [])

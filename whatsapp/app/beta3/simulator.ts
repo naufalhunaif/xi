@@ -24,7 +24,8 @@ import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { runLeanProvider } from '#beta3/provider'
 import { allowedPrices, unknownPrices } from '#beta3/quality_service'
 import { reviewNudge } from '#beta3/reply_check'
-import { addLeanExample, listLeanExamples } from '#beta3/examples_service'
+import { addLeanExample, clearExampleCache, listLeanExamples, productsOf, topicsOf } from '#beta3/examples_service'
+import { REPLY_TEMPLATE } from '#beta3/style_service'
 import { memoryFromChat, mergeChatMemory, readCustomerNote, writeCustomerNote } from '#beta3/customer_service'
 import { readExchangePolicy, renderExchangePolicy } from '#beta3/store_policy'
 import { STORE_BASICS, bubblesToSend, createLeanReply, productionRanges, type LeanSettings } from '#beta3/reply_service'
@@ -676,7 +677,7 @@ export async function learnAllRealChats(days = 365) {
     chats++
     const rows = (await db
       .from('whatsapp_messages')
-      .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
+      .select('id', 'jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
       .where('jid', jid)
       .where('created_at', '>', since)
       .orderBy('created_at', 'asc')
@@ -684,12 +685,10 @@ export async function learnAllRealChats(days = 365) {
       .limit(600)) as RealRow[]
     for (const segment of realSegments(rows)) {
       pairs++
-      const customerText = maskPii(segment.teks).replace(/\n+/g, ' / ').slice(0, 300).trim()
-      const csText = maskPii(segment.jawaban.join('\n')).slice(0, 400).trim()
-      const key = fold(customerText)
-      if (!learnablePair(customerText, csText) || existing.has(key)) continue
-      await addLeanExample({ situation: segment.kutip ? `membalas: ${segment.kutip.slice(0, 80)}` : '', customerText, csText, tags: 'riwayat', source: 'riwayat' })
-      existing.add(key)
+      const example = exampleFromSegment(rows, segment)
+      if (!example || existing.has(fold(example.customerText))) continue
+      await addLeanExample(example)
+      existing.add(fold(example.customerText))
       added++
     }
   }
@@ -714,6 +713,119 @@ export async function learnAllRealChats(days = 365) {
     }
   }
   return { chats, pairs, added, customers }
+}
+
+type LearnRow = RealRow & { id?: number }
+/** Balasan otomatis WA Business (salam/di luar jam kerja) — bukan jawaban CS manusia. */
+const AUTO_REPLY =
+  /(?:terima\s*kasih|makasih|thanks?)\s+(?:telah|sudah|udah|sdh|for)\s+(?:menghubungi|contacting)|pesan\s+(?:anda|kamu|kakak)\s+akan\s+(?:segera\s+)?(?:kami\s+)?(?:balas|dibalas|direspon)|di\s*luar\s+jam\s+(?:kerja|operasional)|jam\s+operasional\s+kami/i
+const foldLine = (text: string) => text.toLowerCase().replace(/\s+/g, ' ').trim()
+/**
+ * v3.7.0 — satu giliran chat asli → contoh CS: percakapan sebelumnya ikut sebagai situasi, balasan CS utuh per bubble.
+ * Auto-reply / quick reply otomatis (terkirim < 5 dtk setelah pesan pelanggan), teks template, dan salinan pesan AI
+ * tidak dipelajari (pemilik 13 Okt).
+ */
+export function exampleFromSegment(rows: LearnRow[], segment: RealSegment) {
+  const start = segment.mulai ?? 0
+  const human = (row: LearnRow) => row.direction === 'out' && ['cs', 'owner'].includes(String(row.sender_type || '')) && Boolean(row.body)
+  const replyIndex = rows.findIndex((row, index) => index > start && human(row))
+  if (replyIndex < 0) return null
+  const reply = rows[replyIndex]
+  const lastIn = rows
+    .slice(start, replyIndex)
+    .reverse()
+    .find((row) => row.direction === 'in')
+  if (lastIn && new Date(reply.created_at).getTime() - new Date(lastIn.created_at).getTime() < 5000) return null
+  const aiBodies = new Set(rows.filter((row) => row.sender_type === 'ai' && row.body).map((row) => foldLine(String(row.body))))
+  const answers = segment.jawaban.filter((text) => !aiBodies.has(foldLine(text)) && !REPLY_TEMPLATE.test(text.trim()) && !AUTO_REPLY.test(text))
+  if (!answers.length) return null
+  const customerText = maskPii(segment.teks).replace(/\n+/g, ' / ').slice(0, 500).trim()
+  const csText = maskPii(answers.join('\n')).slice(0, 800).trim()
+  if (!learnablePair(customerText, csText)) return null
+  const before = rows
+    .slice(Math.max(0, start - 3), start)
+    .filter((row) => row.body && (row.direction === 'in' || human(row)))
+    .map((row) => `${row.direction === 'in' ? 'Pelanggan' : 'Toko'}: ${String(row.body).replace(/\s+/g, ' ').slice(0, 70)}`)
+  const situation = maskPii(segment.kutip ? `membalas: ${segment.kutip.slice(0, 80)}` : before.length ? `sebelumnya — ${before.join(' / ')}` : '').slice(0, 250)
+  const tags = ['riwayat', ...topicsOf(customerText), ...productsOf(customerText)].join(',').slice(0, 255)
+  return { situation, customerText, csText, tags, source: 'riwayat', replyId: Number(reply.id || 0) }
+}
+
+const LEARN_CURSOR = 'cs_learn_cursor'
+/** Batas contoh dari chat asli yang aktif; yang terlama dinonaktifkan. */
+export const RIWAYAT_LIMIT = 3000
+/**
+ * v3.7.0 — belajar otomatis dari balasan CS manusia yang BARU (web & HP), dijalankan worker tiap 30 menit
+ * (dulu hanya lewat tombol). Jawaban yang sama persis di ≥ 3 chat = quick reply/template → tidak dipelajari.
+ */
+export async function learnNewCsReplies(days = 180) {
+  await ensureLeanTables()
+  const cursor = Number(await readLeanState(LEARN_CURSOR).catch(() => '')) || 0
+  const top = Number((await db.from('whatsapp_messages').max('id as id').first())?.id || 0)
+  if (!top || top <= cursor) return { chats: 0, added: 0 }
+  const since = new Date(Date.now() - days * 86_400_000)
+  const jids = (await db
+    .from('whatsapp_messages')
+    .select('jid')
+    .where('id', '>', cursor)
+    .where('id', '<=', top)
+    .where('direction', 'out')
+    .whereIn('sender_type', ['cs', 'owner'])
+    .where('created_at', '>', since)
+    .where((query) => query.where('jid', 'like', '%@s.whatsapp.net').orWhere('jid', 'like', '%@lid').orWhere('jid', 'like', '%@ig'))
+    .groupBy('jid')) as Array<{ jid: string }>
+  const known = await listLeanExamples()
+  const existing = new Set(known.map((example) => foldLine(example.customerText)))
+  // Jawaban → chat yang memakainya (contoh lama dihitung satu chat masing-masing).
+  const usedIn = new Map<string, Set<string>>()
+  for (const example of known.filter((item) => item.source === 'riwayat')) {
+    const key = foldLine(example.csText)
+    usedIn.set(key, (usedIn.get(key) || new Set()).add(`old:${example.id}`))
+  }
+  const fresh: Array<{ jid: string; example: NonNullable<ReturnType<typeof exampleFromSegment>> }> = []
+  let chats = 0
+  for (const { jid } of jids) {
+    if (isHoldout(jid)) continue
+    chats++
+    const rows = ((await db
+      .from('whatsapp_messages')
+      .select('id', 'jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
+      .where('jid', jid)
+      .where('id', '<=', top)
+      .orderBy('id', 'desc')
+      .limit(300)) as LearnRow[]).reverse()
+    for (const segment of realSegments(rows)) {
+      const example = exampleFromSegment(rows, segment)
+      if (!example || example.replyId <= cursor) continue
+      const key = foldLine(example.csText)
+      usedIn.set(key, (usedIn.get(key) || new Set()).add(jid))
+      fresh.push({ jid, example })
+    }
+  }
+  let added = 0
+  for (const { example } of fresh) {
+    if ((usedIn.get(foldLine(example.csText))?.size || 0) >= 3) continue
+    const key = foldLine(example.customerText)
+    if (existing.has(key)) continue
+    const { replyId: _replyId, ...row } = example
+    await addLeanExample(row)
+    existing.add(key)
+    added++
+  }
+  await writeLeanState(LEARN_CURSOR, String(top))
+  const old = await db
+    .from('whatsapp_beta3_examples')
+    .where('source', 'riwayat')
+    .where('active', 1)
+    .orderBy('id', 'desc')
+    .offset(RIWAYAT_LIMIT)
+    .limit(5000)
+    .select('id')
+  if (old.length) {
+    await db.from('whatsapp_beta3_examples').whereIn('id', old.map((item: any) => item.id)).update({ active: 0 })
+    clearExampleCache()
+  }
+  return { chats, added }
 }
 
 type LearnState = { running: boolean; startedAt?: string; finishedAt?: string; result?: { chats: number; pairs: number; added: number; customers?: number }; error?: string }
@@ -755,19 +867,6 @@ export async function learnFromRealChat(asal: Array<{ teks: string; jawaban: str
 
 /* ---------------- Skenario dari chat nyata (v3.6.80) ---------------- */
 
-const PRODUCT_WORDS = /\b(jas|blazer|suit|setelan|stelan|celana|pants|beskap|bescap|tuxedo|vest|rompi|kemeja|shirt|jaket|batik)\b/g
-const TOPIC_WORDS: Array<[string, RegExp]> = [
-  ['harga', /\b(harga|hrg|brp|berapa|brapa|piro|total|diskon|promo|nego|budget)\b/i],
-  ['ukuran', /\b(size|ukuran|ukrn|tinggi|berat|tb|bb|xs|s|m|l|xl|xxl|[2-5]xl|lingkar|dada|pinggang|bahu)\b/i],
-  ['warna', /\b(warna|wrn|hitam|item|navy|dongker|putih|cream|krem|maroon|marun|abu|grey|gray|coklat|choco|brown|biru|hijau|army|gold)\b/i],
-  ['custom', /\b(custom|kancing|kerah|model|detail|bordir|request|ankle|slim)\b/i],
-  ['kirim', /\b(ongkir|kirim|alamat|resi|jne|ekspedisi|sampai|paket)\b/i],
-  ['bayar', /\b(bayar|tf|transfer|rekening|rek|dp|lunas|pembayaran|cod)\b/i],
-  ['waktu', /\b(kapan|lama|hari|tgl|tanggal|jadi|selesai|proses|pre ?order|po|ready|stok)\b/i],
-  ['foto', /\b(foto|gambar|pic|contoh|realpic|lihat|liat)\b/i],
-]
-const topicsOf = (text: string) => new Set(TOPIC_WORDS.filter(([, pattern]) => pattern.test(text)).map(([name]) => name))
-const productsOf = (text: string) => new Set((text.toLowerCase().match(PRODUCT_WORDS) || []).map((word) => word.replace(/^(stelan)$/, 'setelan').replace(/^(blazer|suit)$/, 'jas').replace(/^(pants)$/, 'celana').replace(/^(bescap)$/, 'beskap').replace(/^(rompi)$/, 'vest').replace(/^(shirt)$/, 'kemeja')))
 
 /**
  * v3.6.160 — Pertanyaan tambahan yang nyambung: produk sama (bobot 2) atau topik sama (bobot 1), diutamakan yang

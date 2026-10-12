@@ -290,17 +290,21 @@ const KEEP_WHOLE = /\n|nama\s*:|alamat|total\b|rekening|\brek\b|\d{1,3}\.\d{3}|^
 /** Kalimat yang menyambung ke kalimat sebelumnya (tidak dipisah ke bubble baru). */
 const CONTINUES = /^(?:jadi|kalau|kalo|tapi|tetapi|karena|soalnya|biar|supaya|atau|dan|terus|lalu|nanti|untuk itu|makanya)\b/i
 
+const QUESTION = (text: string) => /\?\s*$/.test(text)
+/** "model yang ini ya bos, untuk kombinasi kerah hitam atau mau warna apa ya?" → jawaban | pertanyaan. */
+const ANSWER_THEN_QUESTION = /^(.{6,}?\b(?:ya(?:\s+(?:bos|kak|gan|sis|min))?|bos|kak|gan|sis|min))\s*,\s+((?:\S+\s+){2,}\S+\?)$/i
+
 /**
- * v3.6.157 — Satu bubble panjang berisi beberapa konteks (catat data · hasil ukuran · langkah berikut) dipecah jadi
- * beberapa bubble pendek seperti CS asli (pemilik: "jadi beberapa bagian, karena memuat konteks berbeda").
- * Kalimat ≤ 15 kata, pecah di batas kalimat; kalimat penyambung ("tapi…", "jadi…") ikut kalimat sebelumnya bila
- * gabungannya masih ≤ 22 kata. Maksimal 4 bubble; template/rincian tidak dipecah.
+ * v3.7.0 — bubble dipecah per MAKSUD seperti CS asli, bukan per jumlah kata (pemilik 13 Okt: "model yang ini ya bos" |
+ * "untuk kombinasi kerah hitam atau mau warna apa ya"). Pertanyaan sesudah jawaban selalu bubble sendiri; kalimat
+ * penyambung ("tapi…", "jadi…") ikut kalimat sebelumnya; dua pernyataan pendek tetap satu bubble kecuali gabungannya
+ * panjang (> 20 kata). Maksimal 3 bubble; template/rincian tidak dipecah.
  */
-export function splitLongBubbles(pesan: string[], maxWords = 15, maxBubbles = 4) {
+export function splitLongBubbles(pesan: string[], maxWords = 20, maxBubbles = 3) {
   const out: string[] = []
   for (const bubble of pesan) {
     const text = String(bubble || '').trim()
-    if (!text || KEEP_WHOLE.test(text) || WORDS(text) <= maxWords) {
+    if (!text || KEEP_WHOLE.test(text)) {
       out.push(text)
       continue
     }
@@ -312,13 +316,18 @@ export function splitLongBubbles(pesan: string[], maxWords = 15, maxBubbles = 4)
       .map((part) => part.split(DOT).join('.').trim())
       .filter(Boolean)
     if (sentences.length < 2) {
-      out.push(text)
+      const pair = text.match(ANSWER_THEN_QUESTION)
+      if (pair && !CONTINUES.test(pair[1]) && !CONTINUES.test(pair[2])) out.push(pair[1], pair[2][0].toUpperCase() + pair[2].slice(1))
+      else out.push(text)
       continue
     }
     const parts: string[] = []
     for (const sentence of sentences) {
       const last = parts[parts.length - 1]
-      const join = last && (CONTINUES.test(sentence) || WORDS(last) + WORDS(sentence) <= Math.ceil(maxWords / 2)) && WORDS(last) + WORDS(sentence) <= maxWords + 7
+      const join =
+        last &&
+        ((CONTINUES.test(sentence) && WORDS(last) + WORDS(sentence) <= maxWords + 7) ||
+          (QUESTION(sentence) ? QUESTION(last) : !QUESTION(last) && WORDS(last) + WORDS(sentence) <= maxWords))
       if (join) parts[parts.length - 1] = `${last} ${sentence}`
       else parts.push(sentence)
     }
@@ -326,6 +335,6 @@ export function splitLongBubbles(pesan: string[], maxWords = 15, maxBubbles = 4)
     out.push(...parts.map((part) => part.replace(/[.]+$/, '').trim()))
   }
   const trimmed = out.filter(Boolean)
-  if (trimmed.length > maxBubbles) trimmed.splice(maxBubbles - 1, trimmed.length - maxBubbles + 1, trimmed.slice(maxBubbles - 1).join('. '))
+  if (trimmed.length > maxBubbles) trimmed.splice(maxBubbles - 1, trimmed.length - maxBubbles + 1, trimmed.slice(maxBubbles - 1).join(' '))
   return { pesan: trimmed, changed: trimmed.length !== pesan.length || trimmed.some((bubble, index) => bubble !== String(pesan[index] || '').trim()) }
 }

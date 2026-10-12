@@ -62,6 +62,7 @@ const INFO: Record<string, Info> = {
       ganti_alamat: 'Address change after payment',
       ekspedisi_lain: 'Wants a courier other than JNE',
       nego: 'Bargaining / asks for a discount',
+      custom: 'Custom details given (priced by the store)',
       tidak_perlu: 'No CS needed',
     },
     effect: (answer) => (answer === 'tidak_perlu' ? 'The AI keeps replying.' : 'Chat handed to CS; the AI stops.'),
