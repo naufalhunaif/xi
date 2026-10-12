@@ -890,7 +890,7 @@ export function realSegments(rows: RealRow[], includeAi = false) {
  * dikombinasikan: kalimat diacak (singkatan, salah ketik, bahasa daerah) dan digabung dengan pertanyaan
  * pelanggan lain, supaya maksud yang sama diuji dalam bentuk yang lebih rumit.
  */
-export async function realScenarios(count: number, seed: number, mix = 0.5, today = false, images = false, days = images ? 365 : 180, flow = 0): Promise<SimScenario[]> {
+export async function realScenarios(count: number, seed: number, mix = 0.5, today = false, images = false, days = images ? 365 : 180, flow = 0, all = false): Promise<SimScenario[]> {
   const rand = rng(seed)
   // v3.6.147 — today: chat sejak 00:00 WIB hari ini, termasuk yang dijawab AI (pembanding, bukan acuan).
   const since = today ? startOfTodayWib() : new Date(Date.now() - days * 86_400_000)
@@ -913,7 +913,8 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
   for (const { jid } of jids) {
     // v3.6.87: uji hanya memakai chat yang tidak dipelajari.
     // Uji gambar: semua chat (giliran bergambar jarang; contoh yang dipelajari hanya teks).
-    if (!today && !images && !isHoldout(jid)) continue
+    // v3.6.170 — all (mode alur): semua room ikut (ratusan kasus), bukan hanya 1 dari 5 yang disisihkan.
+    if (!today && !images && !all && !isHoldout(jid)) continue
     const rows = (await db
       .from('whatsapp_messages')
       .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
@@ -1045,8 +1046,8 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
     })
   }
   // v3.6.153 — putaran 100: chat 180 hari kurang → rentang diperluas (set yang sudah cukup tetap sama).
-  if (!today && out.length < count && days < 720) {
-    const wider = await realScenarios(count, seed, mix, today, images, days * 2, flow)
+  if (!today && out.length < count && days < (flow ? 1500 : 720)) {
+    const wider = await realScenarios(count, seed, mix, today, images, days * 2, flow, all)
     if (wider.length > out.length) return wider
   }
   return out
@@ -1122,7 +1123,7 @@ export async function startSimRun(
     judge?: boolean
     label?: string
     generate?: { count: number; seed?: number }
-    real?: { count: number; seed?: number; mix?: number; today?: boolean; images?: boolean; flow?: number }
+    real?: { count: number; seed?: number; mix?: number; today?: boolean; images?: boolean; flow?: number; all?: boolean }
     parallel?: number
     /** Pemilik mengizinkan memakai kuota sampai 95% (pelanggan ditangani CS). */
     ownerQuota?: boolean
@@ -1142,7 +1143,7 @@ export async function startSimRun(
     ? generateScenarios((await catalogDigest()).rows, Math.min(500, Math.max(1, input.generate.count)), input.generate.seed)
     : []
   const real = input.real?.count
-    ? await realScenarios(Math.min(300, Math.max(1, input.real.count)), input.real.seed ?? Math.floor(Math.random() * 1_000_000), input.real.mix ?? 0.5, input.real.today === true, input.real.images === true, undefined, Math.min(8, Math.max(0, Number(input.real.flow) || 0)))
+    ? await realScenarios(Math.min(300, Math.max(1, input.real.count)), input.real.seed ?? Math.floor(Math.random() * 1_000_000), input.real.mix ?? 0.5, input.real.today === true, input.real.images === true, undefined, Math.min(8, Math.max(0, Number(input.real.flow) || 0)), input.real.all === true)
     : []
   const picked = [
     ...(input.ids?.length ? all.filter((item) => input.ids!.includes(item.id)) : input.custom?.length || generated.length || real.length ? [] : all),
