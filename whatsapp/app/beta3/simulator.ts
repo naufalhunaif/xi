@@ -18,7 +18,7 @@ import { addLesson, saveSimCorrection } from '#beta3/sim_lessons'
 import { aiSlotStats, memoryLow, resetAiSlotStats } from '#beta3/ai_slots'
 import { catalogDigest, findCatalogVariant } from '#beta3/catalog_service'
 import { downloadOutgoingImage } from '#services/outgoing_image_service'
-import { renderPaymentMessage, renderTotalMessage } from '#beta3/order_service'
+import { approveLeanOrder, renderPaymentMessage, renderTotalMessage } from '#beta3/order_service'
 import { pricePattern, renderPricePattern } from '#beta3/price_pattern'
 import { renderWholesaleRule, wholesaleDiscounts } from '#beta3/wholesale'
 import { runLeanProvider } from '#beta3/provider'
@@ -472,6 +472,14 @@ export async function runSimTurn(state: SimState, message: string | SimMessage, 
           .map((method) => ({ bank: method.name, number: method.destination, holder: method.accountName || '' }))
       )
       if (payment) turn.total = `${turn.total}\n\n${payment}`
+      // v3.6.171 (uji alur #59 real-44): seperti chat sungguhan, order jadi "menunggu bayar" setelah total terkirim —
+      // dulu uji tidak menandainya, sehingga giliran berikutnya ("reg") menghitung & mengirim total yang sama lagi.
+      await approveLeanOrder({
+        id: reply.autoTotal.orderId,
+        shippingService: reply.autoTotal.shippingService,
+        shippingCost: reply.autoTotal.shippingCost,
+        subtotal: reply.autoTotal.subtotal,
+      }).catch(() => null)
     }
     // Riwayat berikutnya: urutan kirim sama dengan chat sungguhan (bubble 1 → foto → sisanya).
     const out = (body: string, isImage = false) =>

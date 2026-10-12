@@ -228,13 +228,13 @@ export default class Beta3Controller {
   /** v3.6.163 — tambah pelajaran hasil tinjauan pemilik (riwayat uji lama). */
   async addLesson({ request, response }: HttpContext) {
     const { addLesson } = await import('#beta3/sim_lessons')
-    const lesson = await addLesson(String(request.input('text') || ''), String(request.input('contoh') || ''))
+    const lesson = await addLesson(String(request.input('text') || ''), String(request.input('contoh') || ''), request.input('sumber') === 'uji' ? 'uji' : 'pemilik')
     return lesson ? response.json({ lesson }) : response.badRequest({ error: 'Teks pelajaran terlalu pendek.' })
   }
 
   async updateLesson({ params, request, response }: HttpContext) {
     const { updateLesson } = await import('#beta3/sim_lessons')
-    return (await updateLesson(Number(params.index), String(request.input('text') || ''))) ? response.noContent() : response.badRequest({ error: 'Pelajaran tidak ditemukan atau teks terlalu pendek.' })
+    return (await updateLesson(Number(params.index), String(request.input('text') || ''), request.input('sumber') === 'uji' ? 'uji' : 'pemilik')) ? response.noContent() : response.badRequest({ error: 'Pelajaran tidak ditemukan atau teks terlalu pendek.' })
   }
 
   async updateExample({ params, request, response }: HttpContext) {

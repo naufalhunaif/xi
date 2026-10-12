@@ -45,3 +45,14 @@ test.group('balasan mengutip pesan pelanggan', () => {
     assert.deepEqual(assignQuotes(['Iya bisa bos'], messages), [null])
   })
 })
+
+// v3.6.171 — uji alur #59 real-28: jawaban size jangan ikut terbuang sebagai "ulangan pembuka".
+test.group('pembuka cepat: info baru tidak dibuang', () => {
+  test('kalimat size tetap, ulangan murni dibuang', async ({ assert }) => {
+    const { dropOpenerRepeat } = await import('#beta3/quick_opener')
+    const opener = 'Siap bos, tinggi 175, berat 77 dicatat ya'
+    assert.deepEqual(dropOpenerRepeat(['Tinggi 175 berat 77 masuk XL bos'], opener), ['Tinggi 175 berat 77 masuk XL bos'])
+    assert.deepEqual(dropOpenerRepeat(['Siap bos, tinggi 175 berat 77 sudah dicatat ya', 'Masuknya size XL bos'], opener), ['Masuknya size XL bos'])
+    assert.deepEqual(dropOpenerRepeat(['Siap bos, dicatat ya. Dada 120 paling dekat 3XL'], opener), ['Dada 120 paling dekat 3XL'])
+  })
+})

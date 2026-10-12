@@ -68,20 +68,23 @@ export function dropOpenerRepeat(pesan: string[], opener: string) {
         .filter((word) => word.length >= 3 && !FILLER.has(word))
     )
   const mine = words(opener)
+  // v3.6.171 (uji alur #59 real-28): "Tinggi 175 berat 77 masuk XL bos" dibuang karena 4 dari 6 katanya sama dengan
+  // pembuka "Siap bos, tinggi 175, berat 77 dicatat ya" → jawaban size hilang, pelanggan hanya dapat "dicatat".
+  // Kalimat yang membawa info BARU (size, angka, kata isi yang tidak ada di pembuka) tidak dianggap ulangan.
+  const informative = (w: Set<string>) =>
+    [...w].some((word) => !mine.has(word) && (/^(?:xs|xxs|xxl|xl|[2-5]xl|\d+)$/.test(word) || word.length >= 5))
+  const repeats = (w: Set<string>) => w.size > 0 && [...w].filter((word) => mine.has(word)).length / w.size >= 0.6 && !informative(w)
+  const SIZE_TOKEN = /\b(?:xs|s|m|l|xl|xxl|[2-5]xl)\b/i
   const out: string[] = []
   for (let bubble of pesan) {
     let text = bubble.trim()
     if (/^waalaikumsalam/i.test(opener)) text = text.replace(/^wa'?alaikum\s*salam\S*\s*(?:bos|kak|pak|bu|gan)?[,.!\s]*/i, '').trim()
     if (!text) continue
     const theirs = words(text)
-    const shared = [...theirs].filter((word) => mine.has(word)).length
-    if (theirs.size && shared / theirs.size >= 0.6) continue
+    if (repeats(theirs) && !SIZE_TOKEN.test(text)) continue
     // Pembuka "Siap bos, tinggi 170 berat 96 dicatat" + bubble "Siap bos, dicatat ya. Dada 120 …" → sisakan isinya.
     const sentences = text.split(/(?<=[.!?])\s+/)
-    const kept = sentences.filter((sentence) => {
-      const w = words(sentence)
-      return !(w.size && [...w].filter((word) => mine.has(word)).length / w.size >= 0.6)
-    })
+    const kept = sentences.filter((sentence) => !(repeats(words(sentence)) && !SIZE_TOKEN.test(sentence)))
     text = kept.join(' ').trim()
     if (text) {
       bubble = text[0].toUpperCase() + text.slice(1)

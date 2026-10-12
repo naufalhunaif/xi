@@ -53,3 +53,21 @@ test.group('pelajaran yang nyambung v3.6.165', () => {
     assert.equal(pickLessons(lessons, 'halo', 1)[0].count, 5)
   })
 })
+
+// v3.6.171 — pelajaran pemilik dilindungi dari pemangkasan; teks pemilik menggantikan teks penilai yang mirip.
+test.group('pelajaran pemilik', () => {
+  test('sumber pemilik didahulukan saat disimpan dan menggantikan teks penilai yang mirip', async ({ assert }) => {
+    const { addLesson, listLessons, removeLesson } = await import('#beta3/sim_lessons')
+    for (let i = (await listLessons()).length; i > 0; i--) await removeLesson(0)
+    await addLesson('Ditanya rekening sebelum total: kirim rekening resmi dulu baru tanya size', 'real-1')
+    await addLesson('Ditanya rekening: kirim rekening resmi dulu, pertanyaan size sesudahnya', 'tinjauan', 'pemilik')
+    await addLesson('Pelanggan menyebut warna di luar katalog: jawab belum ada dan tawarkan warna terdekat', 'real-2')
+    const list = await listLessons()
+    assert.lengthOf(list, 2)
+    assert.equal(list[0].sumber, 'pemilik')
+    assert.equal(list[0].count, 2)
+    assert.equal(list[0].text, 'Ditanya rekening: kirim rekening resmi dulu, pertanyaan size sesudahnya')
+    assert.equal(list[1].sumber, 'uji')
+    for (let i = (await listLessons()).length; i > 0; i--) await removeLesson(0)
+  })
+})

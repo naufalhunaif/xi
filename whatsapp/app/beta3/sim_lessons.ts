@@ -4,7 +4,8 @@
 import { readLeanState, writeLeanState } from '#beta3/tables'
 import { addLeanExample, listLeanExamples } from '#beta3/examples_service'
 
-export type SimLesson = { text: string; count: number; lastAt: string; contoh: string[] }
+/** v3.6.171 — sumber 'pemilik' = hasil tinjauan pemilik (dilindungi dari pemangkasan); 'uji' = dari penilai. */
+export type SimLesson = { text: string; count: number; lastAt: string; contoh: string[]; sumber?: 'pemilik' | 'uji' }
 
 const STATE = 'sim_lessons'
 /** v3.6.166: 60 → 250 — pelajaran hasil tinjauan pemilik (±200 baris) harus muat; ke prompt tetap hanya yang nyambung. */
@@ -46,13 +47,16 @@ export async function listLessons(): Promise<SimLesson[]> {
 }
 
 async function saveLessons(list: SimLesson[]) {
-  const sorted = [...list].sort((a, b) => b.count - a.count || b.lastAt.localeCompare(a.lastAt)).slice(0, MAX_LESSONS)
+  // v3.6.171 — pelajaran pemilik tidak pernah terdesak pelajaran penilai yang lebih baru (dulu urut count → lastAt,
+  // sehingga 200 pelajaran tinjauan tersingkir oleh pelajaran uji otomatis).
+  const rank = (item: SimLesson) => (item.sumber === 'pemilik' ? 1 : 0)
+  const sorted = [...list].sort((a, b) => rank(b) - rank(a) || b.count - a.count || b.lastAt.localeCompare(a.lastAt)).slice(0, MAX_LESSONS)
   await writeLeanState(STATE, JSON.stringify(sorted))
   return sorted
 }
 
 /** Tambah pelajaran; yang mirip digabung (hitungannya naik), supaya daftar tetap ringkas. */
-export async function addLesson(text: string, contoh = '') {
+export async function addLesson(text: string, contoh = '', sumber: 'pemilik' | 'uji' = 'uji') {
   const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 220)
   if (clean.split(' ').length < 4) return null
   const list = await listLessons()
@@ -62,17 +66,24 @@ export async function addLesson(text: string, contoh = '') {
     hit.count += 1
     hit.lastAt = now
     if (contoh && !hit.contoh.includes(contoh)) hit.contoh = [...hit.contoh, contoh].slice(-3)
-  } else list.push({ text: clean, count: 1, lastAt: now, contoh: contoh ? [contoh] : [] })
+    // Teks pemilik menggantikan teks penilai; sumber naik jadi pemilik.
+    if (sumber === 'pemilik') {
+      hit.text = clean
+      hit.sumber = 'pemilik'
+    }
+  } else list.push({ text: clean, count: 1, lastAt: now, contoh: contoh ? [contoh] : [], sumber })
   await saveLessons(list)
   return hit || list[list.length - 1]
 }
 
 /** v3.6.163 — pemilik membenarkan teks pelajaran. */
-export async function updateLesson(index: number, text: string) {
+export async function updateLesson(index: number, text: string, sumber?: 'pemilik' | 'uji') {
   const list = await listLessons()
   const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 220)
   if (index < 0 || index >= list.length || clean.split(' ').length < 3) return false
   list[index].text = clean
+  // Pemilik membenarkan teks = pelajaran pemilik (dilindungi).
+  list[index].sumber = sumber || 'pemilik'
   await saveLessons(list)
   return true
 }
