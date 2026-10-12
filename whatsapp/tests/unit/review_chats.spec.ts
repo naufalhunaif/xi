@@ -5,7 +5,7 @@ import { test } from '@japa/runner'
 import { completePhotos, polishText, polishWithPhotos, splitLongBubbles } from '#beta3/reply_polish'
 import { pricePattern, productPriceMap, seriesMentioned } from '#beta3/price_pattern'
 import { quickReply } from '#beta3/token_saver'
-import { keepCustomInChat, CUSTOM_REPLY, dropRepeatedWait, hasCustomDetail, customHandoffReply, CUSTOM_HANDOFF_REPLIES, CUSTOM_SPEC } from '#beta3/reply_guards'
+import { keepCustomInChat, CUSTOM_REPLY, dropRepeatedWait, hasCustomDetail, customHandoffReply, withCustomHandoff, CUSTOM_HANDOFF_REPLIES, CUSTOM_SPEC } from '#beta3/reply_guards'
 import { partsMissingFromItems, orderPartsOf, parseCsTotalMessage, matchAutoTotal, serviceLabel } from '#beta3/order_service'
 import { looksSelfDelivery, detectAwb } from '#beta3/shipments'
 import { normalizeStage, type LeanDecision } from '#beta3/prompt'
@@ -316,18 +316,22 @@ test.group('Ulasan chat pemilik (diputar ulang)', () => {
       'mau custom kancingnya warna gold',
       'modelnya kayak gambar ini bos',
       'mau custom sesuai ukuran badan, lingkar dada 112 pinggang 98',
-      'panjang celana 98 cm ya',
       'celananya model ankle',
+      'celananya dipendekin 3 cm ya',
+      'custom panjang lengannya 62 cm',
     ])
       assert.isTrue(hasCustomDetail(text), text)
     // Lingkar badan tanpa minta custom = tanya size (uji live 13 Okt: AI menjawab "rekomendasi XL, celana no 37").
-    for (const text of ['bisa custom ga kak?', 'Mau custkm bisa', 'tinggi 170 cm berat 70', 'Kancing 1 ..ya', 'kerahnya bisa diganti?', 'jas hitam ada?', 'lingkar dada 112, pinggang 98'])
+    for (const text of ['bisa custom ga kak?', 'Mau custkm bisa', 'tinggi 170 cm berat 70', 'Kancing 1 ..ya', 'kerahnya bisa diganti?', 'jas hitam ada?', 'lingkar dada 112, pinggang 98', 'lingkar dada 112, pinggang 98, panjang lengan 60 cm'])
       assert.isFalse(hasCustomDetail(text), text)
     // Model sudah serah CS untuk detail custom → dibiarkan (dulu dibatalkan).
     const handoff = { serah_cs: true, alasan: 'Custom kerah', pesan: ['siap bos, dicatat ya'] }
     assert.isNull(keepCustomInChat(handoff, 'mau custom kerahnya diganti hitam'))
     // "bisa custom?" polos tetap dijawab AI.
     assert.deepEqual(keepCustomInChat({ ...handoff, pesan: [] }, 'bisa custom ga kak?'), { pesan: CUSTOM_REPLY })
+    // Model sendiri serah CS untuk custom → kalimat "harganya dicek dulu" tetap ada, tidak dobel (uji live v3.7.0).
+    assert.lengthOf(withCustomHandoff(['siap bos, dicatat ya', 'jasnya mau warna apa bos?'], 'x'), 3)
+    assert.lengthOf(withCustomHandoff(['siap bos, saya cek dulu harganya ya'], 'x'), 1)
     // Kalimat serah custom bervariasi, bicara sebagai CS sendiri (tanpa "CS kami").
     assert.include(CUSTOM_HANDOFF_REPLIES, customHandoffReply('628@s.whatsapp.net:kerah hitam'))
     for (const reply of CUSTOM_HANDOFF_REPLIES) assert.notMatch(reply, /\bcs\b|admin/i)

@@ -579,3 +579,7 @@ Format tiap contoh: ringkasan chat → yang sudah sesuai skill → usulan peruba
 2. Bubble per maksud: pertanyaan sesudah jawaban jadi bubble sendiri; maks 3 bubble (dulu parser memotong ke 2 sehingga bubble ketiga hilang).
 3. Belajar dari CS: balasan CS manusia baru (web & HP) dipelajari otomatis tiap 30 menit beserta percakapan sebelumnya; auto-reply, template/quick reply, salinan AI tidak. Contoh dipilih per situasi dan ditampilkan utuh per bubble (dulu dipotong 220 huruf).
 4. Tes: `tests/unit/review_chats.spec.ts` (13 Okt), `tests/unit/cs_learning.spec.ts`.
+
+**Uji live v3.7.0 (13 Okt, AI sungguhan di Ruang simulasi)** → diperbaiki di v3.7.1
+- "mau custom kerahnya diganti hitam, lapelnya satin" → AI sendiri serah CS (benar) tapi tidak bilang harganya dicek dulu → sekarang kalimat "saya tanyakan dulu ke produksi…" selalu ditambahkan bila belum ada.
+- "lingkar dada 112, pinggang 98, panjang lengan 60 cm" → AI menjawab XL (benar) lalu ikut diserahkan ke CS (salah) → ukuran badan untuk tanya size bukan custom; custom hanya bila pelanggan minta custom / minta panjang diubah.

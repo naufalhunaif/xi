@@ -67,7 +67,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, asksCall, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, fixPantsLetterSize, ensureStoreAddress, productionWhens, keepCustomInChat, hasCustomDetail, customHandoffReply, mentionsWaiting, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, asksCall, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, fixPantsLetterSize, ensureStoreAddress, productionWhens, keepCustomInChat, hasCustomDetail, withCustomHandoff, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -1879,9 +1879,11 @@ export async function createLeanReply(input: {
     decision.alasan = `Custom: ${String(input.text || '').replace(/\s+/g, ' ').trim().slice(0, 140)}`
     decision.tahap = 'tunggu_cs'
     decision.susulan = ''
-    if (!mentionsWaiting(decision.pesan)) decision.pesan = [...decision.pesan, customHandoffReply(`${jid}:${input.text}`, style?.address || 'bos')]
     onTrace?.({ key: 'beta3-custom', label: 'Detail custom masuk → dicatat, diserahkan ke toko untuk harga', status: 'completed', detail: { alasan: decision.alasan } })
   }
+  // Uji live v3.7.0: model sendiri serah CS untuk custom tapi tidak bilang harganya dicek → pelanggan menunggu tanpa kabar.
+  if (decision.serah_cs && !custom && (customDetail || /\bcustom\b/i.test(decision.alasan)))
+    decision.pesan = withCustomHandoff(decision.pesan, `${jid}:${input.text}`, style?.address || 'bos')
   // Pelanggan menunda / membatalkan (Jev): tidak ada susulan; batal → order yang belum dibayar ditutup.
   if (understanding.follow === 'tunda' || understanding.follow === 'batal') decision.susulan = ''
   if (

@@ -19,11 +19,13 @@ const CHANGE = '(?:ganti|diganti|ubah|diubah|tambah|ditambah|tambahin|tanpa|hila
 const CUSTOM_DETAIL = [
   new RegExp(`\\b${PART}\\w*\\b[^.?!\\n]{0,40}\\b${CHANGE}\\b|\\b${CHANGE}\\b[^.?!\\n]{0,40}\\b${PART}\\w*\\b`, 'i'),
   /\b(?:sesuai|seperti|kayak|kaya|mirip)\s+(?:di\s+)?(?:gambar|foto|contoh|referensi)\b|\bmodel(?:nya)?\s+(?:kayak|seperti|sesuai)\b/i,
-  /\bpanjang\s+(?:jas|lengan|celana|badan)\b[^\n]{0,12}\d{2,3}/i,
   /\b(?:ukuran badan|ukur badan|ankle|panjang khusus|model khusus|dipotong|dipendekin|dipanjangin|5xl|6xl|7xl)\b/i,
 ]
-/** Ukuran badan (lingkar dada/pinggang dalam cm) = custom hanya bila pelanggan memang minta custom; tanpa itu = tanya size. */
-const BODY_SIZE = /\b(?:lingkar|lebar)\s+(?:dada|pinggang|pinggul|bahu|perut|paha|lengan|leher)\b[^\n]{0,12}\d{2,3}|(?<!\b(?:tinggi|tb|tinggi badan|tingginya)\s*:?\s*)\b\d{2,3}(?:[.,]\d)?\s*cm\b/i
+/**
+ * Ukuran badan (lingkar/panjang dalam cm) = custom hanya bila pelanggan memang minta custom; tanpa itu = tanya size
+ * (uji live v3.7.0: "lingkar dada 112, pinggang 98, panjang lengan 60 cm" dijawab XL lalu ikut diserahkan — salah).
+ */
+const BODY_SIZE = /\b(?:lingkar|lebar)\s+(?:dada|pinggang|pinggul|bahu|perut|paha|lengan|leher)\b[^\n]{0,12}\d{2,3}|\bpanjang\s+(?:jas|lengan|celana|badan)\w*\b[^\n]{0,12}\d{2,3}|(?<!\b(?:tinggi|tb|tinggi badan|tingginya)\s*:?\s*)\b\d{2,3}(?:[.,]\d)?\s*cm\b/i
 /** Pelanggan sudah menyebut detail custom (bagian model diubah, model dari gambar, panjang khusus, atau ukuran badan + custom). */
 export function hasCustomDetail(text: string) {
   const value = String(text || '')
@@ -47,6 +49,10 @@ export function customHandoffReply(seed: string, address = 'bos') {
 }
 /** Balasan sudah menyebut akan dicek/dikabari (tidak perlu ditambah kalimat serah custom). */
 export const mentionsWaiting = (pesan: string[]) => pesan.some((bubble) => WAITING.test(bubble) || /\bkabar(?:i|in)\b/i.test(bubble))
+/** Serah CS karena custom: pelanggan diberi tahu harganya dicek dulu (sekali), apa pun yang memutuskan serah. */
+export function withCustomHandoff(pesan: string[], seed: string, address = 'bos') {
+  return mentionsWaiting(pesan) ? pesan : [...pesan, customHandoffReply(seed, address)]
+}
 
 /**
  * Custom tanpa detail ("mau custom bisa?") tidak diserahkan ke CS — dijawab bisa + tanya custom apa.

@@ -181,7 +181,7 @@ export async function understandTurn(input: {
         nego: 'Pelanggan menawar harga atau minta diskon khusus',
         // v3.7.0 — detail custom diserahkan ke toko (harga/produksi); "bisa custom?" polos tetap dijawab AI.
         custom:
-          'Pelanggan sudah menyebut detail custom: bagian model yang diubah (kerah, saku, kancing, list, lapel, bordir), model sesuai gambar/foto dari pelanggan, panjang khusus (lengan/celana/ankle), atau minta dibuat custom sesuai ukuran badannya',
+          'Pelanggan sudah menyebut detail custom: bagian model yang diubah (kerah, saku, kancing, list, lapel, bordir), model sesuai gambar/foto dari pelanggan, minta panjang diubah (dipanjangkan/dipendekkan/ankle), atau minta dibuat custom sesuai ukuran badannya. Hanya menyebut ukuran badan (lingkar/panjang/tinggi/berat) untuk tanya size BUKAN custom',
         tidak_perlu:
           'Tidak perlu dialihkan ke manusia (termasuk tanya "bisa custom?" tanpa detail, menyebut tinggi/berat atau lingkar badan untuk tanya size, tanya harga, foto, size, atau stok)',
       },
