@@ -890,11 +890,14 @@ export function realSegments(rows: RealRow[], includeAi = false) {
  * dikombinasikan: kalimat diacak (singkatan, salah ketik, bahasa daerah) dan digabung dengan pertanyaan
  * pelanggan lain, supaya maksud yang sama diuji dalam bentuk yang lebih rumit.
  */
-export async function realScenarios(count: number, seed: number, mix = 0.5, today = false, images = false, days = images ? 365 : 180): Promise<SimScenario[]> {
+export async function realScenarios(count: number, seed: number, mix = 0.5, today = false, images = false, days = images ? 365 : 180, flow = 0): Promise<SimScenario[]> {
   const rand = rng(seed)
   // v3.6.147 — today: chat sejak 00:00 WIB hari ini, termasuk yang dijawab AI (pembanding, bukan acuan).
   const since = today ? startOfTodayWib() : new Date(Date.now() - days * 86_400_000)
-  if (today || images) mix = 0
+  // v3.6.169 — flow: satu room = satu skenario, pertanyaan pelanggan asli berurutan (sampai `flow` giliran) tanpa
+  // gabungan/pengacakan, supaya alur percakapan dan jawabannya jelas (pemilik: "gunakan chat pertanyaan pelanggan
+  // asli dan pertanyaan selanjutnya di room yang sama, ratusan room, baru skoring").
+  if (today || images || flow) mix = 0
   const jids = (await db
     .from('whatsapp_messages')
     .select('jid')
@@ -927,28 +930,32 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
         (!images || Boolean(segment.gambar) || Boolean(segment.kutipFoto) || /^\[(?:foto|image)/i.test(segment.kutip || '')) &&
         (today
           ? new Date(rows[segment.mulai ?? 0]?.created_at || 0) >= since && !isOtherBot(segment.teks) && !isBusinessPitch(segment.teks)
-          : !learned.has(foldText(segment.teks)))
+          : flow || !learned.has(foldText(segment.teks)))
     )
+    // flow: room yang diawali tawaran bisnis / bot lain dilewati; urutan segmen harus utuh (tidak dipotong).
+    if (flow && segments.length && (isBusinessPitch(segments[0].teks) || isOtherBot(segments[0].teks))) continue
     if (segments.length) pool.push({ jid, segments, rows })
-    if (pool.length >= count * 2) break
+    if (pool.length >= (flow ? count : count * 2)) break
   }
   const out: SimScenario[] = []
   // v3.6.89: chat uji terbatas (1 dari 5) → satu chat boleh dipakai beberapa kali dengan bagian yang berbeda.
   const used = new Map<string, Set<number>>()
   const turns: Array<[number, (typeof pool)[number], number]> = []
-  for (let round = 0; round < 4; round++)
-    for (const [index, chat] of pool.entries()) {
-      const taken = used.get(chat.jid) || new Set<number>()
-      const free = chat.segments.map((_, at) => at).filter((at) => !taken.has(at) && !taken.has(at - 1) && !taken.has(at + 1))
-      if (!free.length) continue
-      const start = free[Math.floor(rand() * free.length)]
-      taken.add(start)
-      used.set(chat.jid, taken)
-      turns.push([index, chat, start])
-    }
+  if (flow) for (const [index, chat] of pool.entries()) turns.push([index, chat, 0])
+  else
+    for (let round = 0; round < 4; round++)
+      for (const [index, chat] of pool.entries()) {
+        const taken = used.get(chat.jid) || new Set<number>()
+        const free = chat.segments.map((_, at) => at).filter((at) => !taken.has(at) && !taken.has(at - 1) && !taken.has(at + 1))
+        if (!free.length) continue
+        const start = free[Math.floor(rand() * free.length)]
+        taken.add(start)
+        used.set(chat.jid, taken)
+        turns.push([index, chat, start])
+      }
   for (const [index, chat, start] of turns) {
     if (out.length >= count) break
-    const picked = chat.segments.slice(start, start + 2)
+    const picked = chat.segments.slice(start, start + (flow ? Math.max(1, flow) : 2))
     // v3.6.160 — pertanyaan tambahan dipilih yang NYAMBUNG dengan pembahasan (produk/topik sama; pemilik: "bukan
     // benar-benar random, seperti otak bekerja"), bukan pertanyaan acak dari pelanggan lain.
     const context = [picked[0].teks, ...chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 6), picked[0].mulai ?? 0).map((row) => String(row.body || ''))].join(' ')
@@ -1028,7 +1035,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
           gambar: row.media_type === 'image',
           ...(row.message_id && notes.get(String(row.message_id)) ? { catatan: notes.get(String(row.message_id)) } : {}),
         })),
-      judul: `${images ? '[gambar] ' : ''}${today ? 'Chat hari ini' : combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'}${chat.jid.endsWith('@ig') ? ' IG' : ''} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
+      judul: `${images ? '[gambar] ' : ''}${today ? 'Chat hari ini' : flow ? `Alur chat asli (${picked.length} giliran)` : combined ? 'Chat nyata (dikombinasikan)' : 'Chat nyata'}${chat.jid.endsWith('@ig') ? ' IG' : ''} · ${maskPii(messageText(giliran[0])).replace(/\s+/g, ' ').slice(0, 48)}`,
       maksud: [
         'Pertanyaan dari chat nyata toko. Jawab semua maksudnya dengan benar menurut FAKTA saat ini, dengan rasa bahasa CS manusia.',
         'Acuan (harga/stok bisa sudah berubah — FAKTA saat ini yang berlaku):',
@@ -1039,7 +1046,7 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
   }
   // v3.6.153 — putaran 100: chat 180 hari kurang → rentang diperluas (set yang sudah cukup tetap sama).
   if (!today && out.length < count && days < 720) {
-    const wider = await realScenarios(count, seed, mix, today, images, days * 2)
+    const wider = await realScenarios(count, seed, mix, today, images, days * 2, flow)
     if (wider.length > out.length) return wider
   }
   return out
@@ -1115,7 +1122,7 @@ export async function startSimRun(
     judge?: boolean
     label?: string
     generate?: { count: number; seed?: number }
-    real?: { count: number; seed?: number; mix?: number; today?: boolean; images?: boolean }
+    real?: { count: number; seed?: number; mix?: number; today?: boolean; images?: boolean; flow?: number }
     parallel?: number
     /** Pemilik mengizinkan memakai kuota sampai 95% (pelanggan ditangani CS). */
     ownerQuota?: boolean
@@ -1135,7 +1142,7 @@ export async function startSimRun(
     ? generateScenarios((await catalogDigest()).rows, Math.min(500, Math.max(1, input.generate.count)), input.generate.seed)
     : []
   const real = input.real?.count
-    ? await realScenarios(Math.min(300, Math.max(1, input.real.count)), input.real.seed ?? Math.floor(Math.random() * 1_000_000), input.real.mix ?? 0.5, input.real.today === true, input.real.images === true)
+    ? await realScenarios(Math.min(300, Math.max(1, input.real.count)), input.real.seed ?? Math.floor(Math.random() * 1_000_000), input.real.mix ?? 0.5, input.real.today === true, input.real.images === true, undefined, Math.min(8, Math.max(0, Number(input.real.flow) || 0)))
     : []
   const picked = [
     ...(input.ids?.length ? all.filter((item) => input.ids!.includes(item.id)) : input.custom?.length || generated.length || real.length ? [] : all),

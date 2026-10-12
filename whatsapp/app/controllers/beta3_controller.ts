@@ -797,7 +797,7 @@ export default class Beta3Controller {
         judgeLater: request.input('judgeLater') === true || request.input('judgeLater') === 'true',
         waitQuota: request.input('waitQuota') === true || request.input('waitQuota') === 'true',
         ...(Number(request.input('real')) > 0
-          ? { real: { count: Number(request.input('real')), seed: Number(request.input('seed')) || Math.floor(Math.random() * 1_000_000), mix: request.input('mix') === undefined ? 0.5 : Number(request.input('mix')), today: request.input('today') === true || request.input('today') === 'true', images: request.input('images') === true || request.input('images') === 'true' } }
+          ? { real: { count: Number(request.input('real')), seed: Number(request.input('seed')) || Math.floor(Math.random() * 1_000_000), mix: request.input('mix') === undefined ? 0.5 : Number(request.input('mix')), today: request.input('today') === true || request.input('today') === 'true', images: request.input('images') === true || request.input('images') === 'true', flow: Number(request.input('flow')) || 0 } }
           : {}),
         ...(Number(request.input('generate')) > 0
           ? { generate: { count: Number(request.input('generate')), seed: Number(request.input('seed')) || Math.floor(Math.random() * 1_000_000) } }
