@@ -67,7 +67,7 @@ import { detectAwb, looksSelfDelivery } from '#beta3/shipments'
 import { readLeanState, writeLeanState, readBeta3ChatNote, saveChatPriority } from '#beta3/tables'
 import { imageNotes, recordImageKinds, saveAiRefs } from '#beta3/refs_service'
 import { describeStatus, statusPostsByIds } from '#services/status_posts'
-import { alignFitSize, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, fixPantsLetterSize, ensureStoreAddress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
+import { alignFitSize, asksCall, cancelsOrder, listReference, trimOrderTemplate, dropGuessedPantsNumber, dropRepeatedWait, capOversize, dropRepeatedTopics, singleQuestion, fixCodClaim, fixProductionKind, maxCatalogSize, fixWeekEstimate, inventsProgress, keepNonProgress, dropVagueAdjust, capOversizeBody, dropPaymentClaim, fixPantsLetterSize, ensureStoreAddress, productionWhens, keepCustomInChat, qualifySamePrice } from '#beta3/reply_guards'
 import { focusCatalog, isBusinessPitch, isOtherBot, promptNeeds, quickReply, skillContext, trimSkill } from '#beta3/token_saver'
 import { bubblesFromText, tidyReply } from '#beta3/reply_tidy'
 import { imageColorNote } from '#beta3/image_color'
@@ -2365,7 +2365,13 @@ export async function createLeanReply(input: {
     // di riwayat membuat "rekomendasi no 37" lolos).
     const aboutPants = (body: string) =>
       body.split(/(?<=[.!?])\s+|\n+/).filter((line) => /celana|pants|pinggang|\bno(?:mor|mer)?\.?\s*\d{2}\b/i.test(line) || /^\s*\d{2}\s*$/.test(line))
+    // v3.6.173 (uji alur #60 real-72/59/43): "pake 30 min", "32/33 min", "celana no. 32" — angka nomor celana yang ditulis
+    // pelanggan di pesan ini (bukan tinggi/berat/kg/cm) selalu dianggap diketahui, apa pun kalimatnya.
+    const ownNumbers = (input.text.match(/(?<![\d.,])\b(?:2[6-9]|3\d|4[0-6])\b(?!\s*(?:kg|cm|th|tahun|%|\.\d|rb|k\b))(?![\d.,])/gi) || []).filter(
+      (number) => !new RegExp(`\\b(?:tinggi|tb|berat|bb|umur|usia)\\b[^\\d]{0,8}${number}\\b`, 'i').test(input.text)
+    )
     const known = [
+      ...ownNumbers,
       ...aboutPants(input.text),
       ...rows.filter((row) => row.direction === 'in' || row.senderType === 'cs' || row.senderType === 'owner').flatMap((row) => aboutPants(String(row.body || ''))),
       // v3.6.143: persentase Fit Advisor ("L 37%") bukan nomor celana.
@@ -2452,6 +2458,15 @@ export async function createLeanReply(input: {
       onTrace?.({ key: 'beta3-progress-unknown', label: 'Progres pesanan tidak ada di data → dicek CS', status: 'completed', detail: {} })
     }
   }
+  // v3.6.173 — minta telepon: diiyakan, dikonfirmasi CS manusia dulu (pemilik). Dulu AI menolak ("lewat chat saja").
+  if (!decision.serah_cs && asksCall(input.text)) {
+    decision.pesan = [`Bisa ${style?.address || 'bos'}, nanti CS kami konfirmasi dulu ya 🙏`]
+    decision.serah_cs = true
+    decision.alasan = 'Pelanggan minta telepon — CS manusia yang mengonfirmasi'
+    decision.susulan = ''
+    photos = []
+    onTrace?.({ key: 'beta3-call', label: 'Pelanggan minta telepon → diiyakan, konfirmasi CS', status: 'completed', detail: {} })
+  }
   // v3.6.85 — AI tidak melihat semua pesanan lama: jangan pernah bilang pesanan "belum tercatat / tidak ada"
   // (uji chat nyata: pesanan pelanggan sedang finishing, AI bilang belum tercatat). Cek oleh CS.
   if (!decision.serah_cs && deniesOrder(decision.pesan)) {
@@ -2528,7 +2543,7 @@ export function productionRanges(production?: LeanSettings['production']) {
 
 /** Fakta dasar toko untuk pemeriksa & penilai (bukan prompt AI). */
 export const STORE_BASICS =
-  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp (CS mengirim format order untuk diisi: nama, alamat lengkap, kecamatan, no HP — atau data dikumpulkan lewat obrolan) atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer; bisa DP minimal 50% dari total, pelunasan setelah pesanan jadi. Size di atas varian terbesar katalog (mis. 5XL bila varian sampai 4XL) tidak bisa dibuat, juga tidak lewat custom.'
+  'DASAR TOKO: pengiriman JNE — REG, YES (Yakin Esok Sampai, sehari sampai; tidak semua tujuan), kargo JTR min 8 kg. Pemesanan lewat WhatsApp (CS mengirim format order untuk diisi: nama, alamat lengkap, kecamatan, no HP — atau data dikumpulkan lewat obrolan) atau website chameleoncloth.com; tidak ada di marketplace. Pembayaran transfer; bisa DP minimal 50% dari total, pelunasan setelah pesanan jadi. Size di atas varian terbesar katalog (mis. 5XL bila varian sampai 4XL) tidak bisa dibuat, juga tidak lewat custom. Pelanggan minta telepon: bisa, dikonfirmasi CS manusia dulu (jangan ditolak).'
 
 const WEB_PLACE_SCHEMA = {
   type: 'object',

@@ -223,7 +223,19 @@ export function fixProductionKind(
 ) {
   let changed = false
   const nums = (range?: string) => range?.match(/^(\d+(?:-\d+)?)/)?.[1] || ''
+  const pre = nums(ranges.preorder)
+  const cus = nums(ranges.custom)
   const out = pesan.map((bubble) => {
+    // v3.6.173 (uji alur #60 real-88): "PO 7-14 hari kerja, kalau custom 7-14 hari kerja" — satu bubble menyebut keduanya;
+    // angka yang menempel pada kata PO/pre-order dan custom dibetulkan masing-masing.
+    if (pre && cus && pre !== cus && /\b(?:pre-?order|po)\b/i.test(bubble) && /\bcustom\b/i.test(bubble)) {
+      const range = (value: string) => value.replace('-', '\\s*[-–]\\s*')
+      const fixed = bubble
+        .replace(new RegExp(`(\\b(?:pre-?order|po)\\b[^.,;\\n]{0,12}?)${range(cus)}(?=\\s*hari)`, 'i'), `$1${pre}`)
+        .replace(new RegExp(`(\\bcustom\\b[^.,;\\n]{0,12}?)${range(pre)}(?=\\s*hari)`, 'i'), `$1${cus}`)
+      if (fixed !== bubble) changed = true
+      return fixed
+    }
     const custom = CUSTOM_WORDS.test(bubble) || (CUSTOM_WORDS.test(customerText) && /\bdibuat/i.test(bubble))
     const kind: 'custom' | 'preorder' | null = custom ? 'custom' : PREORDER_WORDS.test(bubble) ? 'preorder' : null
     if (!kind) return bubble
@@ -600,4 +612,16 @@ export function singleQuestion(pesan: string[]) {
     )
     .filter(Boolean)
   return { pesan: changed && out.length ? out : pesan, changed: changed && out.length > 0 }
+}
+
+/**
+ * v3.6.173 — Pelanggan minta ditelepon / mau menelepon (pemilik: "di-acc saja, jangan ditolak, tapi perlu konfirmasi
+ * CS manusia dulu"). Bukan "no telp" di form order.
+ */
+const ASKS_CALL =
+  /\b(?:boleh|bisa|mau|minta|tolong|coba|pengen|ingin)\b[^.?!\n]{0,24}\b(?:telp|telpon|telepon|tlp|tlpn|nelpon|nelfon|nelp|call|vc|video\s*call|ditelpon|ditelepon|ditelp)\b|\b(?:telp|telpon|telepon|tlp|nelpon|nelfon|call)\w*\s*(?:bentar|sebentar|dulu|ya|dong|yah|aja|saja|bisa|boleh)\b|\bsaya\s+(?:mau\s+)?(?:telp|telpon|telepon|tlp|nelpon)\b/i
+const PHONE_FIELD = /\b(?:no\.?|nomor|nmr)\s*(?:telp|telpon|telepon|hp|wa)\b|\btelp\s*:/i
+export function asksCall(text: string) {
+  const clean = String(text || '')
+  return ASKS_CALL.test(clean) && !PHONE_FIELD.test(clean)
 }

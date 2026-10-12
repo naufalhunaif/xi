@@ -384,3 +384,26 @@ test.group('segmen foto hilang (v3.6.172)', () => {
     assert.isUndefined(segments[1].tanpaGambar)
   })
 })
+
+// v3.6.173 — PO dan custom dalam satu bubble.
+test.group('estimasi PO/custom dalam satu bubble (v3.6.173)', () => {
+  test('angka PO dan custom dibetulkan masing-masing', async ({ assert }) => {
+    const ranges = { preorder: '5-10 hari kerja', custom: '7-14 hari kerja' }
+    const out = fixProductionKind(['PO 7-14 hari kerja bos, kalau custom 7-14 hari kerja'], ranges, {}, 'PO brp lama?')
+    assert.isTrue(out.changed)
+    assert.equal(out.pesan[0], 'PO 5-10 hari kerja bos, kalau custom 7-14 hari kerja')
+    const out2 = fixProductionKind(['Pre-order sekitar 5-10 hari kerja, custom 5-10 hari kerja'], ranges, {}, '')
+    assert.equal(out2.pesan[0], 'Pre-order sekitar 5-10 hari kerja, custom 7-14 hari kerja')
+  })
+})
+
+// v3.6.173 — minta telepon diiyakan, konfirmasi CS.
+test.group('minta telepon (v3.6.173)', () => {
+  test('asksCall mengenali permintaan telepon, bukan kolom no telp', async ({ assert }) => {
+    const { asksCall } = await import('#beta3/reply_guards')
+    for (const text of ['Boleh telp bentr kak', 'Saya mau TLP tapi memanggil terus', 'bisa video call kak?', 'tolong telepon saya ya', 'nelpon dulu boleh?'])
+      assert.isTrue(asksCall(text), text)
+    for (const text of ['No. telp : 0812', 'nomor hp saya 0812', 'jas hitam ready?', 'pakai nomor telp ini ya'])
+      assert.isFalse(asksCall(text), text)
+  })
+})
