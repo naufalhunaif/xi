@@ -819,7 +819,7 @@ function startOfTodayWib(now = Date.now()) {
 }
 
 type RealRow = { jid: string; message_id?: string | null; reply_to_message_id?: string | null; direction: string; sender_type: string | null; body: string | null; media_type: string | null; media_url: string | null; created_at: Date | string }
-type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number; kutip?: string; ai?: boolean; fotoSebelum?: string; kutipFoto?: boolean }
+type RealSegment = { teks: string; gambar?: string; jawaban: string[]; mulai?: number; kutip?: string; ai?: boolean; fotoSebelum?: string; kutipFoto?: boolean; tanpaGambar?: boolean }
 
 /** Potong chat menjadi giliran: pesan pelanggan beruntun → balasan CS manusia (cs/owner) sesudahnya. */
 export function realSegments(rows: RealRow[], includeAi = false) {
@@ -831,6 +831,9 @@ export function realSegments(rows: RealRow[], includeAi = false) {
   const flush = () => {
     const texts = asked.map((row) => String(row.body || '').trim()).filter(Boolean)
     const image = asked.find((row) => row.media_type === 'image' && row.media_url)?.media_url || undefined
+    // v3.6.172 — foto pelanggan yang filenya tidak tersimpan (chat lama/impor): giliran ini tidak bisa diuji dengan jujur
+    // (AI pasti bilang "fotonya belum masuk" dan dinilai salah) → ditandai, mode alur berhenti sebelum giliran ini.
+    const missingImage = asked.some((row) => row.media_type === 'image' && !row.media_url)
     // v3.6.86: pesan yang dikutip pelanggan ("yang ini berapa" sambil membalas foto) ikut, seperti di chat asli.
     const quotedId = asked.find((row) => row.reply_to_message_id)?.reply_to_message_id
     const quoted = quotedId ? rows.find((row) => row.message_id && row.message_id === quotedId) : undefined
@@ -864,6 +867,7 @@ export function realSegments(rows: RealRow[], includeAi = false) {
         ...(byAi ? { ai: true } : {}),
         ...(fotoSebelum ? { fotoSebelum } : {}),
         ...(quotedImage && !image ? { kutipFoto: true } : {}),
+        ...(missingImage && !image ? { tanpaGambar: true } : {}),
       })
     asked = []
     answered = []
@@ -927,14 +931,18 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
       .from('whatsapp_messages')
       .select('jid', 'message_id', 'reply_to_message_id', 'direction', 'sender_type', 'body', 'media_type', 'media_url', 'created_at')
       .where('jid', jid)
-      .where('created_at', '>', today ? new Date(since.getTime() - 3 * 86_400_000) : since)
+      // v3.6.172 — mode alur: 60 hari sebelum rentang ikut diambil sebagai KONTEKS (riwayat), supaya "450k" / "yang ini"
+      // di awal rentang tidak kehilangan pembahasan sebelumnya; giliran uji tetap dimulai dari dalam rentang.
+      .where('created_at', '>', today ? new Date(since.getTime() - 3 * 86_400_000) : flow ? new Date(since.getTime() - 60 * 86_400_000) : since)
       .orderBy('created_at', 'asc')
       .orderBy('id', 'asc')
-      .limit(120)) as RealRow[]
+      .limit(flow ? 160 : 120)) as RealRow[]
     // Pertanyaan yang sudah jadi contoh (dipelajari dari uji sebelumnya) tidak diuji lagi.
     const segments = realSegments(rows, today).filter(
       (segment) =>
         (segment.teks.length >= 2 || segment.gambar) &&
+        // v3.6.172 — foto pelanggan yang filenya hilang: bukan mode alur → giliran dilewati (mode alur: dipotong di sana).
+        !(segment.tanpaGambar && !flow) &&
         // v3.6.147 — uji gambar: hanya giliran yang pelanggannya mengirim/membalas foto (foto asli dari chat).
         (!images || Boolean(segment.gambar) || Boolean(segment.kutipFoto) || /^\[(?:foto|image)/i.test(segment.kutip || '')) &&
         (today
@@ -950,7 +958,12 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
   // v3.6.89: chat uji terbatas (1 dari 5) → satu chat boleh dipakai beberapa kali dengan bagian yang berbeda.
   const used = new Map<string, Set<number>>()
   const turns: Array<[number, (typeof pool)[number], number]> = []
-  if (flow) for (const [index, chat] of pool.entries()) turns.push([index, chat, 0])
+  if (flow)
+    for (const [index, chat] of pool.entries()) {
+      // Mulai dari segmen pertama di dalam rentang (segmen sebelumnya hanya konteks).
+      const first = chat.segments.findIndex((segment) => new Date(chat.rows[segment.mulai ?? 0]?.created_at || 0) >= since)
+      if (first >= 0) turns.push([index, chat, first])
+    }
   else
     for (let round = 0; round < 4; round++)
       for (const [index, chat] of pool.entries()) {
@@ -964,7 +977,13 @@ export async function realScenarios(count: number, seed: number, mix = 0.5, toda
       }
   for (const [index, chat, start] of turns) {
     if (out.length >= count) break
-    const picked = chat.segments.slice(start, start + (flow ? Math.max(1, flow) : 2))
+    let picked = chat.segments.slice(start, start + (flow ? Math.max(1, flow) : 2))
+    if (flow) {
+      // Berhenti sebelum giliran yang fotonya tidak tersimpan; room yang diawali foto hilang dilewati.
+      const cut = picked.findIndex((segment) => segment.tanpaGambar)
+      if (cut === 0) continue
+      if (cut > 0) picked = picked.slice(0, cut)
+    }
     // v3.6.160 — pertanyaan tambahan dipilih yang NYAMBUNG dengan pembahasan (produk/topik sama; pemilik: "bukan
     // benar-benar random, seperti otak bekerja"), bukan pertanyaan acak dari pelanggan lain.
     const context = [picked[0].teks, ...chat.rows.slice(Math.max(0, (picked[0].mulai ?? 0) - 6), picked[0].mulai ?? 0).map((row) => String(row.body || ''))].join(' ')

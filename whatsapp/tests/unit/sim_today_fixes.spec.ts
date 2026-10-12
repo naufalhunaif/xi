@@ -368,3 +368,19 @@ test.group('uji gabungan masuk akal (v3.6.168)', () => {
       assert.isTrue(standaloneQuestion(text), text)
   })
 })
+
+// v3.6.172 — foto pelanggan yang filenya tidak tersimpan ditandai.
+test.group('segmen foto hilang (v3.6.172)', () => {
+  test('realSegments menandai tanpaGambar bila foto pelanggan tidak punya file', async ({ assert }) => {
+    const rows = [
+      { jid: 'a', direction: 'in', sender_type: 'customer', body: 'ini warna apa kak', media_type: 'image', media_url: null, created_at: '2026-01-01T00:00:00Z' },
+      { jid: 'a', direction: 'out', sender_type: 'cs', body: 'green emerald bos', media_type: null, media_url: null, created_at: '2026-01-01T00:01:00Z' },
+      { jid: 'a', direction: 'in', sender_type: 'customer', body: 'harga?', media_type: null, media_url: null, created_at: '2026-01-01T00:02:00Z' },
+      { jid: 'a', direction: 'out', sender_type: 'cs', body: '685.000 bos', media_type: null, media_url: null, created_at: '2026-01-01T00:03:00Z' },
+    ]
+    const segments = realSegments(rows as never)
+    assert.lengthOf(segments, 2)
+    assert.isTrue(segments[0].tanpaGambar)
+    assert.isUndefined(segments[1].tanpaGambar)
+  })
+})
